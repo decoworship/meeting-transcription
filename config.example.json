@@ -1,0 +1,13 @@
+{
+  "model_size": "large-v3",
+  "engine": "faster-whisper",
+  "language": "en",
+  "diarization": true,
+  "condition_on_previous_text": false,
+  "diar_model": "community-1",
+  "client": "",
+  "project": "",
+  "initial_prompt": "",
+  "recognize_voices": true,
+  "voice_threshold": 0.7
+}

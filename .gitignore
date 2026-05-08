@@ -1,0 +1,49 @@
+# Environment variables (contains secrets)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test/lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings (keep settings.json if/when added)
+.claude/settings.local.json
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Audio extraction temp files
+*.wav
+
+# Runtime user data: per-user config, project list, history,
+# voice fingerprints, and HuggingFace model cache. Never commit.
+data/
