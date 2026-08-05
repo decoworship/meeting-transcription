@@ -5,6 +5,7 @@ import logging
 import os
 import queue
 import re
+import subprocess
 import tempfile
 import threading
 import time
@@ -575,6 +576,13 @@ def transcribe_pipeline(
             )
             timings["Transcription"] = time.time() - t0
 
+            # The stages run sequentially and nothing below needs the ASR weights.
+            # Keeping them resident forces diarization to share the card; on a small
+            # GPU that spills into host memory over PCIe instead of failing loudly,
+            # which shows up as a mysteriously slow diarization step.
+            transcriber.unload_model()
+            transcriber = None
+
             # Step 4: Diarization (optional)
             if diarization:
                 event_q.put(("step", 3))
@@ -589,6 +597,12 @@ def transcribe_pipeline(
                 except Exception as e:
                     logger.warning(f"Diarization failed: {e}")
                     event_q.put(("warn", f"Diarization failed: {e}. Continuing without speakers."))
+                finally:
+                    # Voice fingerprinting loads its own embedding model next.
+                    try:
+                        diarizer.unload_model()
+                    except (NameError, AttributeError):
+                        pass
 
             # Step 5: Output
             event_q.put(("step", 4))
@@ -1162,6 +1176,35 @@ def on_file_change(file_obj):
 # ── Build Gradio app ─────────────────────────────────────────────────
 
 
+def get_build_label() -> str:
+    """Identify the running code, so a stale container is visible at a glance.
+
+    Docker bakes /app/BUILD_INFO at build time. Running from source there is no
+    stamp, so fall back to the current git commit.
+    """
+    stamp = Path("/app/BUILD_INFO")
+    if stamp.is_file():
+        try:
+            text = stamp.read_text().strip()
+            if text:
+                return f"build {text}"
+        except OSError:
+            pass
+
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+        if sha.returncode == 0 and sha.stdout.strip():
+            return f"source @ {sha.stdout.strip()}"
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    return "source (unversioned)"
+
+
 def create_app() -> gr.Blocks:
     enable_gpu_optimizations()
 
@@ -1171,6 +1214,8 @@ def create_app() -> gr.Blocks:
 
     config = load_config()
     logo_svg = get_logo_inline_svg()
+    build_label = get_build_label()
+    logger.info(f"Running {build_label}")
 
     # Header HTML with inline logo
     header_html = f"""
@@ -1180,7 +1225,7 @@ def create_app() -> gr.Blocks:
         </div>
         <div>
             <h1 style="margin: 0; font-size: 1.6rem;">Meeting Transcription</h1>
-            <div style="color: #94a3b8; font-size: 0.9rem;">Transcribe meetings with speaker diarization &mdash; <strong>{gpu_label}</strong></div>
+            <div style="color: #94a3b8; font-size: 0.9rem;">Transcribe meetings with speaker diarization &mdash; <strong>{gpu_label}</strong> &middot; <span title="Which code this container is running. After a rebuild, recreate the container (docker compose up -d) or this will not change.">{escape(build_label)}</span></div>
         </div>
     </div>
     """
@@ -1392,6 +1437,11 @@ def create_app() -> gr.Blocks:
             initial_prompt_input = gr.Textbox(
                 label="Custom vocabulary / context",
                 placeholder="Names, jargon, technical terms (e.g., 'Acme Corp, Project Atlas, Jane Smith, API REST'). Helps the model recognize domain-specific words.",
+                info=(
+                    "Only include words that are actually spoken out loud — table and "
+                    "field names waste the budget. Keep it under ~220 tokens (roughly "
+                    "150 words); anything beyond that is silently dropped."
+                ),
                 value=config.get("initial_prompt", ""),
                 lines=2,
                 max_lines=4,
