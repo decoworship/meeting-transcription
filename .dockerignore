@@ -41,3 +41,7 @@ docker-compose.*.yml
 # Docs that don't need to be in the image
 *.md
 !README.md
+
+# Windows-native recorder — never runs in the container, and keeping it out
+# stops edits there from invalidating the (slow) image build.
+recorder/
