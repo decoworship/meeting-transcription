@@ -1,5 +1,6 @@
 """Abstract base class for transcription engines."""
 
+import gc
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Optional, Callable
@@ -108,5 +109,18 @@ class BaseTranscriber(ABC):
         return self._model is not None
 
     def unload_model(self) -> None:
-        """Unload the model to free memory."""
+        """Unload the model and actually release its VRAM.
+
+        Dropping the reference is not enough: CTranslate2 frees device memory only
+        when the object is collected, and torch keeps freed blocks in its caching
+        allocator. Without the explicit collect + empty_cache the weights stay
+        resident, and the next pipeline stage has to squeeze in beside them.
+        """
         self._model = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
