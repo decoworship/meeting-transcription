@@ -1,0 +1,10 @@
+# Dependências do gravador — Windows apenas.
+#
+# Deliberadamente separado do pyproject.toml da raiz: aquele é consumido pelo
+# `uv sync --frozen` do Docker, e PyAudioWPatch não instala em Linux.
+
+PyAudioWPatch>=0.2.12   # PyAudio + loopback WASAPI
+numpy>=1.26
+soxr>=0.5               # resampler de qualidade, leve (evita puxar scipy)
+pystray>=0.19           # ícone de bandeja
+Pillow>=10.0            # pystray desenha o ícone com PIL
