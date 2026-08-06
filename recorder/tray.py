@@ -135,6 +135,34 @@ class RecorderTray:
 
         return tuple(make(d) for d in devices)
 
+    def _calendar_items(self):
+        """Submenu do calendario: qual conta, trocar, desconectar, ligar/desligar."""
+        conta = calendar_sync.account_email()
+        autorizado = calendar_sync.is_authorized()
+
+        if autorizado:
+            rotulo = f"Conectado: {conta}" if conta else "Conectado"
+        else:
+            rotulo = "Nenhuma conta conectada"
+
+        itens = [
+            pystray.MenuItem(rotulo, None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Usar esta agenda", self.on_toggle_calendar,
+                             checked=lambda item: bool(self.cfg.get("use_calendar", True))),
+            pystray.MenuItem(
+                "Trocar de conta..." if autorizado else "Conectar conta...",
+                self.on_authorize_calendar),
+        ]
+        if autorizado:
+            itens.append(pystray.MenuItem("Desconectar", self.on_disconnect_calendar))
+        return tuple(itens)
+
+    def on_disconnect_calendar(self, icon=None, item=None) -> None:
+        calendar_sync.disconnect()
+        self.icon.notify("Conta do Google desconectada", "Gravador")
+        self._refresh()
+
     def _primary_label(self, item=None) -> str:
         if not self.recording:
             return "Iniciar gravacao"
@@ -155,16 +183,9 @@ class RecorderTray:
             pystray.MenuItem("Audio do sistema",
                              pystray.Menu(lambda: self._device_items("loopbacks"))),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem(
-                lambda item: ("Google Calendar: ligado" if self.cfg.get("use_calendar", True)
-                              else "Google Calendar: desligado"),
-                self.on_toggle_calendar,
-                checked=lambda item: bool(self.cfg.get("use_calendar", True))),
-            pystray.MenuItem(
-                lambda item: ("Reautorizar Google Calendar..." if calendar_sync.is_authorized()
-                              else "Autorizar Google Calendar..."),
-                self.on_authorize_calendar,
-                visible=lambda item: calendar_sync.is_configured()),
+            pystray.MenuItem("Google Calendar",
+                             pystray.Menu(lambda: self._calendar_items()),
+                             visible=lambda item: calendar_sync.is_configured()),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Abrir pasta das gravacoes", self.on_open_folder),
             pystray.MenuItem("Sair", self.on_quit),
@@ -285,8 +306,10 @@ class RecorderTray:
 
         def run():
             ok = calendar_sync.authorize()
-            self.icon.notify("Calendario autorizado" if ok else "Autorizacao falhou",
-                             "Gravador")
+            conta = calendar_sync.account_email()
+            msg = (f"Conectado: {conta}" if ok and conta
+                   else "Calendario autorizado" if ok else "Autorizacao falhou")
+            self.icon.notify(msg, "Gravador")
             self._refresh()
 
         threading.Thread(target=run, daemon=True).start()

@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 BASE = Path.home() / ".meeting-recorder"
 CLIENT_SECRET = BASE / "google_client_secret.json"
 TOKEN_PATH = BASE / "google_token.json"
+# Qual conta o token representa. Guardado à parte porque a bandeja precisa
+# mostrar isso a cada abertura de menu, e consultar a API para isso seria
+# uma chamada de rede por clique.
+ACCOUNT_PATH = BASE / "google_account.json"
 
 # Somente leitura: o gravador não tem motivo para escrever na agenda.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -165,15 +169,66 @@ def _load_credentials(interactive: bool):
         return None
 
     flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET), SCOPES)
-    creds = flow.run_local_server(port=0, prompt="consent")
+    # "select_account" força o seletor de contas. Só "consent" reaproveita a
+    # sessão do navegador e conecta de novo a mesma conta -- inútil para quem
+    # quer trocar da conta pessoal para a da empresa.
+    creds = flow.run_local_server(port=0, prompt="select_account consent")
     BASE.mkdir(parents=True, exist_ok=True)
     TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
     logger.info(f"autorizado; token salvo em {TOKEN_PATH}")
+    _store_account(creds)
     return creds
 
 
+def _store_account(creds) -> None:
+    """Descobre e guarda o e-mail da conta conectada.
+
+    O id do calendário "primary" é o próprio endereço, então dá para saber a
+    conta sem pedir nenhum escopo de identidade além do que já temos.
+    """
+    try:
+        from googleapiclient.discovery import build
+        service = build("calendar", "v3", credentials=creds, cache_discovery=False)
+        cal = service.calendars().get(calendarId="primary").execute()
+        email = cal.get("id", "")
+        if email:
+            ACCOUNT_PATH.write_text(
+                __import__("json").dumps({"email": email}), encoding="utf-8")
+            logger.info(f"conta conectada: {email}")
+    except Exception as e:
+        # Saber a conta é conveniência; não vale derrubar a autorização por isso.
+        logger.debug(f"não foi possível identificar a conta: {e}")
+
+
+def account_email() -> str:
+    """E-mail da conta conectada, ou string vazia. Nunca faz rede."""
+    if not ACCOUNT_PATH.is_file():
+        return ""
+    try:
+        import json as _json
+        return _json.loads(ACCOUNT_PATH.read_text(encoding="utf-8")).get("email", "")
+    except (OSError, ValueError):
+        return ""
+
+
+def disconnect() -> None:
+    """Esquece a conta atual. A próxima autorização começa do zero."""
+    for p in (TOKEN_PATH, ACCOUNT_PATH):
+        try:
+            p.unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning(f"não foi possível remover {p}: {e}")
+    logger.info("conta do Google desconectada")
+
+
 def authorize() -> bool:
-    """Fluxo interativo. Abre o navegador uma vez; depois o token se renova."""
+    """Fluxo interativo, com seletor de contas.
+
+    Remove o token antes de começar: com um token válido em disco o fluxo
+    devolveria as credenciais existentes sem abrir o navegador, e trocar de
+    conta seria impossível.
+    """
+    disconnect()
     return _load_credentials(interactive=True) is not None
 
 
