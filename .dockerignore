@@ -45,3 +45,6 @@ docker-compose.*.yml
 # Windows-native recorder — never runs in the container, and keeping it out
 # stops edits there from invalidating the (slow) image build.
 recorder/
+
+# Dev tooling — never runs in the container.
+tools/
