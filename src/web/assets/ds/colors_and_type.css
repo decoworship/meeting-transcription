@@ -1,0 +1,403 @@
+/* ============================================================
+   AA Design System — Colors & Type
+   Base tokens + semantic tokens + semantic typography mixins.
+   Import this on every project page; it declares local web fonts
+   and exposes the full token set described in docs/guia-de-design.md.
+   ============================================================ */
+
+/* Fraunces — local variable fonts (full SOFT/WONK/opsz/wght axes) */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/Fraunces/Fraunces-VariableFont.ttf') format('truetype-variations'),
+       url('fonts/Fraunces/Fraunces-VariableFont.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/Fraunces/Fraunces-Italic-VariableFont.ttf') format('truetype-variations'),
+       url('fonts/Fraunces/Fraunces-Italic-VariableFont.ttf') format('truetype');
+}
+
+/* Hanken Grotesk — local variable fonts (uploaded by the brand owner) */
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf') format('truetype-variations'),
+       url('fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Hanken Grotesk';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf') format('truetype-variations'),
+       url('fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf') format('truetype');
+}
+
+:root {
+  /* ---------- Cores cruas: escala neutra (areia quente) ---------- */
+  --areia-50:  #FAF7F1;
+  --areia-100: #F4EFE6;
+  --areia-200: #E9E1D2;
+  --areia-300: #DAD0BC;
+  --areia-400: #C2B69D;
+  --areia-500: #A6987D;
+  --areia-600: #847A63;
+  --areia-700: #5F584A;
+  --areia-800: #3D382F;
+  --areia-900: #221F1A;
+
+  /* ---------- Cores cruas: primária (azul calmo) ---------- */
+  --primaria-50:  #EAEEF4;
+  --primaria-100: #CBD6E4;
+  --primaria-200: #A9BCD1;
+  --primaria-300: #7C95B4;
+  --primaria-400: #5B7B9E;
+  --primaria-500: #3D6189;
+  --primaria-600: #31506F;
+  --primaria-700: #26405A;
+  --primaria-800: #1B2E41;
+  --primaria-900: #131F2C;
+
+  /* ---------- Cores cruas: acento (terracota) ---------- */
+  --acento-50:  #F8EFE9;
+  --acento-100: #EFDACE;
+  --acento-300: #DBAA8B;
+  --acento-500: #C57B57;
+  --acento-600: #AC6644;
+  --acento-700: #8A5136;
+
+  /* ---------- SEMÂNTICOS — superfícies, texto, ações ---------- */
+  --cor-fundo:           var(--areia-100);
+  --cor-superficie:      var(--areia-50);
+  --cor-superficie-2:    var(--areia-200);
+  --cor-borda:           var(--areia-300);   /* separador decorativo */
+  --cor-borda-forte:     var(--areia-400);   /* separador decorativo com mais peso */
+  --cor-borda-controle:  var(--areia-600);   /* borda de campo/checkbox — precisa 3:1 (WCAG 1.4.11) */
+  --cor-texto:           var(--areia-800);
+  --cor-texto-suave:     var(--areia-700);
+  --cor-texto-forte:     var(--areia-900);
+  --cor-texto-invertido: var(--areia-50);
+
+  --cor-acao:            var(--primaria-500);
+  --cor-acao-hover:      var(--primaria-600);
+  --cor-acao-ativa:      var(--primaria-700);
+  --cor-destaque:        var(--acento-500);  /* DECORATIVO: preenchimento, filete, ícone. Nunca texto. */
+  --cor-destaque-texto:  var(--acento-700);  /* use este quando o destaque for texto */
+
+  /* Estados de interação. Existem como token semântico — e não como
+     escala crua dentro do componente — porque é isso que faz o tema
+     escuro funcionar sem reescrever componente nenhum. */
+  --cor-acao-suave:      var(--primaria-50);   /* fundo de botão de texto no hover */
+  --cor-acao-suave-2:    var(--primaria-100);  /* mesmo, pressionado */
+  --cor-destaque-bg:     var(--acento-50);     /* fundo de etiqueta de destaque */
+  --cor-borda-controle-hover: var(--areia-700);/* borda de campo no hover */
+  --cor-linha-hover:     var(--areia-100);     /* linha de tabela sob o cursor */
+  --cor-link-sublinhado: var(--primaria-200);
+  --cor-veu:             rgba(34,31,26,0.38); /* cortina atrás de modal e gaveta */
+
+  /* ---------- Feedback ---------- */
+  /* Valores auditados: cada cor passa AA (4.5:1) tanto como texto sobre seu -bg
+     quanto como preenchimento com --cor-texto-invertido em cima. Ver preview/contraste.html. */
+  --cor-sucesso:    #4A6746;  --cor-sucesso-bg: #E7EDE4;
+  --cor-atencao:    #8A5F22;  --cor-atencao-bg: #F5EBD8;
+  --cor-erro:       #8E3A2E;  --cor-erro-bg:    #F3E0DC;
+  --cor-info:       #3D6189;  --cor-info-bg:    #EAEEF4;
+
+  /* ---------- Paleta de dados (gráficos) ---------- */
+  /* Categórica — use NESTA ORDEM. Nunca reordene por gosto: a ordem é a hierarquia. */
+  --dados-1: #3D6189;
+  --dados-2: #C57B57;
+  --dados-3: #6E8E6B;
+  --dados-4: #D0A24E;
+  --dados-5: #8A6E8E;
+  --dados-6: #5E7C8A;
+  --dados-7: #9C6B57;
+  --dados-8: #6B7F5E;
+
+  /* Sequencial — uma única variável, do claro ao escuro (mapa de calor, densidade) */
+  --seq-1: #E4EBF2;
+  --seq-2: #B9CBDD;
+  --seq-3: #8AA6C3;
+  --seq-4: #5B7B9E;
+  --seq-5: #31506F;
+
+  /* Divergente — terracota ↔ azul, neutro quente no meio (variação, saldo, delta) */
+  --div-1: #AC6644;
+  --div-2: #DBAA8B;
+  --div-3: #E9E1D2;
+  --div-4: #8AA6C3;
+  --div-5: #31506F;
+
+  /* Cromo do gráfico — grade, eixo, rótulo, área de série */
+  --grafico-grade:    #E9E1D2;
+  --grafico-eixo:     #DAD0BC;
+  --grafico-rotulo:   #5F584A;
+  --grafico-area:     rgba(61,97,137,0.14);
+  --grafico-realce:   #C57B57;
+  --grafico-referencia: #A6987D;
+
+  /* ---------- Tipografia: famílias ---------- */
+  --fonte-display: 'Fraunces', Georgia, serif;   /* @kind font */
+  --fonte-ui:      'Hanken Grotesk', system-ui, -apple-system, sans-serif;   /* @kind font */
+  --fonte-mono:    ui-monospace, 'SF Mono', Menlo, monospace;   /* @kind font */
+
+  /* ---------- Tipografia: escala (tamanho base) ---------- */
+  --texto-heroi:    48px;   /* SÓ para hero de login/marketing. Nunca em dashboard. */
+  --texto-display:  36px;
+  --texto-titulo-g: 24px;
+  --texto-titulo-m: 18px;
+  --texto-corpo:    15px;
+  --texto-pequeno:  13px;
+  --texto-rotulo:   12px;
+
+  /* ---------- Espaçamento (base 4px) ---------- */
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 24px;
+  --espaco-6: 32px;
+  --espaco-7: 48px;
+  --espaco-8: 64px;
+
+  /* ---------- Raio de borda ---------- */
+  --raio-pequeno: 6px;
+  --raio-medio:   10px;
+  --raio-grande:  16px;
+  --raio-pilula:  999px;
+
+  /* ---------- Sombras ---------- */
+  --sombra-pequena: 0 1px 2px rgba(34,31,26,0.06);
+  --sombra-media:   0 4px 12px rgba(34,31,26,0.08);
+  --sombra-grande:  0 12px 28px rgba(34,31,26,0.12);
+
+  /* ---------- Movimento ---------- */
+  --transicao-rapida: 120ms ease;   /* @kind other */
+  --transicao:        150ms ease;   /* @kind other */
+  --transicao-lenta:  240ms ease;   /* @kind other */
+
+  /* ---------- Foco ---------- */
+  --anel-foco: 0 0 0 3px var(--primaria-400);
+  --anel-foco-erro: 0 0 0 3px var(--cor-erro);
+
+  /* ---------- Camadas ---------- */
+  --z-base:         0;   /* @kind other */
+  --z-suspenso:   100;   /* @kind other */ /* dropdown, tooltip */
+  --z-cortina:    200;   /* @kind other */ /* overlay escuro */
+  --z-modal:      300;   /* @kind other */
+  --z-aviso:      400;   /* @kind other */ /* toast */
+
+  /* ---------- Layout ---------- */
+  --largura-maxima:  980px;
+  --largura-leitura: 64ch;
+  --quebra-mobile:   620px;
+}
+
+
+/* ============================================================
+   MODO ESCURO
+   Só os tokens SEMÂNTICOS são redefinidos. As cores cruas
+   (--areia-*, --primaria-*, --acento-*) ficam intactas de propósito:
+   é isso que faz componente nenhum precisar de mudança.
+
+   Base é marrom-carvão, não cinza azulado. O sistema é areia; areia
+   no escuro continua quente. Cinza neutro aqui mataria a identidade.
+
+   Como ligar:  <html data-tema="escuro">
+   Automático:  <html data-tema="auto">   (segue o sistema operacional)
+   ============================================================ */
+
+[data-tema="escuro"] {
+  /* Superfícies — sobem de tom conforme sobem de camada.
+     No escuro sombra não separa nada: separação é tom e borda. */
+  --cor-fundo:           #1A1714;
+  --cor-superficie:      #221F1A;
+  --cor-superficie-2:    #2E2A24;
+  --cor-borda:           #322D26;
+  --cor-borda-forte:     #4E483D;
+  --cor-borda-controle:  #7B7362;
+
+  --cor-texto:           #EDE7DB;
+  --cor-texto-suave:     #B7AC98;
+  --cor-texto-forte:     #FAF7F1;
+  --cor-texto-invertido: #221F1A;   /* inverte junto: texto escuro sobre botão claro */
+
+  /* Ações clareiam. Azul escuro sobre fundo escuro é ilegível. */
+  --cor-acao:            #8FAECD;
+  --cor-acao-hover:      #A6C0DA;
+  --cor-acao-ativa:      #BDD2E7;
+  --cor-destaque:        #DBAA8B;
+  --cor-destaque-texto:  #E4BFA5;
+  --cor-acao-suave:      #1E2A38;
+  --cor-acao-suave-2:    #26364A;
+  --cor-destaque-bg:     #33251C;
+  --cor-borda-controle-hover: #8A8170;
+  --cor-linha-hover:     #2A2620;
+  --cor-link-sublinhado: #4F739A;
+  --cor-veu:             rgba(8,6,4,0.62);
+
+  /* Feedback: cor clara + fundo escuro tingido do mesmo matiz. */
+  --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
+  --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
+  --cor-erro:       #E08172;  --cor-erro-bg:    #3A211C;
+  --cor-info:       #8FAECD;  --cor-info-bg:    #1E2A38;
+
+  /* Séries de gráfico clareiam mantendo a MESMA ordem e o mesmo matiz.
+     Ordem é hierarquia; trocar a ordem no escuro quebraria a leitura. */
+  --dados-1: #6E9AC8;
+  --dados-2: #DB9A72;
+  --dados-3: #8AB185;
+  --dados-4: #E0BB68;
+  --dados-5: #B292B6;
+  --dados-6: #82A5B4;
+  --dados-7: #C4917A;
+  --dados-8: #93A883;
+
+  /* Sequencial inverte o sentido: no escuro, "mais" é mais claro. */
+  --seq-1: #23313F;
+  --seq-2: #35506B;
+  --seq-3: #4F739A;
+  --seq-4: #7C9CBF;
+  --seq-5: #B4C8DD;
+
+  --div-1: #DB9A72;
+  --div-2: #A6714F;
+  --div-3: #3B362E;
+  --div-4: #4F739A;
+  --div-5: #B4C8DD;
+
+  --grafico-grade:      #322D26;
+  --grafico-eixo:       #4E483D;
+  --grafico-rotulo:     #B7AC98;
+  --grafico-area:       rgba(143,174,205,0.16);
+  --grafico-realce:     #DBAA8B;
+  --grafico-referencia: #7B7362;
+
+  /* Sombras ficam mais fundas e menos úteis — a borda é que separa. */
+  --sombra-pequena: 0 1px 2px rgba(0,0,0,0.40);
+  --sombra-media:   0 4px 12px rgba(0,0,0,0.45);
+  --sombra-grande:  0 12px 28px rgba(0,0,0,0.55);
+
+  --anel-foco:      0 0 0 3px var(--primaria-300);
+  --anel-foco-erro: 0 0 0 3px var(--cor-erro);
+
+  color-scheme: dark;
+}
+
+/* data-tema="auto": segue o sistema operacional. */
+@media (prefers-color-scheme: dark) {
+  [data-tema="auto"] {
+    --cor-fundo:           #1A1714;
+    --cor-superficie:      #221F1A;
+    --cor-superficie-2:    #2E2A24;
+    --cor-borda:           #322D26;
+    --cor-borda-forte:     #4E483D;
+    --cor-borda-controle:  #7B7362;
+    --cor-texto:           #EDE7DB;
+    --cor-texto-suave:     #B7AC98;
+    --cor-texto-forte:     #FAF7F1;
+    --cor-texto-invertido: #221F1A;
+    --cor-acao:            #8FAECD;
+    --cor-acao-hover:      #A6C0DA;
+    --cor-acao-ativa:      #BDD2E7;
+    --cor-destaque:        #DBAA8B;
+    --cor-destaque-texto:  #E4BFA5;
+    --cor-acao-suave:      #1E2A38;
+    --cor-acao-suave-2:    #26364A;
+    --cor-destaque-bg:     #33251C;
+    --cor-borda-controle-hover: #8A8170;
+    --cor-linha-hover:     #2A2620;
+    --cor-link-sublinhado: #4F739A;
+    --cor-veu:             rgba(8,6,4,0.62);
+  --cor-veu:             rgba(8,6,4,0.62);
+    --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
+    --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
+    --cor-erro:       #E08172;  --cor-erro-bg:    #3A211C;
+    --cor-info:       #8FAECD;  --cor-info-bg:    #1E2A38;
+    --dados-1: #6E9AC8; --dados-2: #DB9A72; --dados-3: #8AB185; --dados-4: #E0BB68;
+    --dados-5: #B292B6; --dados-6: #82A5B4; --dados-7: #C4917A; --dados-8: #93A883;
+    --seq-1: #23313F; --seq-2: #35506B; --seq-3: #4F739A; --seq-4: #7C9CBF; --seq-5: #B4C8DD;
+    --div-1: #DB9A72; --div-2: #A6714F; --div-3: #3B362E; --div-4: #4F739A; --div-5: #B4C8DD;
+    --grafico-grade: #322D26; --grafico-eixo: #4E483D; --grafico-rotulo: #B7AC98;
+    --grafico-area: rgba(143,174,205,0.16); --grafico-realce: #DBAA8B; --grafico-referencia: #7B7362;
+    --sombra-pequena: 0 1px 2px rgba(0,0,0,0.40);
+    --sombra-media:   0 4px 12px rgba(0,0,0,0.45);
+    --sombra-grande:  0 12px 28px rgba(0,0,0,0.55);
+    --anel-foco:      0 0 0 3px var(--primaria-300);
+    --anel-foco-erro: 0 0 0 3px var(--cor-erro);
+    color-scheme: dark;
+  }
+}
+
+/* ============================================================
+   ESTILOS SEMÂNTICOS DE TEXTO
+   Aplique como classe ou copie as regras para um seletor próprio.
+   ============================================================ */
+
+body {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-corpo);
+  line-height: 1.55;
+  color: var(--cor-texto);
+  background: var(--cor-fundo);
+  -webkit-font-smoothing: antialiased;
+}
+
+.t-display {
+  font-family: var(--fonte-display);
+  font-size: var(--texto-display);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--cor-texto-forte);
+  letter-spacing: -0.01em;
+}
+
+.t-titulo-g {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-titulo-g);
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--cor-texto-forte);
+}
+
+.t-titulo-m {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-titulo-m);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--cor-texto-forte);
+}
+
+.t-corpo {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-corpo);
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--cor-texto);
+}
+
+.t-pequeno {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
+.t-rotulo {
+  font-family: var(--fonte-ui);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}

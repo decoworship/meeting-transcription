@@ -1,0 +1,3 @@
+commit: 259b8cfaf2c998202915c998a478a3ef088c90bf
+origem: https://github.com/decoworship/aa-design-system
+copiado em: 2026-08-06
