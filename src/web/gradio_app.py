@@ -1205,15 +1205,21 @@ def on_file_change(file_obj):
     return gr.update()
 
 
-def on_recording_change(recording_sel: str):
-    """Preenche a data ao escolher uma gravação, como o upload já fazia.
+def on_recording_change(recording_sel: str, vocabulary: str = ""):
+    """Preenche data e vocabulário ao escolher uma gravação.
 
-    Prefere `recorded_at` do meta.json ao nome da pasta: é o instante real da
-    gravação, e o nome da pasta pode ter sido renomeado.
+    A data vem de `recorded_at` no meta.json e não do nome da pasta: é o
+    instante real e sobrevive a um rename. O vocabulário recebe os
+    participantes que o gravador colheu da agenda -- nomes próprios são a
+    maior fonte de erro da transcrição, e aqui eles chegam de graça.
     """
     rec = recordings.find(recording_sel or "")
     if rec is None:
-        return gr.update()
+        return gr.update(), gr.update()
+
+    vocab = rec.merge_vocabulary(vocabulary)
+    vocab_update = (gr.update(value=vocab) if vocab != (vocabulary or "").strip()
+                    else gr.update())
     stamp = rec.meta.get("recorded_at")
     if stamp:
         try:
@@ -1221,11 +1227,11 @@ def on_recording_change(recording_sel: str):
             dt = datetime.fromisoformat(stamp)
             if dt.tzinfo is not None:
                 dt = dt.astimezone()
-            return gr.update(value=dt.strftime("%Y-%m-%d"))
+            return gr.update(value=dt.strftime("%Y-%m-%d")), vocab_update
         except ValueError:
             logger.debug(f"recorded_at ilegivel em {rec.name}: {stamp!r}")
     date = extract_date_from_filename(rec.name)
-    return gr.update(value=date) if date else gr.update()
+    return (gr.update(value=date) if date else gr.update()), vocab_update
 
 
 # ── Build Gradio app ─────────────────────────────────────────────────
@@ -1774,8 +1780,10 @@ def create_app() -> gr.Blocks:
             outputs=[recording_input],
         )
 
-        recording_input.change(fn=on_recording_change,
-                               inputs=[recording_input], outputs=[date_input])
+        recording_input.change(
+            fn=on_recording_change,
+            inputs=[recording_input, initial_prompt_input],
+            outputs=[date_input, initial_prompt_input])
 
         # Apply speaker name changes (also learns voice profiles)
         apply_names_btn.click(

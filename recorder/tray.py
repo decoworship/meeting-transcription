@@ -28,6 +28,7 @@ import pystray
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import calendar_sync
 import settings as settings_mod
 from capture import DualRecorder, TARGET_RATE, list_devices
 
@@ -69,6 +70,7 @@ class RecorderTray:
         self._stop_ui = threading.Event()
         self._muted_since: float | None = None
         self._mute_warned = 0
+        self._event: object | None = None
 
         self.icon = pystray.Icon(
             "meeting-recorder", make_icon(IDLE), "Gravador de reunioes",
@@ -96,6 +98,8 @@ class RecorderTray:
         if self.rec.is_muted:
             mudo = int(time.monotonic() - (self._muted_since or time.monotonic()))
             txt += f"  (mic mudo ha {mudo//60:02d}:{mudo%60:02d})"
+        if self._event is not None:
+            txt += f"  |  {self._event.title[:34]}"
         mudas = [t.name for t in (self.rec.system, self.rec.mic)
                  if t.stats.warned_silent]
         if mudas:
@@ -151,6 +155,17 @@ class RecorderTray:
             pystray.MenuItem("Audio do sistema",
                              pystray.Menu(lambda: self._device_items("loopbacks"))),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem(
+                lambda item: ("Google Calendar: ligado" if self.cfg.get("use_calendar", True)
+                              else "Google Calendar: desligado"),
+                self.on_toggle_calendar,
+                checked=lambda item: bool(self.cfg.get("use_calendar", True))),
+            pystray.MenuItem(
+                lambda item: ("Reautorizar Google Calendar..." if calendar_sync.is_authorized()
+                              else "Autorizar Google Calendar..."),
+                self.on_authorize_calendar,
+                visible=lambda item: calendar_sync.is_configured()),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Abrir pasta das gravacoes", self.on_open_folder),
             pystray.MenuItem("Sair", self.on_quit),
         )
@@ -190,6 +205,11 @@ class RecorderTray:
             self.icon.notify(f"Falha ao iniciar: {e}", "Gravador")
             return
         self.rec, self.session_dir = rec, out
+        self._event = None
+        # Depois de start(): a agenda e uma chamada de rede e nao pode
+        # atrasar o inicio da captura nem roubar foco.
+        if self.cfg.get("use_calendar", True):
+            threading.Thread(target=self._lookup_event, daemon=True).start()
         logger.info(f"gravando em {out}")
         logger.info(f"  sistema: {rec.system.device_name}")
         logger.info(f"  mic    : {rec.mic.device_name}")
@@ -199,8 +219,10 @@ class RecorderTray:
         rec, out = self.rec, self.session_dir
         self.rec, self.session_dir = None, None
         self._muted_since, self._mute_warned = None, 0
+        evento = self._event
+        self._event = None
         try:
-            meta = rec.stop()
+            meta = rec.stop(evento.to_meta() if evento else None)
         except Exception as e:
             logger.error(f"falha ao parar: {e}")
             self.icon.notify(f"Falha ao parar: {e}", "Gravador")
@@ -209,6 +231,8 @@ class RecorderTray:
         dur = meta["duration_s"]
         mudas = [n for n, t in meta["tracks"].items() if t["no_audio"]]
         msg = f"{int(dur)//60:02d}:{int(dur)%60:02d} salvos"
+        if evento is not None:
+            msg += f"\n{evento.title[:40]}"
         if mudas:
             msg += f"\nATENCAO: sem audio em {', '.join(mudas)}"
         logger.info(f"gravacao encerrada: {out} ({dur:.1f}s)")
@@ -221,6 +245,55 @@ class RecorderTray:
         self.rec.set_muted(novo)
         self._muted_since = time.monotonic() if novo else None
         self._mute_warned = 0
+        self._refresh()
+
+    def _lookup_event(self) -> None:
+        """Procura na agenda a reuniao correspondente. Roda em thread propria."""
+        r = calendar_sync.current_event()
+        if not self.recording:
+            return
+
+        if r.needs_attention:
+            # Nao encontrar reuniao e normal; ter autorizado e o token morrer
+            # nao e. Sem este aviso o gravador pararia de identificar reunioes
+            # em silencio e so se descobriria semanas depois.
+            logger.warning(f"calendario indisponivel ({r.status}): {r.detail}")
+            self.icon.notify(
+                "Calendario indisponivel. Reautorize pelo menu.\n"
+                "A gravacao continua normalmente.", "Gravador")
+            return
+
+        if r.event is None:
+            logger.info(f"sem evento na agenda ({r.status})")
+            return
+
+        self._event = r.event
+        logger.info(f"agenda: {r.event.title!r} "
+                    f"({len(r.event.attendee_names)} participantes)")
+        self.icon.notify(
+            f"{r.event.title[:40]}\n{len(r.event.attendee_names)} participantes",
+            "Reuniao identificada")
+        self._refresh()
+
+    def on_authorize_calendar(self, icon=None, item=None) -> None:
+        """Abre o navegador uma vez para autorizar o Google Calendar."""
+        if not calendar_sync.is_configured():
+            self.icon.notify(
+                "Falta google_client_secret.json em\n%USERPROFILE%\\.meeting-recorder",
+                "Gravador")
+            return
+
+        def run():
+            ok = calendar_sync.authorize()
+            self.icon.notify("Calendario autorizado" if ok else "Autorizacao falhou",
+                             "Gravador")
+            self._refresh()
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def on_toggle_calendar(self, icon=None, item=None) -> None:
+        self.cfg["use_calendar"] = not self.cfg.get("use_calendar", True)
+        settings_mod.save(self.cfg)
         self._refresh()
 
     def _check_forgotten_mute(self) -> None:

@@ -297,7 +297,7 @@ class DualRecorder:
             self._writers.append(t)
             track._stream.start_stream()
 
-    def stop(self) -> dict:
+    def stop(self, meeting: dict | None = None) -> dict:
         self._stop.set()
         for track in (self.system, self.mic):
             if track._stream is not None:
@@ -341,10 +341,11 @@ class DualRecorder:
                 }
                 for t in (self.system, self.mic)
             },
-            # Preenchido depois pela integração com o Google Calendar; o contrato
-            # já existe para não mudar quando ela entrar.
-            "meeting": {"title": None, "client": None, "project": None,
-                        "attendees": [], "calendar_event_id": None},
+            # Vem do Google Calendar quando a integração está ativa; os campos
+            # existem sempre, para o transcritor não precisar checar.
+            "meeting": meeting or {
+                "title": None, "client": None, "project": None,
+                "attendees": [], "calendar_event_id": None},
         }
         (self.out_dir / "meta.json").write_text(
             json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

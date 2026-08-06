@@ -47,3 +47,10 @@ Thumbs.db
 # Runtime user data: per-user config, project list, history,
 # voice fingerprints, and HuggingFace model cache. Never commit.
 data/
+
+# OAuth client secrets and tokens — machine credentials, never in the repo.
+# They live in %USERPROFILE%\.meeting-recorder alongside the recorder env.
+client_secret*.json
+google_client_secret.json
+token*.json
+*.Zone.Identifier

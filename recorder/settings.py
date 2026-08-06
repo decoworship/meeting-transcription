@@ -21,6 +21,8 @@ DEFAULTS = {
     "loopback_index": None,
     "output_dir": None,      # None = pasta padrao (ver default_output_dir)
     "start_muted": False,
+    # Consultar o Google Calendar ao iniciar a gravacao.
+    "use_calendar": True,
 }
 
 

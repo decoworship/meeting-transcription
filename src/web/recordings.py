@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import os
 import logging
+import unicodedata
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +46,12 @@ SAMPLE_RATE = 16000
 OWNER_MARGIN = 2.0
 # Abaixo disso o microfone é ruído de fundo, não fala.
 OWNER_MIN_RMS = 5e-3
+
+
+def norm_para_comparar(s: str) -> str:
+    """Minúsculas sem acento, para não duplicar 'Elio' e 'Élio'."""
+    s = unicodedata.normalize("NFKD", s.lower())
+    return "".join(c for c in s if not unicodedata.combining(c))
 
 
 @dataclass
@@ -85,6 +92,27 @@ class Recording:
             if self.duration_s and mudo > 0.25 * self.duration_s:
                 out.append(f"{nome} mudo {mudo / 60:.0f}min")
         return out
+
+    @property
+    def attendees(self) -> list[str]:
+        return [a for a in ((self.meta.get("meeting") or {}).get("attendees") or [])
+                if isinstance(a, str) and a.strip()]
+
+    def merge_vocabulary(self, atual: str) -> str:
+        """Acrescenta ao vocabulário os participantes que ainda não estão nele.
+
+        É aqui que a integração com a agenda paga: nomes próprios são a maior
+        fonte de erro da transcrição, e o gravador já sabe quem estava na sala.
+        Acrescenta em vez de substituir -- o vocabulário do projeto tem jargão
+        que a agenda não conhece.
+        """
+        existente = (atual or "").strip()
+        base = norm_para_comparar(existente)
+        novos = [n for n in self.attendees if norm_para_comparar(n) not in base]
+        if not novos:
+            return existente
+        prefixo = ", ".join(novos)
+        return f"{prefixo}. {existente}" if existente else f"{prefixo}."
 
     def label(self) -> str:
         """Rótulo para o seletor da UI."""
