@@ -216,11 +216,7 @@ def format_transcript_html(
     filter_set = set(speaker_filter) if speaker_filter else None
 
     rows = []
-    rows.append(
-        '<div id="mt-transcript" style="font-family: ui-monospace, Menlo, Consolas, monospace; '
-        'line-height: 1.7; padding: 14px; background: var(--block-background-fill, transparent); '
-        'border-radius: 8px; max-height: 600px; overflow-y: auto;">'
-    )
+    rows.append('<div id="mt-transcript" class="mt-transcript">')
 
     match_count = 0
     visible_count = 0
@@ -248,7 +244,7 @@ def format_transcript_html(
                 for i, part in enumerate(parts):
                     rebuilt.append(escape(part))
                     if i < len(matches):
-                        rebuilt.append(f'<mark style="background:#fde68a;color:#1f2937;padding:0 2px;border-radius:2px;">{escape(matches[i])}</mark>')
+                        rebuilt.append(f'<mark class="mt-hit">{escape(matches[i])}</mark>')
                 text_escaped = "".join(rebuilt)
             except re.error:
                 pass
@@ -257,13 +253,12 @@ def format_transcript_html(
         if include_speakers and seg.speaker:
             name = escape(speaker_names.get(seg.speaker, seg.speaker))
             color = colors.get(seg.speaker, "#666")
-            speaker_html = f'<strong style="color: {color};">{name}:</strong> '
+            speaker_html = f'<strong class="mt-speaker" style="color:{color};">{name}:</strong> '
 
         rows.append(
             f'<div class="mt-segment" data-idx="{idx}" data-start="{seg.start:.3f}" '
-            f'style="margin-bottom: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer;" '
             f'title="Click to seek audio &middot; double-click to edit">'
-            f'<span style="color: #94a3b8; font-size: 0.85em;">[{ts}]</span> '
+            f'<span class="mt-ts">[{ts}]</span> '
             f'{speaker_html}'
             f'<span>{text_escaped}</span>'
             f'</div>'
@@ -271,7 +266,7 @@ def format_transcript_html(
         visible_count += 1
 
     if visible_count == 0:
-        rows.append('<div style="color:#94a3b8;text-align:center;padding:20px;">No matching segments.</div>')
+        rows.append('<div class="mt-empty">No matching segments.</div>')
 
     rows.append('</div>')
     return "".join(rows), (match_count if has_search else -1)
@@ -314,34 +309,31 @@ def compute_speaker_stats(
 
 
 def render_steps_html(active_idx: int = -1, done: bool = False, elapsed: Optional[float] = None) -> str:
-    """Render pipeline step badges + elapsed time as HTML."""
+    """Render pipeline step badges + elapsed time as HTML.
+
+    Styling lives in CSS classes (see theme.py) rather than inline: the colours
+    have to follow the design system's tokens, which change with the theme, and
+    an inline hex cannot.
+    """
     parts = []
     for i, step in enumerate(PIPELINE_STEPS):
-        if done:
-            style = "background:#2ecc71;color:white;"
-            label = f"&#10003; {step}"
-        elif i < active_idx:
-            style = "background:#2ecc71;color:white;"
-            label = f"&#10003; {step}"
+        if done or i < active_idx:
+            cls, label = "mt-step mt-step--done", f"&#10003; {step}"
         elif i == active_idx:
-            style = "background:#3b82f6;color:white;font-weight:bold;"
-            label = f"&#9654; {step}"
+            cls, label = "mt-step mt-step--active", f"&#9654; {step}"
         else:
-            style = "background:#e5e7eb;color:#6b7280;"
-            label = step
+            cls, label = "mt-step", step
 
-        parts.append(
-            f'<span style="{style}display:inline-block;padding:4px 14px;'
-            f'border-radius:14px;margin:0 3px;font-size:13px;">{label}</span>'
-        )
+        parts.append(f'<span class="{cls}">{label}</span>')
         if i < len(PIPELINE_STEPS) - 1:
-            parts.append('<span style="color:#9ca3af;font-size:12px;">&#x2500;&#x2500;</span>')
+            parts.append('<span class="mt-step-sep">&#x2500;&#x2500;</span>')
 
     elapsed_html = ""
     if elapsed is not None:
-        elapsed_html = f'<div style="text-align:center;color:#6b7280;font-size:12px;margin-top:4px;">Elapsed: {format_time(elapsed)}</div>'
+        elapsed_html = (f'<div class="mt-elapsed">Elapsed: '
+                        f'{format_time(elapsed)}</div>')
 
-    return f'<div style="text-align:center;padding:8px 0;">{"".join(parts)}</div>{elapsed_html}'
+    return f'<div class="mt-steps">{"".join(parts)}</div>{elapsed_html}'
 
 
 def extract_date_from_filename(filepath: str) -> Optional[str]:
@@ -1280,15 +1272,17 @@ def create_app() -> gr.Blocks:
 
     # Header HTML with inline logo
     header_html = f"""
-    <div style="display: flex; align-items: center; gap: 16px; padding: 8px 0; margin-bottom: 8px;">
-        <div style="width: 56px; height: 56px; flex-shrink: 0; color: var(--body-text-color, currentColor);">
-            {logo_svg}
-        </div>
+    <header class="mt-header">
+        <div class="mt-logo">{logo_svg}</div>
         <div>
-            <h1 style="margin: 0; font-size: 1.6rem;">Meeting Transcription</h1>
-            <div style="color: #94a3b8; font-size: 0.9rem;">Transcribe meetings with speaker diarization &mdash; <strong>{gpu_label}</strong> &middot; <span title="Which code this container is running. After a rebuild, recreate the container (docker compose up -d) or this will not change.">{escape(build_label)}</span></div>
+            <h1 class="mt-title">Meeting Transcription</h1>
+            <div class="mt-subtitle">Transcribe meetings with speaker diarization
+                <span class="mt-dot">&middot;</span>
+                <span class="aa-etiqueta aa-etiqueta--info">{gpu_label}</span>
+                <span class="aa-etiqueta" title="Which code this container is running. After a rebuild, recreate the container (docker compose up -d) or this will not change.">{escape(build_label)}</span>
+            </div>
         </div>
-    </div>
+    </header>
     """
 
     # JS attached on load:

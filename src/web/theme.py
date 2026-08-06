@@ -233,9 +233,81 @@ _APP_CSS = """
     border-radius: var(--raio-pequeno) !important;
 }
 
+/* ---------- cabeçalho ---------- */
+.mt-header {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-4);
+    padding: var(--espaco-2) 0;
+    margin-bottom: var(--espaco-2);
+}
+.mt-logo {
+    width: 56px; height: 56px; flex-shrink: 0;
+    color: var(--cor-texto-forte);
+}
+.mt-title {
+    margin: 0;
+    font-family: var(--fonte-display) !important;
+    font-size: var(--texto-titulo-g) !important;
+    color: var(--cor-texto-forte) !important;
+}
+.mt-subtitle {
+    display: flex; align-items: center; gap: var(--espaco-2);
+    flex-wrap: wrap;
+    color: var(--cor-texto-suave);
+    font-size: var(--texto-pequeno);
+    margin-top: var(--espaco-1);
+}
+.mt-dot { color: var(--cor-borda-forte); }
+
+/* ---------- barra de etapas ---------- */
+.mt-steps { text-align: center; padding: var(--espaco-2) 0; }
+.mt-step {
+    display: inline-block;
+    padding: var(--espaco-1) var(--espaco-3);
+    margin: 0 var(--espaco-1);
+    border-radius: var(--raio-pilula);
+    font-size: var(--texto-pequeno);
+    background: var(--cor-superficie-2);
+    color: var(--cor-texto-suave);
+    border: 1px solid var(--cor-borda);
+}
+.mt-step--done {
+    background: var(--cor-sucesso-bg);
+    color: var(--cor-sucesso);
+    border-color: var(--cor-sucesso);
+}
+.mt-step--active {
+    background: var(--cor-acao);
+    color: var(--cor-texto-invertido);
+    border-color: var(--cor-acao);
+    font-weight: 600;
+}
+.mt-step-sep { color: var(--cor-borda-forte); font-size: var(--texto-rotulo); }
+.mt-elapsed {
+    text-align: center;
+    color: var(--cor-texto-suave);
+    font-size: var(--texto-rotulo);
+    margin-top: var(--espaco-1);
+}
+
 /* ---------- transcrição ---------- */
+.mt-transcript {
+    font-family: var(--fonte-mono);
+    font-size: var(--texto-pequeno);
+    line-height: 1.7;
+    padding: var(--espaco-4);
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-medio);
+    max-height: 600px;
+    overflow-y: auto;
+}
 .mt-segment {
+    margin-bottom: var(--espaco-1);
+    padding: var(--espaco-1) var(--espaco-2);
     border-radius: var(--raio-pequeno);
+    cursor: pointer;
     transition: background var(--transicao-rapida);
 }
 .mt-segment:hover {
@@ -244,6 +316,22 @@ _APP_CSS = """
 .mt-segment.mt-active {
     background: var(--cor-acao-suave) !important;
     box-shadow: inset 3px 0 0 var(--cor-acao);
+}
+.mt-ts {
+    color: var(--cor-texto-suave);
+    font-size: 0.85em;
+}
+.mt-speaker { font-weight: 600; }
+.mt-hit {
+    background: var(--cor-atencao-bg);
+    color: var(--cor-atencao);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+.mt-empty {
+    color: var(--cor-texto-suave);
+    text-align: center;
+    padding: var(--espaco-5);
 }
 
 /* ---------- campo auxiliar oculto ----------
