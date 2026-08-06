@@ -33,7 +33,7 @@ from ..transcription.faster_whisper_transcriber import FasterWhisperTranscriber
 from ..transcription.whisperx_transcriber import WhisperXTranscriber
 from ..diarization.speaker_diarizer import SpeakerDiarizer
 from ..utils.gpu_detector import is_cuda_available, get_device_info, enable_gpu_optimizations
-from . import history, projects, voices
+from . import history, projects, recordings, voices
 from .exporters import to_srt, to_vtt, write_docx
 
 logger = logging.getLogger(__name__)
@@ -498,6 +498,8 @@ def transcribe_pipeline(
     initial_prompt: str,
     recognize_voices: bool,
     voice_threshold: float,
+    recording_sel: str = "",
+    user_label: str = "You",
 ):
     """Run the full transcription pipeline. Yields intermediate updates.
 
@@ -527,12 +529,23 @@ def transcribe_pipeline(
 
     empty = (render_steps_html(-1), "", "", [], [], "", None, {}, None, None, None)
 
-    if file_obj is None:
-        gr.Warning("Please upload a media file.")
+    # A dual-track recording takes precedence over the upload box: it carries
+    # strictly more information (which of the two tracks each utterance came
+    # from), so there is no reason to fall back to the mixdown when both exist.
+    dual: "recordings.Recording | None" = None
+    if recording_sel:
+        dual = recordings.find(recording_sel)
+        if dual is None:
+            gr.Warning(f"Recording '{recording_sel}' not found.")
+            yield empty
+            return
+
+    if dual is None and file_obj is None:
+        gr.Warning("Please upload a media file or pick a recording.")
         yield empty
         return
 
-    file_path = file_obj if isinstance(file_obj, str) else file_obj.name
+    file_path = None if dual else (file_obj if isinstance(file_obj, str) else file_obj.name)
     language_norm = language.strip() or None
     initial_prompt_norm = initial_prompt.strip() or None
     pipeline_start = time.time()
@@ -551,8 +564,15 @@ def transcribe_pipeline(
             # Step 1: Audio extraction
             event_q.put(("step", 0))
             t0 = time.time()
-            extractor = AudioExtractor()
-            audio_path = extractor.extract(file_path)
+            if dual:
+                # The tracks are already 16kHz mono and aligned by the recorder;
+                # transcription still runs on the sum so overlapping speech reads
+                # the same as it always did.
+                audio_path = str(recordings.mix_tracks(
+                    dual, Path(tempfile.gettempdir()) / f"mix_{dual.name}.wav"))
+            else:
+                extractor = AudioExtractor()
+                audio_path = extractor.extract(file_path)
             timings["Audio extraction"] = time.time() - t0
 
             # Step 2: Load model
@@ -591,8 +611,18 @@ def transcribe_pipeline(
                     token = hf_token.strip() if hf_token else None
                     diarizer = SpeakerDiarizer(hf_token=token, model=diar_model)
                     diarizer.load_model()
-                    diar_segments = diarizer.diarize(audio_path)
+                    # With two tracks, diarize only the system side: the mic
+                    # track is known to be the user, so making pyannote guess at
+                    # it only creates opportunities to confuse them.
+                    diar_target = str(dual.system) if dual else audio_path
+                    diar_segments = diarizer.diarize(diar_target)
                     result = diarizer.assign_speakers(result, diar_segments)
+                    if dual:
+                        mine, total = recordings.assign_owner(
+                            result, dual, user_label=user_label or "You")
+                        timings["Own-voice tagging"] = 0.0
+                        logger.info(f"dual-track: {mine}/{total} segments tagged "
+                                    f"as '{user_label}'")
                     timings["Diarization"] = time.time() - t0
                 except Exception as e:
                     logger.warning(f"Diarization failed: {e}")
@@ -636,7 +666,7 @@ def transcribe_pipeline(
             transcript_html, _ = format_transcript_html(result, speaker_names, diarization)
             transcript_text = format_transcript_text(result, speaker_names, diarization)
             stats = compute_speaker_stats(result, speaker_names=speaker_names, voice_matches=voice_matches)
-            thumbs = extract_speaker_thumbnails(file_path, result) if diarization else []
+            thumbs = extract_speaker_thumbnails(file_path, result) if (diarization and file_path) else []
 
             total = sum(timings.values())
             timing_lines = [f"{'Step':<22} {'Time':>8}", "─" * 32]
@@ -657,7 +687,7 @@ def transcribe_pipeline(
                     project=project,
                     meeting_date=meeting_date,
                     audio_path=audio_path,
-                    source_file=file_path,
+                    source_file=file_path or str(dual.path),
                 )
             except Exception as e:
                 logger.warning(f"History save failed: {e}")
@@ -1347,6 +1377,29 @@ def create_app() -> gr.Blocks:
             type="filepath",
         )
 
+        # ── Dual-track recordings from the Windows recorder ──
+        with gr.Accordion("From the recorder (two tracks)", open=False):
+            gr.Markdown(
+                "Recordings made by the Windows tray recorder keep your mic and "
+                "the meeting audio on separate tracks. Picking one here means "
+                "your own speech is identified from the mic track instead of "
+                "being guessed at by diarization."
+            )
+            with gr.Row():
+                recording_input = gr.Dropdown(
+                    label="Recording",
+                    choices=[r.label() for r in recordings.list_recordings()],
+                    value=None,
+                    interactive=True,
+                    scale=4,
+                )
+                refresh_recordings_btn = gr.Button("Refresh", scale=1)
+            user_label_input = gr.Textbox(
+                label="Your name on the mic track",
+                value=config.get("user_label", "You"),
+                placeholder="How segments from your microphone get labelled",
+            )
+
         # ── Recent Transcriptions ──
         with gr.Accordion("Recent transcriptions", open=False):
             history_table = gr.Dataframe(
@@ -1667,6 +1720,8 @@ def create_app() -> gr.Blocks:
                 initial_prompt_input,
                 recognize_voices_input,
                 voice_threshold_input,
+                recording_input,
+                user_label_input,
             ],
             outputs=[
                 steps_html,
@@ -1685,6 +1740,14 @@ def create_app() -> gr.Blocks:
 
         # Cancel button — cancels the start event
         cancel_btn.click(fn=lambda: None, cancels=[start_event])
+
+        # Re-scan the recordings folder without reloading the page: the recorder
+        # writes into it while this app is up.
+        refresh_recordings_btn.click(
+            fn=lambda: gr.update(
+                choices=[r.label() for r in recordings.list_recordings()]),
+            outputs=[recording_input],
+        )
 
         # Apply speaker name changes (also learns voice profiles)
         apply_names_btn.click(
