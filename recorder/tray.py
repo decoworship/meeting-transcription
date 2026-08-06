@@ -35,6 +35,9 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("recorder")
 
+# Marcos (em minutos) para lembrar que o microfone segue mudo.
+MUTE_REMINDERS_MIN = (2, 5, 15, 30)
+
 IDLE, RECORDING, MUTED, WARNING = "idle", "recording", "muted", "warning"
 COLORS = {
     IDLE:      (110, 110, 115),
@@ -64,6 +67,8 @@ class RecorderTray:
                          "default_mic": None, "default_loopback": None}
         self._lock = threading.Lock()
         self._stop_ui = threading.Event()
+        self._muted_since: float | None = None
+        self._mute_warned = 0
 
         self.icon = pystray.Icon(
             "meeting-recorder", make_icon(IDLE), "Gravador de reunioes",
@@ -89,7 +94,8 @@ class RecorderTray:
         el = self.rec.elapsed_s
         txt = f"Gravando  {int(el)//60:02d}:{int(el)%60:02d}"
         if self.rec.is_muted:
-            txt += "  (mic mudo)"
+            mudo = int(time.monotonic() - (self._muted_since or time.monotonic()))
+            txt += f"  (mic mudo ha {mudo//60:02d}:{mudo%60:02d})"
         mudas = [t.name for t in (self.rec.system, self.rec.mic)
                  if t.stats.warned_silent]
         if mudas:
@@ -192,6 +198,7 @@ class RecorderTray:
     def _stop(self) -> None:
         rec, out = self.rec, self.session_dir
         self.rec, self.session_dir = None, None
+        self._muted_since, self._mute_warned = None, 0
         try:
             meta = rec.stop()
         except Exception as e:
@@ -208,9 +215,32 @@ class RecorderTray:
         self.icon.notify(msg, "Gravador")
 
     def on_toggle_mute(self, icon=None, item=None) -> None:
-        if self.recording:
-            self.rec.set_muted(not self.rec.is_muted)
-            self._refresh()
+        if not self.recording:
+            return
+        novo = not self.rec.is_muted
+        self.rec.set_muted(novo)
+        self._muted_since = time.monotonic() if novo else None
+        self._mute_warned = 0
+        self._refresh()
+
+    def _check_forgotten_mute(self) -> None:
+        """Cutuca quem esqueceu o microfone mudo.
+
+        Desde que o clique passou a mutar em vez de parar, mute esquecido virou
+        o modo de falha mais provavel -- uma gravacao de 36 min saiu 95% muda
+        exatamente assim.
+        """
+        if not (self.recording and self.rec.is_muted and self._muted_since):
+            return
+        minutos = int((time.monotonic() - self._muted_since) // 60)
+        for marco in MUTE_REMINDERS_MIN:
+            if minutos >= marco > self._mute_warned:
+                self._mute_warned = marco
+                self.icon.notify(
+                    f"Microfone mudo ha {marco} min.\n"
+                    "Sua voz nao esta sendo gravada.", "Gravador")
+                logger.warning(f"microfone mudo ha {marco} min")
+                break
 
     def on_open_folder(self, icon=None, item=None) -> None:
         target = self.session_dir or Path(self.cfg["output_dir"])
@@ -234,6 +264,7 @@ class RecorderTray:
         while not self._stop_ui.wait(1.0):
             if self.recording:
                 try:
+                    self._check_forgotten_mute()
                     self._refresh()
                 except Exception as e:      # a bandeja nunca deve derrubar o app
                     logger.debug(f"refresh falhou: {e}")

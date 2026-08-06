@@ -67,6 +67,25 @@ class Recording:
     def has_both_tracks(self) -> bool:
         return self.mic.is_file() and self.system.is_file()
 
+    def warnings(self) -> list[str]:
+        """Problemas visíveis nos metadados, do mais grave ao menos.
+
+        Um booleano "nunca teve áudio" não basta: uma gravação de 36 min saiu
+        95% muda depois de um início saudável, e o meta.json a declarou boa.
+        """
+        out = []
+        for nome, t in (self.meta.get("tracks") or {}).items():
+            if t.get("no_audio"):
+                out.append(f"{nome} sem audio")
+                continue
+            util = t.get("usable_pct")
+            if util is not None and util < 50:
+                out.append(f"{nome} so {util:.0f}% util")
+            mudo = t.get("muted_s") or 0
+            if self.duration_s and mudo > 0.25 * self.duration_s:
+                out.append(f"{nome} mudo {mudo / 60:.0f}min")
+        return out
+
     def label(self) -> str:
         """Rótulo para o seletor da UI."""
         mins, secs = divmod(int(self.duration_s), 60)
@@ -74,10 +93,9 @@ class Recording:
         title = (self.meta.get("meeting") or {}).get("title")
         if title:
             parts.append(title)
-        avisos = [n for n, t in (self.meta.get("tracks") or {}).items()
-                  if t.get("no_audio")]
+        avisos = self.warnings()
         if avisos:
-            parts.append(f"SEM AUDIO: {', '.join(avisos)}")
+            parts.append("ATENCAO: " + ", ".join(avisos))
         return "  |  ".join(parts)
 
 

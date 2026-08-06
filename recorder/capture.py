@@ -71,6 +71,12 @@ class TrackStats:
     # Se o canal já produziu áudio alguma vez. Separa "configuração errada" de
     # "pausa na conversa", que precisam de limiares muito diferentes.
     ever_heard: bool = False
+    # Um booleano "nunca teve áudio" não basta: uma gravação de 36 min ficou 95%
+    # muda depois de um início saudável e o meta.json a declarou boa. Estes três
+    # campos tornam esse tipo de falha visível depois do fato.
+    total_silent_s: float = 0.0
+    longest_silence_s: float = 0.0
+    muted_s: float = 0.0
 
 
 @dataclass
@@ -187,6 +193,14 @@ class DualRecorder:
                 rms = float(np.sqrt(np.mean(audio ** 2))) if audio.size else 0.0
                 track.stats.peak_rms = max(track.stats.peak_rms, rms)
 
+                # Contabiliza o tempo deste bloco antes de classificá-lo, para
+                # os totais baterem com a duração do arquivo.
+                bloco_s = audio.size / track.native_rate if audio.size else 0.0
+                if track.muted:
+                    track.stats.muted_s += bloco_s
+                elif rms < SILENCE_RMS:
+                    track.stats.total_silent_s += bloco_s
+
                 now = time.monotonic()
                 if rms >= SILENCE_RMS:
                     # Um canal que produziu áudio está comprovadamente vivo.
@@ -197,6 +211,8 @@ class DualRecorder:
                 elif not track.muted:
                     silent_since = silent_since if silent_since is not None else now
                     track.stats.silent_for_s = now - silent_since
+                    track.stats.longest_silence_s = max(
+                        track.stats.longest_silence_s, track.stats.silent_for_s)
                     limite = (GONE_QUIET_WARN_S if track.stats.ever_heard
                               else NEVER_HEARD_WARN_S)
                     if (track.stats.silent_for_s > limite
@@ -312,6 +328,16 @@ class DualRecorder:
                     "ever_heard": t.stats.ever_heard,
                     # Falha de configuração: o canal nunca produziu áudio.
                     "no_audio": not t.stats.ever_heard,
+                    "total_silent_s": round(t.stats.total_silent_s, 1),
+                    "longest_silence_s": round(t.stats.longest_silence_s, 1),
+                    "muted_s": round(t.stats.muted_s, 1),
+                    # A leitura que interessa de relance: quanto da faixa tem
+                    # conteudo util. Baixo aqui significa gravacao suspeita,
+                    # mesmo com no_audio=false.
+                    "usable_pct": round(
+                        100 * max(0.0, duration - t.stats.total_silent_s
+                                  - t.stats.muted_s) / duration, 1
+                    ) if duration > 0 else 0.0,
                 }
                 for t in (self.system, self.mic)
             },
