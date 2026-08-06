@@ -74,6 +74,11 @@ GRADIO_TO_DS = {
 }
 
 # Escalares que não são cor.
+#
+# As larguras de borda são obrigatórias, não decorativas: o Gradio resolve
+# `border: var(--input-border-width) solid var(--input-border-color)`, e sem
+# a largura o resultado é `0px` -- campo sem contorno nenhum, que foi
+# exatamente o que aconteceu ao trocar o tema pronto por Base.
 GRADIO_SCALARS = {
     "radius-sm": "var(--raio-pequeno)",
     "radius-md": "var(--raio-medio)",
@@ -86,6 +91,23 @@ GRADIO_SCALARS = {
     "spacing-lg": "var(--espaco-4)",
     "shadow-drop": "var(--sombra-pequena)",
     "block-shadow": "var(--sombra-pequena)",
+    "input-border-width": "1px",
+    "input-radius": "var(--raio-pequeno)",
+    "input-padding": "var(--espaco-2) var(--espaco-3)",
+    "input-shadow-focus": "0 0 0 3px var(--cor-acao-suave)",
+    "input-background-fill-focus": "var(--cor-superficie)",
+    "block-border-width": "1px",
+    "block-radius": "var(--raio-medio)",
+    "panel-border-width": "1px",
+    "checkbox-border-width": "1px",
+    "checkbox-border-radius": "var(--raio-pequeno)",
+    "checkbox-background-color": "var(--cor-superficie)",
+    "checkbox-border-color": "var(--cor-borda-controle)",
+    "checkbox-border-color-hover": "var(--cor-borda-controle-hover)",
+    "checkbox-border-color-selected": "var(--cor-acao)",
+    "button-large-radius": "var(--raio-pequeno)",
+    "button-small-radius": "var(--raio-pequeno)",
+    "button-border-width": "1px",
 }
 
 _FONT_MIME = "font/ttf"
@@ -189,12 +211,17 @@ def build_css() -> str:
     partes.append(componentes)
     partes.append(_dark_bridge(tokens))
 
-    # Mapeamento das variáveis do Gradio. Vai por último e em :root para
-    # alcançar tudo que o Gradio desenha.
-    linhas = [f"  --{g}: var({ds});" for g, ds in GRADIO_TO_DS.items()]
-    linhas += [f"  --{g}: {v};" for g, v in GRADIO_SCALARS.items()]
-    linhas.append("  --font: var(--fonte-ui);")
-    linhas.append("  --font-mono: var(--fonte-mono);")
+    # Mapeamento das variáveis do Gradio.
+    #
+    # `!important` em cada declaração porque o Gradio injeta o próprio bloco
+    # `:root` com a paleta dele. Mesma especificidade que a nossa, e a ordem de
+    # carga não está sob nosso controle -- sem isto, parte das variáveis vencia
+    # e parte não, de forma inconsistente (a borda dos campos caía em
+    # currentColor enquanto o fundo obedecia).
+    linhas = [f"  --{g}: var({ds}) !important;" for g, ds in GRADIO_TO_DS.items()]
+    linhas += [f"  --{g}: {v} !important;" for g, v in GRADIO_SCALARS.items()]
+    linhas.append("  --font: var(--fonte-ui) !important;")
+    linhas.append("  --font-mono: var(--fonte-mono) !important;")
     partes.append(
         "/* Gradio -> AA Design System */\n:root, .gradio-container {\n"
         + "\n".join(linhas) + "\n}\n"
@@ -207,6 +234,25 @@ def build_css() -> str:
 # CSS próprio do app, agora escrito em cima dos tokens em vez de valores soltos.
 _APP_CSS = """
 /* ---------- estrutura ---------- */
+/* O Gradio só estiliza .gradio-container; o body fica branco e aparece nas
+   bordas da página em telas largas. */
+body {
+    background: var(--cor-fundo) !important;
+    font-family: var(--fonte-ui) !important;
+    color: var(--cor-texto) !important;
+}
+
+/* O reset do Tailwind que o Gradio embute declara `border-color: currentColor`
+   no seletor universal, e ele vence a regra de componente que resolve
+   `var(--border-color-primary)`. O sintoma é sutil e feio: toda borda sai na cor
+   do TEXTO em vez da cor de borda -- quase preta no claro, quase branca no
+   escuro. Reancorar aqui é mais barato que caçar cada componente. */
+.gradio-container *,
+.gradio-container *::before,
+.gradio-container *::after {
+    border-color: var(--cor-borda);
+}
+
 .gradio-container {
     max-width: 1100px !important;
     margin-left: auto !important;
@@ -243,7 +289,18 @@ _APP_CSS = """
 }
 .mt-logo {
     width: 56px; height: 56px; flex-shrink: 0;
+    /* O SVG do logo declara width/height em pontos (496pt) e, sem isto,
+       renderiza a 661x661 transbordando por cima da página inteira -- eram as
+       formas pretas atravessando o layout. Conter aqui e forçar o SVG a
+       preencher o quadro resolve na origem. */
+    overflow: hidden;
+    line-height: 0;
     color: var(--cor-texto-forte);
+}
+.mt-logo svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
 }
 .mt-title {
     margin: 0;

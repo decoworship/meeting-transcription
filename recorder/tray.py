@@ -158,6 +158,27 @@ class RecorderTray:
             itens.append(pystray.MenuItem("Desconectar", self.on_disconnect_calendar))
         return tuple(itens)
 
+    def _folder_items(self):
+        """Submenu da pasta de saida: qual e, abrir, trocar, restaurar."""
+        atual = str(self.cfg.get("output_dir") or "")
+        padrao = settings_mod.default_output_dir()
+        # Caminho de rede e longo; mostra o final, que e a parte que identifica.
+        curto = atual if len(atual) <= 52 else "..." + atual[-49:]
+        itens = [
+            pystray.MenuItem(curto or "(nao definida)", None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Abrir no Explorer", self.on_open_folder),
+            # Trocar durante a gravacao nao afeta a sessao em curso -- o destino
+            # ja foi resolvido no start() -- mas confunde; melhor bloquear.
+            pystray.MenuItem("Escolher outra pasta...", self.on_choose_folder,
+                             enabled=not self.recording),
+        ]
+        if atual != padrao:
+            itens.append(pystray.MenuItem("Restaurar pasta padrao",
+                                          self.on_reset_folder,
+                                          enabled=not self.recording))
+        return tuple(itens)
+
     def on_disconnect_calendar(self, icon=None, item=None) -> None:
         calendar_sync.disconnect()
         self.icon.notify("Conta do Google desconectada", "Gravador")
@@ -187,7 +208,8 @@ class RecorderTray:
                              pystray.Menu(lambda: self._calendar_items()),
                              visible=lambda item: calendar_sync.is_configured()),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Abrir pasta das gravacoes", self.on_open_folder),
+            pystray.MenuItem("Pasta das gravacoes",
+                             pystray.Menu(lambda: self._folder_items())),
             pystray.MenuItem("Sair", self.on_quit),
         )
 
@@ -337,6 +359,67 @@ class RecorderTray:
                     "Sua voz nao esta sendo gravada.", "Gravador")
                 logger.warning(f"microfone mudo ha {marco} min")
                 break
+
+    def on_choose_folder(self, icon=None, item=None) -> None:
+        """Escolhe onde as gravacoes sao salvas.
+
+        O seletor roda em thread propria com um Tk oculto: o pystray e dono da
+        thread principal, e abrir um dialogo modal ali travaria a bandeja
+        enquanto a janela estivesse aberta -- inclusive durante uma gravacao.
+        """
+        def run():
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+            except ImportError as e:
+                logger.error(f"tkinter indisponivel: {e}")
+                self.icon.notify("Seletor de pastas indisponivel nesta build",
+                                 "Gravador")
+                return
+
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            try:
+                escolhida = filedialog.askdirectory(
+                    title="Onde salvar as gravacoes",
+                    initialdir=self.cfg.get("output_dir") or "",
+                )
+            finally:
+                root.destroy()
+
+            if not escolhida:
+                return
+
+            destino = Path(escolhida)
+            try:
+                destino.mkdir(parents=True, exist_ok=True)
+                # Escrita de teste: um caminho de rede pode listar mas nao
+                # aceitar escrita, e descobrir isso ao parar a gravacao seria
+                # perder a reuniao.
+                sonda = destino / ".gravador_teste"
+                sonda.write_text("ok", encoding="utf-8")
+                sonda.unlink()
+            except OSError as e:
+                logger.error(f"pasta nao utilizavel: {e}")
+                self.icon.notify(f"Sem permissao de escrita em\n{destino}",
+                                 "Gravador")
+                return
+
+            self.cfg["output_dir"] = str(destino)
+            settings_mod.save(self.cfg)
+            logger.info(f"pasta das gravacoes: {destino}")
+            self.icon.notify(f"Gravacoes serao salvas em\n{destino}", "Gravador")
+            self._refresh()
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def on_reset_folder(self, icon=None, item=None) -> None:
+        self.cfg["output_dir"] = settings_mod.default_output_dir()
+        settings_mod.save(self.cfg)
+        self.icon.notify(f"Pasta padrao restaurada:\n{self.cfg['output_dir']}",
+                         "Gravador")
+        self._refresh()
 
     def on_open_folder(self, icon=None, item=None) -> None:
         target = self.session_dir or Path(self.cfg["output_dir"])
