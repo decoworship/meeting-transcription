@@ -15,7 +15,13 @@
          trim completo desliga. -->
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <TrimMode>partial</TrimMode>
-    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Mesma configuração do CLI, e pelo mesmo motivo: análise ligada, só o
+         resumo de terceiros calado. Hoje o WinForms impede trimar este projeto
+         (NETSDK1175), então nada disto tem efeito prático — está aqui para a
+         troca por Shell_NotifyIcon herdar a configuração segura em vez do
+         cheque em branco que havia antes. -->
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
 

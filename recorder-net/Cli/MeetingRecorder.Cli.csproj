@@ -17,12 +17,32 @@
          com "Built-in COM has been disabled via a feature switch". Medir tamanho
          sem executar não vale nada. -->
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-    <!-- TrimMode=partial + supressão das análises: o trim completo recusa o COM
-         embutido (IL2026 em ComActivator), e sem COM o WASAPI não inicializa.
-         Parcial corta 64,8 MB para 12,4 MB e o binário roda — verificado, não
-         só compilado. -->
+    <!-- TrimMode=partial: o trim completo recusa o COM embutido (IL2026 em
+         ComActivator), e sem COM o WASAPI não inicializa. Parcial corta
+         64,8 MB para 12,4 MB e o binário roda — verificado, não só compilado. -->
     <TrimMode>partial</TrimMode>
-    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- A análise de trim fica LIGADA de propósito. O que havia aqui antes era
+         SuppressTrimAnalysisWarnings=true, um cheque em branco: calava também
+         os avisos do nosso código, e reflexão nova (o caso clássico é
+         System.Text.Json sem source generator) quebraria em runtime sem nenhum
+         sinal na compilação.
+
+         Os 27 avisos existentes foram auditados um a um: todos de NAudio (Dmo,
+         MediaFoundation e Wave — subsistemas que este projeto nem usa) mais um
+         do COM do runtime. Nenhum do nosso código.
+
+         IL2104 é o resumo por assembly de terceiros, e é o único calado. O que
+         vem dos NOSSOS assemblies nunca é agrupado nele, então continua
+         aparecendo individualmente no build.
+
+         O ILLinkTreatWarningsAsErrors=false separa o aviso de trim do
+         TreatWarningsAsErrors geral. Sem isso o IL2026 do ComActivator — que é
+         justamente o COM que precisamos manter — derrubaria o build. O preço é
+         que um aviso nosso não quebra a compilação; a rede de segurança para
+         isso é executar o binário trimado, que é o que a Fase 1 vem fazendo
+         desde o episódio dos 11,9 MB que não rodavam. -->
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
