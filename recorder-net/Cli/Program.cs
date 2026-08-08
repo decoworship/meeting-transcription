@@ -9,6 +9,21 @@ using NAudio.CoreAudioApi;
 //   Capture.exe --seconds 30 --track system
 //   Capture.exe --seconds 30 --out ../data/recordings
 
+// O console do Windows usa a code page ANSI por padrão e embaralha acentos —
+// o mesmo problema que o capture.py resolve com sys.stdout.reconfigure.
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+// Requisito 3.4: duas instâncias gravariam a mesma reunião em duas pastas, e
+// pior, disputariam os mesmos dispositivos. O mutex é global (prefixo "Global\\")
+// para valer entre sessões de usuário.
+using var instanciaUnica = new Mutex(initiallyOwned: true,
+    "Global\\MeetingRecorder.Capture", out bool sozinho);
+if (!sozinho)
+{
+    Console.Error.WriteLine("Já existe uma gravação em andamento nesta máquina.");
+    return 2;
+}
+
 var argumentos = ParseArgs(args);
 
 if (argumentos.ContainsKey("list"))
@@ -26,6 +41,28 @@ WasapiTrackCapture.Diagnostico = argumentos.ContainsKey("debug");
 
 var pasta = Path.Combine(saida, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
 Directory.CreateDirectory(pasta);
+
+// Requisito 3.3: recusar cedo é melhor que parar no meio da reunião.
+//
+// Mas a checagem NUNCA pode impedir a gravação por falha própria — é o mesmo
+// princípio da integração com o calendário ("nada pode atrasar ou impedir uma
+// gravação"). Se não dá para medir o espaço livre (caminho de rede, unidade
+// exótica, path em estilo POSIX vindo do WSL), grava-se assim mesmo.
+var guarda = new GuardaDeDisco();
+try
+{
+    long livres = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(pasta))!).AvailableFreeSpace;
+    if (!guarda.PodeComecar(livres, out string? motivo))
+    {
+        Console.Error.WriteLine(motivo);
+        return 3;
+    }
+    if (motivo is not null) Console.WriteLine($"  aviso: {motivo}");
+}
+catch (Exception e)
+{
+    Console.WriteLine($"  aviso: não foi possível medir o espaço livre ({e.GetType().Name})");
+}
 
 var enumerador = new MMDeviceEnumerator();
 var capturas = new List<WasapiTrackCapture>();
@@ -105,7 +142,12 @@ try
             (st.SemAudio ? "  <- SEM AUDIO" : ""));
         if (l is { PacotesComDescontinuidade: > 0 } or { PacotesComErroDeTimestamp: > 0 })
             Console.WriteLine($"          anomalias: descontinuidade={l.PacotesComDescontinuidade} " +
-                              $"timestamp={l.PacotesComErroDeTimestamp}");
+                              $"timestamp={l.PacotesComErroDeTimestamp} " +
+                              $"amostras_perdidas={st.AmostrasDescartadas}");
+        if (c.Desconectado)
+            Console.WriteLine($"          DISPOSITIVO DESCONECTADO: {c.MotivoDaFalha}");
+        if (c.FalhaDeEscrita)
+            Console.WriteLine($"          FALHA DE ESCRITA: {c.MotivoDaFalha}");
     }
 
     if (capturas.Count == 2)

@@ -53,6 +53,13 @@ public sealed class WasapiTrackCapture : IDisposable
     /// </remarks>
     public volatile bool Mudo;
 
+    /// <summary>A faixa parou porque o dispositivo sumiu (requisito 3.7).</summary>
+    public volatile bool Desconectado;
+    public string? MotivoDaFalha { get; private set; }
+
+    /// <summary>Erro de escrita em disco (requisito 3.3): degrada, não morre.</summary>
+    public volatile bool FalhaDeEscrita;
+
     public WasapiTrackCapture(MMDevice dispositivo, bool loopback, string caminhoWav, string nome)
     {
         _dispositivo = dispositivo;
@@ -131,6 +138,15 @@ public sealed class WasapiTrackCapture : IDisposable
             }
         }
         catch (OperationCanceledException) { /* parada normal */ }
+        catch (Exception e)
+        {
+            // Requisito 3.7: o headset caindo no meio da reunião não pode
+            // derrubar a gravação em silêncio. A faixa para, o motivo fica
+            // registrado, e a outra continua — meia reunião é muito melhor que
+            // nenhuma.
+            Desconectado = true;
+            MotivoDaFalha = e.Message;
+        }
     }
 
     /// <summary>Imprime os primeiros pacotes, para diagnóstico.</summary>
@@ -147,6 +163,13 @@ public sealed class WasapiTrackCapture : IDisposable
         int quadrosAlvo = (int)Math.Round(quadros * (double)CrashSafeWavWriter.TaxaAlvo / TaxaNativa);
         var decisao = _linha!.Chegou(qpc, quadrosAlvo, anomalias);
 
+        // Requisito 3.5: DATA_DISCONTINUITY significa que o driver perdeu
+        // amostras antes de nos entregar. Preferimos perder áudio a travar o
+        // callback, mas a perda tem que ficar registrada — o gravador Python
+        // descarta em silêncio quando a fila enche.
+        if (anomalias.HasFlag(AnomaliaPacote.Descontinuidade) && _pacotesVistos > 0)
+            _stats.AmostrasDescartadas += decisao.SilencioAntes;
+
         if (Diagnostico && _pacotesVistos < 12)
         {
             _pacotesVistos++;
@@ -161,7 +184,7 @@ public sealed class WasapiTrackCapture : IDisposable
         // senão encolhe e desalinha da outra.
         if (decisao.SilencioAntes > 0)
         {
-            _writer.Escrever(new float[decisao.SilencioAntes]);
+            if (!Escrever(new float[decisao.SilencioAntes])) return;
             _stats.AmostrasEscritas += decisao.SilencioAntes;
         }
 
@@ -198,7 +221,7 @@ public sealed class WasapiTrackCapture : IDisposable
                                           _stats.AmostrasEscritas, reamostrado.Length);
         var final = correcao == 0 ? reamostrado : DriftAnchor.Aplicar(reamostrado, correcao);
 
-        _writer.Escrever(final);
+        if (!Escrever(final)) return;
         _stats.AmostrasEscritas += final.Length;
         _stats.CorrecoesDeriva = _ancora.Correcoes;
         _stats.DerivaLiquidaAmostras = _ancora.AmostrasLiquidas;
@@ -221,9 +244,23 @@ public sealed class WasapiTrackCapture : IDisposable
     /// silêncio zero. Duas fontes de tempo numa mesma linha é o tipo de erro que
     /// só aparece em execução.
     /// </remarks>
+    /// <summary>
+    /// Margem de segurança do preenchimento ocioso.
+    /// </summary>
+    /// <remarks>
+    /// Pacotes sempre descrevem o <b>passado</b>: o carimbo é do instante em que
+    /// o hardware digitalizou, e ele só chega até 100 ms depois (o tamanho do
+    /// buffer). Preencher silêncio até "agora" garante escrever por cima do
+    /// intervalo que o próximo pacote vai cobrir.
+    ///
+    /// Medido antes desta margem: 4849 correções de deriva em 100 s, cada uma
+    /// descartando exatos 160 quadros — um pacote inteiro, escrito duas vezes.
+    /// </remarks>
+    private static readonly long MargemOciosa = PacketTimeline.QpcPorSegundo / 5;   // 200 ms
+
     private void PreencherOcioso()
     {
-        long qpc = QpcAgora();
+        long qpc = QpcAgora() - MargemOciosa;
 
         int silencio = _linha!.SilencioAte(qpc);
         if (Diagnostico && silencio > 0 && _pacotesVistos < 12)
@@ -233,11 +270,36 @@ public sealed class WasapiTrackCapture : IDisposable
         }
         if (silencio <= 0) return;
 
-        _writer.Escrever(new float[silencio]);
+        if (!Escrever(new float[silencio])) return;
         _stats.AmostrasEscritas += silencio;
         _stats.TotalSilencioS += silencio / (double)CrashSafeWavWriter.TaxaAlvo;
         _stats.SilencioAtualS += silencio / (double)CrashSafeWavWriter.TaxaAlvo;
         _stats.MaiorSilencioS = Math.Max(_stats.MaiorSilencioS, _stats.SilencioAtualS);
+    }
+
+    /// <summary>
+    /// Escreve, degradando visivelmente se o disco falhar.
+    /// </summary>
+    /// <remarks>
+    /// Requisito 3.3. O gravador Python deixa a exceção morrer dentro da thread:
+    /// a gravação "continua" sem gravar, o ícone segue vermelho e o usuário só
+    /// descobre depois. Aqui a falha marca a faixa, e o que já foi escrito
+    /// permanece — o header do WAV é atualizado a cada 10 s justamente por isso.
+    /// </remarks>
+    private bool Escrever(float[] amostras)
+    {
+        if (FalhaDeEscrita) return false;
+        try
+        {
+            _writer.Escrever(amostras);
+            return true;
+        }
+        catch (IOException e)
+        {
+            FalhaDeEscrita = true;
+            MotivoDaFalha = $"falha ao escrever: {e.Message}";
+            return false;
+        }
     }
 
     /// <summary>Agora, na mesma escala do <c>u64QPCPosition</c> dos pacotes.</summary>

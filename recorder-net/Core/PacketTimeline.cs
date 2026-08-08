@@ -102,11 +102,24 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
             silencio = (int)buraco;
             SilencioInserido += silencio;
         }
-        // Buraco negativo é jitter do carimbo, não áudio sobrando: ignoramos em
-        // vez de descartar dados bons.
+        // Buraco negativo é jitter do carimbo, não áudio sobrando: não se
+        // insere silêncio, mas a linha do tempo continua ancorada no QPC.
 
-        _fimEscritoAlvo = Math.Max(inicioAlvo, _fimEscritoAlvo) + quadrosAlvo;
-        return new DecisaoPacote(silencio, _fimEscritoAlvo);
+        // Dois conceitos distintos, que uma versão anterior tinha fundido num só:
+        //
+        // * `fimPeloRelogio` é onde o TEMPO diz que este pacote termina. É o que
+        //   a âncora precisa: comparado com o que foi escrito, revela deriva do
+        //   dispositivo. Fundir isso com o acumulado de quadros tornava a
+        //   comparação quase tautológica — 0 correções em 20 min de soak enquanto
+        //   os gravadores se afastavam 1,6 ms por minuto.
+        //
+        // * `_fimEscritoAlvo` é um CURSOR DE ESCRITA, e só anda para a frente. É
+        //   o que detecta buracos. Deixá-lo recuar com pacote atrasado fazia o
+        //   pacote seguinte enxergar um buraco que não existe e inserir silêncio
+        //   sobre tempo já coberto.
+        long fimPeloRelogio = inicioAlvo + quadrosAlvo;
+        _fimEscritoAlvo = Math.Max(_fimEscritoAlvo, fimPeloRelogio);
+        return new DecisaoPacote(silencio, fimPeloRelogio);
     }
 
     /// <summary>

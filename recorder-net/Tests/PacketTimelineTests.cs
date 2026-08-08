@@ -99,6 +99,31 @@ public sealed class PacketTimelineTests
     }
 
     [Fact]
+    public void PreenchimentoOciosoNaoPodeCobrirOFuturoDosPacotes()
+    {
+        // A interação que 100 s de captura expuseram: pacotes descrevem o
+        // passado (o carimbo é de quando o hardware digitalizou, e ele chega até
+        // 100 ms depois). Se o preenchimento ocioso avança até "agora", o pacote
+        // seguinte cobre um intervalo já preenchido e o áudio é escrito duas
+        // vezes — 4849 correções descartando 160 quadros cada.
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);          // cobre 0-10 ms
+
+        // Ocioso preenche só até 500 ms, deixando margem.
+        t.SilencioAte(inicio + Ms(500));
+
+        // Pacote atrasado, carimbado em 400 ms: já está coberto, e a posição não
+        // pode recuar a ponto de a âncora ver excesso de escrita.
+        var d = t.Chegou(inicio + Ms(400), 160, AnomaliaPacote.Nenhuma);
+        Assert.Equal(0, d.SilencioAntes);
+
+        // O caso correto: o próximo pacote vem depois do preenchimento.
+        var d2 = t.Chegou(inicio + Ms(600), 160, AnomaliaPacote.Nenhuma);
+        Assert.Equal(Alvo * 100 / 1000, d2.SilencioAntes);       // 100 ms de buraco
+    }
+
+    [Fact]
     public void CarimboQueRetrocedeNaoDescartaAudio()
     {
         var t = new PacketTimeline();
@@ -136,6 +161,32 @@ public sealed class PacketTimelineTests
         // própria aritmética — uma deriva inventada por nós, somada à do
         // hardware e indistinguível dela no critério A.
         Assert.Equal(10 * Alvo, d.PosicaoAlvo);
+    }
+
+    [Fact]
+    public void DispositivoMaisRapidoQueORelogioApareceComoDivergencia()
+    {
+        // O bug que 20 min de soak expuseram: se a linha do tempo seguisse o
+        // acumulado de quadros, um dispositivo 1% rápido divergiria do tempo real
+        // sem nunca ser detectado — a âncora compararia a escrita com um número
+        // derivado das mesmas amostras.
+        var t = new PacketTimeline();
+        long escritas = 0;
+        DecisaoPacote d = default;
+
+        for (int i = 0; i < 600; i++)          // 6 s de pacotes de 10 ms
+        {
+            // O relógio anda 10 ms; o dispositivo entrega 1% de amostras a mais.
+            d = t.Chegou(Ms(10.0 * i), 162, AnomaliaPacote.Nenhuma);
+            escritas += 162;
+        }
+
+        // A posição alvo tem que seguir o RELÓGIO (6 s = 96000), não os quadros
+        // entregues (600 × 162 = 97200).
+        Assert.InRange(d.PosicaoAlvo, 96_000, 96_200);
+        Assert.True(escritas - d.PosicaoAlvo > 1000,
+            "a divergência entre o escrito e o tempo real tem que ficar visível " +
+            "para a âncora poder corrigi-la");
     }
 
     [Theory]
