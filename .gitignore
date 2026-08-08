@@ -54,3 +54,7 @@ client_secret*.json
 google_client_secret.json
 token*.json
 *.Zone.Identifier
+
+# .NET (Fase 1)
+recorder-net/**/bin/
+recorder-net/**/obj/

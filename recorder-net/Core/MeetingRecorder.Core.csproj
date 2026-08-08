@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- net8.0 e nao net8.0-windows: o writer e a ancora de deriva nao dependem
+       de Windows, e mante-los portateis permite rodar os testes em qualquer
+       maquina. A captura WASAPI, que e Windows-only, entra num projeto
+       separado (Capture) para nao contaminar o que da para testar sem audio. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
