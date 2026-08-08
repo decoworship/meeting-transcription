@@ -12,4 +12,11 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- NAudio.Core (e não o metapacote NAudio): traz o WdlResamplingSampleProvider
+         sem arrastar as camadas WinMM/WASAPI. É o que mantém este projeto
+         net8.0 portátil e testável sem hardware de áudio. -->
+    <PackageReference Include="NAudio.Core" Version="2.2.1" />
+  </ItemGroup>
+
 </Project>
