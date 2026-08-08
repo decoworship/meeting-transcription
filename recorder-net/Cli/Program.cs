@@ -22,6 +22,8 @@ string faixa = argumentos.GetValueOrDefault("track") ?? "both";
 string saida = argumentos.GetValueOrDefault("out")
     ?? Path.Combine(Directory.GetCurrentDirectory(), "gravacoes");
 
+WasapiTrackCapture.Diagnostico = argumentos.ContainsKey("debug");
+
 var pasta = Path.Combine(saida, DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
 Directory.CreateDirectory(pasta);
 
@@ -50,10 +52,13 @@ try
     // intervalo. Marcando depois, o áudio da inicialização entra no arquivo sem
     // contar no tempo pedido — medido: 10,48 s gravados para 10 s pedidos.
     var inicio = DateTime.UtcNow;
+    // Origem única para as duas faixas: é o que faz o alinhamento entre elas ser
+    // construção e não inferência.
+    long origem = WasapiTrackCapture.QpcAgora();
 
     foreach (var c in capturas)
     {
-        c.Iniciar();
+        c.Iniciar(origem);
         Console.WriteLine($"  {c.Stats.Nome,-7} {c.NomeDispositivo} @ {c.TaxaNativa} Hz");
     }
 

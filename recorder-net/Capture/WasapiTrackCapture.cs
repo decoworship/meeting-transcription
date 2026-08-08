@@ -61,7 +61,11 @@ public sealed class WasapiTrackCapture : IDisposable
         _writer = new CrashSafeWavWriter(caminhoWav);
     }
 
-    public void Iniciar()
+    /// <param name="qpcOrigem">
+    /// Origem comum da linha do tempo, marcada uma vez antes de iniciar todas as
+    /// faixas. É o que garante o alinhamento entre elas por construção.
+    /// </param>
+    public void Iniciar(long qpcOrigem)
     {
         _cliente = _dispositivo.AudioClient;
         var formato = _cliente.MixFormat;
@@ -75,7 +79,7 @@ public sealed class WasapiTrackCapture : IDisposable
             // parada.
             refTimesPerSecond, 0, formato, Guid.Empty);
 
-        _linha = new PacketTimeline(TaxaNativa);
+        _linha = new PacketTimeline(qpcOrigem);
         _resampler = new StreamingResampler(TaxaNativa);
         _ancora = new DriftAnchor();
 
@@ -99,15 +103,24 @@ public sealed class WasapiTrackCapture : IDisposable
             while (!_parar.IsCancellationRequested)
             {
                 int disponivel = captura.GetNextPacketSize();
-                if (disponivel == 0) { Thread.Sleep(intervalo); continue; }
+                if (disponivel == 0)
+                {
+                    // Requisito 3.6 no caso extremo: sem pacote nenhum não há
+                    // salto para detectar, e a faixa ficaria vazia em vez de
+                    // conter silêncio — medido, 20 s pedidos deram 0 s. O
+                    // relógio do dispositivo dá o QPC sem depender de pacote.
+                    PreencherOcioso();
+                    Thread.Sleep(intervalo);
+                    continue;
+                }
 
                 while (disponivel > 0 && !_parar.IsCancellationRequested)
                 {
                     IntPtr buffer = captura.GetBuffer(out int quadros, out var flags,
-                                                      out long posicao, out _);
+                                                      out long posicao, out long qpc);
                     try
                     {
-                        if (quadros > 0) Processar(buffer, quadros, canais, flags, posicao);
+                        if (quadros > 0) Processar(buffer, quadros, canais, flags, posicao, qpc);
                     }
                     finally
                     {
@@ -120,11 +133,28 @@ public sealed class WasapiTrackCapture : IDisposable
         catch (OperationCanceledException) { /* parada normal */ }
     }
 
+    /// <summary>Imprime os primeiros pacotes, para diagnóstico.</summary>
+    public static bool Diagnostico;
+    private int _pacotesVistos;
+    private long _qpcInicial;
+
     private unsafe void Processar(IntPtr buffer, int quadros, int canais,
-                                  AudioClientBufferFlags flags, long posicao)
+                                  AudioClientBufferFlags flags, long posicao, long qpc)
     {
         var anomalias = Traduzir(flags);
-        var decisao = _linha!.Chegou(posicao, quadros, anomalias);
+        // Os quadros vêm no mix format; a linha do tempo só trabalha em amostras
+        // de saída. Converter aqui mantém a aritmética de taxa fora dela.
+        int quadrosAlvo = (int)Math.Round(quadros * (double)CrashSafeWavWriter.TaxaAlvo / TaxaNativa);
+        var decisao = _linha!.Chegou(qpc, quadrosAlvo, anomalias);
+
+        if (Diagnostico && _pacotesVistos < 12)
+        {
+            _pacotesVistos++;
+            _qpcInicial = _qpcInicial == 0 ? qpc : _qpcInicial;
+            double msQpc = (qpc - _qpcInicial) / 10_000.0;
+            Console.WriteLine($"\n  [{_stats.Nome}] taxa={TaxaNativa} pos={posicao} quadros={quadros} " +
+                              $"qpc_ms={msQpc:F1} escritas={_stats.AmostrasEscritas} flags={flags}");
+        }
 
         // Buraco: o hardware digitalizou áudio que não nos foi entregue (no
         // loopback, silêncio). O tempo passou e a faixa tem que acompanhar,
@@ -173,6 +203,47 @@ public sealed class WasapiTrackCapture : IDisposable
         _stats.CorrecoesDeriva = _ancora.Correcoes;
         _stats.DerivaLiquidaAmostras = _ancora.AmostrasLiquidas;
     }
+
+    /// <summary>
+    /// Escreve o silêncio correspondente ao tempo decorrido quando o dispositivo
+    /// não entrega pacote.
+    /// </summary>
+    /// <remarks>
+    /// O relógio usado é o <b>mesmo</b> dos carimbos de pacote. O
+    /// <c>u64QPCPosition</c> do WASAPI é o performance counter convertido para
+    /// unidades de 100 ns, e o <see cref="System.Diagnostics.Stopwatch"/> lê esse
+    /// mesmo contador — a conversão pela <c>Frequency</c> põe os dois na mesma
+    /// escala.
+    ///
+    /// Uma tentativa anterior usou o <c>IAudioClock</c>, e o resultado foi
+    /// instrutivo: os dois relógios <b>não compartilham época</b>. Misturá-los
+    /// produziu ora um estouro aritmético (silêncio de dias a inserir), ora
+    /// silêncio zero. Duas fontes de tempo numa mesma linha é o tipo de erro que
+    /// só aparece em execução.
+    /// </remarks>
+    private void PreencherOcioso()
+    {
+        long qpc = QpcAgora();
+
+        int silencio = _linha!.SilencioAte(qpc);
+        if (Diagnostico && silencio > 0 && _pacotesVistos < 12)
+        {
+            _pacotesVistos++;
+            Console.WriteLine($"\n  [{_stats.Nome}] OCIOSO qpc_relogio={qpc} -> silencio={silencio}");
+        }
+        if (silencio <= 0) return;
+
+        _writer.Escrever(new float[silencio]);
+        _stats.AmostrasEscritas += silencio;
+        _stats.TotalSilencioS += silencio / (double)CrashSafeWavWriter.TaxaAlvo;
+        _stats.SilencioAtualS += silencio / (double)CrashSafeWavWriter.TaxaAlvo;
+        _stats.MaiorSilencioS = Math.Max(_stats.MaiorSilencioS, _stats.SilencioAtualS);
+    }
+
+    /// <summary>Agora, na mesma escala do <c>u64QPCPosition</c> dos pacotes.</summary>
+    public static long QpcAgora() =>
+        (long)(System.Diagnostics.Stopwatch.GetTimestamp()
+               * (double)PacketTimeline.QpcPorSegundo / System.Diagnostics.Stopwatch.Frequency);
 
     private void AtualizarEstatisticas(float[] mono, int quadros, bool silencio)
     {

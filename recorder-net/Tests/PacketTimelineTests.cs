@@ -9,27 +9,31 @@ namespace MeetingRecorder.Tests;
 /// </summary>
 public sealed class PacketTimelineTests
 {
-    private const int Nativa = 48_000;
+    private const long Qpc = PacketTimeline.QpcPorSegundo;
+    private const int Alvo = CrashSafeWavWriter.TaxaAlvo;
+
+    /// <summary>QPC de N milissegundos.</summary>
+    private static long Ms(double ms) => (long)(ms * Qpc / 1000);
 
     [Fact]
     public void PrimeiroPacoteDefineAOrigem()
     {
-        var t = new PacketTimeline(Nativa);
-        // A posição absoluta do dispositivo é arbitrária — conta desde que o
-        // endpoint iniciou, não desde que começamos a gravar. Tomá-la como
-        // deslocamento inseriria horas de silêncio no começo do arquivo.
-        var d = t.Chegou(posicaoDispositivo: 987_654_321, quadros: 480, AnomaliaPacote.Nenhuma);
+        var t = new PacketTimeline();
+        // O QPC é o relógio da máquina desde o boot. Tomá-lo como deslocamento
+        // inseriria dias de silêncio no começo do arquivo.
+        var d = t.Chegou(qpc: 987_654_321_000, quadrosAlvo: 160, AnomaliaPacote.Nenhuma);
 
         Assert.Equal(0, d.SilencioAntes);
-        Assert.Equal(160, d.PosicaoAlvo);          // 480 a 48 kHz = 160 a 16 kHz
+        Assert.Equal(160, d.PosicaoAlvo);
     }
 
     [Fact]
     public void PacotesContiguosNaoGeramSilencio()
     {
-        var t = new PacketTimeline(Nativa);
-        t.Chegou(1000, 480, AnomaliaPacote.Nenhuma);
-        var d = t.Chegou(1480, 480, AnomaliaPacote.Nenhuma);
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);              // 10 ms
+        var d = t.Chegou(inicio + Ms(10), 160, AnomaliaPacote.Nenhuma);
 
         Assert.Equal(0, d.SilencioAntes);
         Assert.Equal(320, d.PosicaoAlvo);
@@ -39,26 +43,69 @@ public sealed class PacketTimelineTests
     [Fact]
     public void BuracoDoLoopbackViraSilencioExato()
     {
-        var t = new PacketTimeline(Nativa);
-        t.Chegou(1000, 480, AnomaliaPacote.Nenhuma);       // termina em 1480
+        var t = new PacketTimeline();
+        long inicio = Ms(5000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
 
         // Ninguém falou por 30 s: o WASAPI não entregou nada, e o próximo pacote
-        // chega com a posição 30 s à frente.
-        long depois = 1480 + 30L * Nativa;
-        var d = t.Chegou(depois, 480, AnomaliaPacote.Nenhuma);
+        // chega 30 s à frente no QPC.
+        var d = t.Chegou(inicio + Ms(30_000), 160, AnomaliaPacote.Nenhuma);
 
-        Assert.Equal(30 * CrashSafeWavWriter.TaxaAlvo, d.SilencioAntes);
-        Assert.Equal(30 * CrashSafeWavWriter.TaxaAlvo, t.SilencioInserido);
+        // 30 s menos os 10 ms do primeiro pacote já escritos.
+        Assert.Equal(30 * Alvo - 160, d.SilencioAntes);
+        Assert.Equal(30 * Alvo - 160, t.SilencioInserido);
     }
 
     [Fact]
-    public void PosicaoQueRetrocedeNaoDescartaAudio()
+    public void SemPacoteNenhumOSilencioAindaEhPreenchido()
     {
-        var t = new PacketTimeline(Nativa);
-        t.Chegou(1000, 480, AnomaliaPacote.Nenhuma);
-        // Posição menor que o fim anterior é dado corrompido, não buraco.
-        // Descartar áudio por causa disso seria pior que ignorar o retrocesso.
-        var d = t.Chegou(1200, 480, AnomaliaPacote.ErroDeTimestamp);
+        // O caso que a captura real expôs: 20 s pedidos produziram 0 s na faixa
+        // do sistema, porque sem pacote não há salto para detectar. A camada de
+        // captura consulta o relógio e chama SilencioAte.
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
+
+        int silencio = t.SilencioAte(inicio + Ms(5000));
+
+        Assert.Equal(5 * Alvo - 160, silencio);
+    }
+
+    [Fact]
+    public void SilencioAteNaoDuplicaOQueJaFoiEscrito()
+    {
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
+        t.SilencioAte(inicio + Ms(5000));
+
+        // Chamada repetida no mesmo instante não pode inserir de novo.
+        Assert.Equal(0, t.SilencioAte(inicio + Ms(5000)));
+    }
+
+    [Fact]
+    public void PacoteDepoisDeSilencioAteNaoRegride()
+    {
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
+        t.SilencioAte(inicio + Ms(5000));
+
+        // O pacote seguinte chega logo após o preenchimento: não deve inserir
+        // mais silêncio nem descartar o que já foi escrito.
+        var d = t.Chegou(inicio + Ms(5000), 160, AnomaliaPacote.Nenhuma);
+        Assert.Equal(0, d.SilencioAntes);
+        Assert.Equal(5 * Alvo + 160, d.PosicaoAlvo);
+    }
+
+    [Fact]
+    public void CarimboQueRetrocedeNaoDescartaAudio()
+    {
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
+        // Jitter do carimbo, não áudio sobrando. Descartar seria pior.
+        var d = t.Chegou(inicio + Ms(5), 160, AnomaliaPacote.ErroDeTimestamp);
 
         Assert.Equal(0, d.SilencioAntes);
         Assert.Equal(1, t.PacotesComErroDeTimestamp);
@@ -67,57 +114,37 @@ public sealed class PacketTimelineTests
     [Fact]
     public void FlagsViramContadoresDeAnomalia()
     {
-        var t = new PacketTimeline(Nativa);
-        t.Chegou(0, 480, AnomaliaPacote.Silencio);
-        t.Chegou(480, 480, AnomaliaPacote.Descontinuidade | AnomaliaPacote.ErroDeTimestamp);
-        t.Chegou(960, 480, AnomaliaPacote.Silencio);
+        var t = new PacketTimeline();
+        t.Chegou(0, 160, AnomaliaPacote.Silencio);
+        t.Chegou(Ms(10), 160, AnomaliaPacote.Descontinuidade | AnomaliaPacote.ErroDeTimestamp);
+        t.Chegou(Ms(20), 160, AnomaliaPacote.Silencio);
 
         Assert.Equal(2, t.PacotesDeSilencio);
         Assert.Equal(1, t.PacotesComDescontinuidade);
         Assert.Equal(1, t.PacotesComErroDeTimestamp);
     }
 
+    [Fact]
+    public void MilPacotesNaoAcumulamErroDeArredondamento()
+    {
+        var t = new PacketTimeline();
+        DecisaoPacote d = default;
+        for (int i = 0; i < 1000; i++)                 // 1000 × 10 ms = 10 s
+            d = t.Chegou(Ms(10.0 * i), 160, AnomaliaPacote.Nenhuma);
+
+        // 10 s têm que dar 160000 amostras exatas, senão a faixa deriva pela
+        // própria aritmética — uma deriva inventada por nós, somada à do
+        // hardware e indistinguível dela no critério A.
+        Assert.Equal(10 * Alvo, d.PosicaoAlvo);
+    }
+
     [Theory]
-    [InlineData(48_000, 48_000, 16_000)]     // 1 s
-    [InlineData(44_100, 44_100, 16_000)]     // taxa não múltipla
-    [InlineData(16_000, 16_000, 16_000)]     // passthrough
-    public void ConversaoDeTaxaPreservaDuracao(int taxaNativa, long nativas, long esperadoAlvo)
+    [InlineData(1000.0, 16_000)]
+    [InlineData(10.0, 160)]
+    [InlineData(33.333, 533)]
+    public void ConversaoDeQpcParaAmostras(double ms, long esperado)
     {
-        var t = new PacketTimeline(taxaNativa);
-        Assert.Equal(esperadoAlvo, t.ParaAlvo(nativas));
-    }
-
-    [Fact]
-    public void PosicaoAlvoAcumulaAoLongoDeMuitosPacotes()
-    {
-        var t = new PacketTimeline(Nativa);
-        long pos = 5_000_000;
-        DecisaoPacote d = default;
-        // 1000 pacotes de 10 ms = 10 s
-        for (int i = 0; i < 1000; i++)
-        {
-            d = t.Chegou(pos, 480, AnomaliaPacote.Nenhuma);
-            pos += 480;
-        }
-
-        // O erro de arredondamento não pode acumular: 10 s têm que dar 160000
-        // amostras exatas, senão a faixa deriva por conta da própria aritmética.
-        Assert.Equal(10 * CrashSafeWavWriter.TaxaAlvo, d.PosicaoAlvo);
-    }
-
-    [Fact]
-    public void TaxaNaoMultiplaNaoAcumulaErro()
-    {
-        var t = new PacketTimeline(44_100);
-        long pos = 0;
-        DecisaoPacote d = default;
-        for (int i = 0; i < 1000; i++)
-        {
-            d = t.Chegou(pos, 441, AnomaliaPacote.Nenhuma);   // 10 ms a 44,1 kHz
-            pos += 441;
-        }
-
-        // 441000 amostras a 44,1 kHz = 10 s = 160000 a 16 kHz.
-        Assert.Equal(160_000, d.PosicaoAlvo);
+        var t = new PacketTimeline();
+        Assert.Equal(esperado, t.QpcParaAmostras(Ms(ms)));
     }
 }

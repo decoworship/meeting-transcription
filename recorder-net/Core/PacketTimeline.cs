@@ -19,34 +19,49 @@ public enum AnomaliaPacote
 public readonly record struct DecisaoPacote(int SilencioAntes, long PosicaoAlvo);
 
 /// <summary>
-/// Traduz a posição carimbada em cada pacote pelo WASAPI numa linha do tempo em
-/// amostras de 16 kHz, detectando os buracos.
+/// Traduz o carimbo QPC de cada pacote numa linha do tempo em amostras de
+/// 16 kHz, detectando os buracos.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Por que os buracos não podem ser inferidos por relógio.</b> O loopback
-/// WASAPI não entrega pacote enquanto nada toca — numa reunião em que ninguém
-/// fala por 30 s, o <c>DataAvailable</c> simplesmente não dispara (armadilha do
-/// NAudio registrada no PLANO). Se o laço de escrita não preencher esse vazio, a
-/// faixa encolhe e desalinha da outra.
+/// <b>Por que QPC e não <c>u64DevicePosition</c>.</b> A primeira versão usava a
+/// posição do dispositivo, supondo que ela contasse os mesmos quadros que
+/// chegam nos dados. Medido no hardware: o microfone entrega <b>480 quadros por
+/// pacote</b> num mix format de 48 kHz, enquanto a posição avança <b>320</b> —
+/// porque o dispositivo roda a 32 kHz e o motor de áudio reamostra no caminho. O
+/// <c>u64DevicePosition</c> conta <i>device frames</i>, os dados vêm em
+/// <i>mix frames</i>, e as unidades não coincidem sempre que há reamostragem.
+/// O sintoma foi a âncora achar que havia áudio demais e descartar 35% da faixa.
 /// </para>
 /// <para>
-/// Com o laço próprio sobre <c>AudioCaptureClient</c>, o buraco deixa de ser
-/// inferência: o <c>u64DevicePosition</c> do pacote seguinte diz exatamente
-/// quantas amostras o hardware digitalizou no intervalo. O salto entre "onde o
-/// pacote anterior terminou" e "onde este começa" é o silêncio a inserir, com
-/// precisão de amostra.
+/// O <c>u64QPCPosition</c> não tem essa ambiguidade: é tempo absoluto em unidades
+/// de 100 ns, igual para qualquer dispositivo. E é o mesmo relógio para as duas
+/// faixas — então o alinhamento entre elas deixa de ser inferência e passa a ser
+/// construção.
 /// </para>
 /// <para>
-/// Toda a aritmética vive aqui, no <c>Core</c> portátil, para poder ser testada
-/// sem dispositivo de áudio. A camada Windows só entrega
-/// <c>(posicao, quadros, flags)</c>.
+/// <b>Por que os buracos não podem ser inferidos por relógio de parede.</b> O
+/// loopback WASAPI não entrega pacote enquanto nada toca (armadilha do NAudio
+/// registrada no PLANO). O QPC do pacote seguinte diz exatamente quanto tempo
+/// passou, com precisão de 100 ns.
 /// </para>
 /// </remarks>
-public sealed class PacketTimeline(int taxaNativa, int taxaAlvo = CrashSafeWavWriter.TaxaAlvo)
+public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafeWavWriter.TaxaAlvo)
 {
-    private long _posicaoInicial = -1;
-    private long _fimAnteriorNativo;
+    /// <summary>Unidades de QPC por segundo: o carimbo vem em múltiplos de 100 ns.</summary>
+    public const long QpcPorSegundo = 10_000_000;
+
+    /// <summary>
+    /// Origem da linha do tempo. Quando as duas faixas recebem a <b>mesma</b>
+    /// origem, o alinhamento entre elas deixa de ser inferência e passa a ser
+    /// construção: cada pacote sabe seu instante numa régua comum.
+    ///
+    /// Medido com origens independentes (cada faixa marcando a sua no primeiro
+    /// pacote): 302 ms de desalinhamento em 20 s de captura, porque o loopback e
+    /// o microfone começam a entregar em instantes diferentes.
+    /// </summary>
+    private long _qpcInicial = qpcOrigem;
+    private long _fimEscritoAlvo;
 
     public int PacotesComDescontinuidade { get; private set; }
     public int PacotesComErroDeTimestamp { get; private set; }
@@ -54,49 +69,70 @@ public sealed class PacketTimeline(int taxaNativa, int taxaAlvo = CrashSafeWavWr
     /// <summary>Total de amostras de silêncio inseridas para tapar buracos (taxa alvo).</summary>
     public long SilencioInserido { get; private set; }
 
-    /// <summary>
-    /// Processa a chegada de um pacote e diz quanto silêncio o precede.
-    /// </summary>
-    /// <param name="posicaoDispositivo">
-    /// <c>u64DevicePosition</c>: amostras que o dispositivo digitalizou até o
-    /// primeiro quadro deste pacote, na taxa nativa.
+    /// <summary>Processa a chegada de um pacote e diz quanto silêncio o precede.</summary>
+    /// <param name="qpc"><c>u64QPCPosition</c> do primeiro quadro do pacote.</param>
+    /// <param name="quadrosAlvo">
+    /// Quadros deste pacote <b>já convertidos para a taxa alvo</b>. Quem chama
+    /// sabe a razão; a linha do tempo trabalha só em amostras de saída.
     /// </param>
-    /// <param name="quadros">Quadros neste pacote, na taxa nativa.</param>
-    public DecisaoPacote Chegou(long posicaoDispositivo, int quadros, AnomaliaPacote flags)
+    public DecisaoPacote Chegou(long qpc, int quadrosAlvo, AnomaliaPacote flags)
     {
         if (flags.HasFlag(AnomaliaPacote.Silencio)) PacotesDeSilencio++;
         if (flags.HasFlag(AnomaliaPacote.Descontinuidade)) PacotesComDescontinuidade++;
         if (flags.HasFlag(AnomaliaPacote.ErroDeTimestamp)) PacotesComErroDeTimestamp++;
 
-        if (_posicaoInicial < 0)
+        if (_qpcInicial < 0)
         {
-            // O primeiro pacote define a origem. A posição absoluta do
-            // dispositivo é arbitrária (conta desde que o endpoint iniciou, não
-            // desde que começamos a gravar).
-            _posicaoInicial = posicaoDispositivo;
-            _fimAnteriorNativo = 0;
+            // O primeiro pacote define a origem: o QPC é o relógio da máquina
+            // desde o boot, e tomá-lo como deslocamento inseriria dias de
+            // silêncio no começo do arquivo.
+            _qpcInicial = qpc;
         }
 
-        long inicioNativo = posicaoDispositivo - _posicaoInicial;
+        long inicioAlvo = QpcParaAmostras(qpc - _qpcInicial);
 
-        // Um salto significa que o hardware digitalizou áudio que não nos foi
-        // entregue: no loopback, silêncio; em qualquer faixa, também pode ser
-        // glitch. De todo modo, o tempo passou e a faixa precisa acompanhar.
-        long buracoNativo = inicioNativo - _fimAnteriorNativo;
+        // Salto: o tempo passou sem que nos entregassem áudio. No loopback é
+        // silêncio real (ninguém falando); em qualquer faixa também pode ser
+        // glitch. De todo modo a faixa precisa acompanhar, senão encolhe e
+        // desalinha da outra.
         int silencio = 0;
-        if (buracoNativo > 0)
+        long buraco = inicioAlvo - _fimEscritoAlvo;
+        if (buraco > 0)
         {
-            silencio = (int)ParaAlvo(buracoNativo);
+            silencio = (int)buraco;
             SilencioInserido += silencio;
         }
-        // Salto negativo (posição retrocedeu) é dado corrompido, não buraco;
-        // ignoramos o retrocesso em vez de descartar áudio bom.
+        // Buraco negativo é jitter do carimbo, não áudio sobrando: ignoramos em
+        // vez de descartar dados bons.
 
-        _fimAnteriorNativo = inicioNativo + quadros;
-        return new DecisaoPacote(silencio, ParaAlvo(_fimAnteriorNativo));
+        _fimEscritoAlvo = Math.Max(inicioAlvo, _fimEscritoAlvo) + quadrosAlvo;
+        return new DecisaoPacote(silencio, _fimEscritoAlvo);
     }
 
-    /// <summary>Converte contagem de amostras da taxa nativa para a taxa alvo.</summary>
-    public long ParaAlvo(long amostrasNativas) =>
-        (long)Math.Round(amostrasNativas * (double)taxaAlvo / taxaNativa);
+    /// <summary>
+    /// Quanto silêncio falta para alcançar um instante, sem pacote nenhum.
+    /// </summary>
+    /// <remarks>
+    /// Requisito 3.6 no seu caso extremo: se <b>nenhum</b> pacote chegar — reunião
+    /// em que ninguém fala, loopback sem nada tocando — não há salto para
+    /// detectar, e a faixa ficaria vazia em vez de conter silêncio. Medido: uma
+    /// captura de 20 s produziu 0 s na faixa do sistema.
+    /// A camada de captura consulta o relógio do dispositivo quando o polling
+    /// não traz pacote e chama isto para preencher.
+    /// </remarks>
+    public int SilencioAte(long qpc)
+    {
+        if (_qpcInicial < 0) { _qpcInicial = qpc; return 0; }
+
+        long alvo = QpcParaAmostras(qpc - _qpcInicial);
+        long falta = alvo - _fimEscritoAlvo;
+        if (falta <= 0) return 0;
+
+        SilencioInserido += falta;
+        _fimEscritoAlvo = alvo;
+        return (int)falta;
+    }
+
+    public long QpcParaAmostras(long deltaQpc) =>
+        (long)Math.Round(deltaQpc * (double)taxaAlvo / QpcPorSegundo);
 }
