@@ -20,17 +20,7 @@ public sealed class Meta
     [JsonPropertyName("tracks")] public required Dictionary<string, MetaTrack> Tracks { get; init; }
     [JsonPropertyName("meeting")] public required MetaMeeting Meeting { get; init; }
 
-    private static readonly JsonSerializerOptions Opcoes = new()
-    {
-        WriteIndented = true,
-        // O Python grava com ensure_ascii=False, então acentos vão literais. Sem
-        // isto o .NET escaparia "Fone (AN01)" e nomes de dispositivo com acento,
-        // e o arquivo deixaria de bater byte a byte com o do gravador antigo.
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-    };
-
-    public string ParaJson() => JsonSerializer.Serialize(this, Opcoes);
+    public string ParaJson() => JsonSerializer.Serialize(this, MetaJson.Default.Meta);
 
     public static Meta Montar(DateTimeOffset quando, TrackStats system, TrackStats mic,
                               string dispositivoSystem, string dispositivoMic,
@@ -102,6 +92,34 @@ public sealed class MetaTrack
         UsablePct = s.PercentualUtil(duracao),
         DroppedSamples = s.AmostrasDescartadas,
     };
+}
+
+/// <summary>
+/// Contexto de serialização gerado em tempo de compilação.
+/// </summary>
+/// <remarks>
+/// O <c>JsonSerializer.Serialize</c> por reflexão não sobrevive ao
+/// <c>PublishTrimmed</c> — o trimmer não consegue provar quais tipos são
+/// necessários e o build falha com IL2026. O gerador resolve isso e, de quebra,
+/// deixa o caminho pronto para NativeAOT, que a Fase 4 pode querer.
+///
+/// O <c>UnsafeRelaxedJsonEscaping</c> continua indispensável: o Python grava com
+/// <c>ensure_ascii=False</c>, e sem ele "Áudio Genérico" viraria escape unicode,
+/// quebrando a comparação byte a byte com o gravador antigo.
+/// </remarks>
+[JsonSourceGenerationOptions(
+    WriteIndented = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
+[JsonSerializable(typeof(Meta))]
+internal sealed partial class MetaJsonBase : JsonSerializerContext;
+
+internal static class MetaJson
+{
+    public static readonly MetaJsonBase Default = new(new JsonSerializerOptions
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    });
 }
 
 public sealed class MetaMeeting

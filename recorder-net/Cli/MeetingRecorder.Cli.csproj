@@ -12,6 +12,17 @@
     <!-- self-contained só na Fase 4; por ora framework-dependent basta e o
          build fica rápido para o loop de validação. -->
     <SelfContained>false</SelfContained>
+    <!-- O PublishTrimmed desliga o COM embutido por padrão, e todo o WASAPI
+         depende dele: o binário compila em 11,9 MB e morre na primeira linha
+         com "Built-in COM has been disabled via a feature switch". Medir tamanho
+         sem executar não vale nada. -->
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <!-- TrimMode=partial + supressão das análises: o trim completo recusa o COM
+         embutido (IL2026 em ComActivator), e sem COM o WASAPI não inicializa.
+         Parcial corta 64,8 MB para 12,4 MB e o binário roda — verificado, não
+         só compilado. -->
+    <TrimMode>partial</TrimMode>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
   </PropertyGroup>
 
   <ItemGroup>
