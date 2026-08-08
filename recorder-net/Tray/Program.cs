@@ -74,16 +74,16 @@ internal static class Programa
     {
         menu.Items.Clear();
 
-        var status = new ToolStripMenuItem(Estado.TextoDeStatus(
+        menu.Items.Add(new ToolStripMenuItem(Estado.TextoDeStatus(
             DuracaoAtual(), Capturas.FirstOrDefault(c => c.Stats.Nome == "mic")?.NomeDispositivo))
-        { Enabled = false };
-        menu.Items.Add(status);
+        { Enabled = false });
         menu.Items.Add(new ToolStripSeparator());
 
         menu.Items.Add(new ToolStripMenuItem(
             Estado.Gravando ? (Estado.Mudo ? "Desmutar microfone" : "Mutar microfone")
                             : "Iniciar gravação",
-            null, (_, _) => AoClicar()));
+            null, (_, _) => AoClicar())
+        { Font = new Font(menu.Font, FontStyle.Bold) });   // a ação principal
 
         // Parar só pelo menu — nunca pelo clique no ícone.
         menu.Items.Add(new ToolStripMenuItem("Parar gravação", null, (_, _) => Parar())
@@ -91,19 +91,110 @@ internal static class Programa
 
         menu.Items.Add(new ToolStripSeparator());
 
+        // A escolha de dispositivo trava durante a gravação: reabrir o stream no
+        // meio exigiria realinhar as faixas, e o alinhamento é o que dá valor às
+        // duas terem sido gravadas em separado.
+        menu.Items.Add(SubmenuDeDispositivos("Microfone", DataFlow.Capture, Role.Communications,
+            _cfg.MicId, id => { _cfg.MicId = id; _cfg.Salvar(); }));
+        menu.Items.Add(SubmenuDeDispositivos("Áudio do sistema", DataFlow.Render, Role.Multimedia,
+            _cfg.LoopbackId, id => { _cfg.LoopbackId = id; _cfg.Salvar(); }));
+
+        menu.Items.Add(SubmenuDaPasta());
+        menu.Items.Add(SubmenuDoCalendario());
+
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Notificações", null,
             (_, _) => AlternarNotificacoes())
-        { Checked = Estado.NotificacoesLigadas, CheckOnClick = false });
-
-        menu.Items.Add(new ToolStripMenuItem("Abrir pasta das gravações", null,
-            (_, _) => AbrirPasta()));
-        menu.Items.Add(new ToolStripMenuItem("Escolher outra pasta...", null,
-            (_, _) => EscolherPasta())
-        { Enabled = !Estado.Gravando });   // trocar no meio desalinharia as faixas
+        { Checked = Estado.NotificacoesLigadas });
 
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Sair", null, (_, _) => Application.Exit()));
     }
+
+    /// <summary>Lista os dispositivos ativos, com o escolhido marcado.</summary>
+    /// <remarks>
+    /// O item "Padrão do Windows" existe e é o default: seguir o padrão do
+    /// sistema é o que a maioria quer, e fixar um dispositivo específico quebra
+    /// quando o headset é desconectado.
+    /// </remarks>
+    private static ToolStripMenuItem SubmenuDeDispositivos(
+        string titulo, DataFlow fluxo, Role papel, string? escolhidoId, Action<string?> escolher)
+    {
+        var raiz = new ToolStripMenuItem(titulo) { Enabled = !Estado.Gravando };
+
+        raiz.DropDownItems.Add(new ToolStripMenuItem("Padrão do Windows", null,
+            (_, _) => escolher(null))
+        { Checked = escolhidoId is null });
+        raiz.DropDownItems.Add(new ToolStripSeparator());
+
+        try
+        {
+            using var e = new MMDeviceEnumerator();
+            var padrao = e.HasDefaultAudioEndpoint(fluxo, papel)
+                ? e.GetDefaultAudioEndpoint(fluxo, papel).ID : null;
+
+            var lista = e.EnumerateAudioEndPoints(fluxo, DeviceState.Active).ToList();
+            if (lista.Count == 0)
+                raiz.DropDownItems.Add(new ToolStripMenuItem("(nenhum encontrado)")
+                { Enabled = false });
+
+            foreach (var d in lista)
+            {
+                string id = d.ID;
+                // Nomes de endpoint passam de 60 caracteres com facilidade e
+                // esticam o menu inteiro; 44 é o corte que o tray.py já usava.
+                string nome = d.FriendlyName.Length > 44
+                    ? d.FriendlyName[..44] + "..." : d.FriendlyName;
+                if (id == padrao) nome += "  (padrão)";
+
+                raiz.DropDownItems.Add(new ToolStripMenuItem(nome, null, (_, _) => escolher(id))
+                { Checked = id == escolhidoId });
+            }
+        }
+        catch (Exception ex)
+        {
+            raiz.DropDownItems.Add(new ToolStripMenuItem($"(erro ao listar: {ex.Message})")
+            { Enabled = false });
+        }
+
+        if (Estado.Gravando)
+            raiz.ToolTipText = "Não dá para trocar de dispositivo durante a gravação.";
+        return raiz;
+    }
+
+    private static ToolStripMenuItem SubmenuDaPasta()
+    {
+        var raiz = new ToolStripMenuItem("Pasta das gravações");
+        string atual = _cfg.OutputDir ?? PastaPadrao();
+        raiz.DropDownItems.Add(new ToolStripMenuItem(Encurtar(atual)) { Enabled = false });
+        raiz.DropDownItems.Add(new ToolStripSeparator());
+        raiz.DropDownItems.Add(new ToolStripMenuItem("Abrir no Explorer", null, (_, _) => AbrirPasta()));
+        raiz.DropDownItems.Add(new ToolStripMenuItem("Escolher outra pasta...", null,
+            (_, _) => EscolherPasta())
+        { Enabled = !Estado.Gravando });
+        if (_cfg.OutputDir is not null)
+            raiz.DropDownItems.Add(new ToolStripMenuItem("Restaurar pasta padrão", null,
+                (_, _) => { _cfg.OutputDir = null; _cfg.Salvar(); })
+            { Enabled = !Estado.Gravando });
+        return raiz;
+    }
+
+    private static ToolStripMenuItem SubmenuDoCalendario()
+    {
+        var raiz = new ToolStripMenuItem("Google Calendar");
+        raiz.DropDownItems.Add(new ToolStripMenuItem("(ainda não portado — item 4 da Fase 1)")
+        { Enabled = false });
+        raiz.DropDownItems.Add(new ToolStripSeparator());
+        raiz.DropDownItems.Add(new ToolStripMenuItem("Usar a agenda", null,
+            (_, _) => { _cfg.UseCalendar = !_cfg.UseCalendar; _cfg.Salvar(); })
+        { Checked = _cfg.UseCalendar, Enabled = false });
+        return raiz;
+    }
+
+    /// <summary>Encurta caminho longo pelo meio, preservando início e fim.</summary>
+    private static string Encurtar(string caminho, int max = 44) =>
+        caminho.Length <= max ? caminho
+            : caminho[..(max / 2 - 2)] + "..." + caminho[^(max / 2 - 1)..];
 
     // ─────────────────────────────────────────────────────── ações
 
@@ -139,8 +230,8 @@ internal static class Programa
             }
 
             var enumerador = new MMDeviceEnumerator();
-            var alto = enumerador.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-            var micDev = enumerador.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+            var alto = Escolhido(enumerador, DataFlow.Render, _cfg.LoopbackId, Role.Multimedia);
+            var micDev = Escolhido(enumerador, DataFlow.Capture, _cfg.MicId, Role.Communications);
 
             Capturas.Add(new WasapiTrackCapture(alto, true,
                 Path.Combine(_pastaAtual, "system.wav"), "system"));
@@ -162,6 +253,29 @@ internal static class Programa
             Avisar($"Não foi possível iniciar: {e.Message}", ToolTipIcon.Error, sempre: true);
             Parar();
         }
+    }
+
+    /// <summary>
+    /// O dispositivo salvo nas configurações, ou o padrão do Windows.
+    /// </summary>
+    /// <remarks>
+    /// Cair no padrão quando o dispositivo salvo sumiu é deliberado: fixar um
+    /// headset específico e ele estar desconectado não pode impedir a gravação —
+    /// gravar pelo alto-falante do notebook é muito melhor que não gravar.
+    /// </remarks>
+    private static MMDevice Escolhido(MMDeviceEnumerator e, DataFlow fluxo,
+                                      string? id, Role papel)
+    {
+        if (id is not null)
+        {
+            try
+            {
+                var d = e.GetDevice(id);
+                if (d.State == DeviceState.Active) return d;
+            }
+            catch { /* sumiu; cai no padrão */ }
+        }
+        return e.GetDefaultAudioEndpoint(fluxo, papel);
     }
 
     private static void AlternarMudo()

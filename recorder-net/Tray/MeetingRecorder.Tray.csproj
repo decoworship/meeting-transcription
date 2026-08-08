@@ -16,6 +16,7 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <TrimMode>partial</TrimMode>
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

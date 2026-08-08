@@ -26,6 +26,18 @@ public sealed class Configuracoes
     [JsonPropertyName("use_calendar")] public bool UseCalendar { get; set; } = true;
 
     /// <summary>
+    /// Identificadores WASAPI dos dispositivos escolhidos.
+    /// </summary>
+    /// <remarks>
+    /// Chaves novas, separadas de <c>mic_index</c> e <c>loopback_index</c> de
+    /// propósito: aqueles guardam índices do PyAudio, que não significam a mesma
+    /// coisa no WASAPI. Escrever por cima faria o gravador Python passar a
+    /// capturar o dispositivo errado enquanto os dois coexistem.
+    /// </remarks>
+    [JsonPropertyName("mic_id")] public string? MicId { get; set; }
+    [JsonPropertyName("loopback_id")] public string? LoopbackId { get; set; }
+
+    /// <summary>
     /// Requisito A14. Chave nova: o gravador Python ignora o que não conhece, e
     /// o padrão <c>true</c> mantém o comportamento atual para quem não mexer.
     /// </summary>

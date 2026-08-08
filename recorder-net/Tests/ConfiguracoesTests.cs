@@ -75,6 +75,26 @@ public sealed class ConfiguracoesTests : IDisposable
     }
 
     [Fact]
+    public void IdsDeDispositivoNaoSobrescrevemOsIndicesDoPython()
+    {
+        // mic_index é índice do PyAudio; mic_id é identificador WASAPI. Escrever
+        // um no outro faria o gravador Python capturar o dispositivo errado
+        // enquanto os dois coexistem.
+        File.WriteAllText(Caminho, """
+            { "mic_index": 7, "loopback_index": 3 }
+            """);
+
+        var c = Configuracoes.Carregar(Caminho);
+        c.MicId = "{0.0.1.00000000}.{abc}";
+        c.Salvar(Caminho);
+
+        var relida = Configuracoes.Carregar(Caminho);
+        Assert.Equal(7, relida.MicIndex);
+        Assert.Equal(3, relida.LoopbackIndex);
+        Assert.Equal("{0.0.1.00000000}.{abc}", relida.MicId);
+    }
+
+    [Fact]
     public void NaoDeixaArquivoTemporarioParaTras()
     {
         new Configuracoes().Salvar(Caminho);
