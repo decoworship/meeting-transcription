@@ -92,10 +92,19 @@ Objetivos e executáveis, na ordem em que destravam os seguintes:
 - **B. kill -9 no meio de uma gravação de 10 min** deixa arquivos
   recuperáveis sem ferramenta externa.
 - **C. Soak de 1h+** com medição de deriva (a âncora só foi validada em 36
-  min até hoje).
+  min até hoje). — **OK parcial (08/08/2026)**: validado em 20 min, com 72
+  correções de âncora e 1,7 ms de alinhamento entre faixas. O soak longo
+  acontece na validação em reunião real, item 5 da ordem de trabalho.
 - **D. Disco cheio durante gravação** (volume pequeno de teste): ícone em
-  WARNING, dados até o momento preservados.
-- **E. Tamanho ≤ 25 MB** e nenhuma dependência instalada na máquina.
+  WARNING, dados até o momento preservados. — **OK parcial (08/08/2026)**: a
+  `GuardaDeDisco` está implementada e coberta por teste (limiares em minutos de
+  gravação: 15 avisa, 3 é crítico), mas o teste com volume pequeno de verdade
+  não rodou.
+- **E. Tamanho ≤ 25 MB** e nenhuma dependência instalada na máquina. — **em
+  auditoria externa (08/08/2026)**. Situação medida: CLI 12,7 MB (passa),
+  bandeja 154,7 MB (não passa). A causa é o WinForms não ser trimável
+  (`NETSDK1175`); a saída prevista no PLANO §5 é trocar o `NotifyIcon` por
+  `Shell_NotifyIcon` via P/Invoke.
 
 ## 5. Ordem de trabalho
 
