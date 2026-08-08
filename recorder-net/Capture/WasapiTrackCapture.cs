@@ -41,7 +41,19 @@ public sealed class WasapiTrackCapture : IDisposable
     private DriftAnchor? _ancora;
     private Thread? _thread;
 
-    public string NomeDispositivo => _dispositivo.FriendlyName;
+    /// <remarks>
+    /// Guardado depois da primeira leitura: <c>FriendlyName</c> abre o property
+    /// store do dispositivo e custa ~170 ms, e a bandeja pergunta isso toda vez
+    /// que o menu abre. O nome não muda durante uma gravação.
+    /// </remarks>
+    public string NomeDispositivo => _nome ??= LerNome();
+    private string? _nome;
+
+    private string LerNome()
+    {
+        try { return _dispositivo.FriendlyName; }
+        catch (Exception) { return "(nome indisponível)"; }
+    }
     public int TaxaNativa { get; private set; }
     public TrackStats Stats => _stats;
     public PacketTimeline? Linha => _linha;

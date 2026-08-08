@@ -22,6 +22,7 @@ internal static class Programa
     private static System.Windows.Forms.Timer _relogio = null!;
 
     private static readonly List<WasapiTrackCapture> Capturas = [];
+    private static CatalogoDeDispositivos _catalogo = null!;
     private static string? _pastaAtual;
     private static DateTime _inicio;
 
@@ -41,6 +42,11 @@ internal static class Programa
         _cfg = Configuracoes.Carregar();
         Estado.NotificacoesLigadas = _cfg.Notifications;
 
+        // Lê os nomes dos dispositivos uma vez, em segundo plano, e só relê
+        // quando o Windows avisa que mudaram. Ver CatalogoDeDispositivos: cada
+        // nome custa ~170 ms, e lê-los ao abrir o menu travava a bandeja.
+        _catalogo = new CatalogoDeDispositivos();
+
         _icone = new NotifyIcon
         {
             Icon = IconeDaBandeja.De(CorDaBandeja.Cinza),
@@ -56,7 +62,12 @@ internal static class Programa
         _relogio.Tick += (_, _) => Atualizar();
         _relogio.Start();
 
-        Application.ApplicationExit += (_, _) => { Parar(); _icone.Visible = false; };
+        Application.ApplicationExit += (_, _) =>
+        {
+            Parar();
+            _catalogo.Dispose();
+            _icone.Visible = false;
+        };
         Application.Run();
     }
 
@@ -94,9 +105,10 @@ internal static class Programa
         // A escolha de dispositivo trava durante a gravação: reabrir o stream no
         // meio exigiria realinhar as faixas, e o alinhamento é o que dá valor às
         // duas terem sido gravadas em separado.
-        menu.Items.Add(SubmenuDeDispositivos("Microfone", DataFlow.Capture, Role.Communications,
+        var cat = _catalogo.Atual;
+        menu.Items.Add(SubmenuDeDispositivos("Microfone", cat.Entradas,
             _cfg.MicId, id => { _cfg.MicId = id; _cfg.Salvar(); }));
-        menu.Items.Add(SubmenuDeDispositivos("Áudio do sistema", DataFlow.Render, Role.Multimedia,
+        menu.Items.Add(SubmenuDeDispositivos("Áudio do sistema", cat.Saidas,
             _cfg.LoopbackId, id => { _cfg.LoopbackId = id; _cfg.Salvar(); }));
 
         menu.Items.Add(SubmenuDaPasta());
@@ -113,12 +125,15 @@ internal static class Programa
 
     /// <summary>Lista os dispositivos ativos, com o escolhido marcado.</summary>
     /// <remarks>
-    /// O item "Padrão do Windows" existe e é o default: seguir o padrão do
+    /// Lê só do cache do <see cref="CatalogoDeDispositivos"/>: consultar o
+    /// Windows aqui custaria mais de um segundo com o menu já aberto.
+    /// O item "Padrão do Windows" existe e é o default porque seguir o padrão do
     /// sistema é o que a maioria quer, e fixar um dispositivo específico quebra
     /// quando o headset é desconectado.
     /// </remarks>
     private static ToolStripMenuItem SubmenuDeDispositivos(
-        string titulo, DataFlow fluxo, Role papel, string? escolhidoId, Action<string?> escolher)
+        string titulo, IReadOnlyList<Dispositivo> lista,
+        string? escolhidoId, Action<string?> escolher)
     {
         var raiz = new ToolStripMenuItem(titulo) { Enabled = !Estado.Gravando };
 
@@ -127,34 +142,19 @@ internal static class Programa
         { Checked = escolhidoId is null });
         raiz.DropDownItems.Add(new ToolStripSeparator());
 
-        try
+        if (lista.Count == 0)
+            raiz.DropDownItems.Add(new ToolStripMenuItem("(carregando...)") { Enabled = false });
+
+        foreach (var d in lista)
         {
-            using var e = new MMDeviceEnumerator();
-            var padrao = e.HasDefaultAudioEndpoint(fluxo, papel)
-                ? e.GetDefaultAudioEndpoint(fluxo, papel).ID : null;
+            // Nomes de endpoint passam de 60 caracteres com facilidade e esticam
+            // o menu inteiro; 44 é o corte que o tray.py já usava.
+            string nome = d.Nome.Length > 44 ? d.Nome[..44] + "..." : d.Nome;
+            if (d.EhPadrao) nome += "  (padrão)";
 
-            var lista = e.EnumerateAudioEndPoints(fluxo, DeviceState.Active).ToList();
-            if (lista.Count == 0)
-                raiz.DropDownItems.Add(new ToolStripMenuItem("(nenhum encontrado)")
-                { Enabled = false });
-
-            foreach (var d in lista)
-            {
-                string id = d.ID;
-                // Nomes de endpoint passam de 60 caracteres com facilidade e
-                // esticam o menu inteiro; 44 é o corte que o tray.py já usava.
-                string nome = d.FriendlyName.Length > 44
-                    ? d.FriendlyName[..44] + "..." : d.FriendlyName;
-                if (id == padrao) nome += "  (padrão)";
-
-                raiz.DropDownItems.Add(new ToolStripMenuItem(nome, null, (_, _) => escolher(id))
-                { Checked = id == escolhidoId });
-            }
-        }
-        catch (Exception ex)
-        {
-            raiz.DropDownItems.Add(new ToolStripMenuItem($"(erro ao listar: {ex.Message})")
-            { Enabled = false });
+            string id = d.Id;
+            raiz.DropDownItems.Add(new ToolStripMenuItem(nome, null, (_, _) => escolher(id))
+            { Checked = id == escolhidoId });
         }
 
         if (Estado.Gravando)
