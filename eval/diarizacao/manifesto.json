@@ -1,0 +1,2275 @@
+[
+  {
+    "id": "reuniao_00",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_00.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FEO070",
+      "FEO072",
+      "MEE071",
+      "MEE073"
+    ],
+    "referencia": [
+      {
+        "inicio": 4.48,
+        "fim": 4.6000000000000005,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 4.83,
+        "fim": 4.95,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 16.64,
+        "fim": 16.92,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 24.23,
+        "fim": 28.51,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 29.06,
+        "fim": 29.29,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 32.59,
+        "fim": 33.080000000000005,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 36.03,
+        "fim": 36.47,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 37.03,
+        "fim": 38.15,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 39.03,
+        "fim": 43.81,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 39.76,
+        "fim": 39.919999999999995,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 41.99,
+        "fim": 43.730000000000004,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 44.95,
+        "fim": 46.120000000000005,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 45.81,
+        "fim": 46.96,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 48.28,
+        "fim": 62.31,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 58.73,
+        "fim": 58.93,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 62.02,
+        "fim": 62.52,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 82.44,
+        "fim": 89.47,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 85.17,
+        "fim": 85.74,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 93.22,
+        "fim": 93.48,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 93.68,
+        "fim": 93.93,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 123.13,
+        "fim": 124.14,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 124.7,
+        "fim": 130.62,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 137.43,
+        "fim": 139.46,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 137.72,
+        "fim": 139.68,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 139.26,
+        "fim": 142.94,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 141.11,
+        "fim": 142.63000000000002,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 142.19,
+        "fim": 143.12,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 144.37,
+        "fim": 150.21,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 144.51,
+        "fim": 144.85,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 149.11,
+        "fim": 168.9,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 154.41,
+        "fim": 157.49,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 167.42,
+        "fim": 175.26,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 170.46,
+        "fim": 170.58,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 174.69,
+        "fim": 175.13,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 177.3,
+        "fim": 191.42000000000002,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 183.61,
+        "fim": 185.97000000000003,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 190.18,
+        "fim": 190.52,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 191.59,
+        "fim": 200.74,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 194.27,
+        "fim": 194.5,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 200.13,
+        "fim": 209.34,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 208.88,
+        "fim": 213.79,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 211.33,
+        "fim": 211.86,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 212.47,
+        "fim": 213.66,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 213.13,
+        "fim": 229.53,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 222.75,
+        "fim": 223.75,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 229.84,
+        "fim": 247.54,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 231.25,
+        "fim": 233.49,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 231.69,
+        "fim": 236.6,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 235.13,
+        "fim": 244.4,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 237.35,
+        "fim": 250.92,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 251.96,
+        "fim": 252.25,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 252.07,
+        "fim": 252.32999999999998,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 253.47,
+        "fim": 255.38,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 253.79,
+        "fim": 259.19,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 259.41,
+        "fim": 259.61,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 260.45,
+        "fim": 267.15,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 264.08,
+        "fim": 268.57,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 266.15,
+        "fim": 300.0,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 266.76,
+        "fim": 266.96999999999997,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 275.34,
+        "fim": 285.91999999999996,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 275.48,
+        "fim": 280.52000000000004,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 283.05,
+        "fim": 283.37,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 286.21,
+        "fim": 289.65999999999997,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 286.68,
+        "fim": 292.0,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 289.2,
+        "fim": 294.06,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 293.53,
+        "fim": 293.61999999999995,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 296.84,
+        "fim": 300.0,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 296.91,
+        "fim": 300.0,
+        "falante": "FEO072"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_01",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_01.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "MTD0010ID",
+      "MTD009PM",
+      "MTD011UID",
+      "MTD012ME"
+    ],
+    "referencia": [
+      {
+        "inicio": 13.46,
+        "fim": 27.11,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 15.344,
+        "fim": 15.568,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 15.37,
+        "fim": 15.809999999999999,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 16.42,
+        "fim": 16.700000000000003,
+        "falante": "MTD0010ID"
+      },
+      {
+        "inicio": 19.67,
+        "fim": 20.03,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 32.64,
+        "fim": 33.37,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 35.95,
+        "fim": 48.42,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 40.79,
+        "fim": 41.49,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 42.99,
+        "fim": 43.620000000000005,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 48.1,
+        "fim": 48.440000000000005,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 50.14,
+        "fim": 58.01,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 62.27,
+        "fim": 62.92,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 65.58,
+        "fim": 101.44999999999999,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 106.87,
+        "fim": 113.75,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 111.31,
+        "fim": 113.53,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 116.66,
+        "fim": 138.65,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 140.63,
+        "fim": 141.76999999999998,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 143.39,
+        "fim": 147.70999999999998,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 149.67,
+        "fim": 159.01999999999998,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 161.34,
+        "fim": 190.52,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 163.72,
+        "fim": 164.0,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 182.45,
+        "fim": 183.53,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 182.69,
+        "fim": 182.85999999999999,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 189.69,
+        "fim": 189.82999999999998,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 190.89,
+        "fim": 192.64,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 193.52,
+        "fim": 193.96,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 196.05,
+        "fim": 252.14000000000001,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 212.16,
+        "fim": 212.68,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 216.09,
+        "fim": 216.79,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 238.31,
+        "fim": 238.61,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 253.41,
+        "fim": 258.96,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 257.2,
+        "fim": 257.32,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 260.37,
+        "fim": 262.06,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 263.16,
+        "fim": 279.92,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 281.25,
+        "fim": 286.84,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 288.19,
+        "fim": 300.0,
+        "falante": "MTD009PM"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_02",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_02.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FEE013",
+      "FEE016",
+      "MEE014",
+      "MEO015"
+    ],
+    "referencia": [
+      {
+        "inicio": 0.02,
+        "fim": 2.03,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 17.57,
+        "fim": 19.13,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 22.85,
+        "fim": 23.19,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 29.76,
+        "fim": 30.240000000000002,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 50.13,
+        "fim": 50.550000000000004,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 52.39,
+        "fim": 54.75,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 54.23,
+        "fim": 54.43,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 78.08,
+        "fim": 78.56,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 79.22,
+        "fim": 79.6,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 80.08,
+        "fim": 83.87,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 82.47,
+        "fim": 83.27,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 85.13,
+        "fim": 85.36,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 85.44,
+        "fim": 93.52,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 89.18,
+        "fim": 89.94000000000001,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 94.77,
+        "fim": 99.69,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 96.01,
+        "fim": 98.26,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 96.42,
+        "fim": 96.63,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 98.28,
+        "fim": 98.41,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 101.04,
+        "fim": 111.60000000000001,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 109.85,
+        "fim": 110.41999999999999,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 111.92,
+        "fim": 112.28,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 112.69,
+        "fim": 115.00999999999999,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 116.64,
+        "fim": 118.91,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 120.4,
+        "fim": 121.07000000000001,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 122.98,
+        "fim": 143.36,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 144.72,
+        "fim": 165.39,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 168.97,
+        "fim": 172.1,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 172.32,
+        "fim": 172.65,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 173.31,
+        "fim": 192.81,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 177.68,
+        "fim": 178.07,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 188.1,
+        "fim": 188.35999999999999,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 191.24,
+        "fim": 194.51000000000002,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 191.78,
+        "fim": 192.17,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 201.1,
+        "fim": 201.44,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 217.91,
+        "fim": 228.53,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 229.82,
+        "fim": 232.39,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 234.6,
+        "fim": 269.09,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 249.46,
+        "fim": 250.6,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 270.29,
+        "fim": 289.55,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 290.9,
+        "fim": 300.0,
+        "falante": "FEE016"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_03",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_03.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FEE013",
+      "FEE016",
+      "MEE014",
+      "MEO015"
+    ],
+    "referencia": [
+      {
+        "inicio": 0.2,
+        "fim": 4.83,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 8.18,
+        "fim": 10.8,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 37.05,
+        "fim": 39.72,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 48.39,
+        "fim": 49.18,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 55.45,
+        "fim": 55.86,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 66.81,
+        "fim": 78.86,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 80.31,
+        "fim": 81.52,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 81.27,
+        "fim": 83.39999999999999,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 85.93,
+        "fim": 88.7,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 89.12,
+        "fim": 89.38000000000001,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 90.54,
+        "fim": 91.15,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 92.63,
+        "fim": 99.11999999999999,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 100.62,
+        "fim": 129.48000000000002,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 100.7,
+        "fim": 100.94,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 131.42,
+        "fim": 144.13,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 144.85,
+        "fim": 159.35999999999999,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 161.19,
+        "fim": 166.8,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 168.66,
+        "fim": 170.62,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 171.01,
+        "fim": 175.84,
+        "falante": "FEE016"
+      },
+      {
+        "inicio": 175.03,
+        "fim": 177.32,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 176.5,
+        "fim": 179.23,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 179.07,
+        "fim": 179.82,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 182.12,
+        "fim": 183.41,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 191.55,
+        "fim": 193.32000000000002,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 194.0,
+        "fim": 195.12,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 195.96,
+        "fim": 197.26000000000002,
+        "falante": "FEE013"
+      },
+      {
+        "inicio": 196.84,
+        "fim": 197.89000000000001,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 200.97,
+        "fim": 201.45,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 203.67,
+        "fim": 204.57,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 209.34,
+        "fim": 209.78,
+        "falante": "MEO015"
+      },
+      {
+        "inicio": 209.98,
+        "fim": 210.61999999999998,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 212.5,
+        "fim": 218.49,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 219.96,
+        "fim": 246.92000000000002,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 249.03,
+        "fim": 260.06,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 261.48,
+        "fim": 271.82,
+        "falante": "MEE014"
+      },
+      {
+        "inicio": 272.66,
+        "fim": 300.0,
+        "falante": "MEE014"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_04",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_04.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "MTD009PM",
+      "MTD011UID",
+      "MTD012ME"
+    ],
+    "referencia": [
+      {
+        "inicio": 57.11,
+        "fim": 71.0,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 60.55,
+        "fim": 60.959999999999994,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 71.8,
+        "fim": 72.11,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 72.76,
+        "fim": 92.45,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 93.12,
+        "fim": 107.74000000000001,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 109.66,
+        "fim": 119.92999999999999,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 120.38,
+        "fim": 120.74,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 121.11,
+        "fim": 121.48,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 121.57,
+        "fim": 139.10999999999999,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 132.84,
+        "fim": 133.18,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 140.36,
+        "fim": 163.54000000000002,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 164.39,
+        "fim": 181.33999999999997,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 178.78,
+        "fim": 179.07,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 182.76,
+        "fim": 183.54999999999998,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 183.74,
+        "fim": 186.07000000000002,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 187.94,
+        "fim": 197.87,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 206.59,
+        "fim": 210.91,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 212.1,
+        "fim": 228.22,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 229.36,
+        "fim": 236.64000000000001,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 238.9,
+        "fim": 249.63,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 250.97,
+        "fim": 263.2,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 264.67,
+        "fim": 273.32,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 275.08,
+        "fim": 279.39,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 280.47,
+        "fim": 280.8,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 281.83,
+        "fim": 282.08,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 282.33,
+        "fim": 283.07,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 285.34,
+        "fim": 300.0,
+        "falante": "MTD012ME"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_05",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_05.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FIE088",
+      "FIO084",
+      "FIO087",
+      "FIO089"
+    ],
+    "referencia": [
+      {
+        "inicio": 54.95,
+        "fim": 60.85,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 55.7,
+        "fim": 56.03,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 56.9,
+        "fim": 57.04,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 57.25,
+        "fim": 57.7,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 61.54,
+        "fim": 62.57,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 62.0,
+        "fim": 67.29,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 66.63,
+        "fim": 80.83,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 76.08,
+        "fim": 76.42999999999999,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 81.04,
+        "fim": 82.05000000000001,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 83.39,
+        "fim": 86.94,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 87.49,
+        "fim": 88.58999999999999,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 88.82,
+        "fim": 89.69,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 90.21,
+        "fim": 90.52,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 91.31,
+        "fim": 107.4,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 107.88,
+        "fim": 118.16999999999999,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 118.76,
+        "fim": 119.05000000000001,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 119.38,
+        "fim": 119.91,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 122.4,
+        "fim": 132.39000000000001,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 131.13,
+        "fim": 131.49,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 132.87,
+        "fim": 146.77,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 145.55,
+        "fim": 145.79000000000002,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 149.44,
+        "fim": 162.32,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 159.51,
+        "fim": 159.78,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 165.19,
+        "fim": 166.99,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 188.06,
+        "fim": 188.34,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 195.04,
+        "fim": 195.26999999999998,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 195.56,
+        "fim": 195.82,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 196.38,
+        "fim": 202.4,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 203.78,
+        "fim": 218.2,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 219.44,
+        "fim": 222.12,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 220.46,
+        "fim": 221.49,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 222.76,
+        "fim": 226.45,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 225.98,
+        "fim": 227.26999999999998,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 236.11,
+        "fim": 238.38000000000002,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 241.01,
+        "fim": 242.5,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 243.94,
+        "fim": 245.45,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 248.32,
+        "fim": 251.04,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 251.8,
+        "fim": 252.70000000000002,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 252.79,
+        "fim": 254.69,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 255.24,
+        "fim": 257.74,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 260.02,
+        "fim": 272.52,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 274.68,
+        "fim": 275.95,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 276.23,
+        "fim": 278.89000000000004,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 277.59,
+        "fim": 279.85999999999996,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 280.08,
+        "fim": 285.51,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 288.1,
+        "fim": 291.15000000000003,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 290.06,
+        "fim": 297.75,
+        "falante": "FIO089"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_06",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_06.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FIE088",
+      "FIO084",
+      "FIO087",
+      "FIO089"
+    ],
+    "referencia": [
+      {
+        "inicio": 39.38,
+        "fim": 41.330000000000005,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 41.27,
+        "fim": 41.56,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 41.31,
+        "fim": 41.550000000000004,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 41.82,
+        "fim": 42.25,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 43.24,
+        "fim": 54.400000000000006,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 50.89,
+        "fim": 51.34,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 55.91,
+        "fim": 64.64,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 65.64,
+        "fim": 66.87,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 65.67,
+        "fim": 89.79,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 90.2,
+        "fim": 107.80000000000001,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 111.92,
+        "fim": 129.26,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 130.37,
+        "fim": 130.9,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 130.37,
+        "fim": 135.06,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 132.38,
+        "fim": 133.32,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 133.21,
+        "fim": 134.57000000000002,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 134.85,
+        "fim": 164.38,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 165.64,
+        "fim": 171.16,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 172.84,
+        "fim": 191.44,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 192.63,
+        "fim": 194.71,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 195.99,
+        "fim": 220.01000000000002,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 215.46,
+        "fim": 215.73000000000002,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 222.16,
+        "fim": 226.96,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 228.04,
+        "fim": 232.64,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 233.84,
+        "fim": 238.91,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 240.4,
+        "fim": 262.73,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 264.31,
+        "fim": 266.54,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 270.36,
+        "fim": 277.46000000000004,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 280.59,
+        "fim": 290.57,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 292.13,
+        "fim": 300.0,
+        "falante": "FIE088"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_07",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_07.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FIE088",
+      "FIO084",
+      "FIO087",
+      "FIO089"
+    ],
+    "referencia": [
+      {
+        "inicio": 37.32,
+        "fim": 38.65,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 39.06,
+        "fim": 39.27,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 39.73,
+        "fim": 42.79,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 43.16,
+        "fim": 43.5,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 45.13,
+        "fim": 45.35,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 47.17,
+        "fim": 58.69,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 55.21,
+        "fim": 55.44,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 55.71,
+        "fim": 56.11,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 60.79,
+        "fim": 67.33,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 75.89,
+        "fim": 77.03,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 78.43,
+        "fim": 79.03,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 79.32,
+        "fim": 86.44,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 86.28,
+        "fim": 86.64,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 95.59,
+        "fim": 97.05,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 96.82,
+        "fim": 98.86,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 100.69,
+        "fim": 101.13,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 100.96,
+        "fim": 103.72999999999999,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 104.21,
+        "fim": 104.61,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 106.29,
+        "fim": 107.53,
+        "falante": "FIE088"
+      },
+      {
+        "inicio": 108.47,
+        "fim": 119.58,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 110.39,
+        "fim": 111.17,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 120.69,
+        "fim": 165.31,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 130.02,
+        "fim": 130.29000000000002,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 155.16,
+        "fim": 155.39,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 165.62,
+        "fim": 213.22,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 169.39,
+        "fim": 169.6,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 171.69,
+        "fim": 172.05,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 173.86,
+        "fim": 173.98000000000002,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 174.57,
+        "fim": 175.03,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 177.46,
+        "fim": 178.4,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 179.12,
+        "fim": 179.32,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 182.06,
+        "fim": 182.36,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 195.35,
+        "fim": 195.62,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 197.33,
+        "fim": 197.65,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 213.64,
+        "fim": 261.02,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 218.1,
+        "fim": 218.41,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 232.67,
+        "fim": 233.01999999999998,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 250.63,
+        "fim": 250.89,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 260.98,
+        "fim": 261.32,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 261.31,
+        "fim": 292.06,
+        "falante": "FIO089"
+      },
+      {
+        "inicio": 264.84,
+        "fim": 265.53999999999996,
+        "falante": "FIO084"
+      },
+      {
+        "inicio": 269.25,
+        "fim": 269.98,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 275.7,
+        "fim": 277.40999999999997,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 289.01,
+        "fim": 289.27,
+        "falante": "FIO087"
+      },
+      {
+        "inicio": 294.86,
+        "fim": 300.0,
+        "falante": "FIO089"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_08",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_08.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "FEO070",
+      "FEO072",
+      "MEE071",
+      "MEE073"
+    ],
+    "referencia": [
+      {
+        "inicio": 21.68,
+        "fim": 25.04,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 23.59,
+        "fim": 25.62,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 29.52,
+        "fim": 32.98,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 34.94,
+        "fim": 35.47,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 41.28,
+        "fim": 47.07,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 42.57,
+        "fim": 43.36,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 49.25,
+        "fim": 52.15,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 50.0,
+        "fim": 53.68,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 51.57,
+        "fim": 52.79,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 65.88,
+        "fim": 86.39999999999999,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 70.53,
+        "fim": 73.9,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 72.91,
+        "fim": 74.53999999999999,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 74.93,
+        "fim": 75.87,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 86.0,
+        "fim": 86.43,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 90.34,
+        "fim": 90.62,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 91.33,
+        "fim": 92.0,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 107.69,
+        "fim": 107.92,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 108.15,
+        "fim": 110.06,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 111.45,
+        "fim": 111.84,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 113.27,
+        "fim": 123.1,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 113.44,
+        "fim": 119.82,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 118.11,
+        "fim": 118.22,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 118.88,
+        "fim": 119.39,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 120.12,
+        "fim": 121.47,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 123.09,
+        "fim": 124.42,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 126.41,
+        "fim": 126.96,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 127.34,
+        "fim": 130.51,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 129.89,
+        "fim": 140.6,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 135.16,
+        "fim": 135.29,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 135.93,
+        "fim": 138.06,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 139.08,
+        "fim": 145.35000000000002,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 143.24,
+        "fim": 173.4,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 145.98,
+        "fim": 146.61999999999998,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 164.51,
+        "fim": 164.72,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 173.26,
+        "fim": 175.94,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 173.81,
+        "fim": 179.17000000000002,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 175.45,
+        "fim": 193.66,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 178.31,
+        "fim": 178.87,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 187.02,
+        "fim": 191.51000000000002,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 187.49,
+        "fim": 190.79000000000002,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 194.8,
+        "fim": 201.21,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 194.95,
+        "fim": 196.01,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 195.07,
+        "fim": 196.70999999999998,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 196.23,
+        "fim": 202.97,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 203.09,
+        "fim": 206.75,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 208.63,
+        "fim": 209.53,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 209.34,
+        "fim": 209.62,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 209.7,
+        "fim": 213.07,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 211.06,
+        "fim": 223.81,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 215.94,
+        "fim": 217.0,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 224.1,
+        "fim": 232.73,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 225.49,
+        "fim": 226.44,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 228.1,
+        "fim": 230.07999999999998,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 228.63,
+        "fim": 238.57,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 233.8,
+        "fim": 234.99,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 236.21,
+        "fim": 240.47,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 240.32,
+        "fim": 241.69,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 240.59,
+        "fim": 244.19,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 244.03,
+        "fim": 247.14000000000001,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 245.99,
+        "fim": 266.56,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 248.8,
+        "fim": 253.33,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 249.96,
+        "fim": 254.51000000000002,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 250.12,
+        "fim": 256.61,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 261.13,
+        "fim": 274.39,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 264.21,
+        "fim": 268.59,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 268.82,
+        "fim": 274.89,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 270.76,
+        "fim": 279.82,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 273.66,
+        "fim": 274.87,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 276.76,
+        "fim": 279.02,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 280.23,
+        "fim": 282.36,
+        "falante": "MEE073"
+      },
+      {
+        "inicio": 280.81,
+        "fim": 281.33,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 282.44,
+        "fim": 284.56,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 285.09,
+        "fim": 292.67999999999995,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 286.77,
+        "fim": 287.03,
+        "falante": "FEO070"
+      },
+      {
+        "inicio": 288.41,
+        "fim": 289.15000000000003,
+        "falante": "FEO072"
+      },
+      {
+        "inicio": 294.08,
+        "fim": 294.49,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 295.99,
+        "fim": 300.0,
+        "falante": "MEE071"
+      },
+      {
+        "inicio": 299.03,
+        "fim": 300.0,
+        "falante": "MEE073"
+      }
+    ]
+  },
+  {
+    "id": "reuniao_09",
+    "audio": "data/eval-diarizacao/corpus10/audio/reuniao_09.wav",
+    "duracao_s": 300.0,
+    "falantes": [
+      "MTD009PM",
+      "MTD011UID",
+      "MTD012ME"
+    ],
+    "referencia": [
+      {
+        "inicio": 21.26,
+        "fim": 36.02,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 24.09,
+        "fim": 24.64,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 39.62,
+        "fim": 60.949999999999996,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 61.25,
+        "fim": 75.8,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 77.08,
+        "fim": 98.0,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 99.11,
+        "fim": 107.47,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 109.64,
+        "fim": 112.56,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 109.75,
+        "fim": 109.97,
+        "falante": "MTD011UID"
+      },
+      {
+        "inicio": 114.8,
+        "fim": 139.87,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 141.37,
+        "fim": 157.55,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 158.44,
+        "fim": 163.34,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 165.11,
+        "fim": 174.02,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 175.32,
+        "fim": 180.12,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 180.27,
+        "fim": 183.0,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 180.89,
+        "fim": 181.23999999999998,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 182.67,
+        "fim": 184.51999999999998,
+        "falante": "MTD009PM"
+      },
+      {
+        "inicio": 192.77,
+        "fim": 193.34,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 203.97,
+        "fim": 216.1,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 216.7,
+        "fim": 235.25,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 236.85,
+        "fim": 254.62,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 255.1,
+        "fim": 267.76,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 268.97,
+        "fim": 291.93,
+        "falante": "MTD012ME"
+      },
+      {
+        "inicio": 295.07,
+        "fim": 300.0,
+        "falante": "MTD012ME"
+      }
+    ]
+  }
+]

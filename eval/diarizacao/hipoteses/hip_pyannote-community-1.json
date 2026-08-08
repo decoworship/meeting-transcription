@@ -1,0 +1,2656 @@
+{
+  "motor": "pyannote community-1",
+  "segundos": 512.5,
+  "hipoteses": {
+    "reuniao_00": [
+      {
+        "inicio": 9.78471875,
+        "fim": 10.10534375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 16.652843750000002,
+        "fim": 17.00721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 24.769718750000003,
+        "fim": 28.53284375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 29.039093750000003,
+        "fim": 29.309093750000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 37.00409375,
+        "fim": 37.54409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 37.76346875,
+        "fim": 37.78034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 37.78034375,
+        "fim": 37.79721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 37.79721875,
+        "fim": 38.016593750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 38.016593750000006,
+        "fim": 38.53971875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 38.99534375,
+        "fim": 43.56846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 39.73784375,
+        "fim": 39.90659375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 41.99909375,
+        "fim": 43.315343750000004,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 44.95221875,
+        "fim": 45.86346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 45.74534375,
+        "fim": 46.892843750000004,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 48.259718750000005,
+        "fim": 53.59221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 54.75659375,
+        "fim": 58.45221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 58.77284375000001,
+        "fim": 58.890968750000006,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 59.430968750000005,
+        "fim": 61.08471875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 61.08471875,
+        "fim": 61.455968750000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 61.455968750000004,
+        "fim": 62.51909375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 82.43159375,
+        "fim": 84.13596875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 84.87846875000001,
+        "fim": 85.84034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 85.84034375,
+        "fim": 88.94534375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 93.34971875000001,
+        "fim": 93.46784375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 93.46784375,
+        "fim": 93.55221875000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 93.68721875,
+        "fim": 93.94034375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 123.21846875000001,
+        "fim": 123.42096875000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 123.47159375000001,
+        "fim": 123.97784375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 124.72034375000001,
+        "fim": 130.52534375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 129.31034375000002,
+        "fim": 129.37784375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 129.44534375,
+        "fim": 129.49596875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 137.44409375,
+        "fim": 139.72221875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 140.21159375000002,
+        "fim": 142.08471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 141.15659375,
+        "fim": 142.05096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 142.05096875,
+        "fim": 142.97909375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 142.08471875,
+        "fim": 142.38846875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 142.38846875000002,
+        "fim": 142.59096875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 142.97909375,
+        "fim": 143.19846875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 144.16034375,
+        "fim": 150.18471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 144.39659375000002,
+        "fim": 144.83534375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 150.03284375,
+        "fim": 156.90096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 154.42034375,
+        "fim": 157.44096875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 157.08659375000002,
+        "fim": 157.22159375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 158.52096875,
+        "fim": 167.41409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 167.41409375,
+        "fim": 168.89909375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 167.43096875,
+        "fim": 167.76846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 169.50659375,
+        "fim": 175.26096875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 177.28596875000002,
+        "fim": 183.52971875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 183.56346875,
+        "fim": 191.37659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 183.61409375000002,
+        "fim": 185.74034375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 191.54534375,
+        "fim": 200.47221875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 194.29596875000001,
+        "fim": 194.56596875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 200.16846875000002,
+        "fim": 200.37096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 201.13034375,
+        "fim": 201.16409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 201.16409375,
+        "fim": 201.87284375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 201.97409375,
+        "fim": 208.35284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 208.87596875000003,
+        "fim": 211.54221875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 211.54221875000002,
+        "fim": 211.96409375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 211.96409375000002,
+        "fim": 212.03159375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 212.03159375,
+        "fim": 220.95846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 222.08909375000002,
+        "fim": 222.15659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 222.69659375,
+        "fim": 222.71346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 222.71346875,
+        "fim": 222.73034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 222.73034375,
+        "fim": 222.74721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 222.74721875,
+        "fim": 240.02721875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 222.93284375000002,
+        "fim": 223.75971875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 231.60659375,
+        "fim": 242.03534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 240.02721875,
+        "fim": 251.62034375000002,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 242.03534375,
+        "fim": 249.74721875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 251.70471875,
+        "fim": 251.72159375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 251.72159375,
+        "fim": 251.73846875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 251.73846875,
+        "fim": 251.75534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 251.75534375,
+        "fim": 253.03784375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 252.02534375000002,
+        "fim": 252.32909375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 253.03784375,
+        "fim": 255.38346875000002,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 253.76346875000002,
+        "fim": 259.31534375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 259.34909375,
+        "fim": 259.95659375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 260.34471875,
+        "fim": 267.36471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 265.96409375,
+        "fim": 278.70471875000004,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 275.29596875000004,
+        "fim": 290.24721875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 285.82596875,
+        "fim": 291.51284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 290.24721875,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 291.51284375,
+        "fim": 291.64784375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 291.64784375,
+        "fim": 291.81659375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 291.81659375000004,
+        "fim": 293.35221875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 293.58846875,
+        "fim": 293.60534375000003,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 296.94659375000003,
+        "fim": 297.14909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 297.31784375,
+        "fim": 297.43596875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 297.72284375000004,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_01": [
+      {
+        "inicio": 13.46346875,
+        "fim": 22.035968750000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 15.353468750000001,
+        "fim": 15.89346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 19.656593750000003,
+        "fim": 19.90971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 23.36909375,
+        "fim": 24.820343750000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 26.23784375,
+        "fim": 27.08159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 32.59971875,
+        "fim": 33.190343750000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 36.07596875,
+        "fim": 47.58471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 40.81784375,
+        "fim": 41.42534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 43.43346875,
+        "fim": 43.48409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 45.35721875,
+        "fim": 45.627218750000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 48.02346875,
+        "fim": 48.462218750000005,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 50.149718750000005,
+        "fim": 52.242218750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 54.19971875,
+        "fim": 58.03034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 62.265968750000006,
+        "fim": 62.77221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 65.59034375,
+        "fim": 87.81471875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 87.89909375,
+        "fim": 88.13534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 88.59096875,
+        "fim": 90.68346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 91.72971875,
+        "fim": 97.73721875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 99.17159375,
+        "fim": 101.41596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 106.90034375,
+        "fim": 113.21159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 111.32159375,
+        "fim": 111.45659375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 116.65409375,
+        "fim": 138.52409375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 140.61659375000002,
+        "fim": 141.81471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 143.41784375,
+        "fim": 147.70409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 149.66159375,
+        "fim": 155.34846875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 157.57596875000002,
+        "fim": 158.14971875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 161.35596875000002,
+        "fim": 163.51596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 163.68471875,
+        "fim": 163.97159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 164.42721875,
+        "fim": 166.45221875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 167.02596875,
+        "fim": 170.31659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 171.34596875,
+        "fim": 188.32221875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 182.66909375,
+        "fim": 182.87159375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 183.12471875,
+        "fim": 183.51284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 188.86221875,
+        "fim": 188.94659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 188.96346875,
+        "fim": 189.03096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 189.45284375,
+        "fim": 189.80721875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 190.88721875000002,
+        "fim": 192.67596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 193.45221875000001,
+        "fim": 194.00909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 196.05096875,
+        "fim": 199.30784375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 200.57346875000002,
+        "fim": 200.94471875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 202.02471875,
+        "fim": 222.15659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 212.16659375,
+        "fim": 212.63909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 222.96659375000002,
+        "fim": 223.15221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 223.23659375000003,
+        "fim": 253.20659375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 253.32471875000002,
+        "fim": 258.70784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 260.36159375,
+        "fim": 262.18409375000005,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 262.40346875,
+        "fim": 262.96034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 262.97721875,
+        "fim": 279.93659375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 281.35409375,
+        "fim": 284.76284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 285.25221875,
+        "fim": 285.84284375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 288.20534375,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_02": [
+      {
+        "inicio": 0.03096875,
+        "fim": 1.0265937500000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 47.415968750000005,
+        "fim": 49.03596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 78.07784375,
+        "fim": 78.56721875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 79.24221875,
+        "fim": 79.59659375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 80.05221875000001,
+        "fim": 83.84909375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 82.58346875000001,
+        "fim": 83.08971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 85.04721875,
+        "fim": 85.36784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 85.40159375,
+        "fim": 91.02096875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 89.16471875,
+        "fim": 89.41784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 91.49346875,
+        "fim": 95.88096875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 95.99909375,
+        "fim": 98.29409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 96.42096875,
+        "fim": 103.99784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 105.56721875000001,
+        "fim": 115.10159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 109.87034375,
+        "fim": 110.30909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 111.91221875000001,
+        "fim": 112.30034375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 116.62034375,
+        "fim": 119.08409375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 119.97846875,
+        "fim": 121.17659375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 122.94846875,
+        "fim": 165.43971875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 168.98346875000001,
+        "fim": 172.71284375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 172.34159375000002,
+        "fim": 172.67909375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 173.20221875000001,
+        "fim": 193.30034375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 177.69096875000002,
+        "fim": 178.09596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 188.22096875000003,
+        "fim": 188.38971875000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 191.37659375,
+        "fim": 192.11909375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 193.30034375000002,
+        "fim": 194.54909375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 201.14721875,
+        "fim": 201.46784375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 218.91659375,
+        "fim": 232.55159375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 234.59346875000003,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 249.49409375000002,
+        "fim": 250.60784375000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_03": [
+      {
+        "inicio": 0.30096875,
+        "fim": 0.7565937500000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 8.19846875,
+        "fim": 10.712843750000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 26.42346875,
+        "fim": 26.625968750000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 26.86221875,
+        "fim": 26.879093750000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 26.89596875,
+        "fim": 27.773468750000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 32.970968750000004,
+        "fim": 33.03846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 37.02096875,
+        "fim": 39.75471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 61.742843750000006,
+        "fim": 63.008468750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 63.143468750000004,
+        "fim": 63.531593750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 63.565343750000004,
+        "fim": 63.58221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 66.73784375000001,
+        "fim": 68.49284375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 68.66159375000001,
+        "fim": 68.94846875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 69.67409375,
+        "fim": 78.95534375000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 80.30534375,
+        "fim": 81.99284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 82.34721875000001,
+        "fim": 82.98846875000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 85.95846875000001,
+        "fim": 88.60784375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 89.11409375000001,
+        "fim": 89.40096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 90.53159375,
+        "fim": 91.17284375000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 92.57346875,
+        "fim": 99.25596875000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 100.60596875,
+        "fim": 129.52971875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 131.40284375000002,
+        "fim": 133.84971875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 135.97596875000002,
+        "fim": 159.49971875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 161.18721875,
+        "fim": 166.80659375000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 168.67971875,
+        "fim": 170.56971875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 171.02534375000002,
+        "fim": 176.12159375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 175.04159375,
+        "fim": 176.37471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 176.47596875000002,
+        "fim": 179.31096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 179.04096875000002,
+        "fim": 179.85096875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 182.09534375,
+        "fim": 182.77034375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 191.52846875,
+        "fim": 193.09784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 192.00096875,
+        "fim": 192.01784375000003,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 192.01784375000003,
+        "fim": 192.60846875000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 194.00909375,
+        "fim": 197.31659375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 196.79346875000002,
+        "fim": 197.43471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 203.64471875,
+        "fim": 204.15096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 209.33159375000002,
+        "fim": 210.71534375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 210.71534375000002,
+        "fim": 210.74909375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 212.57159375,
+        "fim": 223.20284375000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 225.00846875000002,
+        "fim": 246.94596875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 248.93721875000003,
+        "fim": 255.46784375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 257.34096875,
+        "fim": 271.19534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 272.57909375,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_04": [
+      {
+        "inicio": 5.9372187499999995,
+        "fim": 7.3209687500000005,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 7.92846875,
+        "fim": 8.89034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 24.83721875,
+        "fim": 31.992218750000006,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 41.070968750000006,
+        "fim": 42.28596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 50.909093750000004,
+        "fim": 51.26346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 57.119093750000005,
+        "fim": 57.45659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 57.50721875,
+        "fim": 59.127218750000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 59.228468750000005,
+        "fim": 60.86534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 61.16909375,
+        "fim": 61.92846875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 63.767843750000004,
+        "fim": 66.16409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 66.29909375,
+        "fim": 66.40034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 66.77159375000001,
+        "fim": 67.54784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 67.68284375,
+        "fim": 71.39534375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 71.80034375000001,
+        "fim": 72.13784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 71.81721875000001,
+        "fim": 71.88471875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 72.67784375000001,
+        "fim": 98.74971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 99.12096875,
+        "fim": 107.77784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 109.34721875000001,
+        "fim": 120.02909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 120.36659375,
+        "fim": 121.09221875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 121.09221875,
+        "fim": 121.44659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 121.44659375,
+        "fim": 125.51346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 125.51346875,
+        "fim": 125.54721875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 125.54721875000001,
+        "fim": 125.91846875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 125.91846875,
+        "fim": 125.96909375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 125.96909375000001,
+        "fim": 126.07034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 126.07034375,
+        "fim": 126.10409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 126.10409375,
+        "fim": 126.32346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 126.32346875,
+        "fim": 126.99846875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 128.53409375,
+        "fim": 132.46596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 134.37284375000002,
+        "fim": 139.11471875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 140.36346875,
+        "fim": 181.36971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 182.75346875000002,
+        "fim": 183.54659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 183.73221875000002,
+        "fim": 186.24659375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 187.96784375000001,
+        "fim": 195.19034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 196.57409375,
+        "fim": 197.83971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 206.59784375,
+        "fim": 236.68596875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 238.87971875000002,
+        "fim": 249.69659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 249.81471875000003,
+        "fim": 250.13534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 250.20284375000003,
+        "fim": 263.23034375000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 264.66471875,
+        "fim": 273.25409375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 275.05971875,
+        "fim": 280.83096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 281.87721875,
+        "fim": 281.94471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 282.28221875,
+        "fim": 283.04159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 285.30284375,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_05": [
+      {
+        "inicio": 22.96409375,
+        "fim": 24.75284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 25.69784375,
+        "fim": 29.882843750000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 54.95909375,
+        "fim": 57.220343750000005,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 57.220343750000005,
+        "fim": 57.47346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 57.47346875,
+        "fim": 61.101593750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 57.524093750000006,
+        "fim": 57.77721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 61.47284375,
+        "fim": 66.58596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 61.89471875,
+        "fim": 62.53596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 66.58596875,
+        "fim": 81.03096875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 76.10346875,
+        "fim": 76.47471875000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 81.03096875,
+        "fim": 81.92534375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 81.06471875000001,
+        "fim": 81.35159375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 81.35159375,
+        "fim": 81.38534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 81.38534375,
+        "fim": 81.43596875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 81.92534375000001,
+        "fim": 82.19534375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 82.19534375,
+        "fim": 82.22909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 83.29221875,
+        "fim": 89.82284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 89.87346875,
+        "fim": 89.89034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 90.17721875000001,
+        "fim": 90.59909375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 91.29096875,
+        "fim": 107.45721875000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 107.45721875000001,
+        "fim": 107.49096875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 107.82846875000001,
+        "fim": 119.99534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 122.37471875000001,
+        "fim": 137.54534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 137.96721875,
+        "fim": 145.27409375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 145.51034375,
+        "fim": 145.83096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 145.83096875,
+        "fim": 145.84784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 145.96596875,
+        "fim": 146.75909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 149.45909375000002,
+        "fim": 152.78346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 153.22221875,
+        "fim": 153.74534375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 154.15034375000002,
+        "fim": 156.91784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 157.52534375000002,
+        "fim": 159.22971875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 159.43221875,
+        "fim": 162.36846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 159.60096875000002,
+        "fim": 159.90471875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 165.13596875000002,
+        "fim": 166.99221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 188.06909375,
+        "fim": 188.47409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 194.98784375000002,
+        "fim": 202.41284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 203.71221875,
+        "fim": 218.25846875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 219.38909375,
+        "fim": 222.19034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 220.78971875000002,
+        "fim": 221.53221875000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 222.62909375,
+        "fim": 226.57784375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 225.95346875,
+        "fim": 226.47659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 226.91534375,
+        "fim": 227.23596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 236.09534375,
+        "fim": 238.42409375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 240.97221875000002,
+        "fim": 241.57971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 241.57971875,
+        "fim": 241.61346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 243.90846875000003,
+        "fim": 245.00534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 248.31284375,
+        "fim": 249.46034375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 251.73846875,
+        "fim": 255.45096875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 256.22721875,
+        "fim": 256.26096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 256.26096875,
+        "fim": 256.37909375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 257.30721875,
+        "fim": 257.74596875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 260.00721875,
+        "fim": 272.54534375000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 274.65471875000003,
+        "fim": 276.05534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 276.19034375,
+        "fim": 277.43909375000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 277.55721875,
+        "fim": 277.57409375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 277.57409375000003,
+        "fim": 278.53596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 278.53596875,
+        "fim": 285.85971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 278.55284375,
+        "fim": 279.78471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 288.07034375,
+        "fim": 291.29346875000005,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 290.07846875,
+        "fim": 297.89159375,
+        "falante": "Speaker 2"
+      }
+    ],
+    "reuniao_06": [
+      {
+        "inicio": 0.03096875,
+        "fim": 1.26284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 1.93784375,
+        "fim": 2.0897187500000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 3.00096875,
+        "fim": 4.620968749999999,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 3.0515937500000003,
+        "fim": 3.94596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 4.620968749999999,
+        "fim": 6.2915937500000005,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 32.025968750000004,
+        "fim": 33.612218750000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 39.41721875,
+        "fim": 41.64471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 41.77971875,
+        "fim": 42.42096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 43.16346875,
+        "fim": 54.43596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 50.85846875,
+        "fim": 51.26346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 55.76909375,
+        "fim": 104.03159375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 65.65784375,
+        "fim": 67.54784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 104.63909375,
+        "fim": 107.79471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 111.91221875000001,
+        "fim": 130.99784375000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 130.33971875,
+        "fim": 134.67659375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 132.21284375000002,
+        "fim": 162.53721875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 162.89159375,
+        "fim": 164.42721875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 165.64221875,
+        "fim": 170.77221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 172.84784375,
+        "fim": 184.74471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 185.55471875,
+        "fim": 188.20409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 189.23346875000001,
+        "fim": 191.44409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 192.60846875000001,
+        "fim": 194.80221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 195.98346875000001,
+        "fim": 220.03034375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 215.45721875,
+        "fim": 215.79471875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 222.12284375000002,
+        "fim": 232.72034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 233.80034375000002,
+        "fim": 239.03159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 240.33096875,
+        "fim": 262.77471875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 264.27659375,
+        "fim": 266.60534375000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 270.35159375,
+        "fim": 277.48971875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 280.59471875,
+        "fim": 290.58471875000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 292.08659375,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_07": [
+      {
+        "inicio": 37.13909375,
+        "fim": 39.501593750000005,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 39.68721875,
+        "fim": 39.720968750000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 39.720968750000004,
+        "fim": 42.84284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 43.16346875,
+        "fim": 43.500968750000006,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 45.12096875,
+        "fim": 45.407843750000005,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 47.14596875,
+        "fim": 48.95159375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 48.96846875,
+        "fim": 49.03596875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 49.25534375,
+        "fim": 55.68471875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 55.68471875,
+        "fim": 55.937843750000006,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 55.937843750000006,
+        "fim": 58.688468750000006,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 60.76409375,
+        "fim": 67.22721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 75.88409375,
+        "fim": 77.08221875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 78.41534375,
+        "fim": 78.43221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 78.43221875,
+        "fim": 79.10721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 79.10721875,
+        "fim": 86.56596875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 86.21159375,
+        "fim": 86.66721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 95.56034375,
+        "fim": 98.90159375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 100.90971875000001,
+        "fim": 104.62221875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 106.27596875,
+        "fim": 107.03534375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 107.03534375000001,
+        "fim": 107.23784375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 108.38534375,
+        "fim": 192.70971875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 130.06971875000002,
+        "fim": 130.13721875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 193.13159375,
+        "fim": 234.03659375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 218.20784375000002,
+        "fim": 218.35971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 234.77909375000002,
+        "fim": 266.85846875000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 260.95221875000004,
+        "fim": 261.42471875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 267.11159375,
+        "fim": 267.98909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 268.39409375,
+        "fim": 290.21346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 269.17034375000003,
+        "fim": 269.99721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 276.03846875,
+        "fim": 276.96659375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 277.03409375,
+        "fim": 277.05096875000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 277.06784375,
+        "fim": 277.13534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 289.11659375,
+        "fim": 289.36971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 290.65221875000003,
+        "fim": 292.13721875000005,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 294.83721875000003,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ],
+    "reuniao_08": [
+      {
+        "inicio": 21.69846875,
+        "fim": 25.12409375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 25.12409375,
+        "fim": 25.57971875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 25.57971875,
+        "fim": 25.63034375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 29.511593750000003,
+        "fim": 32.83596875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 30.827843750000003,
+        "fim": 31.03034375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 31.249718750000003,
+        "fim": 32.78534375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 32.83596875,
+        "fim": 35.384093750000005,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 34.94534375,
+        "fim": 35.46846875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 41.27346875,
+        "fim": 47.24721875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 42.69096875,
+        "fim": 44.63159375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 45.64409375,
+        "fim": 45.711593750000006,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 49.28909375,
+        "fim": 53.28846875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 49.99784375,
+        "fim": 53.67659375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 65.87721875,
+        "fim": 81.40221875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 69.15096875,
+        "fim": 72.03659375000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 72.03659375000001,
+        "fim": 75.02346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 75.02346875,
+        "fim": 75.90096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 75.90096875,
+        "fim": 75.91784375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 75.91784375,
+        "fim": 76.12034375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 84.25409375000001,
+        "fim": 85.57034375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 85.92471875000001,
+        "fim": 86.04284375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 86.00909375,
+        "fim": 86.02596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 86.02596875,
+        "fim": 86.34659375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 86.34659375000001,
+        "fim": 86.44784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 91.03784375000001,
+        "fim": 93.18096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 108.14909375,
+        "fim": 110.08971875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 111.54096875,
+        "fim": 111.82784375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 113.27909375,
+        "fim": 113.31284375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 113.31284375000001,
+        "fim": 113.36346875000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 113.36346875000001,
+        "fim": 114.19034375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 114.15659375000001,
+        "fim": 114.25784375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 114.19034375000001,
+        "fim": 114.20721875000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 114.20721875000001,
+        "fim": 121.93596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 114.25784375,
+        "fim": 116.13096875000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 116.13096875000001,
+        "fim": 116.19846875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 116.19846875,
+        "fim": 116.28284375000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 116.46846875000001,
+        "fim": 116.55284375000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 116.55284375000001,
+        "fim": 116.75534375000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 118.35846875000001,
+        "fim": 118.49346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 118.72971875,
+        "fim": 123.03284375000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 122.22284375000001,
+        "fim": 122.23971875000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 122.77971875,
+        "fim": 124.28159375000001,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 123.03284375000001,
+        "fim": 123.48846875000001,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 123.48846875000001,
+        "fim": 123.69096875000001,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 127.28534375000001,
+        "fim": 130.64346875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 129.86721875,
+        "fim": 140.54909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 135.95909375000002,
+        "fim": 146.64096875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 143.23221875000002,
+        "fim": 199.88159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 146.64096875,
+        "fim": 146.69159375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 164.44409375,
+        "fim": 164.93346875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 175.49721875,
+        "fim": 179.26034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 187.10721875000002,
+        "fim": 190.00971875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 190.00971875000002,
+        "fim": 190.12784375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 190.53284375,
+        "fim": 191.56221875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 194.78534375,
+        "fim": 199.67909375000002,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 199.88159375,
+        "fim": 199.89846875,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 199.89846875,
+        "fim": 199.98284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 199.96596875,
+        "fim": 200.01659375000003,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 199.99971875,
+        "fim": 202.98659375000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 200.01659375000003,
+        "fim": 201.11346875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 201.11346875,
+        "fim": 201.29909375000003,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 201.29909375000003,
+        "fim": 201.34971875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 201.34971875000002,
+        "fim": 201.36659375000002,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 203.08784375000002,
+        "fim": 206.73284375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 208.63971875000001,
+        "fim": 209.51721875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 209.51721875,
+        "fim": 212.94284375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 211.22159375,
+        "fim": 236.97284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 215.17034375,
+        "fim": 217.02659375000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 225.85221875000002,
+        "fim": 226.40909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 228.23159375,
+        "fim": 228.43409375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 228.55221875,
+        "fim": 228.65346875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 228.65346875,
+        "fim": 230.59409375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 230.59409375,
+        "fim": 230.61096875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 232.19721875000002,
+        "fim": 232.56846875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 232.56846875000002,
+        "fim": 232.65284375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 233.76659375000003,
+        "fim": 234.42471875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 236.21346875,
+        "fim": 240.41534375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 236.97284375,
+        "fim": 237.29346875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 237.29346875000002,
+        "fim": 237.42846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 237.54659375000003,
+        "fim": 237.56346875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 237.63096875000002,
+        "fim": 238.03596875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 238.03596875000002,
+        "fim": 238.57596875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 238.57596875000002,
+        "fim": 238.67721875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 240.41534375,
+        "fim": 269.05221875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 240.55034375000002,
+        "fim": 240.65159375000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 244.29659375000003,
+        "fim": 247.09784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 252.36284375000002,
+        "fim": 253.07159375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 253.07159375,
+        "fim": 253.57784375000003,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 253.57784375000003,
+        "fim": 253.59471875000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 253.59471875000003,
+        "fim": 253.69596875000002,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 255.92346875,
+        "fim": 255.94034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 255.94034375,
+        "fim": 256.46346875,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 262.89284375,
+        "fim": 263.12909375000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 263.34846875,
+        "fim": 265.45784375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 265.45784375,
+        "fim": 274.77284375,
+        "falante": "Speaker 4"
+      },
+      {
+        "inicio": 270.75659375000004,
+        "fim": 278.75534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 276.66284375000004,
+        "fim": 276.73034375000003,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 276.73034375000003,
+        "fim": 278.01284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 278.46846875,
+        "fim": 280.86471875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 280.66221875,
+        "fim": 281.25284375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 280.86471875,
+        "fim": 280.94909375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 280.94909375000003,
+        "fim": 280.96596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 280.96596875,
+        "fim": 280.98284375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 280.98284375000003,
+        "fim": 281.03346875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 281.03346875,
+        "fim": 281.20221875000004,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 281.20221875000004,
+        "fim": 281.97846875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 281.25284375,
+        "fim": 281.28659375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 281.97846875,
+        "fim": 282.34971875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 282.43409375000005,
+        "fim": 284.57721875000004,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 285.08346875,
+        "fim": 292.72784375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 288.39096875,
+        "fim": 289.11659375,
+        "falante": "Speaker 3"
+      },
+      {
+        "inicio": 293.82471875000005,
+        "fim": 294.48284375000003,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 295.96784375000004,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 2"
+      }
+    ],
+    "reuniao_09": [
+      {
+        "inicio": 6.764093750000001,
+        "fim": 8.907218750000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 9.497843750000001,
+        "fim": 10.476593750000003,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 21.10784375,
+        "fim": 21.15846875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 21.15846875,
+        "fim": 21.22596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 21.22596875,
+        "fim": 23.75721875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 21.293468750000002,
+        "fim": 21.31034375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 24.02721875,
+        "fim": 24.044093750000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 24.07784375,
+        "fim": 24.68534375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 24.11159375,
+        "fim": 24.145343750000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 25.20846875,
+        "fim": 36.649718750000005,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 39.602843750000005,
+        "fim": 41.45909375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 43.095968750000004,
+        "fim": 97.28159375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 99.12096875,
+        "fim": 107.32221875,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 109.61721875,
+        "fim": 112.72221875000001,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 114.76409375,
+        "fim": 118.27409375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 119.52284375,
+        "fim": 139.85721875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 141.37596875,
+        "fim": 163.38096875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 165.08534375000002,
+        "fim": 174.78846875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 174.97409375,
+        "fim": 175.26096875000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 175.27784375000002,
+        "fim": 181.82534375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 180.27284375000002,
+        "fim": 180.52596875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 181.89284375000003,
+        "fim": 181.96034375000002,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 181.96034375000002,
+        "fim": 182.92221875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 181.99409375000002,
+        "fim": 183.04034375,
+        "falante": "Speaker 2"
+      },
+      {
+        "inicio": 203.96534375000002,
+        "fim": 208.31909375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 209.92221875,
+        "fim": 235.35284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 236.83784375000002,
+        "fim": 238.03596875000002,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 240.87096875,
+        "fim": 267.76971875000004,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 268.95096875,
+        "fim": 275.95409375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 278.40096875,
+        "fim": 287.19284375,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 289.28534375000004,
+        "fim": 291.90096875,
+        "falante": "Speaker 1"
+      },
+      {
+        "inicio": 295.05659375000005,
+        "fim": 299.96721875000003,
+        "falante": "Speaker 1"
+      }
+    ]
+  }
+}
