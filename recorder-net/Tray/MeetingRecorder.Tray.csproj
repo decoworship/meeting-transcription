@@ -19,6 +19,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- O logo entra embutido no executável: um arquivo solto ao lado do .exe
+         seria mais uma coisa para o instalador da Fase 4 acertar, e some se
+         alguém copiar só o binário. -->
+    <EmbeddedResource Include="..\..\assets\logo-256.png"
+                      LogicalName="MeetingRecorder.Tray.logo-256.png" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Capture\MeetingRecorder.Capture.csproj" />
   </ItemGroup>
 
