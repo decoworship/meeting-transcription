@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MeetingRecorder.Agenda;
 using MeetingRecorder.Capture;
 using MeetingRecorder.Core;
 using NAudio.CoreAudioApi;
@@ -23,6 +24,10 @@ internal static class Programa
 
     private static readonly List<WasapiTrackCapture> Capturas = [];
     private static CatalogoDeDispositivos _catalogo = null!;
+    private static readonly ClienteDaAgenda Agenda = new();
+    private static Evento? _evento;
+    private static CancellationTokenSource? _consulta;
+    private static SynchronizationContext? _ui;
     private static string? _pastaAtual;
     private static DateTime _inicio;
 
@@ -39,6 +44,9 @@ internal static class Programa
         }
 
         ApplicationConfiguration.Initialize();
+        // Capturado aqui porque só existe depois do Initialize e só nesta
+        // thread: é por ele que a consulta da agenda volta para a UI.
+        _ui = SynchronizationContext.Current;
         _cfg = Configuracoes.Carregar();
         Estado.NotificacoesLigadas = _cfg.Notifications;
 
@@ -65,6 +73,8 @@ internal static class Programa
         Application.ApplicationExit += (_, _) =>
         {
             Parar();
+            _consulta?.Cancel();
+            Agenda.Dispose();
             _catalogo.Dispose();
             _icone.Visible = false;
         };
@@ -85,9 +95,10 @@ internal static class Programa
     {
         menu.Items.Clear();
 
-        menu.Items.Add(new ToolStripMenuItem(Estado.TextoDeStatus(
-            DuracaoAtual(), Capturas.FirstOrDefault(c => c.Stats.Nome == "mic")?.NomeDispositivo))
-        { Enabled = false });
+        string status = Estado.TextoDeStatus(
+            DuracaoAtual(), Capturas.FirstOrDefault(c => c.Stats.Nome == "mic")?.NomeDispositivo);
+        if (_evento is { } ev) status += $"\n{Cortar(ev.Titulo, 40)}";
+        menu.Items.Add(new ToolStripMenuItem(status) { Enabled = false });
         menu.Items.Add(new ToolStripSeparator());
 
         menu.Items.Add(new ToolStripMenuItem(
@@ -179,16 +190,65 @@ internal static class Programa
         return raiz;
     }
 
+    /// <remarks>
+    /// Sem <c>google_client_secret.json</c> o submenu vira uma instrução em vez
+    /// de sumir: quem nunca configurou precisa descobrir o que falta, e um item
+    /// invisível não ensina nada.
+    /// </remarks>
     private static ToolStripMenuItem SubmenuDoCalendario()
     {
         var raiz = new ToolStripMenuItem("Google Calendar");
-        raiz.DropDownItems.Add(new ToolStripMenuItem("(ainda não portado — item 4 da Fase 1)")
+
+        if (!ClienteDaAgenda.EstaConfigurado())
+        {
+            raiz.DropDownItems.Add(new ToolStripMenuItem(
+                "Falta google_client_secret.json em") { Enabled = false });
+            raiz.DropDownItems.Add(new ToolStripMenuItem(
+                @"%USERPROFILE%\.meeting-recorder") { Enabled = false });
+            return raiz;
+        }
+
+        bool autorizado = ClienteDaAgenda.EstaAutorizado();
+        string conta = ClienteDaAgenda.EmailDaConta();
+        raiz.DropDownItems.Add(new ToolStripMenuItem(
+            !autorizado ? "Nenhuma conta conectada"
+            : conta.Length > 0 ? $"Conectado: {conta}" : "Conectado")
         { Enabled = false });
         raiz.DropDownItems.Add(new ToolStripSeparator());
-        raiz.DropDownItems.Add(new ToolStripMenuItem("Usar a agenda", null,
+
+        raiz.DropDownItems.Add(new ToolStripMenuItem("Usar esta agenda", null,
             (_, _) => { _cfg.UseCalendar = !_cfg.UseCalendar; _cfg.Salvar(); })
-        { Checked = _cfg.UseCalendar, Enabled = false });
+        { Checked = _cfg.UseCalendar });
+
+        raiz.DropDownItems.Add(new ToolStripMenuItem(
+            autorizado ? "Trocar de conta..." : "Conectar conta...", null,
+            (_, _) => Autorizar()));
+
+        if (autorizado)
+            raiz.DropDownItems.Add(new ToolStripMenuItem("Desconectar", null, (_, _) =>
+            {
+                ClienteDaAgenda.Desconectar();
+                Avisar("Conta do Google desconectada.", ToolTipIcon.Info);
+            }));
+
         return raiz;
+    }
+
+    /// <summary>Abre o navegador uma vez para autorizar. Nunca na thread da UI.</summary>
+    private static void Autorizar()
+    {
+        _ = Task.Run(async () =>
+        {
+            string? token = await Autorizacao.AutorizarAsync();
+            if (token is not null) await Agenda.GuardarContaAsync(token);
+
+            string conta = ClienteDaAgenda.EmailDaConta();
+            string msg = token is null ? "Autorização falhou."
+                : conta.Length > 0 ? $"Conectado: {conta}"
+                : "Calendário autorizado.";
+            NaUi(() => Avisar(msg, token is null ? ToolTipIcon.Error : ToolTipIcon.Info,
+                              sempre: true));
+        });
     }
 
     /// <summary>Encurta caminho longo pelo meio, preservando início e fim.</summary>
@@ -245,6 +305,10 @@ internal static class Programa
 
             _inicio = DateTime.UtcNow;
             Estado.Iniciou();
+            // Depois de Iniciar(), nunca antes: a agenda é chamada de rede e não
+            // pode atrasar o começo da captura. Ver ClienteDaAgenda.
+            _evento = null;
+            if (_cfg.UseCalendar) ConsultarAgenda();
             if (_cfg.StartMuted) AlternarMudo();
             Atualizar();
         }
@@ -294,9 +358,15 @@ internal static class Programa
 
         var system = Stats("system");
         var mic = Stats("mic");
+        // Cancela uma consulta ainda em voo: a gravação acabou, o rótulo dela
+        // não serve mais para nada e o resultado chegaria depois do meta.json.
+        _consulta?.Cancel();
+        var evento = _evento;
+        _evento = null;
+
         var meta = Meta.Montar(DateTimeOffset.Now, system, mic,
             Dispositivo("system"), Dispositivo("mic"),
-            Taxa("system"), Taxa("mic"));
+            Taxa("system"), Taxa("mic"), evento?.ParaMeta());
 
         if (_pastaAtual is not null)
             File.WriteAllText(Path.Combine(_pastaAtual, "meta.json"), meta.ParaJson());
@@ -317,6 +387,53 @@ internal static class Programa
         Estado.Parou();
         Atualizar();
     }
+
+    /// <summary>
+    /// Procura na agenda a reunião correspondente. Roda fora da thread da UI.
+    /// </summary>
+    private static void ConsultarAgenda()
+    {
+        _consulta?.Cancel();
+        var cts = new CancellationTokenSource();
+        _consulta = cts;
+
+        _ = Task.Run(async () =>
+        {
+            var r = await Agenda.EventoAtualAsync(ct: cts.Token);
+            NaUi(() =>
+            {
+                if (!Estado.Gravando || cts.IsCancellationRequested) return;
+
+                if (r.ExigeAtencao)
+                {
+                    // Não achar reunião é normal; ter autorizado e o token morrer
+                    // não é. Sem este aviso o gravador pararia de identificar
+                    // reuniões em silêncio, e só se descobriria semanas depois.
+                    Avisar("Calendário indisponível. Reautorize pelo menu.\n"
+                           + "A gravação continua normalmente.",
+                           ToolTipIcon.Warning, sempre: true);
+                    return;
+                }
+
+                if (r.Evento is not { } ev) return;
+
+                _evento = ev;
+                int n = ev.NomesDosParticipantes().Count;
+                Avisar($"{Cortar(ev.Titulo, 40)}\n{n} participantes", ToolTipIcon.Info);
+                Atualizar();
+            });
+        });
+    }
+
+    /// <summary>Executa na thread da UI, venha de onde vier.</summary>
+    private static void NaUi(Action acao)
+    {
+        if (_ui is null) acao();
+        else _ui.Post(_ => acao(), null);
+    }
+
+    private static string Cortar(string texto, int max) =>
+        texto.Length <= max ? texto : texto[..max];
 
     private static void AlternarNotificacoes()
     {

@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Capture\MeetingRecorder.Capture.csproj" />
+    <ProjectReference Include="..\Agenda\MeetingRecorder.Agenda.csproj" />
   </ItemGroup>
 
 </Project>

@@ -127,6 +127,30 @@ public sealed class MetaMeeting
     [JsonPropertyName("title")] public string? Title { get; init; }
     [JsonPropertyName("client")] public string? Client { get; init; }
     [JsonPropertyName("project")] public string? Project { get; init; }
-    [JsonPropertyName("attendees")] public List<object> Attendees { get; init; } = [];
+    [JsonPropertyName("attendees")] public List<string> Attendees { get; init; } = [];
     [JsonPropertyName("calendar_event_id")] public string? CalendarEventId { get; init; }
+
+    /// <summary>
+    /// Só aparecem quando há evento da agenda, como no gravador Python.
+    /// </summary>
+    /// <remarks>
+    /// O Python grava cinco chaves quando não há evento e oito quando há, então
+    /// "idêntico ao Python" já não é um alvo único — o que precisa valer sempre é
+    /// as cinco de base existirem. Omitir quando nulo reproduz isso.
+    ///
+    /// Diferença conhecida e aceita: com evento sem organizador, o Python grava
+    /// <c>"organizer": null</c> e aqui a chave some. Para quem lê
+    /// (<c>src/web/recordings.py</c>) as duas formas dão <c>None</c>.
+    /// </remarks>
+    [JsonPropertyName("start")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Start { get; init; }
+
+    [JsonPropertyName("end")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? End { get; init; }
+
+    [JsonPropertyName("organizer")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Organizer { get; init; }
 }

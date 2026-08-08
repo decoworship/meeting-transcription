@@ -22,7 +22,16 @@ Porte de `recorder/capture.py` + `tray.py` + `calendar_sync.py` +
 | captura | PyAudioWPatch | NAudio (WASAPI) |
 | bandeja | pystray + PIL | NotifyIcon |
 | pasta | tkinter | IFileOpenDialog |
-| agenda | googleapiclient (99 MB) | Google.Apis.Calendar.v3 |
+| agenda | googleapiclient (99 MB) | HTTP puro (ver nota) |
+
+> **Desvio da carta, com medição.** A carta previa `Google.Apis.Calendar.v3`.
+> Medido num "hello world" publicado com trim: 11,5 MB sem o SDK, 19,5 MB com
+> ele, mais 11 avisos de trim — o mesmo tipo de reflexão que já derrubou a
+> primeira versão trimada deste projeto. A superfície usada são duas chamadas
+> REST (listar eventos, ler o calendário "primary") e um POST de refresh, mais
+> o fluxo OAuth de loopback. Feito à mão custa ~600 linhas com teste e 0 MB.
+> Se um dia a agenda precisar de escrita ou push notifications, o SDK volta à
+> mesa.
 
 **O formato de saída não muda**: `system.wav` + `mic.wav` (16 kHz mono int16)
 + `meta.json` com o mesmo schema. O app Docker continua consumindo as
