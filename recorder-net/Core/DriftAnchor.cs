@@ -53,8 +53,13 @@ public sealed class DriftAnchor
     /// Quanto corrigir, dadas a posição do dispositivo e o que já foi escrito.
     /// </summary>
     /// <param name="posicaoDispositivoAmostras">
-    /// Amostras que o dispositivo capturou desde o início, na taxa nativa dele,
-    /// já convertidas para a taxa alvo. Vem do <c>IAudioClock</c> do WASAPI.
+    /// Amostras que o dispositivo capturou desde o início, já convertidas para a
+    /// taxa alvo. A fonte é a <b>posição carimbada em cada pacote</b> pelo
+    /// <c>IAudioCaptureClient::GetBuffer</c> (<c>u64DevicePosition</c> e
+    /// <c>u64QPCPosition</c>) — o carimbo acompanha os dados, e não o instante da
+    /// pergunta, que é o que torna a medida imune a backlog de fila, GC e stall
+    /// de disco. Consultar o <c>IAudioClock</c> por polling seria plano B, e
+    /// estritamente pior pelo mesmo motivo.
     /// </param>
     /// <param name="amostrasEscritas">Amostras já entregues ao arquivo.</param>
     /// <param name="amostrasNesteBloco">Amostras do bloco em processamento.</param>
@@ -83,11 +88,20 @@ public sealed class DriftAnchor
     /// Aplica a correção a um bloco, preferindo mexer em trecho silencioso.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Refinamento previsto no requisito 3.1: inserir ou descartar amostras no
     /// meio de uma palavra produz um clique audível e, pior, altera a fala. Se o
     /// bloco tem um trecho abaixo de <paramref name="limiarSilencio"/> com folga
     /// suficiente, a correção entra ali. Senão, entra no fim — que é o
     /// comportamento do gravador Python, e continua sendo o recurso final.
+    /// </para>
+    /// <para>
+    /// Vale para os <b>dois sentidos</b>. Uma primeira versão só protegia a
+    /// inserção e truncava o fim do bloco ao descartar — mas o fim do bloco é
+    /// áudio real como qualquer outro, e cortar ali é tão destrutivo quanto
+    /// inserir no meio de uma palavra. Descartar de um trecho silencioso remove
+    /// silêncio, que é o que se quer.
+    /// </para>
     /// </remarks>
     public static float[] Aplicar(ReadOnlySpan<float> bloco, long correcao,
                                   float limiarSilencio = 1e-4f)
@@ -97,7 +111,17 @@ public sealed class DriftAnchor
         if (correcao < 0)
         {
             int descartar = (int)Math.Min(-correcao, bloco.Length);
-            return bloco[..(bloco.Length - descartar)].ToArray();
+            int inicio = AcharTrechoSilencioso(bloco, limiarSilencio);
+
+            // Só remove do trecho silencioso se ele comporta o descarte inteiro;
+            // senão corta do fim, que é o recurso final do Python.
+            if (inicio + descartar > bloco.Length)
+                return bloco[..(bloco.Length - descartar)].ToArray();
+
+            var reduzido = new float[bloco.Length - descartar];
+            bloco[..inicio].CopyTo(reduzido);
+            bloco[(inicio + descartar)..].CopyTo(reduzido.AsSpan(inicio));
+            return reduzido;
         }
 
         int inserir = (int)correcao;

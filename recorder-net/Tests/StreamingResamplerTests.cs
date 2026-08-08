@@ -92,14 +92,34 @@ public sealed class StreamingResamplerTests
     }
 
     [Fact]
-    public void DrenarEntregaACaudaRetidaNoFiltro()
+    public void TotalEntregueBateComARazaoDeTaxas()
+    {
+        // A propriedade que importa não é "Drenar devolve algo" — é que a soma
+        // do que saiu corresponde exatamente ao áudio que entrou. Sem o teto de
+        // contabilidade, o silêncio empurrado para expulsar o atraso do filtro
+        // entraria na faixa e inflaria a duração no meta.json.
+        var r = new StreamingResampler(48_000);
+        int total = 0;
+        for (int i = 0; i < 10; i++)
+            total += r.Processar(Senoide(4800, 48_000, 440, i * 4800)).Length;
+        total += r.Drenar().Length;
+
+        // 48000 amostras a 48 kHz = 1 s = 16000 amostras a 16 kHz, exatamente.
+        Assert.Equal(16_000, total);
+    }
+
+    [Fact]
+    public void DrenarNaoInventaAudioAlemDoQueEntrou()
     {
         var r = new StreamingResampler(48_000);
         r.Processar(Senoide(4800, 48_000, 440));
-        var cauda = r.Drenar();
+        int aposProcessar = 1600;                       // 4800 / 3
 
-        // Sem drenar, alguns milissegundos ficam presos no atraso do filtro — o
-        // suficiente para cortar a última palavra da reunião.
-        Assert.NotEmpty(cauda);
+        var cauda = r.Drenar();
+        var extra = r.Drenar();                          // segunda chamada não deve dar nada
+
+        Assert.True(cauda.Length <= aposProcessar,
+            "a cauda não pode exceder o que a razão de taxas permite");
+        Assert.Empty(extra);
     }
 }

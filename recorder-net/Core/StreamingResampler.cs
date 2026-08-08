@@ -30,10 +30,17 @@ public sealed class StreamingResampler
     private readonly FilaDeAmostras? _fonte;
     private readonly WdlResamplingSampleProvider? _resampler;
     private readonly int _taxaOrigem;
+    private readonly int _taxaDestino;
+
+    // Contabilidade de entrada e saída: é o que permite ao Drenar() distinguir
+    // "cauda legítima retida no filtro" de "silêncio que empurrei para expulsá-la".
+    private long _amostrasEntrada;
+    private long _amostrasSaida;
 
     public StreamingResampler(int taxaOrigem, int taxaDestino = CrashSafeWavWriter.TaxaAlvo)
     {
         _taxaOrigem = taxaOrigem;
+        _taxaDestino = taxaDestino;
         if (taxaOrigem == taxaDestino) return;      // passthrough, sem filtro
 
         _fonte = new FilaDeAmostras(taxaOrigem);
@@ -53,11 +60,13 @@ public sealed class StreamingResampler
         if (bloco.IsEmpty) return [];
 
         _fonte!.Enfileirar(bloco);
+        _amostrasEntrada += bloco.Length;
 
         // Teto proporcional à razão de taxas, com folga para o filtro.
-        int maximo = (int)((long)bloco.Length * CrashSafeWavWriter.TaxaAlvo / _taxaOrigem) + 64;
+        int maximo = (int)((long)bloco.Length * _taxaDestino / _taxaOrigem) + 64;
         var destino = new float[maximo];
         int lidas = _resampler.Read(destino, 0, maximo);
+        _amostrasSaida += lidas;
         return lidas == maximo ? destino : destino[..lidas];
     }
 
@@ -65,18 +74,34 @@ public sealed class StreamingResampler
     /// Drena o que ficou dentro do filtro no fim da gravação.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Sem isto a cauda da gravação some — algumas dezenas de milissegundos, o
     /// suficiente para cortar a última palavra. O Python faz o mesmo com
     /// <c>resample_chunk(..., last=True)</c>.
+    /// </para>
+    /// <para>
+    /// <b>A saída é limitada pela contabilidade, não pelo que o filtro devolve.</b>
+    /// Para expulsar o atraso é preciso empurrar silêncio, e esse silêncio é
+    /// áudio que não existiu: sem o teto, ele entraria na faixa, inflaria
+    /// <c>frames_written</c> e portanto a duração no <c>meta.json</c> — e o
+    /// critério A, que compara amostra a amostra com o gravador Python,
+    /// esbarraria nisso. O teto é <c>entrada × razão − já entregue</c>, que é o
+    /// número de amostras que legitimamente correspondem ao áudio capturado.
+    /// </para>
     /// </remarks>
     public float[] Drenar()
     {
         if (_resampler is null) return [];
-        // Empurra silêncio para expulsar o que está retido no atraso do filtro.
-        _fonte!.Enfileirar(new float[_taxaOrigem / 20]);      // 50 ms
-        var destino = new float[CrashSafeWavWriter.TaxaAlvo / 10];
-        int lidas = _resampler.Read(destino, 0, destino.Length);
-        return lidas == destino.Length ? destino : destino[..lidas];
+
+        long esperadas = (long)(_amostrasEntrada * (double)_taxaDestino / _taxaOrigem);
+        int devidas = (int)Math.Max(0, esperadas - _amostrasSaida);
+        if (devidas == 0) return [];
+
+        _fonte!.Enfileirar(new float[_taxaOrigem / 20]);      // 50 ms para expulsar o atraso
+        var destino = new float[devidas];
+        int lidas = _resampler.Read(destino, 0, devidas);
+        _amostrasSaida += lidas;
+        return lidas == devidas ? destino : destino[..lidas];
     }
 
     /// <summary>

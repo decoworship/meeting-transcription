@@ -112,16 +112,34 @@ public sealed class DriftAnchorTests
     }
 
     [Fact]
-    public void DescarteTiraDoFim()
+    public void DescarteTiraDoTrechoSilencioso()
+    {
+        // Fala nos dois extremos, silêncio no meio: o descarte tem que sair do
+        // meio. Truncar o fim removeria fala real, tão destrutivo quanto inserir
+        // no meio de uma palavra.
+        var bloco = new float[3200];
+        for (int i = 0; i < 1000; i++) bloco[i] = 0.5f;
+        for (int i = 2000; i < 3200; i++) bloco[i] = 0.5f;
+
+        var saida = DriftAnchor.Aplicar(bloco, correcao: -160);
+
+        Assert.Equal(bloco.Length - 160, saida.Length);
+        for (int i = 0; i < 1000; i++) Assert.Equal(0.5f, saida[i]);
+        // A fala do fim tem que continuar lá — se o corte fosse no rabo, os
+        // últimos 160 valores teriam sumido.
+        Assert.Equal(0.5f, saida[^1]);
+    }
+
+    [Fact]
+    public void SemTrechoSilenciosoDescarteCortaOFim()
     {
         var bloco = new float[1000];
-        for (int i = 0; i < bloco.Length; i++) bloco[i] = i / 1000f;
+        for (int i = 0; i < bloco.Length; i++) bloco[i] = 0.5f;   // tudo audível
 
         var saida = DriftAnchor.Aplicar(bloco, correcao: -100);
 
         Assert.Equal(900, saida.Length);
-        Assert.Equal(0f, saida[0]);
-        Assert.Equal(899 / 1000f, saida[899]);
+        for (int i = 0; i < 900; i++) Assert.Equal(0.5f, saida[i]);
     }
 
     [Fact]
