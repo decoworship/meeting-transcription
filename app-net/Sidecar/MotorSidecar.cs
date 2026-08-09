@@ -1,0 +1,212 @@
+using System.Diagnostics;
+using System.Text;
+using System.Text.Json;
+
+namespace MeetingApp.Sidecar;
+
+/// <summary>Erro do lado do motor, ou do canal com ele.</summary>
+public sealed class MotorException(string mensagem) : Exception(mensagem);
+
+/// <summary>
+/// Um motor rodando como processo separado, falando o protocolo por linha do
+/// <c>docs/SIDECAR.md</c>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// O processo fica <b>quente entre requisições</b>: carregar o pyannote a cada
+/// gravação custaria mais que diarizar. Descartar é decisão do cliente — o motor
+/// não tem timeout próprio, porque não sabe se o usuário foi almoçar.
+/// </para>
+/// <para>
+/// <b>Cancelar é matar.</b> Não há operação de cancelamento no protocolo e não
+/// deve haver: dentro de uma inferência o motor não tem ponto em que possa
+/// cooperar. Matar libera a VRAM na hora, que é o critério B da Fase 2.
+/// </para>
+/// </remarks>
+public sealed class MotorSidecar : IDisposable
+{
+    private readonly Process _processo;
+    private int _proximoId = 1;
+
+    /// <summary>Nome e versão que o motor declarou no handshake.</summary>
+    public string Nome { get; }
+    public string Versao { get; }
+
+    /// <summary>Linhas do <c>stderr</c> do motor: log livre, nunca protocolo.</summary>
+    public event Action<string>? AoRegistrar;
+
+    private MotorSidecar(Process processo, string nome, string versao)
+    {
+        _processo = processo;
+        Nome = nome;
+        Versao = versao;
+    }
+
+    /// <summary>Sobe o motor e espera o handshake.</summary>
+    /// <param name="comando">Executável do motor (o Python embutido, na v1).</param>
+    /// <param name="argumentos">Argumentos, tipicamente o script do motor.</param>
+    public static async Task<MotorSidecar> IniciarAsync(
+        string comando, IEnumerable<string> argumentos, CancellationToken ct = default)
+    {
+        var info = new ProcessStartInfo(comando)
+        {
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            // Sem isto cada spawn pisca um console preto no Windows.
+            CreateNoWindow = true,
+            StandardOutputEncoding = new UTF8Encoding(false),
+            StandardErrorEncoding = new UTF8Encoding(false),
+        };
+        foreach (string a in argumentos) info.ArgumentList.Add(a);
+
+        var processo = Process.Start(info)
+            ?? throw new MotorException($"não foi possível iniciar o motor: {comando}");
+
+        var registro = new List<string>();
+        _ = Task.Run(async () =>
+        {
+            // Drenado sempre: um stderr cheio bloqueia o processo do outro lado.
+            while (await processo.StandardError.ReadLineAsync() is { } linha)
+            {
+                lock (registro) registro.Add(linha);
+            }
+        }, CancellationToken.None);
+
+        try
+        {
+            var pronto = await LerMensagemAsync(processo, ct)
+                ?? throw new MotorException(
+                    "o motor morreu antes de dizer que estava pronto." + Cauda(registro));
+
+            if (pronto.Tipo != "pronto")
+                throw new MotorException(
+                    $"o motor falou '{pronto.Tipo}' onde o handshake era esperado.");
+
+            var motor = new MotorSidecar(processo, pronto.Motor ?? "?", pronto.Versao ?? "?");
+            lock (registro)
+            {
+                foreach (string l in registro) motor.AoRegistrar?.Invoke(l);
+            }
+            return motor;
+        }
+        catch
+        {
+            Matar(processo);
+            throw;
+        }
+    }
+
+    /// <param name="progresso">Chamado a cada aviso de progresso: fração e texto.</param>
+    /// <exception cref="MotorException">
+    /// O motor recusou a requisição, ou morreu no meio dela. As duas coisas
+    /// precisam chegar legíveis à UI sem derrubar o app (critério C da Fase 2).
+    /// </exception>
+    public async Task<IReadOnlyList<Segmento>> DiarizarAsync(
+        string caminhoDoAudio, Action<double, string>? progresso = null,
+        CancellationToken ct = default)
+    {
+        int id = _proximoId++;
+        await EnviarAsync(new Requisicao { Id = id, Op = "diarizar", Audio = caminhoDoAudio }, ct);
+
+        while (true)
+        {
+            // O cancelamento chega aqui como morte do processo, e a leitura
+            // devolve null — é o mesmo caminho de "o motor morreu".
+            using var registroDeMorte = ct.Register(() => Matar(_processo));
+
+            var m = await LerMensagemAsync(_processo, ct);
+            if (m is null)
+            {
+                ct.ThrowIfCancellationRequested();
+                throw new MotorException($"o motor '{Nome}' morreu durante a diarização.");
+            }
+
+            // Resposta de uma requisição anterior já abandonada: ignorar em vez
+            // de tratar como erro de protocolo.
+            if (m.Id is not null && m.Id != id) continue;
+
+            switch (m.Tipo)
+            {
+                case "progresso":
+                    progresso?.Invoke(m.Pct ?? 0, m.Texto ?? "");
+                    break;
+
+                case "resultado":
+                    return (m.Segmentos ?? [])
+                        .Select(s => new Segmento(s.Inicio, s.Fim, s.Falante))
+                        .ToList();
+
+                case "erro":
+                    // Erro encerra a requisição, não o motor: ele continua vivo
+                    // e pronto para a próxima.
+                    throw new MotorException(m.MensagemDeErro ?? "erro sem mensagem.");
+
+                default:
+                    throw new MotorException($"o motor falou um tipo desconhecido: '{m.Tipo}'.");
+            }
+        }
+    }
+
+    private async Task EnviarAsync(Requisicao r, CancellationToken ct)
+    {
+        string linha = JsonSerializer.Serialize(r, ProtocoloJson.Default.Requisicao);
+        try
+        {
+            await _processo.StandardInput.WriteLineAsync(linha.AsMemory(), ct);
+            await _processo.StandardInput.FlushAsync(ct);
+        }
+        catch (IOException e)
+        {
+            // Pipe fechado: o motor morreu entre a última resposta e esta
+            // pergunta.
+            throw new MotorException($"o motor '{Nome}' não aceitou a requisição: {e.Message}");
+        }
+    }
+
+    /// <returns><c>null</c> quando o pipe fecha, isto é, quando o motor morreu.</returns>
+    private static async Task<Mensagem?> LerMensagemAsync(Process p, CancellationToken ct)
+    {
+        string? linha = await p.StandardOutput.ReadLineAsync(ct);
+        if (linha is null) return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize(linha, ProtocoloJson.Default.Mensagem)
+                ?? throw new MotorException("o motor mandou uma linha JSON vazia.");
+        }
+        catch (JsonException e)
+        {
+            // Quase sempre é uma biblioteca escrevendo no stdout do motor. Ver a
+            // regra do descritor duplicado em docs/SIDECAR.md.
+            throw new MotorException(
+                $"lixo no canal do protocolo: {e.Message}\nlinha: {Cortar(linha)}");
+        }
+    }
+
+    private static string Cortar(string s) => s.Length <= 200 ? s : s[..200] + "...";
+
+    private static string Cauda(List<string> registro)
+    {
+        lock (registro)
+        {
+            // As últimas linhas do stderr são o que explica a morte; sem elas a
+            // mensagem seria "morreu" e nada mais.
+            return registro.Count == 0 ? ""
+                : "\n" + string.Join("\n", registro.TakeLast(10));
+        }
+    }
+
+    private static void Matar(Process p)
+    {
+        try
+        {
+            if (!p.HasExited) p.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException) { /* já saiu */ }
+        p.Dispose();
+    }
+
+    public void Dispose() => Matar(_processo);
+}

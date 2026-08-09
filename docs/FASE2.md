@@ -96,10 +96,10 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
 
 ## Ordem de trabalho sugerida
 
-1. **Contrato do sidecar primeiro, com o motor de diarização** (o mais
-   simples): spawn, protocolo por linha, keep-alive, kill. Validável por
-   script antes de existir UI — como o `summary_engine/sidecar.rs` do Meetily,
-   que o PLANO §5 manda ler antes de escrever o nosso.
+1. ~~**Contrato do sidecar primeiro, com o motor de diarização**~~ — **FEITO
+   (08/08/2026)**. Especificação em [SIDECAR.md](SIDECAR.md); cliente em
+   `app-net/Sidecar/`, motor em `motores/diarizacao/motor.py`, validação por
+   CLI em `app-net/Cli/`. Ver §"O que o sidecar já provou" abaixo.
 2. Empacotar os dois motores como pastas auto-contidas (python-embeddable) e
    provar o pipeline inteiro por CLI: gravação → mix → ASR → diarização →
    `TranscriptionResult` JSON idêntico ao de hoje.
@@ -109,3 +109,30 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
 4. Correção fonética + filtro de silêncio no núcleo, com os testes portados
    das ferramentas Python.
 5. Paridade final (critério A) e aposentadoria do Docker.
+
+## O que o sidecar já provou (08/08/2026)
+
+Medido com o motor **real** (pyannote `community-1` na RTX 2060), não com
+simulação:
+
+- **Ponta a ponta**: 121 s de gravação real → 28 segmentos, 2 falantes, em
+  16,9 s. O handshake sai em ~90 ms.
+- **Critério B, a parte do cancelamento**: pedido o cancelamento no meio da
+  inferência, o processo morre em **70 ms** e a VRAM cai de 3766 MiB para os
+  941 MiB de linha de base em **≤0,3 s** — contra o orçamento de 2 s. Medido
+  por amostragem de `nvidia-smi` a cada 200 ms, e nenhum processo de motor
+  sobra. Vem de graça do desenho: cancelar é matar.
+- **Critério C**: motor que morre no meio, motor que recusa a requisição e
+  motor que nem sobe viram três mensagens diferentes e legíveis, sem derrubar o
+  cliente. Sete testes cobrem isso contra um motor falso — protocolo e ciclo de
+  vida não deviam depender de um modelo de 2 GB para serem verificados.
+
+**O achado que vale para todo motor futuro**: `torch`, `pyannote` e amigos
+escrevem no `stdout` sem pedir licença, e uma linha dessas corrompe o
+protocolo com um sintoma que não aponta para a causa. Todo motor duplica o
+descritor 1 antes de qualquer import e manda o `stdout` do processo para o
+`stderr`. Está na [SIDECAR.md](SIDECAR.md), com teste que reproduz a falha.
+
+Fora do escopo do que foi feito: empacotamento (python-embeddable), o motor de
+ASR, e o `HF_TOKEN` — hoje vem do ambiente, e quem o fornece na v1 instalada é
+questão do passo 2.

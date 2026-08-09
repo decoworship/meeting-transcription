@@ -58,3 +58,7 @@ token*.json
 # .NET (Fase 1)
 recorder-net/**/bin/
 recorder-net/**/obj/
+
+# .NET (Fase 2)
+app-net/**/bin/
+app-net/**/obj/
