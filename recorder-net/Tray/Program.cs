@@ -2,6 +2,7 @@ using System.Diagnostics;
 using MeetingRecorder.Agenda;
 using MeetingRecorder.Capture;
 using MeetingRecorder.Core;
+using MeetingRecorder.Tray.Nativo;
 using NAudio.CoreAudioApi;
 
 namespace MeetingRecorder.Tray;
@@ -12,41 +13,38 @@ namespace MeetingRecorder.Tray;
 /// <remarks>
 /// Toda a lógica de estado (cores, o que o clique faz, lembretes) vive em
 /// <see cref="EstadoDaBandeja"/>, no Core, e está coberta por teste. Aqui fica só
-/// a costura com o WinForms — que é o que exige sessão interativa e não dá para
-/// verificar sem alguém olhando a tela.
+/// a costura com o Win32 (camada <c>Nativo/</c>) — que é o que exige sessão
+/// interativa e não dá para verificar sem alguém olhando a tela. O WinForms saiu
+/// porque arrastava o framework WindowsDesktop inteiro e recusava trimming;
+/// ver docs/FASE1-HANDOFF.md §3.
 /// </remarks>
 internal static class Programa
 {
     private static readonly EstadoDaBandeja Estado = new();
     private static Configuracoes _cfg = null!;
-    private static NotifyIcon _icone = null!;
-    private static System.Windows.Forms.Timer _relogio = null!;
+    private static JanelaDeMensagens _janela = null!;
+    private static IconeDeNotificacao _icone = null!;
 
     private static readonly List<WasapiTrackCapture> Capturas = [];
     private static CatalogoDeDispositivos _catalogo = null!;
     private static readonly ClienteDaAgenda Agenda = new();
     private static Evento? _evento;
     private static CancellationTokenSource? _consulta;
-    private static SynchronizationContext? _ui;
     private static string? _pastaAtual;
     private static DateTime _inicio;
 
-    [STAThread]
+    [STAThread]   // exigido pelo COM do IFileOpenDialog
     private static void Main()
     {
         // Requisito 3.4: duas bandejas disputariam os mesmos dispositivos.
         using var unica = new Mutex(true, @"Global\MeetingRecorder.Tray", out bool sozinho);
         if (!sozinho)
         {
-            MessageBox.Show("O gravador já está rodando.", "Gravador",
-                MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Win32.MessageBox(IntPtr.Zero, "O gravador já está rodando.", "Gravador",
+                Win32.MB_OK | Win32.MB_ICONINFORMATION);
             return;
         }
 
-        ApplicationConfiguration.Initialize();
-        // Capturado aqui porque só existe depois do Initialize e só nesta
-        // thread: é por ele que a consulta da agenda volta para a UI.
-        _ui = SynchronizationContext.Current;
         _cfg = Configuracoes.Carregar();
         Estado.NotificacoesLigadas = _cfg.Notifications;
 
@@ -55,83 +53,98 @@ internal static class Programa
         // nome custa ~170 ms, e lê-los ao abrir o menu travava a bandeja.
         _catalogo = new CatalogoDeDispositivos();
 
-        _icone = new NotifyIcon
+        try
         {
-            Icon = IconeDaBandeja.De(CorDaBandeja.Cinza),
-            Text = "Gravador — parado",
-            Visible = true,
-            ContextMenuStrip = MontarMenu(),
-        };
-        _icone.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) AoClicar(); };
-
-        // Um segundo é suficiente: o que ele atualiza é duração, cor e lembrete,
-        // nada que precise de resolução mais fina.
-        _relogio = new System.Windows.Forms.Timer { Interval = 1000 };
-        _relogio.Tick += (_, _) => Atualizar();
-        _relogio.Start();
-
-        Application.ApplicationExit += (_, _) =>
+            _janela = new JanelaDeMensagens
+            {
+                // Um segundo é suficiente: o que ele atualiza é duração, cor e
+                // lembrete, nada que precise de resolução mais fina.
+                AoTick = Atualizar,
+                AoEventoDaBandeja = AoEvento,
+                AoRenascerABarra = () => _icone.Adicionar(),
+            };
+            _icone = new IconeDeNotificacao(_janela.Hwnd,
+                IconesDaBandeja.Obter(CorDaBandeja.Cinza), "Gravador — parado");
+        }
+        catch (Exception e)
         {
-            Parar();
-            _consulta?.Cancel();
-            Agenda.Dispose();
-            _catalogo.Dispose();
-            _icone.Visible = false;
-        };
-        Application.Run();
+            // Falhar aqui é falhar em ter interface. Sem esta mensagem o
+            // executável simplesmente não apareceria, sem dizer por quê.
+            Win32.MessageBox(IntPtr.Zero, $"O gravador não conseguiu iniciar:\n{e.Message}",
+                "Gravador", Win32.MB_OK | Win32.MB_ICONINFORMATION);
+            return;
+        }
+
+        _janela.Rodar();
+
+        Parar();
+        _consulta?.Cancel();
+        Agenda.Dispose();
+        _catalogo.Dispose();
+        _icone.Dispose();
+        _janela.Dispose();
+        IconesDaBandeja.Liberar();
+    }
+
+    private static void AoEvento(uint evento, int x, int y)
+    {
+        switch (evento)
+        {
+            // Clique muta e não para; parar só pelo menu.
+            case Win32.NIN_SELECT or Win32.NIN_KEYSELECT:
+                AoClicar();
+                break;
+            case Win32.WM_CONTEXTMENU:
+                using (var menu = MontarMenu()) menu.Mostrar(_janela.Hwnd, x, y);
+                break;
+        }
     }
 
     // ─────────────────────────────────────────────────────────── menu
 
-    private static ContextMenuStrip MontarMenu()
+    private static MenuNativo MontarMenu()
     {
-        var menu = new ContextMenuStrip();
-        menu.Opening += (_, _) => Remontar(menu);
-        Remontar(menu);
-        return menu;
-    }
-
-    private static void Remontar(ContextMenuStrip menu)
-    {
-        menu.Items.Clear();
+        var menu = new MenuNativo();
+        var raiz = menu.Raiz;
 
         string status = Estado.TextoDeStatus(
             DuracaoAtual(), Capturas.FirstOrDefault(c => c.Stats.Nome == "mic")?.NomeDispositivo);
         if (_evento is { } ev) status += $"\n{Cortar(ev.Titulo, 40)}";
-        menu.Items.Add(new ToolStripMenuItem(status) { Enabled = false });
-        menu.Items.Add(new ToolStripSeparator());
+        // Menu do Win32 não quebra linha: cada linha vira um item desabilitado.
+        foreach (string linha in status.Split('\n'))
+            raiz.Item(linha, habilitado: false);
+        raiz.Separador();
 
-        menu.Items.Add(new ToolStripMenuItem(
+        raiz.Item(
             Estado.Gravando ? (Estado.Mudo ? "Desmutar microfone" : "Mutar microfone")
                             : "Iniciar gravação",
-            null, (_, _) => AoClicar())
-        { Font = new Font(menu.Font, FontStyle.Bold) });   // a ação principal
+            AoClicar, negrito: true);   // a ação principal
 
         // Parar só pelo menu — nunca pelo clique no ícone.
-        menu.Items.Add(new ToolStripMenuItem("Parar gravação", null, (_, _) => Parar())
-        { Enabled = Estado.Gravando });
+        raiz.Item("Parar gravação", Parar, habilitado: Estado.Gravando);
 
-        menu.Items.Add(new ToolStripSeparator());
+        raiz.Separador();
 
         // A escolha de dispositivo trava durante a gravação: reabrir o stream no
         // meio exigiria realinhar as faixas, e o alinhamento é o que dá valor às
         // duas terem sido gravadas em separado.
         var cat = _catalogo.Atual;
-        menu.Items.Add(SubmenuDeDispositivos("Microfone", cat.Entradas,
-            _cfg.MicId, id => { _cfg.MicId = id; _cfg.Salvar(); }));
-        menu.Items.Add(SubmenuDeDispositivos("Áudio do sistema", cat.Saidas,
-            _cfg.LoopbackId, id => { _cfg.LoopbackId = id; _cfg.Salvar(); }));
+        SubmenuDeDispositivos(raiz, "Microfone", cat.Entradas,
+            _cfg.MicId, id => { _cfg.MicId = id; _cfg.Salvar(); });
+        SubmenuDeDispositivos(raiz, "Áudio do sistema", cat.Saidas,
+            _cfg.LoopbackId, id => { _cfg.LoopbackId = id; _cfg.Salvar(); });
 
-        menu.Items.Add(SubmenuDaPasta());
-        menu.Items.Add(SubmenuDoCalendario());
+        SubmenuDaPasta(raiz);
+        SubmenuDoCalendario(raiz);
 
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Notificações", null,
-            (_, _) => AlternarNotificacoes())
-        { Checked = Estado.NotificacoesLigadas });
+        raiz.Separador();
+        raiz.Item("Notificações", AlternarNotificacoes, marcado: Estado.NotificacoesLigadas);
 
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Sair", null, (_, _) => Application.Exit()));
+        raiz.Separador();
+        raiz.Item("Sair", () =>
+            Win32.PostMessageW(_janela.Hwnd, Win32.WM_CLOSE, IntPtr.Zero, IntPtr.Zero));
+
+        return menu;
     }
 
     /// <summary>Lista os dispositivos ativos, com o escolhido marcado.</summary>
@@ -142,19 +155,17 @@ internal static class Programa
     /// sistema é o que a maioria quer, e fixar um dispositivo específico quebra
     /// quando o headset é desconectado.
     /// </remarks>
-    private static ToolStripMenuItem SubmenuDeDispositivos(
-        string titulo, IReadOnlyList<Dispositivo> lista,
+    private static void SubmenuDeDispositivos(
+        MenuNativo.Secao menu, string titulo, IReadOnlyList<Dispositivo> lista,
         string? escolhidoId, Action<string?> escolher)
     {
-        var raiz = new ToolStripMenuItem(titulo) { Enabled = !Estado.Gravando };
+        var raiz = menu.Submenu(titulo, habilitado: !Estado.Gravando);
 
-        raiz.DropDownItems.Add(new ToolStripMenuItem("Padrão do Windows", null,
-            (_, _) => escolher(null))
-        { Checked = escolhidoId is null });
-        raiz.DropDownItems.Add(new ToolStripSeparator());
+        raiz.Item("Padrão do Windows", () => escolher(null), marcado: escolhidoId is null);
+        raiz.Separador();
 
         if (lista.Count == 0)
-            raiz.DropDownItems.Add(new ToolStripMenuItem("(carregando...)") { Enabled = false });
+            raiz.Item("(carregando...)", habilitado: false);
 
         foreach (var d in lista)
         {
@@ -164,30 +175,21 @@ internal static class Programa
             if (d.EhPadrao) nome += "  (padrão)";
 
             string id = d.Id;
-            raiz.DropDownItems.Add(new ToolStripMenuItem(nome, null, (_, _) => escolher(id))
-            { Checked = id == escolhidoId });
+            raiz.Item(nome, () => escolher(id), marcado: id == escolhidoId);
         }
-
-        if (Estado.Gravando)
-            raiz.ToolTipText = "Não dá para trocar de dispositivo durante a gravação.";
-        return raiz;
     }
 
-    private static ToolStripMenuItem SubmenuDaPasta()
+    private static void SubmenuDaPasta(MenuNativo.Secao menu)
     {
-        var raiz = new ToolStripMenuItem("Pasta das gravações");
+        var raiz = menu.Submenu("Pasta das gravações");
         string atual = _cfg.OutputDir ?? PastaPadrao();
-        raiz.DropDownItems.Add(new ToolStripMenuItem(Encurtar(atual)) { Enabled = false });
-        raiz.DropDownItems.Add(new ToolStripSeparator());
-        raiz.DropDownItems.Add(new ToolStripMenuItem("Abrir no Explorer", null, (_, _) => AbrirPasta()));
-        raiz.DropDownItems.Add(new ToolStripMenuItem("Escolher outra pasta...", null,
-            (_, _) => EscolherPasta())
-        { Enabled = !Estado.Gravando });
+        raiz.Item(Encurtar(atual), habilitado: false);
+        raiz.Separador();
+        raiz.Item("Abrir no Explorer", AbrirPasta);
+        raiz.Item("Escolher outra pasta...", EscolherPasta, habilitado: !Estado.Gravando);
         if (_cfg.OutputDir is not null)
-            raiz.DropDownItems.Add(new ToolStripMenuItem("Restaurar pasta padrão", null,
-                (_, _) => { _cfg.OutputDir = null; _cfg.Salvar(); })
-            { Enabled = !Estado.Gravando });
-        return raiz;
+            raiz.Item("Restaurar pasta padrão",
+                () => { _cfg.OutputDir = null; _cfg.Salvar(); }, habilitado: !Estado.Gravando);
     }
 
     /// <remarks>
@@ -195,43 +197,35 @@ internal static class Programa
     /// de sumir: quem nunca configurou precisa descobrir o que falta, e um item
     /// invisível não ensina nada.
     /// </remarks>
-    private static ToolStripMenuItem SubmenuDoCalendario()
+    private static void SubmenuDoCalendario(MenuNativo.Secao menu)
     {
-        var raiz = new ToolStripMenuItem("Google Calendar");
+        var raiz = menu.Submenu("Google Calendar");
 
         if (!ClienteDaAgenda.EstaConfigurado())
         {
-            raiz.DropDownItems.Add(new ToolStripMenuItem(
-                "Falta google_client_secret.json em") { Enabled = false });
-            raiz.DropDownItems.Add(new ToolStripMenuItem(
-                @"%USERPROFILE%\.meeting-recorder") { Enabled = false });
-            return raiz;
+            raiz.Item("Falta google_client_secret.json em", habilitado: false);
+            raiz.Item(@"%USERPROFILE%\.meeting-recorder", habilitado: false);
+            return;
         }
 
         bool autorizado = ClienteDaAgenda.EstaAutorizado();
         string conta = ClienteDaAgenda.EmailDaConta();
-        raiz.DropDownItems.Add(new ToolStripMenuItem(
-            !autorizado ? "Nenhuma conta conectada"
-            : conta.Length > 0 ? $"Conectado: {conta}" : "Conectado")
-        { Enabled = false });
-        raiz.DropDownItems.Add(new ToolStripSeparator());
+        raiz.Item(!autorizado ? "Nenhuma conta conectada"
+            : conta.Length > 0 ? $"Conectado: {conta}" : "Conectado", habilitado: false);
+        raiz.Separador();
 
-        raiz.DropDownItems.Add(new ToolStripMenuItem("Usar esta agenda", null,
-            (_, _) => { _cfg.UseCalendar = !_cfg.UseCalendar; _cfg.Salvar(); })
-        { Checked = _cfg.UseCalendar });
+        raiz.Item("Usar esta agenda",
+            () => { _cfg.UseCalendar = !_cfg.UseCalendar; _cfg.Salvar(); },
+            marcado: _cfg.UseCalendar);
 
-        raiz.DropDownItems.Add(new ToolStripMenuItem(
-            autorizado ? "Trocar de conta..." : "Conectar conta...", null,
-            (_, _) => Autorizar()));
+        raiz.Item(autorizado ? "Trocar de conta..." : "Conectar conta...", Autorizar);
 
         if (autorizado)
-            raiz.DropDownItems.Add(new ToolStripMenuItem("Desconectar", null, (_, _) =>
+            raiz.Item("Desconectar", () =>
             {
                 ClienteDaAgenda.Desconectar();
-                Avisar("Conta do Google desconectada.", ToolTipIcon.Info);
-            }));
-
-        return raiz;
+                Avisar("Conta do Google desconectada.", Win32.NIIF_INFO);
+            });
     }
 
     /// <summary>Abre o navegador uma vez para autorizar. Nunca na thread da UI.</summary>
@@ -246,7 +240,7 @@ internal static class Programa
             string msg = token is null ? "Autorização falhou."
                 : conta.Length > 0 ? $"Conectado: {conta}"
                 : "Calendário autorizado.";
-            NaUi(() => Avisar(msg, token is null ? ToolTipIcon.Error : ToolTipIcon.Info,
+            NaUi(() => Avisar(msg, token is null ? Win32.NIIF_ERROR : Win32.NIIF_INFO,
                               sempre: true));
         });
     }
@@ -279,10 +273,10 @@ internal static class Programa
                     .AvailableFreeSpace;
                 if (!guarda.PodeComecar(livres, out string? motivo))
                 {
-                    Avisar(motivo!, ToolTipIcon.Error, sempre: true);
+                    Avisar(motivo!, Win32.NIIF_ERROR, sempre: true);
                     return;
                 }
-                if (motivo is not null) Avisar(motivo, ToolTipIcon.Warning, sempre: true);
+                if (motivo is not null) Avisar(motivo, Win32.NIIF_WARNING, sempre: true);
             }
             catch
             {
@@ -314,7 +308,7 @@ internal static class Programa
         }
         catch (Exception e)
         {
-            Avisar($"Não foi possível iniciar: {e.Message}", ToolTipIcon.Error, sempre: true);
+            Avisar($"Não foi possível iniciar: {e.Message}", Win32.NIIF_ERROR, sempre: true);
             Parar();
         }
     }
@@ -376,10 +370,10 @@ internal static class Programa
         foreach (var (nome, s) in new[] { ("system", system), ("mic", mic) })
         {
             if (s.SemAudio)
-                Avisar($"A faixa '{nome}' não teve áudio nenhum.", ToolTipIcon.Warning, sempre: true);
+                Avisar($"A faixa '{nome}' não teve áudio nenhum.", Win32.NIIF_WARNING, sempre: true);
             else if (s.PercentualUtil(meta.DurationS) < 20)
                 Avisar($"A faixa '{nome}' tem só {s.PercentualUtil(meta.DurationS):F0}% de conteúdo útil.",
-                       ToolTipIcon.Warning, sempre: true);
+                       Win32.NIIF_WARNING, sempre: true);
         }
 
         foreach (var c in Capturas) c.Dispose();
@@ -411,7 +405,7 @@ internal static class Programa
                     // reuniões em silêncio, e só se descobriria semanas depois.
                     Avisar("Calendário indisponível. Reautorize pelo menu.\n"
                            + "A gravação continua normalmente.",
-                           ToolTipIcon.Warning, sempre: true);
+                           Win32.NIIF_WARNING, sempre: true);
                     return;
                 }
 
@@ -419,18 +413,14 @@ internal static class Programa
 
                 _evento = ev;
                 int n = ev.NomesDosParticipantes().Count;
-                Avisar($"{Cortar(ev.Titulo, 40)}\n{n} participantes", ToolTipIcon.Info);
+                Avisar($"{Cortar(ev.Titulo, 40)}\n{n} participantes", Win32.NIIF_INFO);
                 Atualizar();
             });
         });
     }
 
     /// <summary>Executa na thread da UI, venha de onde vier.</summary>
-    private static void NaUi(Action acao)
-    {
-        if (_ui is null) acao();
-        else _ui.Post(_ => acao(), null);
-    }
+    private static void NaUi(Action acao) => _janela.Executar(acao);
 
     private static string Cortar(string texto, int max) =>
         texto.Length <= max ? texto : texto[..max];
@@ -451,28 +441,25 @@ internal static class Programa
 
     private static void EscolherPasta()
     {
-        using var dlg = new FolderBrowserDialog
-        {
-            Description = "Onde salvar as gravações",
-            SelectedPath = _cfg.OutputDir ?? PastaPadrao(),
-        };
-        if (dlg.ShowDialog() != DialogResult.OK) return;
+        string? escolhida = SeletorDePasta.Escolher(_janela.Hwnd,
+            _cfg.OutputDir ?? PastaPadrao(), "Onde salvar as gravações");
+        if (escolhida is null) return;
 
         // Escrita de teste antes de aceitar: descobrir que a pasta é somente
         // leitura no meio de uma reunião seria tarde demais.
         try
         {
-            string teste = Path.Combine(dlg.SelectedPath, ".gravador-teste");
+            string teste = Path.Combine(escolhida, ".gravador-teste");
             File.WriteAllText(teste, "ok");
             File.Delete(teste);
         }
         catch (Exception e)
         {
-            Avisar($"Não dá para escrever nessa pasta: {e.Message}", ToolTipIcon.Error, sempre: true);
+            Avisar($"Não dá para escrever nessa pasta: {e.Message}", Win32.NIIF_ERROR, sempre: true);
             return;
         }
 
-        _cfg.OutputDir = dlg.SelectedPath;
+        _cfg.OutputDir = escolhida;
         _cfg.Salvar();
     }
 
@@ -484,20 +471,18 @@ internal static class Programa
             Capturas.Any(c => !c.Stats.JaOuviu && !c.Mudo &&
                               DuracaoAtual() > 45);   // o mesmo limiar do Python
 
-        _icone.Icon = IconeDaBandeja.De(Estado.Cor);
         string txt = "Gravador — " + Estado.TextoDeStatus(DuracaoAtual(), null).Split('\n')[0];
-        // O Text do NotifyIcon estoura em 63 caracteres e lança se passar.
-        _icone.Text = txt.Length > 62 ? txt[..62] : txt;
+        _icone.Atualizar(IconesDaBandeja.Obter(Estado.Cor), txt);
 
         if (Estado.LembreteDeMute(DateTime.UtcNow) is { } lembrete)
-            Avisar(lembrete, ToolTipIcon.Warning);
+            Avisar(lembrete, Win32.NIIF_WARNING);
 
         foreach (var c in Capturas)
         {
             if (c.Desconectado)
-                Avisar($"Dispositivo de '{c.Stats.Nome}' desconectado.", ToolTipIcon.Error, sempre: true);
+                Avisar($"Dispositivo de '{c.Stats.Nome}' desconectado.", Win32.NIIF_ERROR, sempre: true);
             if (c.FalhaDeEscrita)
-                Avisar($"Falha ao gravar '{c.Stats.Nome}': {c.MotivoDaFalha}", ToolTipIcon.Error, sempre: true);
+                Avisar($"Falha ao gravar '{c.Stats.Nome}': {c.MotivoDaFalha}", Win32.NIIF_ERROR, sempre: true);
         }
     }
 
@@ -506,10 +491,10 @@ internal static class Programa
     /// de mute, que é sobre algo que você pediu — não silencia dispositivo caindo
     /// ou disco enchendo, que são coisas que você precisa saber.
     /// </param>
-    private static void Avisar(string texto, ToolTipIcon tipo, bool sempre = false)
+    private static void Avisar(string texto, uint tipo, bool sempre = false)
     {
         if (!sempre && !Estado.NotificacoesLigadas) return;
-        _icone.ShowBalloonTip(5000, "Gravador", texto, tipo);
+        _icone.Balao("Gravador", texto, tipo);
     }
 
     private static double DuracaoAtual() =>

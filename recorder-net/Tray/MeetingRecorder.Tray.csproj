@@ -6,10 +6,9 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
-    <!-- Exigido pelo gerador do LibraryImport (SYSLIB1062), usado na camada
-         Nativo/ que substituirá o WinForms. -->
+    <!-- Exigido pelo gerador do LibraryImport (SYSLIB1062) e pelo ponteiro fixo
+         que a IconesDaBandeja passa ao CreateIconFromResourceEx. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -19,21 +18,20 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <TrimMode>partial</TrimMode>
     <!-- Mesma configuração do CLI, e pelo mesmo motivo: análise ligada, só o
-         resumo de terceiros calado. Hoje o WinForms impede trimar este projeto
-         (NETSDK1175), então nada disto tem efeito prático — está aqui para a
-         troca por Shell_NotifyIcon herdar a configuração segura em vez do
-         cheque em branco que havia antes. -->
+         resumo de terceiros calado. -->
     <NoWarn>$(NoWarn);IL2104</NoWarn>
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- O logo entra embutido no executável: um arquivo solto ao lado do .exe
-         seria mais uma coisa para o instalador da Fase 4 acertar, e some se
-         alguém copiar só o binário. -->
-    <EmbeddedResource Include="..\..\assets\logo-256.png"
-                      LogicalName="MeetingRecorder.Tray.logo-256.png" />
+    <!-- Os ícones entram embutidos no executável: um arquivo solto ao lado do
+         .exe seria mais uma coisa para o instalador da Fase 4 acertar, e some se
+         alguém copiar só o binário. Um .ico por cor de estado, gerado pelo
+         tools/gerar_icone.py — substituem o tingimento em runtime com GDI+, que
+         era a última dependência de System.Drawing da bandeja. -->
+    <EmbeddedResource Include="..\..\assets\bandeja-*.ico"
+                      LogicalName="MeetingRecorder.Tray.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -10,11 +10,6 @@ namespace MeetingRecorder.Tray.Nativo;
 /// tudo isto, mas <c>UseWindowsForms</c> arrasta o framework WindowsDesktop
 /// inteiro e recusa trimming (<c>NETSDK1175</c>): o gravador que cabe em 12,6 MB
 /// no CLI voltava para 155 MB só por causa da casca. Ver PLANO §5.
-/// <para>
-/// <b>Estado: escrito, ainda não ligado.</b> O <see cref="Programa"/> continua
-/// no WinForms. Esta camada é o começo da troca descrita no PLANO §5 e no
-/// handoff em <c>docs/FASE1-HANDOFF.md</c>.
-/// </para>
 /// </remarks>
 internal static partial class Win32
 {
@@ -131,6 +126,12 @@ internal static partial class Win32
     internal const uint NIF_ICON = 0x00000002;
     internal const uint NIF_TIP = 0x00000004;
     internal const uint NIF_INFO = 0x00000010;
+    /// <summary>Na V4 o tooltip padrão é suprimido a menos que este flag esteja ligado.</summary>
+    internal const uint NIF_SHOWTIP = 0x00000080;
+
+    /// <summary>Eventos que a V4 entrega em LOWORD(lParam) no lugar das mensagens de mouse.</summary>
+    internal const uint NIN_SELECT = 0x0400;       // clique (WM_USER + 0)
+    internal const uint NIN_KEYSELECT = 0x0401;    // Enter/espaço pelo teclado
 
     internal const uint NIIF_NONE = 0x00000000;
     internal const uint NIIF_INFO = 0x00000001;
