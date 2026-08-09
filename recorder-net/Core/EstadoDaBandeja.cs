@@ -43,6 +43,18 @@ public sealed class EstadoDaBandeja
     public bool CanalSemAudio { get; set; }
 
     /// <summary>
+    /// Requisito 3.3: o disco falhou e a gravação está sendo perdida.
+    /// </summary>
+    /// <remarks>
+    /// Separado de <see cref="CanalSemAudio"/> porque precisa vencer o
+    /// <see cref="Mudo"/>. Mutado é um estado que você escolheu e reconhece no
+    /// laranja; se a escrita falhar enquanto você está mudo, a falha ficaria
+    /// escondida atrás dessa escolha — justo no caso em que a reunião inteira
+    /// está indo embora.
+    /// </remarks>
+    public bool FalhaDeEscrita { get; set; }
+
+    /// <summary>
     /// Requisito A14: desligar as notificações. Ligado por padrão, para o
     /// comportamento bater com o gravador Python.
     /// </summary>
@@ -58,6 +70,7 @@ public sealed class EstadoDaBandeja
 
     public CorDaBandeja Cor =>
         !Gravando ? CorDaBandeja.Cinza
+        : FalhaDeEscrita ? CorDaBandeja.Amarelo
         : Mudo ? CorDaBandeja.Laranja
         : CanalSemAudio ? CorDaBandeja.Amarelo
         : CorDaBandeja.Vermelho;
@@ -70,6 +83,7 @@ public sealed class EstadoDaBandeja
         Gravando = true;
         Mudo = false;
         CanalSemAudio = false;
+        FalhaDeEscrita = false;
         _mudoDesde = null;
         _ultimoLembrete = 0;
     }
@@ -118,6 +132,7 @@ public sealed class EstadoDaBandeja
             ? "Parado"
             : $"Gravando {TimeSpan.FromSeconds(duracaoS):hh\\:mm\\:ss}" +
               (Mudo ? " (mudo)" : "") +
-              (CanalSemAudio ? " — canal sem áudio" : "") +
+              (FalhaDeEscrita ? " — FALHA AO GRAVAR"
+               : CanalSemAudio ? " — canal sem áudio" : "") +
               (dispositivoMic is null ? "" : $"\n{dispositivoMic}");
 }

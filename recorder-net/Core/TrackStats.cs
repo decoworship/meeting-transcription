@@ -53,6 +53,16 @@ public sealed class TrackStats
     public bool SemAudio => !JaOuviu;
 
     /// <summary>
+    /// A faixa parou antes do fim porque o dispositivo sumiu (requisito 3.7).
+    /// </summary>
+    /// <remarks>
+    /// Escrito pela thread de captura, lido depois do <c>Join</c> dela — que é a
+    /// barreira que torna a leitura segura sem precisar de <c>volatile</c> aqui.
+    /// O aviso ao vivo na bandeja continua vindo do campo volátil da captura.
+    /// </remarks>
+    public bool Desconectado { get; set; }
+
+    /// <summary>
     /// Quanto da faixa tem conteúdo útil. É a leitura que interessa de relance:
     /// baixo aqui significa gravação suspeita mesmo com <see cref="SemAudio"/>
     /// falso.

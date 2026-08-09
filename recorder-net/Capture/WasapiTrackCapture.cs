@@ -157,6 +157,10 @@ public sealed class WasapiTrackCapture : IDisposable
             // registrado, e a outra continua — meia reunião é muito melhor que
             // nenhuma.
             Desconectado = true;
+            // Também nas estatísticas, porque é de lá que o meta.json lê: o
+            // aviso na bandeja acontece durante a reunião e quem transcreve
+            // semanas depois nunca o viu.
+            _stats.Desconectado = true;
             MotivoDaFalha = e.Message;
         }
     }

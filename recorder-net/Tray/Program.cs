@@ -471,6 +471,10 @@ internal static class Programa
             Capturas.Any(c => !c.Stats.JaOuviu && !c.Mudo &&
                               DuracaoAtual() > 45);   // o mesmo limiar do Python
 
+        // Requisito 3.3: sem isto o ícone continuaria vermelho enquanto a
+        // gravação não chega ao disco.
+        Estado.FalhaDeEscrita = Capturas.Any(c => c.FalhaDeEscrita);
+
         string txt = "Gravador — " + Estado.TextoDeStatus(DuracaoAtual(), null).Split('\n')[0];
         _icone.Atualizar(IconesDaBandeja.Obter(Estado.Cor), txt);
 

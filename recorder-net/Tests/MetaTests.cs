@@ -117,4 +117,20 @@ public sealed class MetaTests
             doc.RootElement.GetProperty("tracks").GetProperty("system")
                .GetProperty("dropped_samples").GetInt64());
     }
+
+    [Fact]
+    public void DesconexaoFicaRegistradaPorFaixa()
+    {
+        // Requisito 3.7. A bandeja avisa durante a reunião, e é justamente o
+        // aviso que ninguém vê; quem transcreve depois precisa distinguir "a
+        // faixa acabou aqui" de "o headset caiu aqui".
+        var system = new TrackStats { Nome = "system", AmostrasEscritas = 16_000 };
+        var mic = new TrackStats { Nome = "mic", AmostrasEscritas = 16_000, Desconectado = true };
+        var m = Meta.Montar(DateTimeOffset.UtcNow, system, mic, "s", "m", 48_000, 16_000);
+
+        using var doc = JsonDocument.Parse(m.ParaJson());
+        var faixas = doc.RootElement.GetProperty("tracks");
+        Assert.True(faixas.GetProperty("mic").GetProperty("disconnected").GetBoolean());
+        Assert.False(faixas.GetProperty("system").GetProperty("disconnected").GetBoolean());
+    }
 }

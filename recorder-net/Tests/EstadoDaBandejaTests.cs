@@ -33,6 +33,22 @@ public sealed class EstadoDaBandejaTests
     }
 
     [Fact]
+    public void FalhaDeEscritaVenceOMudo()
+    {
+        // Requisito 3.3. O laranja é um estado que você escolheu e reconhece; se
+        // ele escondesse a falha de disco, a única gravação em que o aviso mais
+        // importa — a que está indo embora — seria a que não avisaria.
+        var e = new EstadoDaBandeja();
+        e.Iniciou();
+        e.DefinirMudo(true, T0);
+        Assert.Equal(CorDaBandeja.Laranja, e.Cor);
+
+        e.FalhaDeEscrita = true;
+        Assert.Equal(CorDaBandeja.Amarelo, e.Cor);
+        Assert.Contains("FALHA AO GRAVAR", e.TextoDeStatus(10, null));
+    }
+
+    [Fact]
     public void MudoDeliberadoTemPrecedenciaSobreCanalSemAudio()
     {
         // Se você mutou, "canal sem áudio" é consequência esperada e não merece

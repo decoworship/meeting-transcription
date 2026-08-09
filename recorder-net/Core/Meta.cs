@@ -74,6 +74,17 @@ public sealed class MetaTrack
     /// </summary>
     [JsonPropertyName("dropped_samples")] public required long DroppedSamples { get; init; }
 
+    /// <summary>
+    /// A faixa parou antes do fim porque o dispositivo sumiu (requisito 3.7).
+    /// </summary>
+    /// <remarks>
+    /// Campo novo pela mesma regra do <see cref="DroppedSamples"/>. Existe
+    /// porque a bandeja avisa no momento, e um aviso no momento é justamente o
+    /// que ninguém vê: quem for transcrever semanas depois precisa saber que
+    /// aquela faixa não terminou por acidente, e não porque a reunião acabou.
+    /// </remarks>
+    [JsonPropertyName("disconnected")] public required bool Disconnected { get; init; }
+
     public static MetaTrack De(TrackStats s, string arquivo, string dispositivo,
                                int taxaNativa, double duracao) => new()
     {
@@ -91,6 +102,7 @@ public sealed class MetaTrack
         MutedS = Math.Round(s.MudoS, 1),
         UsablePct = s.PercentualUtil(duracao),
         DroppedSamples = s.AmostrasDescartadas,
+        Disconnected = s.Desconectado,
     };
 }
 
