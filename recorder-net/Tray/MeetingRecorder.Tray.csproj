@@ -8,6 +8,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
+    <!-- Exigido pelo gerador do LibraryImport (SYSLIB1062), usado na camada
+         Nativo/ que substituirá o WinForms. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <SelfContained>false</SelfContained>

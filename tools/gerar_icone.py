@@ -102,6 +102,38 @@ def escrever_ico(imagens: list[Image.Image], destino: Path) -> None:
     destino.write_bytes(cabecalho + entradas + b"".join(corpos))
 
 
+# ─────────────────────────────────────────── ícones da bandeja
+
+# A cor do ícone é o único aviso que existe durante a gravação: ela distingue
+# gravando, mudo por sua escolha e canal sem áudio. O amarelo existe por causa
+# da gravação de 06/08, que saiu 95% muda sem ninguém notar.
+CORES_DA_BANDEJA = {
+    "cinza": (120, 120, 120),      # parado
+    "vermelho": (220, 50, 50),     # gravando
+    "laranja": (240, 150, 30),     # mudo pela bandeja (decisão sua)
+    "amarelo": (230, 200, 30),     # canal sem áudio (ninguém pediu)
+}
+
+# Os tamanhos que o Windows pede na área de notificação conforme o DPI.
+TAMANHOS_BANDEJA = [16, 20, 24, 32]
+
+
+def silhueta(tamanho: int, cor: tuple[int, int, int]) -> Image.Image:
+    """O logo tingido, sem pastilha: aqui a cor é a informação.
+
+    Diferente do ícone do .exe, que precisa de fundo próprio, o da bandeja é
+    desenhado sobre a barra de tarefas e deve ser só a forma -- o contraste vem
+    da cor viva do estado, e uma pastilha só roubaria área útil dos 16 px.
+    """
+    escala = 4
+    g = tamanho * escala
+
+    logo = Image.open(ORIGEM).convert("RGBA").resize((g, g), Image.LANCZOS)
+    tingido = Image.new("RGBA", (g, g), cor + (0,))
+    tingido.putalpha(logo.getchannel("A"))
+    return tingido.resize((tamanho, tamanho), Image.LANCZOS)
+
+
 def main() -> None:
     if not ORIGEM.is_file():
         raise SystemExit(f"falta {ORIGEM} (render do logo.svg em 256 px)")
@@ -109,6 +141,11 @@ def main() -> None:
     escrever_ico([pastilha(t) for t in TAMANHOS], DESTINO)
     print(f"{DESTINO.relative_to(RAIZ)}: {len(TAMANHOS)} tamanhos "
           f"({', '.join(str(t) for t in TAMANHOS)})")
+
+    for nome, cor in CORES_DA_BANDEJA.items():
+        destino = RAIZ / "assets" / f"bandeja-{nome}.ico"
+        escrever_ico([silhueta(t, cor) for t in TAMANHOS_BANDEJA], destino)
+        print(f"{destino.relative_to(RAIZ)}: {len(TAMANHOS_BANDEJA)} tamanhos")
 
 
 if __name__ == "__main__":

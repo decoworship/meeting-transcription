@@ -10,6 +10,9 @@ igual ou melhor em tudo que importa.
 
 ---
 
+> **Estado da execução:** ver [FASE1-HANDOFF.md](FASE1-HANDOFF.md) — o que
+> está pronto, o que falta e as armadilhas já mapeadas.
+
 ## 1. O que a fase entrega
 
 Porte de `recorder/capture.py` + `tray.py` + `calendar_sync.py` +
