@@ -10,10 +10,11 @@ Branch: `feat/recorder-and-accuracy`. Último commit desta fase: ver
 
 ## 1. Estado em uma frase
 
-O gravador nativo **funciona e está validado em uso real**: captura duas
-faixas, sobrevive a crash, identifica a reunião pela agenda e tem o menu com
-paridade de features sobre o `tray.py`. O que falta é tamanho (critério E) e
-uma validação longa.
+O gravador nativo **funciona, cabe no orçamento e está validado em uso real**:
+captura duas faixas, sobrevive a crash, identifica a reunião pela agenda, tem o
+menu com paridade sobre o `tray.py` e pesa 14,9 MB. O que falta para fechar a
+fase é uma reunião de verdade gravada em paralelo com o Python — e o Python
+sair de uso.
 
 ---
 
@@ -25,12 +26,12 @@ uma validação longa.
 |---|---|---|
 | 3.1 | âncora no relógio do dispositivo (QPC), correção em trecho silencioso | ✅ |
 | 3.2 | WAV crash-safe (header reescrito a cada 10 s) | ✅ |
-| 3.3 | checagem de disco no start | ✅ parcial — ver §4 |
+| 3.3 | checagem de disco no start + falha de escrita promove o ícone | ✅ |
 | 3.4 | instância única (mutex nomeado) | ✅ |
 | 3.5 | contador de amostras descartadas no `meta.json` | ✅ |
 | 3.6 | loopback sem áudio preenchido com silêncio ancorado no relógio | ✅ |
-| 3.7 | desconexão de dispositivo detectada e avisada | ✅ parcial — ver §4 |
-| 3.8 | pasta padrão sem caminho `\\wsl$` hardcoded | ✅ com desvio — ver §4 |
+| 3.7 | desconexão detectada, avisada e marcada no `meta.json` | ✅ |
+| 3.8 | pasta padrão sem caminho `\\wsl$` hardcoded | ✅ com desvio registrado na carta |
 
 ### Critérios de aceite
 
@@ -40,7 +41,7 @@ uma validação longa.
 | B. kill -9 no meio da gravação | ✅ verificado com kill de verdade |
 | C. soak de 1h+ | 🟡 OK parcial — 20 min, 72 correções de âncora |
 | D. disco cheio | 🟡 OK parcial — guarda implementada e testada, sem teste de volume cheio |
-| E. ≤ 25 MB | ❌ CLI 12,6 MB passa; bandeja 154,8 MB não — **é o trabalho principal restante** |
+| E. ≤ 25 MB | ✅ **14,9 MB** — era 154,8 MB; ver §3 |
 
 ### Além da carta
 
@@ -49,105 +50,90 @@ uma validação longa.
   interop foi verificada nas duas direções com credenciais reais.
 - **Menu com paridade** sobre o `tray.py`: submenus de microfone e áudio do
   sistema, pasta, calendário, notificações (requisito A14).
-- **Ícone próprio** nos dois executáveis, conferido por hash de conteúdo contra
-  o `assets/logo.ico`.
-- 84 testes, todos passando.
+- **Ícone próprio** nos dois executáveis.
+- 86 testes, todos passando.
 
 ---
 
-## 3. O trabalho principal restante: matar o WinForms
+## 3. O WinForms morreu: 154,8 MB → 14,9 MB
 
-**O problema.** O `Tray` usa `UseWindowsForms=true` por causa do `NotifyIcon`.
-Isso arrasta o framework `Microsoft.WindowsDesktop.App` inteiro e recusa
-trimming (`NETSDK1175`). O gravador que cabe em 12,6 MB no CLI volta para
-154,8 MB só por causa da casca — e, de quebra, é o que faz o executável exigir
-o **.NET Desktop Runtime** quando publicado framework-dependent, erro que já
-apareceu uma vez na validação.
+**O que era.** O `Tray` usava `UseWindowsForms=true` por causa do `NotifyIcon`.
+Isso arrastava o framework `Microsoft.WindowsDesktop.App` inteiro e recusava
+trimming (`NETSDK1175`): o gravador que cabe em 12,6 MB no CLI voltava para
+154,8 MB só por causa da casca.
 
-**A correção**, já prescrita no PLANO §5:
+**O que é agora** — a troca prescrita no PLANO §5, feita item a item:
 
-| sai | entra |
+| saiu | entrou |
 |---|---|
-| `NotifyIcon` | `Shell_NotifyIcon` (`NIM_ADD`/`MODIFY`/`DELETE`) |
-| `ContextMenuStrip` | `CreatePopupMenu` + `AppendMenuW` + `TrackPopupMenuEx` |
+| `NotifyIcon` | `Shell_NotifyIcon` + `NOTIFYICON_VERSION_4` (`Nativo/IconeDeNotificacao.cs`) |
+| `ContextMenuStrip` | `CreatePopupMenu`/`AppendMenuW`/`TrackPopupMenuEx` (`Nativo/MenuNativo.cs`) |
 | `ShowBalloonTip` | `NIF_INFO` + `szInfo`/`szInfoTitle`/`dwInfoFlags` |
-| `Forms.Timer` | `SetTimer` → `WM_TIMER` |
-| `FolderBrowserDialog` | `IFileOpenDialog` com `FOS_PICKFOLDERS` |
+| `Forms.Timer` | `SetTimer` → `WM_TIMER` (`Nativo/JanelaDeMensagens.cs`) |
+| `FolderBrowserDialog` | `IFileOpenDialog` com `FOS_PICKFOLDERS` (`Nativo/SeletorDePasta.cs`) |
 | `Application.Run` | `GetMessageW`/`TranslateMessage`/`DispatchMessageW` |
 | `SynchronizationContext` | `PostMessageW(WM_EXECUTAR)` + fila de ações |
-| `IconeDaBandeja` (GDI+) | `CreateIconFromResourceEx` sobre os `.ico` embutidos |
+| `IconeDaBandeja` (GDI+) | `CreateIconFromResourceEx` sobre os `.ico` embutidos (`IconesDaBandeja.cs`) |
 
-Estimativa: 300–400 linhas de costura, **zero mudança no Core** — toda a lógica
-de estado já está em `EstadoDaBandeja`, coberta por teste. Resultado esperado:
-14–18 MB self-contained trimado, critério E passa com folga.
+**Zero mudança no Core** — a estimativa de 300–400 linhas se confirmou, e toda a
+lógica de estado continua em `EstadoDaBandeja`, coberta por teste.
 
-### O que já foi feito desta troca
+### O que a execução ensinou (e a compilação não ensinaria)
 
-- **`recorder-net/Tray/Nativo/Win32.cs`** — as declarações de P/Invoke
-  (janela, bandeja, menu, ícone, `MessageBox`). Compila; **ainda não está
-  ligado**, o `Programa` continua no WinForms.
-- **`tools/gerar_icone.py`** — agora também gera
-  `assets/bandeja-{cinza,vermelho,laranja,amarelo}.ico`, em 16/20/24/32 px.
-  Substituem o tingimento em runtime com GDI+, que era a última dependência de
-  `System.Drawing` da bandeja.
-- **`AllowUnsafeBlocks`** ligado no `.csproj` (exigido pelo gerador do
-  `LibraryImport`).
+- **IL2050 no `SHCreateItemFromParsingName`.** Declarar `out IShellItem` é
+  marshalling COM na fronteira do P/Invoke, e o linker não consegue provar que a
+  interface sobrevive ao trim — vira **erro**, não aviso. A saída foi passar só
+  o `IUnknown*` e resolver o RCW do lado gerenciado, onde o linker enxerga o uso.
+  Vale para qualquer P/Invoke com `[MarshalAs(UnmanagedType.Interface)]`.
+- **`NIM_ADD` falhando passava em silêncio.** O processo ficava vivo e invisível:
+  sem ícone não há menu, nem clique, nem como sair sem o gerenciador de tarefas.
+  Hoje a inicialização inteira está num `try` que morre com uma `MessageBox`
+  dizendo o motivo.
+- **O `$null` do PowerShell não é `NULL`.** No script de validação,
+  `FindWindowW("classe", $null)` procura janela de **título vazio** e nunca acha;
+  o `$null` é marshalado como string vazia. Custou uma rodada de investigação
+  achando que o binário não subia — ele estava lá, com a janela criada.
 
-### O que falta escrever
+### Armadilhas que valeram a pena ter mapeado antes
 
-1. `Nativo/JanelaDeMensagens.cs` — classe de janela, `WndProc`, laço de
-   mensagens, `SetTimer` de 1 s, e a fila de ações para `WM_EXECUTAR`.
-2. `Nativo/IconeDeNotificacao.cs` — `Shell_NotifyIcon` com `NOTIFYICON_VERSION_4`,
-   troca de ícone, tooltip e balão.
-3. `Nativo/MenuNativo.cs` — construtor de menu com submenus, itens marcados,
-   desabilitados e separadores, mapeando id de comando para `Action`.
-4. `Nativo/SeletorDePasta.cs` — `IFileOpenDialog` via `ComImport`.
-5. `IconesDaBandeja.cs` — parsear o `ICONDIR` dos `.ico` embutidos, escolher o
-   tamanho por `GetSystemMetrics(SM_CXSMICON)` e criar o `HICON` com
-   `CreateIconFromResourceEx`. Guardar em cache e `DestroyIcon` no fim.
-6. Reescrever `Program.cs` sobre isso, e tirar `UseWindowsForms`,
-   `IncludeNativeLibrariesForSelfExtract` e o `EmbeddedResource` do
-   `logo-256.png` do `.csproj`.
+Todas se confirmaram na implementação; ficam registradas para a próxima janela
+Win32 que este projeto escrever (a Fase 2 vai precisar de uma).
 
-### Armadilhas conhecidas, para não serem redescobertas
-
-- **Janela escondida, não *message-only*.** Uma janela `HWND_MESSAGE` não
-  recebe broadcast, e é por broadcast que chega o `TaskbarCreated` — a
-  mensagem que avisa que o Explorer reiniciou e que o ícone precisa ser
-  readicionado. Sem isso, um crash do Explorer faz a bandeja sumir para sempre.
-  Registrar com `RegisterWindowMessage("TaskbarCreated")`.
+- **Janela escondida, não *message-only*.** `HWND_MESSAGE` não recebe broadcast,
+  e é por broadcast que chega o `TaskbarCreated` — sem ele, um crash do Explorer
+  faz o ícone sumir para sempre. Registrado com `RegisterWindowMessage`.
+- **`NOTIFYICON_VERSION_4` muda o contrato do callback**: o clique chega como
+  `NIN_SELECT` e o botão direito como `WM_CONTEXTMENU`, com o evento em
+  `LOWORD(lParam)` e as coordenadas no `wParam`. Código que trata `WM_RBUTTONUP`
+  funciona na V3 e falha em silêncio na V4.
+- **`NIF_SHOWTIP` é obrigatório na V4**, senão o tooltip padrão não aparece.
 - **`SetForegroundWindow` antes do `TrackPopupMenuEx`**, e `PostMessage(WM_NULL)`
-  depois. Sem isso o menu não fecha ao clicar fora.
-- **Menu do Win32 não quebra linha.** O item de status hoje concatena o título
-  do evento com `\n`; virar dois itens desabilitados.
-- **`szTip` tem 128 chars** na estrutura V2 (o limite de 63 era da V1). O código
-  atual corta em 62 por causa do WinForms; dá para afrouxar.
-- **Manter a referência gerenciada do `WndProc` viva**, senão o GC a coleta e o
-  processo morre em uma callback do Windows.
+  depois, senão o menu não fecha ao clicar fora.
+- **Menu do Win32 não quebra linha**: o status virou uma linha por item
+  desabilitado.
+- **Manter a referência gerenciada do `WndProc` viva** (é campo, não local).
 - **`[STAThread]`** continua necessário por causa do COM do `IFileOpenDialog`.
 
 ---
 
-## 4. Pendências menores
+## 4. Pendências
 
-1. **Requisito 3.3, segunda metade.** Falha de escrita hoje notifica, mas não
-   promove o ícone para WARNING — a cor continua vermelha. `Atualizar()` em
-   `Program.cs` calcula `CanalSemAudio` só a partir de `JaOuviu`; basta incluir
-   `FalhaDeEscrita`. ~10 linhas.
-2. **Requisito 3.7.** Desconexão é detectada e avisada, mas não é marcada no
-   `meta.json`. O gravador Python também não marca, então é feature nova, não
-   regressão. Pede um campo novo em `MetaTrack` (acrescentar é seguro; remover
-   ou renomear não). ~15 linhas.
-3. **Requisito 3.8 — desvio a confirmar.** Nem o Python nem o C# perguntam a
-   pasta na primeira execução; ambos caem em um padrão (aqui,
-   `Documentos\MeetingRecordings`). O que a carta queria evitar era o
-   `\\wsl$\...` hardcoded, e isso morreu. Julgamento de quem implementou:
-   default + menu é melhor que um modal no primeiro start. Se o dono do produto
-   discordar, é rápido.
-4. **Fluxo OAuth interativo não verificado por execução.** O caminho de
-   *refresh* — o do dia a dia — está provado contra a API real. O de
-   autorização inicial abre navegador e não foi possível exercitá-lo do
-   ambiente de desenvolvimento. Só falta alguém clicar em "Conectar conta...".
+1. **Fluxo OAuth interativo não verificado por execução.** O caminho de
+   *refresh* — o do dia a dia — está provado contra a API real. O de autorização
+   inicial abre navegador e não dá para exercitar sem um clique humano. Falta
+   alguém abrir o menu → Google Calendar → "Conectar conta...".
+2. **A UI nova não foi vista por olhos humanos.** A validação automatizada
+   cobre janela, ícone, timer, captura e `meta.json`; **menu, balão de
+   notificação e diálogo de pasta exigem interação** e não foram exercitados.
+   São exatamente as três peças reescritas do zero. Checagem de 2 minutos:
+   botão direito no ícone (menu e submenus aparecem, fecham ao clicar fora),
+   "Escolher outra pasta..." (o diálogo abre na pasta atual), e um clique no
+   ícone durante a gravação (ícone fica laranja).
+3. **Sugestão fora de escopo, registrada para não se perder:** o `disconnected`
+   novo no `meta.json` não é lido por ninguém ainda. O lugar natural é
+   `Recording.avisos()` em `src/web/recordings.py`, junto de `no_audio` e
+   `usable_pct` — enquanto o app Gradio for a ferramenta de produção, é lá que o
+   aviso seria visto.
 
 ---
 
@@ -157,17 +143,29 @@ A definição de pronto da carta é **o gravador Python aposentado**. Para chega
 lá:
 
 1. Gravar uma reunião real com os dois em paralelo (fecha o critério C de
-   verdade e valida o calendário em uso).
+   verdade e valida o calendário em uso). A ferramenta existe:
+   `tools/comparar_gravadores.py --segundos N`.
 2. Comparar `meta.json` campo a campo, como no critério A.
 3. Aposentar o `recorder/` Python.
 
-Um número para observar nessa validação: o `desalinhamento entre faixas` que o
-CLI imprime é a **diferença de comprimento** entre as faixas, não alinhamento
-temporal ([`Cli/Program.cs`](../recorder-net/Cli/Program.cs), busca por
-`desalinhamento`). Em gravações curtas com nada tocando, a faixa `system` sai
-100% silêncio sintetizado e o número mede o preenchimento de silêncio, não a
-captura — deu 18–44 ms nesses casos, contra 1,7 ms medidos com conteúdo nas duas
-faixas. Vale conferir com áudio real antes de tirar conclusão.
+Dois números para observar nessa validação:
+
+- O `desalinhamento entre faixas` que o CLI imprime é a **diferença de
+  comprimento** entre as faixas, não alinhamento temporal
+  ([`Cli/Program.cs`](../recorder-net/Cli/Program.cs), busca por
+  `desalinhamento`). Em gravação com nada tocando, a faixa `system` sai 100%
+  silêncio sintetizado e o número mede o preenchimento, não a captura — deu
+  18–44 ms nesses casos, contra 1,7 ms medidos com conteúdo nas duas faixas.
+- Nas duas gravações de validação da bandeja nativa (sala silenciosa, `system`
+  100% sintetizado) essa diferença deu **254,8 ms em 19,93 s** (4077 amostras) e
+  **278,7 ms em 14,95 s** (4459 amostras) — acima dos 18–44 ms anteriores. O que
+  esses dois pontos dizem: o número **não cresce com a duração**, e a gravação
+  mais curta deu a diferença maior. Isso é a assinatura de um offset de partida
+  constante (~4 mil amostras, o `system` começando a preencher silêncio depois
+  do `mic`), não de deriva — que é justamente a distinção que o
+  `comparar_gravadores.py` mede por correlação em janelas. Dois pontos não são
+  uma série: **confirmar com conteúdo real nas duas faixas** antes de concluir
+  que não é nada.
 
 ---
 
@@ -179,23 +177,34 @@ export PATH="$HOME/.dotnet:$PATH"
 # testes
 dotnet test recorder-net/Tests/MeetingRecorder.Tests.csproj
 
-# CLI (trimado, este é o que precisa caber no critério E)
+# CLI
 dotnet publish recorder-net/Cli/MeetingRecorder.Cli.csproj -c Release -r win-x64 \
   --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o <saida>
 
-# bandeja (hoje sem trim, ver §3)
+# bandeja — agora com as mesmas flags do CLI, inclusive PublishTrimmed
 dotnet publish recorder-net/Tray/MeetingRecorder.Tray.csproj -c Release -r win-x64 \
-  --self-contained true -p:PublishSingleFile=true \
-  -p:IncludeNativeLibrariesForSelfExtract=true -o <saida>
+  --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o <saida>
 ```
 
 **`--self-contained true` é obrigatório na linha de comando** — o `.csproj` tem
 `SelfContained=false` para o loop de desenvolvimento ficar rápido. Publicar sem
-a flag gera um executável de ~190 KB que pede o .NET Desktop Runtime na
-máquina do usuário. Isso já aconteceu uma vez.
+a flag gera um executável de ~190 KB que pede o .NET Runtime na máquina do
+usuário. Isso já aconteceu uma vez.
 
 E a regra que esta fase aprendeu caro: **medir tamanho sem executar não vale
 nada**. O primeiro binário trimado tinha 11,9 MB e morria na primeira linha,
-porque o trim completo desliga o COM embutido e sem COM o WASAPI não
-inicializa. Todo build vai para uma execução real: `--list` e uma gravação
-curta que produza `meta.json`.
+porque o trim completo desliga o COM embutido e sem COM o WASAPI não inicializa.
+Todo build vai para uma execução real:
+
+```bash
+# CLI: --list e uma gravação curta que produza meta.json
+# bandeja: o mesmo, sem ninguém olhando a tela
+powershell.exe -ExecutionPolicy Bypass -File tools/validar_bandeja.ps1 \
+  -Exe C:\...\MeetingRecorder.exe -Segundos 20
+```
+
+O `validar_bandeja.ps1` lança o `.exe` publicado, espera a janela aparecer,
+dispara o clique pelo contrato da `NOTIFYICON_VERSION_4`, grava e sai pelo
+`WM_CLOSE` — que é o caminho por onde o `meta.json` é escrito. Ele falha em voz
+alta se o processo morrer, se a janela não aparecer ou se a saída travar. O que
+ele **não** cobre está na pendência §4.2.

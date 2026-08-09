@@ -1,0 +1,111 @@
+# Fase 2 — o app nativo com UI completa: carta de execução
+
+Registro da direção decidida ao fim da Fase 1, para a fase não depender de
+nenhuma conversa. Contexto: [FASE1-HANDOFF.md](FASE1-HANDOFF.md) (o que resta
+da Fase 1), [FASE0-RESULTADOS.md](FASE0-RESULTADOS.md) (as decisões de motor).
+
+## A fusão que define a fase
+
+As Fases 2 e 3 do [PLANO.md](PLANO.md) viraram uma só. A Fase 0 decidiu que os
+motores ficam em Python na v1 (faster-whisper pelo `hotwords`… na verdade pelo
+conjunto: ASR condicionado ao teste de segmentação; diarização pelos 6,7
+pontos de DER) — então "migrar o motor" deixou de ser uma fase. O que resta
+dela, o **contrato do sidecar**, é exatamente o que a UI nova precisa.
+
+**A fase entrega: a casca nativa Windows com a UI completa, falando com os
+motores Python existentes por um contrato de processo.**
+
+## Arquitetura
+
+```
+MeetingApp.exe (C#, WebView2)          motores (pastas auto-contidas)
+  UI: AA Design System, React    ◄──►    asr/         faster-whisper (Python embutido)
+  núcleo: projetos, histórico,   stdio   diarizacao/  pyannote community-1 (idem)
+  vozes, exportação, correção
+  fonética, filtro de silêncio
+                                         (futuro: whisper.cpp, resumo LLM)
+MeetingRecorder.exe (bandeja)  — SEPARADO, se comunica por arquivos
+```
+
+Princípios já decididos, com onde está o porquê:
+
+1. **O gravador continua executável separado.** A confiabilidade da gravação
+   não depende do processo da UI. Encontro pelos arquivos
+   (`recordings/` + `meta.json`), como hoje.
+2. **Sidecar por stdio com protocolo por linha, não HTTP** (PLANO §5,
+   "Correção: stdin/stdout"): sem porta, sem diálogo de firewall, morte
+   detectável por pipe fechado. `CREATE_NO_WINDOW` em todo spawn.
+3. **Cancelamento real = matar o processo do motor.** É o conserto do C8
+   cosmético da AUDITORIA §1.5, e vem de graça do desenho.
+4. **Motores escolhidos por qualidade, não por stack** (decisão da Fase 0):
+   `asr/` = faster-whisper com `word_timestamps` (o risco 3 não existe neste
+   arranjo); `diarizacao/` = pyannote `community-1`. Empacotados com
+   python-embeddable + venv congelado, cada um numa pasta com manifesto
+   mínimo (nome, versão, comando). **Sem sistema de plugins ainda** — dois
+   motores hardcoded atrás de uma interface; manifesto/download/registry só
+   quando o terceiro motor (resumo) chegar.
+5. **No núcleo (C#), não nos motores**: correção fonética
+   (`tools/correcao_fonetica.py` é a referência; guarda de capitalização +
+   hunspell pt-BR + trocas visíveis na UI), filtro de segmentos sobre
+   silêncio digital (FASE0 resultado 6-A), e o merge das duas faixas.
+
+## Especificação funcional
+
+**O [FEATURES.md](FEATURES.md) é a especificação: 53 entregas, 27 críticas.**
+A regra de ouro de lá: E1–E5 (ler colorido, clicar-e-ouvir, corrigir no lugar,
+trocar falante, buscar) são interações, não telas — a UI nova precisa entregar
+as cinco ou regride. A divisão núcleo/motor segue a leitura do próprio
+FEATURES: núcleo é dono de A, B, E, F, G e de D2/D3/D5/D6/D7; motores entregam
+C1–C3, C6 e D1.
+
+UI: AA Design System com os componentes React, agora sem o Gradio no caminho
+(a fase 3 do redesign vira a via normal — PLANO §3). Idioma: pt-BR, seguindo o
+design system.
+
+## Dados e migração
+
+- `history/`, `projects.json`, `config.json`: migram como estão (JSON
+  portável), mas os `audio_path` de `/tmp` estão mortos (AUDITORIA §1.6) — o
+  áudio processado passa a morar em diretório de dados gerenciado, referência
+  relativa.
+- `voices.json`: **não migra** — reinscrição com o modelo de dados da
+  [VOZES.md](VOZES.md) §1 (amostra com procedência + snippet). É a única
+  chance barata de fazer isso.
+- Vocabulário: liberto do orçamento de 224 tokens pela correção a jusante
+  (FASE0 5-A) — lista por projeto pode ser ilimitada; o aviso de orçamento da
+  UI atual morre.
+
+## Critérios de aceite
+
+- **A.** As 27 entregas críticas do FEATURES.md funcionando de ponta a ponta
+  numa gravação real de duas faixas — mesmo resultado (ou melhor) que o app
+  Gradio na mesma gravação.
+- **B.** Matar o app no meio de uma transcrição não deixa processo de motor
+  órfão; cancelar libera a GPU em ≤2 s.
+- **C.** Motor que morre no meio devolve erro legível na UI e o app continua
+  vivo (a gravação nunca esteve no mesmo processo, por desenho).
+- **D.** As trocas da correção fonética visíveis e inspecionáveis na UI.
+- **E.** O Docker/Gradio aposentado — mesma régua da Fase 1: o velho sai de
+  uso porque o novo é comprovadamente igual ou melhor.
+
+## Fora da fase
+
+Instalador e assinatura (Fase 4 continua existindo), motores nativos
+(whisper.cpp aguarda o teste de segmentação — trilha do agente de
+benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
+
+## Ordem de trabalho sugerida
+
+1. **Contrato do sidecar primeiro, com o motor de diarização** (o mais
+   simples): spawn, protocolo por linha, keep-alive, kill. Validável por
+   script antes de existir UI — como o `summary_engine/sidecar.rs` do Meetily,
+   que o PLANO §5 manda ler antes de escrever o nosso.
+2. Empacotar os dois motores como pastas auto-contidas (python-embeddable) e
+   provar o pipeline inteiro por CLI: gravação → mix → ASR → diarização →
+   `TranscriptionResult` JSON idêntico ao de hoje.
+3. UI por cima, na ordem do fluxo do usuário: escolher gravação → rodar →
+   ler/corrigir (E1–E5) → exportar. Histórico, vozes e projetos depois do
+   fluxo principal.
+4. Correção fonética + filtro de silêncio no núcleo, com os testes portados
+   das ferramentas Python.
+5. Paridade final (critério A) e aposentadoria do Docker.

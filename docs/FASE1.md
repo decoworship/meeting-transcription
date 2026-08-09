@@ -84,6 +84,13 @@ NativeAOT), Inno Setup fica para a Fase 4. Nesta fase o executável basta.
 8. **Pasta padrão**: primeira execução pergunta (o caminho `\\wsl$\...`
    hardcoded morre com o Python).
 
+> **Desvio do 3.8, confirmado pelo revisor (08/08/2026).** Não há pergunta na
+> primeira execução: o gravador cai em `Documentos\MeetingRecordings` e a pasta
+> se troca pelo menu. O que o requisito existia para matar era o `\\wsl$\...`
+> hardcoded, e isso morreu. Um modal antes do primeiro uso cobra uma decisão de
+> quem ainda não sabe o que o app faz, e a decisão certa para quase todo mundo é
+> o default. Registrado como desvio deliberado, não como pendência.
+
 ## 4. Critérios de aceite
 
 Objetivos e executáveis, na ordem em que destravam os seguintes:
@@ -103,11 +110,12 @@ Objetivos e executáveis, na ordem em que destravam os seguintes:
   `GuardaDeDisco` está implementada e coberta por teste (limiares em minutos de
   gravação: 15 avisa, 3 é crítico), mas o teste com volume pequeno de verdade
   não rodou.
-- **E. Tamanho ≤ 25 MB** e nenhuma dependência instalada na máquina. — **em
-  auditoria externa (08/08/2026)**. Situação medida: CLI 12,7 MB (passa),
-  bandeja 154,7 MB (não passa). A causa é o WinForms não ser trimável
-  (`NETSDK1175`); a saída prevista no PLANO §5 é trocar o `NotifyIcon` por
-  `Shell_NotifyIcon` via P/Invoke.
+- **E. Tamanho ≤ 25 MB** e nenhuma dependência instalada na máquina. —
+  **CUMPRIDO (08/08/2026)**: CLI 12,6 MB, bandeja **14,9 MB** self-contained
+  trimada, contra os 154,8 MB de antes. A causa era o WinForms não ser trimável
+  (`NETSDK1175`), e a saída foi a prevista no PLANO §5: `Shell_NotifyIcon` via
+  P/Invoke. Medido *e executado* — o binário publicado gravou 20 s e produziu
+  `meta.json` completo (`tools/validar_bandeja.ps1`).
 
 ## 5. Ordem de trabalho
 
