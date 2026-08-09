@@ -121,6 +121,22 @@ renomearia todo mundo e quebraria o histórico já gravado.
 - **`CREATE_NO_WINDOW` em todo spawn**, senão cada motor pisca um console preto
   no Windows.
 
+## O que o núcleo faz com o que volta
+
+Vale dizer explicitamente, porque duas dessas regras foram portadas erradas na
+primeira tentativa e só a comparação contra o app antigo as pegou:
+
+- **O falante de um segmento sai da soma das sobreposições por pessoa**, não do
+  maior trecho isolado. Num segmento que atravessa uma troca de turno, quem
+  fala três vezes por um segundo domina quem falou uma vez por dois — pegar o
+  maior trecho responde errado exatamente nas trocas, que é onde importa.
+- **Sem sobreposição nenhuma, o rótulo é `Unknown`**, não ausência. É o que o
+  app atual grava, e um rótulo explícito diz "ninguém foi identificado aqui"
+  onde o nulo pareceria esquecimento.
+- Depois disso vem a atribuição do dono pelas faixas separadas, que sobrescreve
+  o palpite do modelo onde o microfone domina — ali não se está estimando quem
+  falou, se está sabendo.
+
 ## O que ainda não existe, deliberadamente
 
 Sem manifesto, sem registro de motores, sem download, sem `ping`. São dois

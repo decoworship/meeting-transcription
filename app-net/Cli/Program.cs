@@ -34,7 +34,8 @@ if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
     {
         return await Pipeline.ExecutarAsync(gravacao, motor,
             arg.GetValueOrDefault("vocabulario"), arg.GetValueOrDefault("idioma"),
-            arg.GetValueOrDefault("saida"), pipelineCts.Token);
+            arg.GetValueOrDefault("saida"), arg.ContainsKey("filtrar-silencio"),
+            pipelineCts.Token);
     }
     catch (OperationCanceledException)
     {
@@ -51,7 +52,8 @@ if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
 if (audio is null)
 {
     Console.Error.WriteLine(
-        "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"...\"] [--saida x.json]\n"
+        "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"Acme, Élio\"]\n"
+        + "     [--filtrar-silencio] [--idioma pt] [--saida x.json]\n"
         + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
         + "[--cancelar-em <segundos>]");
     return 2;

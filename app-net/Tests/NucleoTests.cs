@@ -97,11 +97,31 @@ public sealed class NucleoTests : IDisposable
     }
 
     [Fact]
-    public void SegmentoSemDiarizacaoFicaSemFalante()
+    public void SegmentoSemDiarizacaoViraUnknown()
     {
+        // Rótulo explícito, como o app atual: a ausência pareceria esquecimento.
         var segmentos = new List<SegmentoFinal> { new() { Start = 20, End = 25, Text = "oi" } };
         Montagem.AtribuirFalantes(segmentos, [new SegmentoDeFalante(0, 3, "SPEAKER_00")]);
-        Assert.Null(segmentos[0].Speaker);
+        Assert.Equal("Unknown", segmentos[0].Speaker);
+    }
+
+    [Fact]
+    public void FalanteSaiDaSomaDosTrechosENaoDoMaiorDeles()
+    {
+        // O caso que o porte errava, e que só a comparação com o app expôs: numa
+        // troca de turno, quem fala três vezes por 1 s domina quem falou uma vez
+        // por 2 s. Pegar o maior trecho isolado responderia SPEAKER_01.
+        var segmentos = new List<SegmentoFinal> { new() { Start = 0, End = 10, Text = "..." } };
+        var diarizacao = new List<SegmentoDeFalante>
+        {
+            new(0, 1, "SPEAKER_00"),
+            new(2, 4, "SPEAKER_01"),
+            new(4, 5, "SPEAKER_00"),
+            new(6, 7, "SPEAKER_00"),
+        };
+
+        Montagem.AtribuirFalantes(segmentos, diarizacao);
+        Assert.Equal("Speaker 1", segmentos[0].Speaker);   // 3 s somados contra 2 s
     }
 
     [Fact]

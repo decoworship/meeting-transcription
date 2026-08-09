@@ -17,7 +17,7 @@ internal static class Pipeline
 {
     public static async Task<int> ExecutarAsync(
         string pasta, string python, string? vocabulario, string? idioma,
-        string? destino, CancellationToken ct)
+        string? destino, bool filtrarSilencio, CancellationToken ct)
     {
         string mic = Path.Combine(pasta, "mic.wav");
         string sistema = Path.Combine(pasta, "system.wav");
@@ -72,6 +72,36 @@ internal static class Pipeline
         var segmentos = transcricao.Segmentos
             .Select(s => new SegmentoFinal { Start = s.Inicio, End = s.Fim, Text = s.Texto })
             .ToList();
+
+        // Opcionais, e desligados por padrão: os dois mudam o texto, e a
+        // paridade com o app Gradio só é medível enquanto a saída for
+        // comparável à dele. Ligá-los é o passo 4 da fase, não o 2.
+        if (filtrarSilencio)
+        {
+            var fora = FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
+            Console.WriteLine($"  silêncio digital: {fora.Count} segmentos descartados"
+                              + (fora.Count == 0 ? "" : $" ({string.Join(" / ",
+                                  fora.Take(3).Select(f => $"\"{f.Text.Trim()}\""))})"));
+        }
+
+        if (vocabulario is { Length: > 0 })
+        {
+            var termos = vocabulario.Split(',', StringSplitOptions.TrimEntries
+                                                | StringSplitOptions.RemoveEmptyEntries);
+            int total = 0;
+            foreach (var seg in segmentos)
+            {
+                var (texto, trocas) = CorrecaoFonetica.Corrigir(seg.Text, termos);
+                if (trocas.Count == 0) continue;
+
+                // As trocas são visíveis de propósito (critério D da fase): quem
+                // lê a ata não tem como desconfiar de uma palavra reescrita.
+                foreach (var t in trocas) Console.WriteLine($"  fonética: {t.De} → {t.Para}");
+                seg.Text = texto;
+                total += trocas.Count;
+            }
+            Console.WriteLine($"  correção fonética: {total} trocas");
+        }
 
         Montagem.AtribuirFalantes(segmentos, diarizacao);
         int meus = Montagem.AtribuirDono(segmentos, faixas);

@@ -17,7 +17,9 @@ public sealed class SegmentoFinal
 {
     [JsonPropertyName("start")] public required double Start { get; init; }
     [JsonPropertyName("end")] public required double End { get; init; }
-    [JsonPropertyName("text")] public required string Text { get; init; }
+    // Mutável como o Speaker: a correção fonética reescreve o texto, e a edição
+    // no lugar (E3 do FEATURES) vai reescrevê-lo de novo.
+    [JsonPropertyName("text")] public required string Text { get; set; }
     [JsonPropertyName("speaker")] public string? Speaker { get; set; }
 }
 
@@ -83,19 +85,24 @@ public static class Montagem
 
         foreach (var seg in segmentos)
         {
-            double melhor = 0;
-            string? escolhido = null;
-
+            // Somar por falante, e não pegar o maior trecho isolado: um segmento
+            // longo pode alternar entre duas pessoas, e quem fala três vezes por
+            // um segundo domina quem falou uma vez por dois. Pegar o maior
+            // trecho daria a resposta errada exatamente nas trocas de turno.
+            var total = new Dictionary<string, double>();
             foreach (var d in diarizacao)
             {
                 double sobreposicao = Math.Min(seg.End, d.Fim) - Math.Max(seg.Start, d.Inicio);
-                if (sobreposicao > melhor)
-                {
-                    melhor = sobreposicao;
-                    escolhido = d.Falante;
-                }
+                if (sobreposicao > 0)
+                    total[d.Falante] = total.GetValueOrDefault(d.Falante) + sobreposicao;
             }
-            seg.Speaker = escolhido is null ? null : nomes[escolhido];
+
+            // "Unknown" e não nulo: é o que o app atual grava, e um rótulo
+            // explícito diz "ninguém foi identificado aqui" onde a ausência
+            // pareceria esquecimento.
+            seg.Speaker = total.Count == 0
+                ? "Unknown"
+                : nomes[total.MaxBy(p => p.Value).Key];
         }
     }
 

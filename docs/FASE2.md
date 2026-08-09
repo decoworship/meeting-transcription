@@ -114,8 +114,33 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
 3. UI por cima, na ordem do fluxo do usuário: escolher gravação → rodar →
    ler/corrigir (E1–E5) → exportar. Histórico, vozes e projetos depois do
    fluxo principal.
-4. Correção fonética + filtro de silêncio no núcleo, com os testes portados
-   das ferramentas Python.
+4. **Correção fonética + filtro de silêncio no núcleo** — **FEITO
+   (09/08/2026)**, em `app-net/Nucleo/`. Ligados por opção no CLI
+   (`--vocabulario`, `--filtrar-silencio`) e **desligados por padrão**: os dois
+   mudam o texto, e a paridade com o Gradio só é medível enquanto a saída for
+   comparável à dele.
+
+   Não havia testes no `tools/` para portar — o que existe lá são **decisões
+   medidas, registradas em prosa**: a regra de "remover vogal final" que fazia
+   `fixo`→`Fixa`, o teto de distância que não pode apertar sem matar o caso
+   `Jimmy`→`Dimi`. Os testes em C# prendem exatamente esses casos, para ninguém
+   "melhorar" o corretor de volta ao que já se provou pior.
+
+   > **Resultado negativo do filtro de silêncio, medido.** Rodado sobre
+   > `2026-08-06_09-03-05` — a mesma gravação do resultado 6-A, e a única do
+   > acervo com silêncio digital em quantidade (32,2% no `system`, 25,5% no
+   > mix) — ele descartou **1 segmento de 194** ("Eu acho que tem"). Os ~5% de
+   > palavras inventadas que a FASE0 mediu **não estão em segmentos inteiros
+   > sobre zeros**: estão espalhadas dentro de segmentos que também cobrem
+   > fala, e a FASE0 as contava rateando por tempo. Um filtro que decide por
+   > segmento inteiro não alcança o fenômeno, e afrouxar o limiar de 2/3 para
+   > alcançá-lo removeria fala verdadeira junto.
+   >
+   > A via certa é **filtrar por palavra**, e ela já está meio aberta: o ASR
+   > roda com `word_timestamps=True` e o protocolo simplesmente não carrega as
+   > palavras ainda. Fica registrado como o próximo passo desta frente — com o
+   > filtro atual mantido, porque o segmento inteiramente sobre zeros que ele
+   > pega é invenção pura.
 5. Paridade final (critério A) e aposentadoria do Docker.
 
 ## O que o sidecar já provou (08/08/2026)
@@ -141,24 +166,48 @@ simulação:
 gravação e compara com o JSON do `Sidecar.exe --gravacao`. Em
 `2026-08-07_15-39-58` (121 s, duas pessoas):
 
-| | resultado |
-|---|---|
-| mix das faixas | **byte a byte idêntico** (3.871.516 bytes dos dois lados) |
-| idioma, duração | `pt`, 120,98 s — iguais |
-| segmentos | 44 x 44, **texto idêntico em todos** |
-| tempos | diferença máxima **0,0 ms** |
-| falantes | 3 x 3, e a mesma atribuição em todos os 44 |
-| segmentos seus | 32 x 32 |
+| | 121 s, 2 pessoas | 995 s, reunião cheia |
+|---|---|---|
+| mix das faixas | **idêntico**, 3.871.516 B | **idêntico**, 31.856.152 B |
+| idioma, duração | `pt`, 120,98 s | `pt`, 995,50 s |
+| segmentos | 44 x 44, **texto idêntico** | 311 x 311, **texto idêntico** |
+| pior diferença de tempo | **0,0 ms** | **0,0 ms** |
+| falantes / atribuição | 3 x 3, zero divergência | 4 x 4, zero divergência |
+| segmentos seus | 32 x 32 | 0 x 0 |
 
-O mix idêntico é o que dá peso ao resto: com a mesma entrada e os mesmos
-parâmetros, texto igual deixa de ser coincidência. Custo do lado novo: ASR
-31,8 s + diarização 17,0 s numa gravação de 121 s.
+**PARIDADE nas duas.** O mix idêntico é o que dá peso ao resto: com a mesma
+entrada e os mesmos parâmetros, texto igual deixa de ser coincidência. Custo do
+lado novo na gravação longa: ASR 112,8 s + diarização 60,3 s para 16,6 min de
+áudio.
 
-A única divergência da primeira medição foi de nomenclatura — o C# devolvia
-`SPEAKER_00` onde o app dizia `Speaker 1`. Era o núcleo não fazendo a parte
-dele: o protocolo manda o rótulo cru de propósito, e nomear é do núcleo.
-Corrigido em `Montagem.AtribuirFalantes`, com a mesma ordem alfabética do
-`_create_speaker_map` — a atribuição em si já estava idêntica.
+### Três defeitos do porte que só a comparação pegou
+
+Nenhum apareceria em teste unitário — os testes tinham sido escritos com o
+mesmo entendimento errado do original. É o argumento inteiro para comparar
+contra o sistema antigo em vez de contra a própria expectativa.
+
+1. **Rótulo cru vazando.** O C# devolvia `SPEAKER_00` onde o app dizia
+   `Speaker 1`. O protocolo manda o rótulo cru de propósito e nomear é do
+   núcleo — faltava o núcleo fazer a parte dele.
+2. **Falante pelo maior trecho, não pela soma.** O original agrupa as
+   sobreposições por pessoa e soma; o porte pegava o maior trecho isolado. Num
+   segmento que atravessa uma troca de turno, quem fala três vezes por 1 s
+   domina quem falou uma vez por 2 s — o porte respondia errado exatamente nas
+   trocas, que é onde a diarização importa.
+3. **`Unknown` virando ausência.** Sem sobreposição nenhuma, o app grava
+   `Unknown`; o porte deixava nulo. Era a diferença de "4 falantes" contra "3"
+   na gravação longa — `Unknown` conta como rótulo.
+
+E um erro de método, registrado porque custou uma rodada inteira de medição:
+a primeira reexecução usou `--no-build` sobre um binário compilado **antes** da
+correção, e mediu o código velho concluindo que a correção não funcionara. A
+regra da Fase 1 ("medir sem executar não vale nada") tem uma irmã: **medir sem
+recompilar mede o passado**.
+
+Também verificado, porque a hipótese óbvia estava errada: a diarização **é
+determinística** entre execuções (321 trechos e 3 falantes em duas rodadas
+independentes) e **não é contaminada** por rodar o ASR antes no mesmo processo.
+A divergência era do porte, não do modelo.
 
 **O achado que vale para todo motor futuro**: `torch`, `pyannote` e amigos
 escrevem no `stdout` sem pedir licença, e uma linha dessas corrompe o

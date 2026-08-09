@@ -40,7 +40,10 @@ public sealed class Faixas
     /// canais, e é justamente esse equilíbrio que o <see cref="AtribuirDono"/>
     /// usa depois para saber quem falou.
     /// </remarks>
-    public void EscreverMix(string destino)
+    public void EscreverMix(string destino) => EscreverWav(destino, Mix());
+
+    /// <summary>A soma das duas faixas, como o ASR a recebe.</summary>
+    public float[] Mix()
     {
         int n = Math.Max(Mic.Length, Sistema.Length);
         var mix = new float[n];
@@ -52,7 +55,7 @@ public sealed class Faixas
         if (pico > 1f)
             for (int i = 0; i < n; i++) mix[i] /= pico;
 
-        EscreverWav(destino, mix);
+        return mix;
     }
 
     /// <summary>Energia média (RMS) de um trecho, em segundos.</summary>
