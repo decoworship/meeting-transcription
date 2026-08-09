@@ -1,11 +1,13 @@
 using System.Diagnostics;
+using MeetingApp.Cli;
 using MeetingApp.Sidecar;
 
-// Valida o contrato do sidecar por linha de comando, antes de existir UI — a
-// ordem de trabalho da FASE2.md. É o equivalente, para a Fase 2, do que o
-// `Capture.exe --list` foi para a Fase 1: a prova de que a peça funciona sem
+// Valida a Fase 2 por linha de comando, antes de existir UI — a ordem de
+// trabalho da FASE2.md. É o equivalente, para esta fase, do que o
+// `Capture.exe --list` foi para a Fase 1: a prova de que as peças funcionam sem
 // depender de nada visual.
 //
+//   Sidecar.exe --gravacao data/recordings/2026-08-07_15-39-58
 //   Sidecar.exe --motor python3 --script motores/diarizacao/motor.py --audio mix.wav
 //   Sidecar.exe ... --cancelar-em 2      (prova que cancelar mata o processo)
 //
@@ -22,10 +24,36 @@ string script = arg.GetValueOrDefault("script") ?? "motores/diarizacao/motor.py"
 string? audio = arg.GetValueOrDefault("audio");
 double? cancelarEm = double.TryParse(arg.GetValueOrDefault("cancelar-em"), out double s) ? s : null;
 
+// O pipeline inteiro é outro modo desta mesma ferramenta: as duas coisas que
+// ela faz são "exercitar um motor" e "provar o caminho completo".
+if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
+{
+    using var pipelineCts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; pipelineCts.Cancel(); };
+    try
+    {
+        return await Pipeline.ExecutarAsync(gravacao, motor,
+            arg.GetValueOrDefault("vocabulario"), arg.GetValueOrDefault("idioma"),
+            arg.GetValueOrDefault("saida"), pipelineCts.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        Console.Error.WriteLine("cancelado; nenhum motor ficou vivo.");
+        return 4;
+    }
+    catch (MotorException e)
+    {
+        Console.Error.WriteLine($"o motor falhou: {e.Message}");
+        return 5;
+    }
+}
+
 if (audio is null)
 {
-    Console.Error.WriteLine("uso: --audio <arquivo.wav> [--motor python3] [--script motor.py] "
-                            + "[--cancelar-em <segundos>]");
+    Console.Error.WriteLine(
+        "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"...\"] [--saida x.json]\n"
+        + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
+        + "[--cancelar-em <segundos>]");
     return 2;
 }
 

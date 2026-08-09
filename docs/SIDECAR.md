@@ -58,8 +58,19 @@ diferentes.
 ### Cliente → motor
 
 ```json
-{"id": 1, "op": "diarizar", "audio": "C:\\...\\mix.wav"}
+{"id": 1, "op": "diarizar", "audio": "C:\\...\\system.wav"}
+{"id": 2, "op": "transcrever", "audio": "C:\\...\\mix.wav", "vocabulario": "Acme, Élio", "idioma": "pt"}
 ```
+
+`vocabulario` e `idioma` são opcionais. O vocabulário chega ao faster-whisper
+como `hotwords` — não como `initial_prompt`, que só enviesa a primeira janela
+de 30 s e é truncado em 223 tokens, descartando em silêncio justamente os nomes
+que vêm primeiro.
+
+**Cada motor recebe o áudio que lhe cabe**, e isso não é detalhe: a diarização
+roda no `system.wav` sozinho, porque o que o microfone captou já se sabe de
+quem é — dar o mix ao pyannote o faria tentar separar você de você mesmo. O ASR
+recebe o mix, para enxergar a conversa inteira, sobreposições inclusive.
 
 ### Motor → cliente, durante
 
@@ -73,7 +84,13 @@ Zero ou mais vezes. `pct` entre 0 e 1.
 
 ```json
 {"id": 1, "tipo": "resultado", "segmentos": [{"inicio": 0.5, "fim": 3.2, "falante": "SPEAKER_00"}]}
+{"id": 2, "tipo": "resultado", "idioma": "pt", "duracao": 120.98,
+ "segmentos": [{"inicio": 0.5, "fim": 3.2, "texto": " bom dia a todos"}]}
 ```
+
+Um só formato de segmento para os dois motores: a diarização preenche
+`falante`, o ASR preenche `texto`. O texto sai como o modelo o produziu,
+espaço à esquerda e tudo — aparar é apresentação.
 
 ```json
 {"id": 1, "tipo": "erro", "mensagem": "não foi possível ler o áudio: ..."}
@@ -84,8 +101,10 @@ pronto para a próxima. Motor que morre é outra coisa, e o cliente detecta pelo
 pipe fechado.
 
 **Os rótulos de falante saem crus** (`SPEAKER_00`), como o pyannote os produz.
-Traduzir para "Falante 1" é decisão de apresentação e vive no núcleo, junto com
-o resto da nomeação de vozes.
+Traduzir para `Speaker 1` é decisão de apresentação e vive no núcleo
+(`Montagem.AtribuirFalantes`), junto com o resto da nomeação de vozes. A ordem
+é a alfabética dos rótulos crus, que é a que o app atual usa — trocá-la
+renomearia todo mundo e quebraria o histórico já gravado.
 
 ## Ciclo de vida
 

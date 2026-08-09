@@ -39,10 +39,25 @@ public sealed class MotorSidecarTests
         var segs = await m.DiarizarAsync("qualquer.wav", (p, t) => avisos.Add((p, t)));
 
         Assert.Equal(2, segs.Count);
-        Assert.Equal(new Segmento(0.5, 3.25, "SPEAKER_00"), segs[0]);
+        Assert.Equal(new SegmentoDeFalante(0.5, 3.25, "SPEAKER_00"), segs[0]);
         // Rótulo cru: nomear falante é apresentação, e vive no núcleo.
         Assert.Equal("SPEAKER_01", segs[1].Falante);
         Assert.Equal(("analisando falantes"), avisos.Single().Item2);
+    }
+
+    [Fact]
+    public async Task TranscricaoDevolveTextoIdiomaEDuracao()
+    {
+        using var m = await Subir();
+
+        var t = await m.TranscreverAsync("qualquer.wav", vocabulario: "Acme, Elio");
+
+        Assert.Equal("pt", t.Idioma);
+        Assert.Equal(7.0, t.Duracao);
+        // O texto sai como o motor o produziu, com o espaço à esquerda que o
+        // whisper põe: aparar é decisão de apresentação, e o app atual apara na
+        // hora de formatar, não na de guardar.
+        Assert.Equal(" bom dia a todos", t.Segmentos[0].Texto);
     }
 
     [Fact]
@@ -75,7 +90,9 @@ public sealed class MotorSidecarTests
         // Critério C da Fase 2: a UI mostra o erro e o app continua vivo.
         using var m = await Subir("morre-no-meio");
         var e = await Assert.ThrowsAsync<MotorException>(() => m.DiarizarAsync("x.wav"));
-        Assert.Contains("morreu durante a diarização", e.Message);
+        // A operação aparece na mensagem: com dois motores no pipeline, "o motor
+        // morreu" sem dizer o quê fazia manda procurar no lugar errado.
+        Assert.Contains("morreu durante a operação 'diarizar'", e.Message);
     }
 
     [Fact]

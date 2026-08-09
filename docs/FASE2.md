@@ -100,9 +100,17 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
    (08/08/2026)**. Especificação em [SIDECAR.md](SIDECAR.md); cliente em
    `app-net/Sidecar/`, motor em `motores/diarizacao/motor.py`, validação por
    CLI em `app-net/Cli/`. Ver §"O que o sidecar já provou" abaixo.
-2. Empacotar os dois motores como pastas auto-contidas (python-embeddable) e
-   provar o pipeline inteiro por CLI: gravação → mix → ASR → diarização →
-   `TranscriptionResult` JSON idêntico ao de hoje.
+2. **Pipeline inteiro por CLI** — **FEITO (09/08/2026)**: gravação → mix → ASR →
+   diarização → `TranscriptionResult` JSON idêntico ao de hoje, com a paridade
+   medida (ver abaixo). `Sidecar.exe --gravacao <pasta>`.
+   **Falta o empacotamento** dos motores como pastas auto-contidas
+   (python-embeddable) — hoje eles rodam do venv de desenvolvimento.
+
+   > **Inversão de ordem, registrada.** A carta pedia empacotar *e* provar no
+   > mesmo passo. Provar primeiro é mais barato e mais informativo: empacotar
+   > antes congelaria um contrato ainda não exercitado, e os ~2,5 GB de
+   > download do python-embeddable com torch não mudariam nada do desenho. A
+   > troca de ordem custa zero e a informação veio antes.
 3. UI por cima, na ordem do fluxo do usuário: escolher gravação → rodar →
    ler/corrigir (E1–E5) → exportar. Histórico, vozes e projetos depois do
    fluxo principal.
@@ -126,6 +134,31 @@ simulação:
   motor que nem sobe viram três mensagens diferentes e legíveis, sem derrubar o
   cliente. Sete testes cobrem isso contra um motor falso — protocolo e ciclo de
   vida não deviam depender de um modelo de 2 GB para serem verificados.
+
+### Paridade do pipeline com o app Gradio (09/08/2026)
+
+`tools/comparar_pipeline.py` roda o pipeline Python de hoje sobre a mesma
+gravação e compara com o JSON do `Sidecar.exe --gravacao`. Em
+`2026-08-07_15-39-58` (121 s, duas pessoas):
+
+| | resultado |
+|---|---|
+| mix das faixas | **byte a byte idêntico** (3.871.516 bytes dos dois lados) |
+| idioma, duração | `pt`, 120,98 s — iguais |
+| segmentos | 44 x 44, **texto idêntico em todos** |
+| tempos | diferença máxima **0,0 ms** |
+| falantes | 3 x 3, e a mesma atribuição em todos os 44 |
+| segmentos seus | 32 x 32 |
+
+O mix idêntico é o que dá peso ao resto: com a mesma entrada e os mesmos
+parâmetros, texto igual deixa de ser coincidência. Custo do lado novo: ASR
+31,8 s + diarização 17,0 s numa gravação de 121 s.
+
+A única divergência da primeira medição foi de nomenclatura — o C# devolvia
+`SPEAKER_00` onde o app dizia `Speaker 1`. Era o núcleo não fazendo a parte
+dele: o protocolo manda o rótulo cru de propósito, e nomear é do núcleo.
+Corrigido em `Montagem.AtribuirFalantes`, com a mesma ordem alfabética do
+`_create_speaker_map` — a atribuição em si já estava idêntica.
 
 **O achado que vale para todo motor futuro**: `torch`, `pyannote` e amigos
 escrevem no `stdout` sem pedir licença, e uma linha dessas corrompe o

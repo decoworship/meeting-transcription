@@ -50,6 +50,14 @@ for linha in sys.stdin:
         # Longo o bastante para o cancelamento chegar no meio.
         time.sleep(60)
 
+    if req.get("op") == "transcrever":
+        enviar(id=id_req, tipo="progresso", pct=0.5, texto="transcrevendo")
+        enviar(id=id_req, tipo="resultado", idioma="pt", duracao=7.0, segmentos=[
+            {"inicio": 0.5, "fim": 3.25, "texto": " bom dia a todos"},
+            {"inicio": 3.25, "fim": 7.0, "texto": " vamos começar"},
+        ], vocabulario_recebido=req.get("vocabulario"))
+        continue
+
     enviar(id=id_req, tipo="progresso", pct=0.3, texto="analisando falantes")
     enviar(id=id_req, tipo="resultado", segmentos=[
         {"inicio": 0.5, "fim": 3.25, "falante": "SPEAKER_00"},

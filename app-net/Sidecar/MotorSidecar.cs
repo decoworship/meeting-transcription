@@ -103,12 +103,47 @@ public sealed class MotorSidecar : IDisposable
     /// O motor recusou a requisição, ou morreu no meio dela. As duas coisas
     /// precisam chegar legíveis à UI sem derrubar o app (critério C da Fase 2).
     /// </exception>
-    public async Task<IReadOnlyList<Segmento>> DiarizarAsync(
+    public async Task<IReadOnlyList<SegmentoDeFalante>> DiarizarAsync(
         string caminhoDoAudio, Action<double, string>? progresso = null,
         CancellationToken ct = default)
     {
-        int id = _proximoId++;
-        await EnviarAsync(new Requisicao { Id = id, Op = "diarizar", Audio = caminhoDoAudio }, ct);
+        var m = await ExecutarAsync(
+            new Requisicao { Id = _proximoId++, Op = "diarizar", Audio = caminhoDoAudio },
+            progresso, ct);
+
+        return (m.Segmentos ?? [])
+            .Select(s => new SegmentoDeFalante(s.Inicio, s.Fim, s.Falante ?? ""))
+            .ToList();
+    }
+
+    /// <param name="vocabulario">Termos do projeto, como <c>hotwords</c> do ASR.</param>
+    /// <inheritdoc cref="DiarizarAsync"/>
+    public async Task<Transcricao> TranscreverAsync(
+        string caminhoDoAudio, string? vocabulario = null, string? idioma = null,
+        Action<double, string>? progresso = null, CancellationToken ct = default)
+    {
+        var m = await ExecutarAsync(
+            new Requisicao
+            {
+                Id = _proximoId++,
+                Op = "transcrever",
+                Audio = caminhoDoAudio,
+                Vocabulario = vocabulario,
+                Idioma = idioma,
+            },
+            progresso, ct);
+
+        return new Transcricao(
+            (m.Segmentos ?? []).Select(s => new SegmentoDeTexto(s.Inicio, s.Fim, s.Texto ?? "")).ToList(),
+            m.Idioma, m.Duracao ?? 0);
+    }
+
+    /// <summary>Envia uma requisição e devolve a mensagem de resultado dela.</summary>
+    private async Task<Mensagem> ExecutarAsync(
+        Requisicao requisicao, Action<double, string>? progresso, CancellationToken ct)
+    {
+        int id = requisicao.Id;
+        await EnviarAsync(requisicao, ct);
 
         while (true)
         {
@@ -120,7 +155,8 @@ public sealed class MotorSidecar : IDisposable
             if (m is null)
             {
                 ct.ThrowIfCancellationRequested();
-                throw new MotorException($"o motor '{Nome}' morreu durante a diarização.");
+                throw new MotorException(
+                    $"o motor '{Nome}' morreu durante a operação '{requisicao.Op}'.");
             }
 
             // Resposta de uma requisição anterior já abandonada: ignorar em vez
@@ -134,9 +170,7 @@ public sealed class MotorSidecar : IDisposable
                     break;
 
                 case "resultado":
-                    return (m.Segmentos ?? [])
-                        .Select(s => new Segmento(s.Inicio, s.Fim, s.Falante))
-                        .ToList();
+                    return m;
 
                 case "erro":
                     // Erro encerra a requisição, não o motor: ele continua vivo
