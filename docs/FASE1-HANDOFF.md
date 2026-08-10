@@ -10,11 +10,12 @@ Branch: `feat/recorder-and-accuracy`. Último commit desta fase: ver
 
 ## 1. Estado em uma frase
 
-O gravador nativo **funciona, cabe no orçamento e está validado em uso real**:
-captura duas faixas, sobrevive a crash, identifica a reunião pela agenda, tem o
-menu com paridade sobre o `tray.py` e pesa 14,9 MB. O que falta para fechar a
-fase é uma reunião de verdade gravada em paralelo com o Python — e o Python
-sair de uso.
+O gravador nativo **funciona, cabe no orçamento e ganhou do Python em gravação
+real**: captura duas faixas, sobrevive a crash, identifica a reunião pela
+agenda, tem o menu com paridade sobre o `tray.py`, pesa 14,9 MB — e num soak de
+57 min com headset Bluetooth terminou com as faixas a 206,7 ms uma da outra,
+contra **17 minutos** de desalinhamento do Python (§6). Falta o clique do OAuth
+inicial e a decisão de aposentar o `recorder/`.
 
 ---
 
@@ -37,9 +38,9 @@ sair de uso.
 
 | | estado |
 |---|---|
-| A. paridade de captura | ✅ aprovado, com conteúdo real |
+| A. paridade de captura | ✅ aprovado — 57,4 min em paralelo, ver §6 |
 | B. kill -9 no meio da gravação | ✅ verificado com kill de verdade |
-| C. soak de 1h+ | 🟡 OK parcial — 20 min, 72 correções de âncora |
+| C. soak de 1h+ | ✅ 57,4 min contínuos com headset Bluetooth, ver §6 |
 | D. disco cheio | 🟡 OK parcial — guarda implementada e testada, sem teste de volume cheio |
 | E. ≤ 25 MB | ✅ **14,9 MB** — era 154,8 MB; ver §3 |
 
@@ -139,37 +140,74 @@ Win32 que este projeto escrever (a Fase 2 vai precisar de uma).
 
 ## 5. Fechamento da fase
 
-A definição de pronto da carta é **o gravador Python aposentado**. Para chegar
-lá:
+A definição de pronto da carta é **o gravador Python aposentado**. Os passos 1 e
+2 estão feitos (§6): a reunião em paralelo aconteceu, e o novo ganhou por uma
+margem que não deixa dúvida. **Sobra a decisão do dono do produto de tirar o
+`recorder/` de uso** — e o clique do OAuth (§4.1), que é a última coisa do
+gravador nunca exercitada.
 
-1. Gravar uma reunião real com os dois em paralelo (fecha o critério C de
-   verdade e valida o calendário em uso). A ferramenta existe:
-   `tools/comparar_gravadores.py --segundos N`.
-2. Comparar `meta.json` campo a campo, como no critério A.
-3. Aposentar o `recorder/` Python.
-
-Dois números para observar nessa validação:
-
-- O `desalinhamento entre faixas` que o CLI imprime é a **diferença de
-  comprimento** entre as faixas, não alinhamento temporal
-  ([`Cli/Program.cs`](../recorder-net/Cli/Program.cs), busca por
-  `desalinhamento`). Em gravação com nada tocando, a faixa `system` sai 100%
-  silêncio sintetizado e o número mede o preenchimento, não a captura — deu
-  18–44 ms nesses casos, contra 1,7 ms medidos com conteúdo nas duas faixas.
-- Nas duas gravações de validação da bandeja nativa (sala silenciosa, `system`
-  100% sintetizado) essa diferença deu **254,8 ms em 19,93 s** (4077 amostras) e
-  **278,7 ms em 14,95 s** (4459 amostras) — acima dos 18–44 ms anteriores. O que
-  esses dois pontos dizem: o número **não cresce com a duração**, e a gravação
-  mais curta deu a diferença maior. Isso é a assinatura de um offset de partida
-  constante (~4 mil amostras, o `system` começando a preencher silêncio depois
-  do `mic`), não de deriva — que é justamente a distinção que o
-  `comparar_gravadores.py` mede por correlação em janelas. Dois pontos não são
-  uma série: **confirmar com conteúdo real nas duas faixas** antes de concluir
-  que não é nada.
+Lembrete de leitura para quem for medir de novo: o `desalinhamento entre faixas`
+que o CLI imprime é a **diferença de comprimento** entre elas, não alinhamento
+temporal ([`Cli/Program.cs`](../recorder-net/Cli/Program.cs), busca por
+`desalinhamento`). Em gravação com nada tocando, a faixa `system` sai 100%
+silêncio sintetizado e o número mede o preenchimento, não a captura.
 
 ---
 
-## 6. Como validar um build
+## 6. O soak de 57 min, e o que ele decidiu (10/08/2026)
+
+Gravação real de **3442,7 s (57,4 min)** com os dois gravadores em paralelo,
+sobre uma reunião reproduzida, **com headset Bluetooth (AN01)** — o caso mais
+duro que existe para deriva, e por acaso o que o usuário usa no dia a dia.
+Pastas: `2026-08-10_08-08-10` (novo) e `2026-08-10_08-08-08` (Python).
+
+| | novo (C#) | Python |
+|---|---|---|
+| faixa `system` | 55.079.887 amostras | 38.684.947 |
+| **alinhamento entre as faixas** | **206,7 ms** | **17 min 9 s** |
+| correções de âncora (sys/mic) | 38.556 / 55.826 | 21 / 168 |
+| palavras transcritas em `system` | 6.632 | 6.703 |
+
+**O Python perdeu 17 minutos da faixa do sistema** — 40 min de arquivo para
+57 min de reunião. É exatamente o defeito que o requisito 3.1 existe para
+corrigir (âncora no relógio de chegada em vez do relógio do dispositivo), agora
+medido em escala real em vez de deduzido. O gravador novo terminou com as duas
+faixas a 206,7 ms uma da outra.
+
+**Isto também fecha o número que ficou sem explicação na versão anterior deste
+handoff**: os 254,8 ms e 278,7 ms das gravações curtas não eram deriva. Em 57
+minutos o desalinhamento ficou em 206,7 ms — não cresce com o tempo, é offset
+de partida constante, como a hipótese previa. Confirmado com conteúdo real nas
+duas faixas e em escala 170× maior.
+
+### O susto: 38 mil correções e 21% menos energia
+
+O novo descartou 11% das amostras de `system` e 16% das de `mic`, e a energia
+total capturada ficou 21% abaixo da do Python. O requisito 3.1 manda descartar
+em trecho silencioso e **nunca no meio de fala**, então isso precisava de
+resposta antes de aprovar o critério A. Duas medições responderam:
+
+1. **Teste com marcadores** (`tools/teste_de_descarte.ps1`): um sinal com um
+   bipe a cada 1,000 s exato, tocado e capturado pelo loopback. Resultado:
+   **120 bipes de 120**, intervalo médio 1,0003 s, desvio 2,2 ms, deriva total
+   de 40 ms em 119 s. Nada descartado. *Ressalva que o próprio teste expôs*:
+   ele rodou na saída HDMI do monitor e produziu **1** correção de âncora,
+   contra as 38.556 da reunião — mediu um regime fácil, não o difícil.
+2. **Contagem de palavras** nas duas faixas `system` reais, que é o regime
+   difícil: **6.632 contra 6.703, diferença de 1,1%**. O conteúdo é o mesmo.
+
+Conclusão: **não há perda de fala**. A diferença de energia é compatível com o
+filtro anti-aliasing da reamostragem de 48 kHz para 16 kHz — o Python tem mais
+energia total *e* pico RMS menor, combinação que aponta para energia espúria de
+aliasing no lado dele, não para conteúdo faltando no nosso.
+
+Fica aberto, sem bloquear nada: **por que o Bluetooth exige 38 mil correções**
+onde o HDMI exige 1. A explicação provável é o clock livre do A2DP, e a âncora
+está fazendo exatamente o que deveria — mas o número nunca foi medido de
+propósito. O teste dos bipes repetido com o AN01 conectado fecharia isso com
+precisão de milissegundos.
+
+## 7. Como validar um build
 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
