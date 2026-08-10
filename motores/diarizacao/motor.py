@@ -42,6 +42,7 @@ class Pipeline:
 
     def __init__(self) -> None:
         self._pipeline = None
+        self.dispositivo = "?"
 
     def carregar(self, id_req: int) -> None:
         if self._pipeline is not None:
@@ -62,14 +63,15 @@ class Pipeline:
         self._pipeline = PyannotePipeline.from_pretrained(
             "pyannote/speaker-diarization-community-1", token=token
         )
-        self._pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        _log(f"pipeline carregado em {'cuda' if torch.cuda.is_available() else 'cpu'}")
+        self.dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
+        self._pipeline.to(torch.device(self.dispositivo))
+        _log(f"pipeline carregado em {self.dispositivo}")
 
     def diarizar(self, caminho: str, id_req: int) -> list[dict]:
         self.carregar(id_req)
         _enviar(id=id_req, tipo="progresso", pct=0.3, texto="analisando falantes")
 
-        saida = self._pipeline(caminho)
+        saida = self._pipeline(self._ler_wav(caminho))
         # O pyannote 3.1+ devolve um objeto com a anotação dentro; versões
         # antigas devolvem a anotação direto. Mesmo tratamento do
         # src/diarization/speaker_diarizer.py, que continua sendo a referência.
@@ -80,6 +82,36 @@ class Pipeline:
             {"inicio": trecho.start, "fim": trecho.end, "falante": falante}
             for trecho, _, falante in anotacao.itertracks(yield_label=True)
         ]
+
+    @staticmethod
+    def _ler_wav(caminho: str) -> dict:
+        """O áudio já decodificado, do jeito que o pyannote aceita.
+
+        Passar o caminho faria o pyannote 4 procurar o ``torchcodec``, que é
+        compilado contra uma versão específica do torch — e o nosso torch vem do
+        índice do PyTorch, para ter CUDA. As duas versões não casam, e o sintoma
+        é ``torchcodec is not available`` no meio da diarização, depois de a
+        transcrição inteira já ter rodado.
+
+        Ler aqui elimina a dependência: o formato é o do nosso próprio gravador
+        (16 kHz mono 16 bits), então não há caso geral a tratar.
+        """
+        import numpy as np
+        import torch
+        import wave
+
+        with wave.open(caminho, "rb") as w:
+            if w.getsampwidth() != 2 or w.getnchannels() != 1:
+                raise RuntimeError(
+                    f"esperado WAV mono de 16 bits, veio {w.getnchannels()} canais "
+                    f"de {8 * w.getsampwidth()} bits"
+                )
+            taxa = w.getframerate()
+            bruto = w.readframes(w.getnframes())
+
+        sinal = np.frombuffer(bruto, dtype=np.int16).astype(np.float32) / 32768.0
+        # (canal, tempo), que é a forma que o pyannote espera.
+        return {"waveform": torch.from_numpy(sinal).unsqueeze(0), "sample_rate": taxa}
 
 
 def main() -> int:

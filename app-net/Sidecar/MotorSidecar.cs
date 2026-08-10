@@ -45,8 +45,13 @@ public sealed class MotorSidecar : IDisposable
     /// <summary>Sobe o motor e espera o handshake.</summary>
     /// <param name="comando">Executável do motor (o Python embutido, na v1).</param>
     /// <param name="argumentos">Argumentos, tipicamente o script do motor.</param>
+    /// <param name="ambiente">
+    /// Variáveis a acrescentar ao processo do motor. É por aqui que o token do
+    /// HuggingFace chega ao pyannote sem ninguém configurar variável de sistema.
+    /// </param>
     public static async Task<MotorSidecar> IniciarAsync(
-        string comando, IEnumerable<string> argumentos, CancellationToken ct = default)
+        string comando, IEnumerable<string> argumentos, CancellationToken ct = default,
+        IReadOnlyDictionary<string, string>? ambiente = null)
     {
         var info = new ProcessStartInfo(comando)
         {
@@ -60,6 +65,8 @@ public sealed class MotorSidecar : IDisposable
             StandardErrorEncoding = new UTF8Encoding(false),
         };
         foreach (string a in argumentos) info.ArgumentList.Add(a);
+        if (ambiente is not null)
+            foreach (var (chave, valor) in ambiente) info.Environment[chave] = valor;
 
         var processo = Process.Start(info)
             ?? throw new MotorException($"não foi possível iniciar o motor: {comando}");

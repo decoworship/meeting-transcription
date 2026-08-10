@@ -121,8 +121,10 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
 2. **Pipeline inteiro por CLI** — **FEITO (09/08/2026)**: gravação → mix → ASR →
    diarização → `TranscriptionResult` JSON idêntico ao de hoje, com a paridade
    medida (ver abaixo). `Sidecar.exe --gravacao <pasta>`.
-   **Falta o empacotamento** dos motores como pastas auto-contidas
-   (python-embeddable) — hoje eles rodam do venv de desenvolvimento.
+   **Empacotamento FEITO (10/08/2026)**, com `tools/empacotar_motores.sh`:
+   Python embeddable 3.12.8 + faster-whisper + pyannote, montado no
+   Linux/WSL (o `uv` baixa wheels `win_amd64` daqui) e rodando no Windows
+   **sem WSL nenhum**. Ver §"Os motores no Windows".
 
    > **Inversão de ordem, registrada.** A carta pedia empacotar *e* provar no
    > mesmo passo. Provar primeiro é mais barato e mais informativo: empacotar
@@ -231,6 +233,50 @@ Também verificado, porque a hipótese óbvia estava errada: a diarização **é
 determinística** entre execuções (321 trechos e 3 falantes em duas rodadas
 independentes) e **não é contaminada** por rodar o ASR antes no mesmo processo.
 A divergência era do porte, não do modelo.
+
+## Os motores no Windows (10/08/2026)
+
+`tools/empacotar_motores.sh` monta a pasta que o app espera ao lado do
+executável. Roda no Linux e produz um ambiente Windows — o `uv` baixa wheels
+`win_amd64` daqui, então não é preciso um Windows para empacotar.
+
+**Provado por execução**, na gravação de 24,5 min do próprio usuário, tudo no
+Windows e sem WSL: **387 segmentos em 330 s**, 4,5× tempo real, `pt`, três
+falantes (`Speaker 1`, `Speaker 2` e `You`). O `transcricao.json` saiu no
+formato do app antigo.
+
+### As três coisas que só a execução ensinou
+
+1. **O torch do PyPI para Windows é CPU-only.** `torch+cpu`, `cuda: False`.
+   Medido com o modelo `tiny`: 12,9× tempo real em CPU contra 21,8× na GPU — e
+   o `large-v3`, que é o de produção, é ~40× maior que o `tiny`. Para a GPU
+   valer é preciso o índice `download.pytorch.org/whl/cu124`, que custa 2,4 GiB
+   de download e traz as DLLs de CUDA.
+2. **O ctranslate2 não traz CUDA consigo**, procura `cublas64_12.dll` e
+   `cudnn*.dll` no caminho de busca do processo. Quem as tem é o torch, em
+   `torch/lib`. Sem registrar esse diretório (`os.add_dll_directory`) o
+   faster-whisper **cai para CPU em silêncio** — não há erro, só lentidão, que
+   é o pior tipo de falha para diagnosticar. Por isso os dois motores agora
+   declaram em que dispositivo rodaram.
+3. **O pyannote 4 lê áudio via `torchcodec`**, que é compilado contra uma
+   versão exata do torch. Trocar o torch pelo do índice CUDA quebrou o par, e o
+   sintoma — `torchcodec is not available` — aparece **no meio da diarização,
+   depois de a transcrição inteira já ter rodado**. A saída foi eliminar a
+   dependência: o motor lê o WAV com a biblioteca padrão e entrega
+   `{waveform, sample_rate}` ao pipeline. O formato é o do nosso próprio
+   gravador, então não há caso geral a tratar. Confirmado idêntico: 14 trechos,
+   2 falantes, como antes.
+
+**Tamanho: 4,2 GB**, dos quais 3,4 GB são o torch com CUDA. O script já corta
+780 MB de coisas que só servem para compilar C++ (os `.lib` são import
+libraries do MSVC, mais os headers). Dá para ir além — `cufft`, `cusparse` e
+`cusolver` somam 650 MB e talvez não sejam usados —, mas cortar DLL de runtime
+sem medir é exatamente o erro que a Fase 1 aprendeu a não cometer.
+
+**O `HF_TOKEN`** sai do ambiente ou de `%USERPROFILE%\.meeting-recorder\.env`,
+o mesmo lugar das credenciais do Google, e o app o repassa aos motores pelo
+ambiente do processo. Só é necessário na primeira execução de cada máquina;
+depois o modelo fica no cache do HuggingFace.
 
 ### O que a primeira tela já decidiu (10/08/2026)
 

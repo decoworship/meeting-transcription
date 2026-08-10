@@ -21,6 +21,34 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
+
+def _achar_cuda() -> None:
+    """Deixa o ctranslate2 encontrar as DLLs de CUDA que vêm com o torch.
+
+    No Windows o ctranslate2 procura ``cublas64_12.dll`` e ``cudnn*.dll`` no
+    caminho de busca do processo, e não as traz consigo. Quem as tem, no nosso
+    empacotamento, é o torch — que instala tudo em ``torch/lib``. Sem este
+    registro o faster-whisper cai para CPU **em silêncio**: não há erro, só
+    lentidão, que é o pior tipo de falha para diagnosticar.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import importlib.util
+
+        spec = importlib.util.find_spec("torch")
+        if spec is None or not spec.submodule_search_locations:
+            return
+        lib = os.path.join(list(spec.submodule_search_locations)[0], "lib")
+        if os.path.isdir(lib):
+            os.add_dll_directory(lib)
+    except Exception as e:                                   # nunca fatal
+        print(f"[asr] não foi possível registrar as DLLs de CUDA: {e!r}",
+              file=sys.stderr, flush=True)
+
+
+_achar_cuda()
+
 VERSAO = "1"
 
 
@@ -39,6 +67,7 @@ class Modelo:
     def __init__(self, tamanho: str) -> None:
         self._tamanho = tamanho
         self._modelo = None
+        self.dispositivo = "?"
 
     def carregar(self, id_req: int) -> None:
         if self._modelo is not None:
@@ -54,7 +83,8 @@ class Modelo:
             device="cuda" if cuda else "cpu",
             compute_type="float16" if cuda else "int8",
         )
-        _log(f"modelo {self._tamanho} carregado em {'cuda' if cuda else 'cpu'}")
+        self.dispositivo = "cuda" if cuda else "cpu"
+        _log(f"modelo {self._tamanho} carregado em {self.dispositivo}")
 
     def transcrever(self, caminho: str, id_req: int,
                     vocabulario: str | None, idioma: str | None) -> dict:
@@ -90,7 +120,8 @@ class Modelo:
                 _enviar(id=id_req, tipo="progresso",
                         pct=min(s.end / duracao, 0.99), texto="transcrevendo")
 
-        return {"segmentos": segmentos, "idioma": info.language, "duracao": duracao}
+        return {"segmentos": segmentos, "idioma": info.language, "duracao": duracao,
+                "dispositivo": self.dispositivo}
 
 
 def main() -> int:

@@ -25,6 +25,49 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             Path.Combine(raiz, "diarizacao", "motor.py"));
     }
 
+    /// <summary>
+    /// O token do HuggingFace, que o pyannote exige para baixar o modelo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Procura primeiro no ambiente e depois em
+    /// <c>%USERPROFILE%\.meeting-recorder\.env</c> — o mesmo lugar onde já vivem
+    /// as credenciais do Google. Quem instala o app não tem variável de ambiente
+    /// configurada, e mandá-lo criar uma seria pedir trabalho de administrador
+    /// para usar um programa de gravar reunião.
+    /// </para>
+    /// <para>
+    /// Só é necessário na <b>primeira</b> execução de cada máquina: depois o
+    /// modelo fica no cache do HuggingFace e o pyannote não pede mais nada.
+    /// </para>
+    /// </remarks>
+    public static string? TokenDoHuggingFace()
+    {
+        if (Environment.GetEnvironmentVariable("HF_TOKEN") is { Length: > 0 } doAmbiente)
+            return doAmbiente;
+
+        string env = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".meeting-recorder", ".env");
+        try
+        {
+            if (!File.Exists(env)) return null;
+            foreach (string linha in File.ReadAllLines(env))
+            {
+                var partes = linha.Split('=', 2);
+                if (partes.Length == 2 && partes[0].Trim() == "HF_TOKEN")
+                    return partes[1].Trim().Trim('"', '\'');
+            }
+        }
+        catch (IOException)
+        {
+            // Arquivo ilegível não pode derrubar a transcrição: o motor dirá que
+            // falta o token, que é uma mensagem melhor que "não consegui ler um
+            // arquivo que você nem sabia que existia".
+        }
+        return null;
+    }
+
     /// <summary>Diz o que falta, ou <c>null</c> se está tudo no lugar.</summary>
     /// <remarks>
     /// Checar antes de spawnar é o que transforma "o motor morreu" — mensagem
@@ -75,8 +118,14 @@ public sealed class Transcritor(Motores motores)
         // ASR primeiro, diarização depois, cada um no seu processo: numa placa
         // de 6 GB os dois modelos não cabem juntos, e processos separados fazem
         // a VRAM do primeiro voltar antes de o segundo subir.
+        // O token vai para os dois motores: hoje só a diarização o usa, mas o
+        // faster-whisper também baixa do HuggingFace e um dia pode precisar.
+        var ambiente = new Dictionary<string, string>();
+        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
+
         Transcricao transcricao;
-        using (var asr = await MotorSidecar.IniciarAsync(motores.Python, [motores.ScriptAsr], ct))
+        using (var asr = await MotorSidecar.IniciarAsync(
+                   motores.Python, [motores.ScriptAsr], ct, ambiente))
         {
             transcricao = await asr.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
                 (pct, texto) => progresso?.Invoke(new Progresso("asr", pct, texto)), ct);
@@ -86,7 +135,7 @@ public sealed class Transcritor(Motores motores)
         // de quem é, e dar o mix ao pyannote o faria tentar separar você de você.
         IReadOnlyList<SegmentoDeFalante> diarizacao;
         using (var diar = await MotorSidecar.IniciarAsync(
-                   motores.Python, [motores.ScriptDiarizacao], ct))
+                   motores.Python, [motores.ScriptDiarizacao], ct, ambiente))
         {
             diarizacao = await diar.DiarizarAsync(sistema,
                 (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)), ct);
