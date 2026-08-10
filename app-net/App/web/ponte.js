@@ -18,17 +18,28 @@ window.chrome.webview.addEventListener("message", (evento) => {
 
   const pendente = pendentes.get(resposta.id);
   if (!pendente) return;          // resposta de um pedido já abandonado
-  pendentes.delete(resposta.id);
 
+  // Progresso não encerra o pedido: a promessa continua pendente até a
+  // mensagem sem `tipo`, que é a final. É o que permite uma operação de
+  // minutos reportar andamento sem um segundo canal.
+  if (resposta.tipo === "progresso") {
+    pendente.aoProgredir?.(resposta);
+    return;
+  }
+
+  pendentes.delete(resposta.id);
   if (resposta.erro) pendente.rejeitar(new Error(resposta.erro));
   else pendente.resolver(resposta);
 });
 
-/** Envia um pedido ao núcleo e espera a resposta. */
-export function pedir(op, campos = {}) {
+/**
+ * Envia um pedido ao núcleo e espera a resposta.
+ * @param aoProgredir chamado a cada aviso de andamento, quando houver.
+ */
+export function pedir(op, campos = {}, aoProgredir = null) {
   const id = proximoId++;
   return new Promise((resolver, rejeitar) => {
-    pendentes.set(id, { resolver, rejeitar });
+    pendentes.set(id, { resolver, rejeitar, aoProgredir });
     window.chrome.webview.postMessage(JSON.stringify({ id, op, ...campos }));
   });
 }

@@ -16,10 +16,19 @@ internal sealed class JanelaDoApp : IDisposable
     // Campo, não local: se o GC coletar o delegate, o processo morre na próxima
     // callback do Windows. Mesma armadilha da bandeja.
     private readonly Win32.WndProc _wndProc;
-    private readonly Ponte _ponte;
+    private Ponte? _ponte;
+    private readonly string _pastaDasGravacoes;
 
     private CoreWebView2Controller? _controlador;
     private CoreWebView2? _web;
+
+    /// <remarks>
+    /// Fila e não <see cref="SynchronizationContext"/>: numa janela Win32 crua
+    /// não há contexto instalado — quem instala é o WinForms, que este projeto
+    /// não usa de propósito. O par fila + <c>PostMessage</c> é o mesmo padrão já
+    /// provado na bandeja.
+    /// </remarks>
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Action> _acoes = new();
 
     public IntPtr Hwnd { get; }
 
@@ -27,7 +36,7 @@ internal sealed class JanelaDoApp : IDisposable
     {
         Win32.SetProcessDpiAwarenessContext(Win32.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-        _ponte = new Ponte(pastaDasGravacoes ?? PastaPadraoDasGravacoes());
+        _pastaDasGravacoes = pastaDasGravacoes ?? PastaPadraoDasGravacoes();
         _wndProc = Processar;
 
         var classe = new Win32.WNDCLASSEX
@@ -92,14 +101,14 @@ internal sealed class JanelaDoApp : IDisposable
                                            CoreWebView2WebResourceContext.All);
         _web.WebResourceRequested += (_, e) => Servir(ambiente, e);
 
-        // A ponte: a página manda JSON, o núcleo responde JSON.
-        _web.WebMessageReceived += async (_, e) =>
+        // A ponte: a página manda JSON, o núcleo responde JSON. O PostWebMessage
+        // só pode ser chamado na thread da UI, e o pipeline responde de uma
+        // thread de trabalho — daí o salto de volta pelo laço de mensagens.
+        _ponte = new Ponte(_pastaDasGravacoes, NaUi);
+        _web.WebMessageReceived += (_, e) =>
         {
-            string resposta = _ponte.Atender(e.TryGetWebMessageAsString());
-            // De volta na thread da UI — o WebView2 exige, e o Atender pode ter
-            // levado tempo em disco.
-            await Task.CompletedTask;
-            _web!.PostWebMessageAsString(resposta);
+            string pedido = e.TryGetWebMessageAsString();
+            _ = _ponte!.AtenderAsync(pedido);
         };
 
         _web.Navigate(Conteudo.Raiz);
@@ -123,6 +132,18 @@ internal sealed class JanelaDoApp : IDisposable
             $"Content-Type: {r.Tipo}\r\nCache-Control: no-cache");
     }
 
+    /// <summary>Manda uma mensagem à página, venha de onde vier a chamada.</summary>
+    /// <remarks>
+    /// O <c>PostWebMessageAsString</c> só pode ser chamado na thread que criou o
+    /// controlador. O pipeline responde de uma thread de trabalho, então a
+    /// mensagem entra numa fila e o laço a executa do lado certo.
+    /// </remarks>
+    private void NaUi(string json)
+    {
+        _acoes.Enqueue(() => _web?.PostWebMessageAsString(json));
+        Win32.PostMessageW(Hwnd, Win32.WM_EXECUTAR, IntPtr.Zero, IntPtr.Zero);
+    }
+
     /// <summary>Encaixa o WebView2 na área útil da janela.</summary>
     private void Ajustar()
     {
@@ -135,6 +156,10 @@ internal sealed class JanelaDoApp : IDisposable
     {
         switch (msg)
         {
+            case Win32.WM_EXECUTAR:
+                while (_acoes.TryDequeue(out var acao)) acao();
+                return IntPtr.Zero;
+
             case Win32.WM_SIZE:
                 Ajustar();
                 return IntPtr.Zero;

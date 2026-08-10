@@ -18,13 +18,28 @@ internal sealed class Pedido
     [JsonPropertyName("id")] public int Id { get; init; }
     [JsonPropertyName("op")] public string? Op { get; init; }
     [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
+    [JsonPropertyName("vocabulario")] public string? Vocabulario { get; init; }
 }
 
 internal sealed class Resposta
 {
     [JsonPropertyName("id")] public int Id { get; init; }
+
+    /// <summary>
+    /// <c>"progresso"</c> numa mensagem intermediária; ausente na final.
+    /// </summary>
+    /// <remarks>
+    /// É o que permite uma operação longa reportar andamento sem inventar um
+    /// segundo canal: a página só resolve a promessa quando o tipo não vem.
+    /// </remarks>
+    [JsonPropertyName("tipo")] public string? Tipo { get; init; }
+    [JsonPropertyName("etapa")] public string? Etapa { get; init; }
+    [JsonPropertyName("fracao")] public double? Fracao { get; init; }
+    [JsonPropertyName("texto")] public string? Texto { get; init; }
+
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
+    [JsonPropertyName("transcricao")] public string? Transcricao { get; init; }
 }
 
 /// <summary>Uma gravação como a lista precisa mostrá-la.</summary>
@@ -39,7 +54,8 @@ internal sealed class GravacaoResumo
     [JsonPropertyName("caminho")] public required string Caminho { get; init; }
     [JsonPropertyName("duracao_s")] public double DuracaoS { get; init; }
     [JsonPropertyName("titulo")] public string? Titulo { get; init; }
-    [JsonPropertyName("participantes")] public int Participantes { get; init; }
+    /// <summary>Quantos a agenda listou — convidados, não presentes.</summary>
+    [JsonPropertyName("convidados")] public int Convidados { get; init; }
     [JsonPropertyName("transcrita")] public bool Transcrita { get; init; }
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
 }
@@ -60,9 +76,15 @@ internal static class PonteJson
 }
 
 /// <summary>Atende os pedidos da página.</summary>
-internal sealed class Ponte(string pastaDasGravacoes)
+/// <param name="responder">
+/// Envia uma mensagem à página. Chamado mais de uma vez por pedido quando há
+/// progresso, e sempre na thread da UI — quem passa o delegate garante isso.
+/// </param>
+internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
 {
-    public string Atender(string mensagem)
+    private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
+
+    public async Task AtenderAsync(string mensagem)
     {
         Pedido? p;
         try
@@ -71,28 +93,79 @@ internal sealed class Ponte(string pastaDasGravacoes)
         }
         catch (JsonException e)
         {
-            return Serializar(new Resposta { Id = 0, Erro = $"pedido ilegível: {e.Message}" });
+            Responder(new Resposta { Id = 0, Erro = $"pedido ilegível: {e.Message}" });
+            return;
         }
-        if (p is null) return Serializar(new Resposta { Id = 0, Erro = "pedido vazio" });
+        if (p is null)
+        {
+            Responder(new Resposta { Id = 0, Erro = "pedido vazio" });
+            return;
+        }
 
         try
         {
-            return p.Op switch
+            switch (p.Op)
             {
-                "gravacoes" => Serializar(new Resposta { Id = p.Id, Gravacoes = Listar() }),
-                _ => Serializar(new Resposta { Id = p.Id, Erro = $"operação desconhecida: {p.Op}" }),
-            };
+                case "gravacoes":
+                    Responder(new Resposta { Id = p.Id, Gravacoes = Listar() });
+                    break;
+
+                case "transcricao":
+                    Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
+                    break;
+
+                case "transcrever":
+                    await TranscreverAsync(p);
+                    break;
+
+                default:
+                    Responder(new Resposta { Id = p.Id, Erro = $"operação desconhecida: {p.Op}" });
+                    break;
+            }
         }
         catch (Exception e)
         {
             // A página precisa poder mostrar o erro; derrubar a janela por causa
             // de uma pasta ilegível seria pior que a falha original.
-            return Serializar(new Resposta { Id = p.Id, Erro = e.Message });
+            Responder(new Resposta { Id = p.Id, Erro = e.Message });
         }
     }
 
-    private static string Serializar(Resposta r) =>
-        JsonSerializer.Serialize(r, PonteJson.Default.Resposta);
+    /// <summary>Roda o pipeline, reportando andamento pelo mesmo id.</summary>
+    private async Task TranscreverAsync(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = "sem gravação" });
+            return;
+        }
+
+        // O pipeline é pesado e bloquearia a thread da UI, que é a mesma que
+        // desenha a janela: sem isto a barra de progresso congelaria justamente
+        // enquanto há progresso a mostrar.
+        var resultado = await Task.Run(() => _transcritor.ExecutarAsync(
+            pasta, p.Vocabulario,
+            progresso: e => Responder(new Resposta
+            {
+                Id = p.Id,
+                Tipo = "progresso",
+                Etapa = e.Etapa,
+                Fracao = e.Fracao,
+                Texto = e.Texto,
+            })));
+
+        Responder(new Resposta { Id = p.Id, Transcricao = resultado.ParaJson() });
+    }
+
+    private static string? LerTranscricao(string? pasta)
+    {
+        if (pasta is not { Length: > 0 }) return null;
+        string caminho = Path.Combine(pasta, "transcricao.json");
+        return File.Exists(caminho) ? File.ReadAllText(caminho) : null;
+    }
+
+    private void Responder(Resposta r) =>
+        responder(JsonSerializer.Serialize(r, PonteJson.Default.Resposta));
 
     /// <summary>As gravações que o gravador deixou, mais recentes primeiro.</summary>
     private List<GravacaoResumo> Listar()
@@ -144,13 +217,13 @@ internal sealed class Ponte(string pastaDasGravacoes)
         }
 
         string? titulo = null;
-        int participantes = 0;
+        int convidados = 0;
         if (raiz.TryGetProperty("meeting", out var reuniao))
         {
             if (reuniao.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String)
                 titulo = t.GetString();
             if (reuniao.TryGetProperty("attendees", out var a) && a.ValueKind == JsonValueKind.Array)
-                participantes = a.GetArrayLength();
+                convidados = a.GetArrayLength();
         }
 
         return new GravacaoResumo
@@ -159,7 +232,7 @@ internal sealed class Ponte(string pastaDasGravacoes)
             Caminho = pasta,
             DuracaoS = duracao,
             Titulo = titulo,
-            Participantes = participantes,
+            Convidados = convidados,
             Transcrita = File.Exists(Path.Combine(pasta, "transcricao.json")),
             Avisos = avisos,
         };

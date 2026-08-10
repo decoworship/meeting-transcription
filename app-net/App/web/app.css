@@ -55,3 +55,39 @@ body {
 .gravacao__avisos { margin-top: var(--espaco-3); display: grid; gap: var(--espaco-2); }
 
 .vazio { color: var(--cor-texto-suave); }
+
+/* ---- tela de detalhe ---- */
+
+/* justify-self porque o #lista é um grid: sem isto o botão é esticado para a
+ * largura da coluna e o texto aparece centralizado no meio da tela. */
+.voltar { padding-left: 0; margin-bottom: var(--espaco-4); justify-self: start; }
+
+.acoes { margin: var(--espaco-5) 0; display: flex; gap: var(--espaco-3); justify-self: start; }
+
+.painel { display: grid; gap: var(--espaco-4); }
+
+/* A barra usa o .aa-progresso do design system; o preenchimento é o filho. */
+.aa-progresso > div {
+  height: 100%;
+  width: 0;
+  background: var(--cor-acao);
+  border-radius: inherit;
+  transition: width .3s ease;
+}
+
+.transcricao { display: grid; gap: var(--espaco-3); }
+
+.segmento {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: var(--espaco-4);
+  margin: 0;
+  align-items: start;
+}
+
+.segmento__falante {
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  text-align: right;
+}

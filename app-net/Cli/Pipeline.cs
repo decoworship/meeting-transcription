@@ -1,17 +1,16 @@
 using System.Diagnostics;
 using MeetingApp.Nucleo;
-using MeetingApp.Sidecar;
 
 namespace MeetingApp.Cli;
 
 /// <summary>
-/// O pipeline inteiro por linha de comando: gravação → mix → ASR → diarização →
+/// O pipeline por linha de comando: gravação → mix → ASR → diarização →
 /// <c>TranscriptionResult</c> JSON.
 /// </summary>
 /// <remarks>
-/// Passo 2 da ordem de trabalho da FASE2.md. Existe para provar o caminho
-/// completo antes de existir UI — e para a paridade com o app Gradio poder ser
-/// medida comparando dois arquivos, em vez de duas telas.
+/// A lógica vive no <see cref="Transcritor"/>, no núcleo, porque o app usa a
+/// mesma. O que sobra aqui é apresentação: onde estão os motores nesta máquina,
+/// e como mostrar o andamento num terminal.
 /// </remarks>
 internal static class Pipeline
 {
@@ -19,125 +18,42 @@ internal static class Pipeline
         string pasta, string python, string? vocabulario, string? idioma,
         string? destino, bool filtrarSilencio, CancellationToken ct)
     {
-        string mic = Path.Combine(pasta, "mic.wav");
-        string sistema = Path.Combine(pasta, "system.wav");
-        foreach (string f in new[] { mic, sistema })
+        // No desenvolvimento os motores estão no repositório e o Python é o do
+        // ambiente; no app instalado eles vêm numa pasta ao lado do executável.
+        var motores = new Motores(python, "motores/asr/motor.py",
+                                  "motores/diarizacao/motor.py");
+        if (motores.OQueFalta() is { } falta)
         {
-            if (!File.Exists(f))
-            {
-                Console.Error.WriteLine($"faixa ausente: {f}");
-                return 2;
-            }
+            Console.Error.WriteLine(falta);
+            return 2;
         }
 
         var relogio = Stopwatch.StartNew();
-        Console.WriteLine($"lendo as faixas de {Path.GetFileName(pasta)}...");
-        var faixas = Faixas.Ler(mic, sistema);
+        var transcritor = new Transcritor(motores);
 
-        // O mix vai para junto da gravação: é derivado, refazível, e ninguém
-        // precisa dele depois — mas enquanto o pipeline roda ele tem que existir
-        // num caminho que o motor Python consiga abrir.
-        string caminhoDoMix = Path.Combine(pasta, "mix.wav");
-        faixas.EscreverMix(caminhoDoMix);
-        Console.WriteLine($"  mix: {faixas.Mic.Length / (double)Faixas.TaxaDeAmostragem:F1} s "
-                          + $"em {relogio.ElapsedMilliseconds} ms");
+        var resultado = await transcritor.ExecutarAsync(
+            pasta, vocabulario, idioma, filtrarSilencio,
+            p => Console.Write($"\r  {p.Etapa}: {p.Fracao,6:P0} {p.Texto}          "),
+            ct);
 
-        // ASR primeiro, diarização depois, cada um no seu processo: numa placa
-        // de 6 GB os dois modelos não cabem juntos, e processos separados fazem
-        // a VRAM do primeiro voltar antes do segundo subir.
-        Transcricao transcricao;
-        relogio.Restart();
-        await using (var asr = await Subir(python, "motores/asr/motor.py", ct))
-        {
-            transcricao = await asr.Motor.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
-                (pct, texto) => Progresso("asr", pct, texto), ct);
-        }
-        Console.WriteLine($"\n  asr: {transcricao.Segmentos.Count} segmentos, "
-                          + $"idioma {transcricao.Idioma}, em {relogio.Elapsed.TotalSeconds:F1} s");
-
-        // A diarização roda só no system.wav: o que o microfone captou já se
-        // sabe de quem é, e dar o mix ao pyannote faria ele tentar separar você
-        // de você mesmo.
-        IReadOnlyList<SegmentoDeFalante> diarizacao;
-        relogio.Restart();
-        await using (var diar = await Subir(python, "motores/diarizacao/motor.py", ct))
-        {
-            diarizacao = await diar.Motor.DiarizarAsync(sistema,
-                (pct, texto) => Progresso("diarizacao", pct, texto), ct);
-        }
-        Console.WriteLine($"\n  diarizacao: {diarizacao.Count} trechos, "
-                          + $"{diarizacao.Select(d => d.Falante).Distinct().Count()} falantes, "
+        Console.WriteLine($"\n\n{resultado.Segments.Count} segmentos, "
+                          + $"idioma {resultado.Language}, "
                           + $"em {relogio.Elapsed.TotalSeconds:F1} s");
 
-        var segmentos = transcricao.Segmentos
-            .Select(s => new SegmentoFinal { Start = s.Inicio, End = s.Fim, Text = s.Texto })
-            .ToList();
+        int meus = resultado.Segments.Count(s => s.Speaker == "You");
+        Console.WriteLine($"  microfone: {meus}/{resultado.Segments.Count} segmentos são seus");
 
-        // Opcionais, e desligados por padrão: os dois mudam o texto, e a
-        // paridade com o app Gradio só é medível enquanto a saída for
-        // comparável à dele. Ligá-los é o passo 4 da fase, não o 2.
-        if (filtrarSilencio)
+        // O Transcritor já grava transcricao.json ao lado da gravação; --saida
+        // existe para comparar sem sobrescrever o que está lá.
+        if (destino is { Length: > 0 })
         {
-            var fora = FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
-            Console.WriteLine($"  silêncio digital: {fora.Count} segmentos descartados"
-                              + (fora.Count == 0 ? "" : $" ({string.Join(" / ",
-                                  fora.Take(3).Select(f => $"\"{f.Text.Trim()}\""))})"));
+            await File.WriteAllTextAsync(destino, resultado.ParaJson(), ct);
+            Console.WriteLine($"\n{destino}");
         }
-
-        if (vocabulario is { Length: > 0 })
+        else
         {
-            var termos = vocabulario.Split(',', StringSplitOptions.TrimEntries
-                                                | StringSplitOptions.RemoveEmptyEntries);
-            int total = 0;
-            foreach (var seg in segmentos)
-            {
-                var (texto, trocas) = CorrecaoFonetica.Corrigir(seg.Text, termos);
-                if (trocas.Count == 0) continue;
-
-                // As trocas são visíveis de propósito (critério D da fase): quem
-                // lê a ata não tem como desconfiar de uma palavra reescrita.
-                foreach (var t in trocas) Console.WriteLine($"  fonética: {t.De} → {t.Para}");
-                seg.Text = texto;
-                total += trocas.Count;
-            }
-            Console.WriteLine($"  correção fonética: {total} trocas");
+            Console.WriteLine($"\n{Path.Combine(pasta, "transcricao.json")}");
         }
-
-        Montagem.AtribuirFalantes(segmentos, diarizacao);
-        int meus = Montagem.AtribuirDono(segmentos, faixas);
-        Console.WriteLine($"  microfone: {meus}/{segmentos.Count} segmentos são seus");
-
-        var resultado = new ResultadoDaTranscricao
-        {
-            Language = transcricao.Idioma,
-            Duration = transcricao.Duracao,
-            Segments = segmentos,
-        };
-
-        string saida = destino ?? Path.Combine(pasta, "transcricao.json");
-        await File.WriteAllTextAsync(saida, resultado.ParaJson(), ct);
-        Console.WriteLine($"\n{saida}");
         return 0;
-    }
-
-    private static void Progresso(string motor, double pct, string texto) =>
-        Console.Write($"\r  {motor}: {pct,6:P0} {texto}          ");
-
-    private static async Task<Descartavel> Subir(string python, string script, CancellationToken ct)
-        => new(await MotorSidecar.IniciarAsync(python, [script], ct));
-
-    /// <summary>
-    /// Só para poder usar <c>await using</c>: o motor morre ao sair do bloco,
-    /// inclusive por exceção, e é isso que impede processo órfão.
-    /// </summary>
-    private sealed class Descartavel(MotorSidecar motor) : IAsyncDisposable
-    {
-        public MotorSidecar Motor { get; } = motor;
-
-        public ValueTask DisposeAsync()
-        {
-            Motor.Dispose();
-            return ValueTask.CompletedTask;
-        }
     }
 }

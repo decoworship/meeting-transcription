@@ -14,6 +14,10 @@ namespace MeetingApp.App.Nativo;
 internal static partial class Win32
 {
     internal const uint WM_DESTROY = 0x0002;
+
+    /// <summary>Pedido de execução na thread da UI, vindo de outra thread.</summary>
+    internal const uint WM_EXECUTAR = 0x0400 + 1;
+
     internal const uint WM_SIZE = 0x0005;
     internal const uint WM_GETMINMAXINFO = 0x0024;
 
@@ -102,6 +106,10 @@ internal static partial class Win32
 
     [LibraryImport("user32.dll")]
     internal static partial void PostQuitMessage(int nExitCode);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
