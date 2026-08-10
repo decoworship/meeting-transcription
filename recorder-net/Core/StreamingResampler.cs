@@ -1,5 +1,4 @@
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
+using NAudio.Dsp;
 
 namespace MeetingRecorder.Core;
 
@@ -15,20 +14,32 @@ namespace MeetingRecorder.Core;
 /// de streaming carrega o estado, que é o que captura contínua exige.
 /// </para>
 /// <para>
-/// O equivalente aqui é o <see cref="WdlResamplingSampleProvider"/>: streaming,
-/// 100% gerenciado e — o que decide — dentro do <c>NAudio.Core</c>, então este
+/// O equivalente aqui é o <see cref="WdlResampler"/>: streaming, 100%
+/// gerenciado e — o que decide — dentro do <c>NAudio.Core</c>, então este
 /// projeto continua <c>net8.0</c> portátil, sem depender do Media Foundation
 /// (que o <c>MediaFoundationResampler</c> exigiria) num app de bandeja.
 /// </para>
 /// <para>
-/// Qualidade do WDL é suficiente para fala a 16 kHz, que é o alvo — o áudio
-/// existe para alimentar o Whisper, não para masterização.
+/// <b>Com filtro sinc, e isso não é luxo.</b> A primeira versão usava o
+/// <c>WdlResamplingSampleProvider</c>, que é o mesmo WDL configurado <i>sem</i>
+/// sinc, sob a justificativa de que "a qualidade é suficiente para fala a
+/// 16 kHz". Nunca foi medida, e estava errada: um tom de 10 kHz — acima do
+/// Nyquist de 8 kHz, portanto obrigado a desaparecer — voltava rebatido em
+/// 6 kHz a <b>−43 dB</b>. Numa gravação real de 57 min isso deixou a banda de
+/// 7–8 kHz <b>36 dB acima</b> da do gravador Python, e o usuário ouviu como
+/// craquelado antes de qualquer métrica apontar para lá.
+/// </para>
+/// <para>
+/// Medido, e é por isso que o filtro é de 256 taps e não de 64: o alias fica em
+/// −60,5 dB com 64, −68,6 dB com 128 e <b>−109,9 dB com 256</b>. O
+/// <c>filtercnt</c> não muda nada nesta razão de taxas (0 e 1 dão o mesmo
+/// número), então fica em 0. Ver
+/// <c>StreamingResamplerTests.TomAcimaDoNyquistNaoVoltaComoAlias</c>.
 /// </para>
 /// </remarks>
 public sealed class StreamingResampler
 {
-    private readonly FilaDeAmostras? _fonte;
-    private readonly WdlResamplingSampleProvider? _resampler;
+    private readonly WdlResampler? _resampler;
     private readonly int _taxaOrigem;
     private readonly int _taxaDestino;
 
@@ -43,8 +54,15 @@ public sealed class StreamingResampler
         _taxaDestino = taxaDestino;
         if (taxaOrigem == taxaDestino) return;      // passthrough, sem filtro
 
-        _fonte = new FilaDeAmostras(taxaOrigem);
-        _resampler = new WdlResamplingSampleProvider(_fonte, taxaDestino);
+        _resampler = new WdlResampler();
+        // sinc de 256 taps: é o que separa −43 dB de alias (audível) de −110 dB.
+        _resampler.SetMode(interp: true, filtercnt: 0, sinc: true,
+                           sinc_size: 256, sinc_interpsize: 64);
+        _resampler.SetFilterParms();
+        // Alimentado pela entrada: a captura empurra blocos do driver, não pede
+        // uma quantidade de saída.
+        _resampler.SetFeedMode(wantInputDriven: true);
+        _resampler.SetRates(taxaOrigem, taxaDestino);
     }
 
     /// <summary>Reamostra um bloco, devolvendo o que o filtro já pode entregar.</summary>
@@ -59,13 +77,17 @@ public sealed class StreamingResampler
         if (_resampler is null) return bloco.ToArray();
         if (bloco.IsEmpty) return [];
 
-        _fonte!.Enfileirar(bloco);
         _amostrasEntrada += bloco.Length;
 
+        // O WDL entrega o próprio buffer de entrada para ser preenchido: copiar
+        // para dentro dele é o contrato, não uma otimização.
+        int aceitas = _resampler.ResamplePrepare(bloco.Length, 1, out float[] entrada, out int offset);
+        bloco[..aceitas].CopyTo(entrada.AsSpan(offset));
+
         // Teto proporcional à razão de taxas, com folga para o filtro.
-        int maximo = (int)((long)bloco.Length * _taxaDestino / _taxaOrigem) + 64;
+        int maximo = (int)((long)aceitas * _taxaDestino / _taxaOrigem) + 64;
         var destino = new float[maximo];
-        int lidas = _resampler.Read(destino, 0, maximo);
+        int lidas = _resampler.ResampleOut(destino, 0, aceitas, maximo, 1);
         _amostrasSaida += lidas;
         return lidas == maximo ? destino : destino[..lidas];
     }
@@ -97,50 +119,15 @@ public sealed class StreamingResampler
         int devidas = (int)Math.Max(0, esperadas - _amostrasSaida);
         if (devidas == 0) return [];
 
-        _fonte!.Enfileirar(new float[_taxaOrigem / 20]);      // 50 ms para expulsar o atraso
+        // 50 ms de silêncio para expulsar o atraso retido no filtro.
+        int empurrar = _taxaOrigem / 20;
+        int aceitas = _resampler.ResamplePrepare(empurrar, 1, out float[] entrada, out int offset);
+        Array.Clear(entrada, offset, aceitas);
+
         var destino = new float[devidas];
-        int lidas = _resampler.Read(destino, 0, devidas);
+        int lidas = _resampler.ResampleOut(destino, 0, aceitas, devidas, 1);
         _amostrasSaida += lidas;
         return lidas == devidas ? destino : destino[..lidas];
     }
 
-    /// <summary>
-    /// Adaptador entre "empurrar blocos" e o modelo de puxar do NAudio.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// O <see cref="ISampleProvider"/> é pull: o resampler chama
-    /// <see cref="Read"/> quando precisa. A captura é push: o driver entrega
-    /// blocos. Esta fila costura os dois.
-    /// </para>
-    /// <para>
-    /// <b>Leitura curta, nunca preenchida com zeros.</b> A primeira versão
-    /// completava com silêncio quando a fila esvaziava, para "não travar o
-    /// resampler". O teste de continuidade reprovou na hora: o resampler pede
-    /// mais do que há para olhar à frente, recebia silêncio fantasma e o
-    /// misturava ao sinal — 0,654 de salto nas fronteiras e 16640 amostras onde
-    /// deveriam ser 16000. Devolver menos do que foi pedido é o contrato certo
-    /// do <see cref="ISampleProvider"/> para fonte que ainda não tem dados.
-    /// </para>
-    /// </remarks>
-    private sealed class FilaDeAmostras(int taxa) : ISampleProvider
-    {
-        private readonly Queue<float> _fila = new();
-        public WaveFormat WaveFormat { get; } =
-            WaveFormat.CreateIeeeFloatWaveFormat(taxa, 1);
-
-        public int Disponivel => _fila.Count;
-
-        public void Enfileirar(ReadOnlySpan<float> bloco)
-        {
-            foreach (float f in bloco) _fila.Enqueue(f);
-        }
-
-        public int Read(float[] destino, int offset, int quantidade)
-        {
-            int i = 0;
-            while (i < quantidade && _fila.Count > 0) destino[offset + i++] = _fila.Dequeue();
-            return i;
-        }
-    }
 }

@@ -196,10 +196,67 @@ resposta antes de aprovar o critério A. Duas medições responderam:
 2. **Contagem de palavras** nas duas faixas `system` reais, que é o regime
    difícil: **6.632 contra 6.703, diferença de 1,1%**. O conteúdo é o mesmo.
 
-Conclusão: **não há perda de fala**. A diferença de energia é compatível com o
-filtro anti-aliasing da reamostragem de 48 kHz para 16 kHz — o Python tem mais
-energia total *e* pico RMS menor, combinação que aponta para energia espúria de
-aliasing no lado dele, não para conteúdo faltando no nosso.
+Conclusão: **não há perda de fala** — e essa conclusão estava certa e
+**incompleta**, do jeito mais instrutivo possível. Ver a seção seguinte.
+
+### O craquelado: o ouvido achou o que as métricas não achavam
+
+Ao escutar as gravações, o dono do produto ouviu **artefato digital no áudio do
+C# e não no do Python** — e lembrou que o mesmo já acontecera na primeira versão
+do gravador Python, por descasamento de taxa. Nenhuma das medições anteriores
+tinha apontado para lá: contar palavras é cego para artefato (cortes de poucas
+amostras não removem palavras, apenas crepitam), e a contagem de
+descontinuidades no tempo até favorecia o C#, que tinha *menos* saltos por
+segundo que o Python.
+
+Quem achou foi o espectro médio das duas faixas `system` da mesma reunião:
+
+| faixa | C# | Python | diferença |
+|---|---|---|---|
+| 6000–7000 Hz | −31,1 dB | −38,2 dB | **+7,2** |
+| 7000–7500 Hz | −31,6 dB | −58,9 dB | **+27,3** |
+| 7500–8000 Hz | −31,7 dB | −67,7 dB | **+36,0** |
+
+O Python desce a −67 dB perto do Nyquist; o C# ficava num **platô plano de
+−31 dB** — assinatura de filtro anti-aliasing insuficiente, que se ouve como
+chiado de banda larga no agudo.
+
+**A causa** estava no `StreamingResampler`, no comentário que dizia "qualidade
+do WDL é suficiente para fala a 16 kHz, o áudio existe para alimentar o Whisper,
+não para masterização". A afirmação nunca tinha sido medida. O
+`WdlResamplingSampleProvider` é o WDL configurado **sem sinc**, e um tom de
+10 kHz — que está acima do Nyquist de 8 kHz e é obrigado a desaparecer —
+voltava rebatido em 6 kHz a **−43,3 dB**.
+
+**A correção** foi usar o `WdlResampler` direto, com sinc ligado. O tamanho do
+filtro foi escolhido por medição, não por gosto:
+
+| sinc_size | alias em 6 kHz |
+|---|---|
+| sem sinc (era) | −43,3 dB |
+| 64 | −60,5 dB |
+| 128 | −68,6 dB |
+| **256** | **−109,9 dB** |
+
+Custo: 71,6 µs por bloco de 10 ms, ou 140× tempo real — 0,7% do orçamento de
+cada bloco, para duas faixas simultâneas.
+
+Validado por execução, não só por teste unitário: gravado um sinal de ruído
+restrito a **9–20 kHz**, que não pode existir num arquivo de 16 kHz. Chegou ao
+dispositivo com RMS 0,08 e saiu do resampler como **zero exato** (−137 dBFS,
+atenuação acima de 116 dB). O teste
+`StreamingResamplerTests.TomAcimaDoNyquistNaoVoltaComoAlias` prende a regressão
+em −90 dB.
+
+> **As gravações feitas antes de 10/08/2026 têm o artefato.** O conteúdo é
+> aproveitável — as palavras estão lá, como a contagem mostrou —, mas o áudio
+> tem chiado no agudo. A reunião de 57 min citada acima é uma delas.
+
+**A lição de método**, que vale mais que o conserto: três medições objetivas
+(palavras, descontinuidades, energia total) disseram "está bom", e um ouvido
+disse "está ruim" — e o ouvido estava certo. Nenhuma das três media *timbre*.
+Quando o usuário relata um sintoma que as métricas não veem, a hipótese certa é
+que **falta métrica**, não que falta problema.
 
 Fica aberto, sem bloquear nada: **por que o Bluetooth exige 38 mil correções**
 onde o HDMI exige 1. A explicação provável é o clock livre do A2DP, e a âncora

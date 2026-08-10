@@ -122,4 +122,51 @@ public sealed class StreamingResamplerTests
             "a cauda não pode exceder o que a razão de taxas permite");
         Assert.Empty(extra);
     }
+
+    /// <summary>Energia de um sinal numa faixa de frequência, em dB.</summary>
+    private static double EnergiaDb(float[] sinal, int taxa, double de, double ate)
+    {
+        // DFT direta nas raias de interesse: o sinal é curto e só interessam
+        // algumas dezenas de frequências, então FFT seria mais código sem ganho.
+        double soma = 0;
+        int raias = 0;
+        for (double f = de; f <= ate; f += 25)
+        {
+            double re = 0, im = 0;
+            for (int i = 0; i < sinal.Length; i++)
+            {
+                double a = 2 * Math.PI * f * i / taxa;
+                re += sinal[i] * Math.Cos(a);
+                im += sinal[i] * Math.Sin(a);
+            }
+            soma += (re * re + im * im) / (sinal.Length * (double)sinal.Length);
+            raias++;
+        }
+        return 10 * Math.Log10(soma / raias + 1e-20);
+    }
+
+    [Fact]
+    public void TomAcimaDoNyquistNaoVoltaComoAlias()
+    {
+        // O defeito que o ouvido do usuário pegou antes de qualquer métrica:
+        // craquelado no áudio gravado. Um tom de 10 kHz a 48 kHz está acima do
+        // Nyquist de 16 kHz (8 kHz) e tem que ser ELIMINADO pelo filtro; se o
+        // filtro for fraco ele reaparece rebatido em 6 kHz (16 - 10), como
+        // chiado de banda larga espalhado pelo agudo.
+        const int origem = 48_000;
+        var resampler = new StreamingResampler(origem);
+
+        var saida = new List<float>();
+        for (int b = 0; b < 100; b++)
+            saida.AddRange(resampler.Processar(Senoide(480, origem, 10_000, b * 480)));
+
+        var s = saida.Skip(1000).ToArray();       // descarta o transiente do filtro
+        double alias = EnergiaDb(s, CrashSafeWavWriter.TaxaAlvo, 5_800, 6_200);
+
+        // Medido: -43,3 dB antes da correção (WDL sem sinc), -109,9 dB depois.
+        // O limite fica em -90 dB, longe dos dois — reprova a regressão sem
+        // quebrar por variação de plataforma.
+        Assert.True(alias < -90,
+            $"alias de 10 kHz rebatido em 6 kHz: {alias:F1} dB (limite -90 dB)");
+    }
 }
