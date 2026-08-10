@@ -10,12 +10,12 @@ Branch: `feat/recorder-and-accuracy`. Último commit desta fase: ver
 
 ## 1. Estado em uma frase
 
-O gravador nativo **funciona, cabe no orçamento e ganhou do Python em gravação
-real**: captura duas faixas, sobrevive a crash, identifica a reunião pela
-agenda, tem o menu com paridade sobre o `tray.py`, pesa 14,9 MB — e num soak de
-57 min com headset Bluetooth terminou com as faixas a 206,7 ms uma da outra,
-contra **17 minutos** de desalinhamento do Python (§6). Falta o clique do OAuth
-inicial e a decisão de aposentar o `recorder/`.
+O gravador nativo **funciona, cabe no orçamento e grava áudio limpo**: duas
+faixas, sobrevive a crash, identifica a reunião pela agenda, menu com paridade
+sobre o `tray.py`, 14,9 MB, e 12,6 ms de desalinhamento entre as faixas no
+cenário mais duro (headset Bluetooth em mãos-livres). O que falta para
+aposentar o `recorder/` Python é **repetir o soak com o binário atual** — a
+âncora mudou depois da última medição longa (§6) — e o clique do OAuth inicial.
 
 ---
 
@@ -25,7 +25,7 @@ inicial e a decisão de aposentar o `recorder/`.
 
 | # | requisito | estado |
 |---|---|---|
-| 3.1 | âncora no relógio do dispositivo (QPC), correção em trecho silencioso | ✅ |
+| 3.1 | deriva corrigida contra o relógio, em trecho silencioso | ✅ **com reversão registrada** — o desenho por carimbo QPC perdeu em campo, ver §6 e a nota na FASE1.md |
 | 3.2 | WAV crash-safe (header reescrito a cada 10 s) | ✅ |
 | 3.3 | checagem de disco no start + falha de escrita promove o ícone | ✅ |
 | 3.4 | instância única (mutex nomeado) | ✅ |
@@ -38,9 +38,9 @@ inicial e a decisão de aposentar o `recorder/`.
 
 | | estado |
 |---|---|
-| A. paridade de captura | ✅ aprovado — 57,4 min em paralelo, ver §6 |
+| A. paridade de captura | 🟡 **refazer** — aprovada em 57,4 min, mas com o binário anterior à troca da âncora (§6) |
 | B. kill -9 no meio da gravação | ✅ verificado com kill de verdade |
-| C. soak de 1h+ | ✅ 57,4 min contínuos com headset Bluetooth, ver §6 |
+| C. soak de 1h+ | 🟡 **refazer** — 57,4 min contínuos, mesmo motivo do critério A (§6) |
 | D. disco cheio | 🟡 OK parcial — guarda implementada e testada, sem teste de volume cheio |
 | E. ≤ 25 MB | ✅ **14,9 MB** — era 154,8 MB; ver §3 |
 
@@ -140,11 +140,14 @@ Win32 que este projeto escrever (a Fase 2 vai precisar de uma).
 
 ## 5. Fechamento da fase
 
-A definição de pronto da carta é **o gravador Python aposentado**. Os passos 1 e
-2 estão feitos (§6): a reunião em paralelo aconteceu, e o novo ganhou por uma
-margem que não deixa dúvida. **Sobra a decisão do dono do produto de tirar o
-`recorder/` de uso** — e o clique do OAuth (§4.1), que é a última coisa do
-gravador nunca exercitada.
+A definição de pronto da carta é **o gravador Python aposentado**. O que falta:
+
+1. **Repetir a reunião em paralelo com o binário atual.** A de 57 min (§6)
+   rodou antes da troca da âncora, e mede um gravador que não existe mais. Os
+   indícios apontam para melhor — 12,6 ms de alinhamento contra 206,7 ms, zero
+   descarte contra 11,3 s —, mas indício não é medição.
+2. **O clique do OAuth** (§4.1), a última coisa do gravador nunca exercitada.
+3. **A decisão do dono do produto** de tirar o `recorder/` de uso.
 
 Lembrete de leitura para quem for medir de novo: o `desalinhamento entre faixas`
 que o CLI imprime é a **diferença de comprimento** entre elas, não alinhamento
@@ -338,6 +341,25 @@ para validar (uma faixa, sinal sintético) não reproduzia o cenário do usuári
 (duas faixas, mãos-livres). Duas correções foram publicadas com base nele, e as
 duas eram consertos reais de problemas reais — mas nenhuma era *o* problema. Um
 teste que não reproduz o caso do usuário aprova qualquer coisa.
+
+**Confirmado por escuta em 10/08/2026**: áudio limpo. A comutação de perfil do
+headset (a queda de volume quando o microfone abre) foi reconhecida como
+comportamento do próprio Bluetooth e aceita — inclusive explica variações de
+som que antes se atribuíam a algum filtro do Windows.
+
+> ### ⚠ Os critérios A e C precisam ser refeitos
+>
+> A validação de 57 min que os fechou (§6) rodou com o binário que descartava
+> 14% do áudio e craquejava. Os números de lá — 206,7 ms de alinhamento, 6.632
+> palavras — descrevem um gravador que **não existe mais**: a âncora foi
+> trocada por completo depois daquela medição.
+>
+> Não é regressão, é o contrário: os indícios apontam para melhor (12,6 ms de
+> alinhamento contra 206,7 ms, zero descarte contra 11,3 s). Mas "aponta para
+> melhor" não é medição, e a régua da fase é a reunião real em paralelo. **O
+> soak precisa ser repetido com o binário atual antes de aposentar o
+> `recorder/` Python.** É barato: acontece sozinho na próxima reunião gravada
+> com os dois.
 
 Fica aberto, sem bloquear nada: **por que o Bluetooth exige 38 mil correções**
 onde o HDMI exige 1. A explicação provável é o clock livre do A2DP, e a âncora
