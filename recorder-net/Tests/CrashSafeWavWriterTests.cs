@@ -57,14 +57,25 @@ public sealed class CrashSafeWavWriterTests : IDisposable
         string p = Caminho("flush.wav");
         var amostras = new float[CrashSafeWavWriter.TaxaAlvo];   // 1 s
 
+        // Duas afirmações, dois escritores, de propósito. Fazer as duas no mesmo
+        // escritor exigia que a leitura do "antes" coubesse na mesma janela de
+        // 50 ms do flush — e numa máquina ocupada não cabe. O teste chegou a
+        // falhar assim uma vez, com a suíte levando 41 s em vez de 0,4 s: o
+        // flush acontecia antes da checagem e o header já não estava zerado.
+        // A corrida era do teste, não do produto.
+        var demorado = TimeSpan.FromMinutes(10);
+        using (var lento = new CrashSafeWavWriter(Caminho("sem-flush.wav"), demorado))
+        {
+            lento.Escrever(amostras);
+            // Antes do intervalo de flush o header ainda diz zero — e é
+            // justamente por isso que ele precisa ser periódico e não só no
+            // close.
+            Assert.Equal(0u, LerHeader(Caminho("sem-flush.wav")).dados);
+        }
+
         var rapido = TimeSpan.FromMilliseconds(50);
         using var w = new CrashSafeWavWriter(p, rapido);
         w.Escrever(amostras);
-
-        // Antes do intervalo de flush o header ainda diz zero — e é justamente
-        // por isso que ele precisa ser periódico e não só no close.
-        var antes = LerHeader(p);
-        Assert.Equal(0u, antes.dados);
 
         // Força o flush avançando além do intervalo.
         Thread.Sleep(rapido + TimeSpan.FromMilliseconds(50));
