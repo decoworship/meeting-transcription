@@ -151,4 +151,56 @@ public sealed class DriftAnchorTests
         Assert.Equal(2, a.Correcoes);
         Assert.Equal(0, a.AmostrasLiquidas);
     }
+
+    /// <summary>
+    /// O bug do craquelado no Bluetooth: o preenchimento por relógio corre à
+    /// frente, o pacote real chega carimbado atrás, e a âncora joga fora áudio
+    /// de verdade para "corrigir" uma deriva que não existe.
+    /// </summary>
+    /// <remarks>
+    /// Medido na gravação `2026-08-10_10-06-09`: 790 correções em 56 s e 14% das
+    /// amostras descartadas, contra 2 correções do gravador Python na mesma
+    /// reunião. Cada descarte é um corte abrupto no meio da fala — o craquelado
+    /// que o ouvido pegou antes de qualquer métrica.
+    /// </remarks>
+    [Theory]
+    [InlineData(100)]    // dispositivo comum: carimbo quase em tempo real
+    [InlineData(400)]    // headset Bluetooth: o pacote descreve o passado distante
+    public void PreenchimentoOciosoNaoFazAAncoraDescartarAudioReal(int atrasoMs)
+    {
+        const int taxa = CrashSafeWavWriter.TaxaAlvo;
+        const int blocoMs = 10;
+        var linha = new PacketTimeline(0);
+        var ancora = new DriftAnchor();
+        long escritas = 0;
+
+        long qpcDe(double ms) => (long)(ms * PacketTimeline.QpcPorSegundo / 1000);
+        int amostras(double ms) => (int)(ms * taxa / 1000);
+
+        // 5 s de captura: a cada 10 ms o laço ou recebe um pacote (carimbado
+        // `atrasoMs` no passado) ou preenche o ocioso até agora menos a margem.
+        for (int t = 0; t < 5000; t += blocoMs)
+        {
+            // O preenchimento ocioso do laço de captura: passa o relógio cru, e
+            // a linha do tempo desconta a margem que ela mesma mede.
+            escritas += linha.SilencioAte(qpcDe(t));
+
+            double carimbo = t - atrasoMs;
+            if (carimbo < 0) continue;
+
+            var d = linha.Chegou(qpcDe(carimbo), amostras(blocoMs), AnomaliaPacote.Nenhuma,
+                                 qpcAgora: qpcDe(t));
+            escritas += d.SilencioAntes;
+
+            long correcao = ancora.Calcular(d.PosicaoAlvo, escritas, amostras(blocoMs));
+            escritas += amostras(blocoMs) + correcao;
+        }
+
+        // Descarte líquido negativo aqui é áudio real jogado fora: o dispositivo
+        // não derivou 14% em 5 s, foi o preenchimento que roubou o lugar dele.
+        Assert.True(ancora.AmostrasLiquidas > -taxa / 10,
+            $"âncora descartou {-ancora.AmostrasLiquidas} amostras "
+            + $"({-ancora.AmostrasLiquidas / (double)taxa:F2} s) com atraso de {atrasoMs} ms; "
+            + $"{ancora.Correcoes} correções");
+    }
 }

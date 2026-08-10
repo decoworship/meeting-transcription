@@ -62,6 +62,41 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     /// </summary>
     private long _qpcInicial = qpcOrigem;
     private long _fimEscritoAlvo;
+    private long _atrasoObservado;
+
+    /// <summary>
+    /// Até onde o preenchimento por relógio pode avançar sem roubar o lugar de
+    /// áudio que o dispositivo ainda vai entregar.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Pacotes descrevem o <b>passado</b>: o carimbo é do instante em que o
+    /// hardware digitalizou, e ele chega depois. Preencher silêncio até "agora"
+    /// escreve por cima do tempo que o próximo pacote vai ocupar — e aí a âncora
+    /// vê a faixa adiantada e <b>descarta o áudio real</b> para compensar.
+    /// </para>
+    /// <para>
+    /// <b>Por que medido e não fixo.</b> A constante de 200 ms cobria a placa
+    /// integrada e não cobria o headset Bluetooth, que entrega com ~400 ms de
+    /// atraso. Medido em gravação real com o AN01: 790 correções de âncora em
+    /// 56 s e <b>14% das amostras descartadas</b>, contra 2 correções do gravador
+    /// Python na mesma reunião — cada descarte um corte abrupto no meio da fala,
+    /// audível como craquelado. Ver
+    /// <c>DriftAnchorTests.PreenchimentoOciosoNaoFazAAncoraDescartarAudioReal</c>.
+    /// </para>
+    /// <para>
+    /// Margem grande demais é inofensiva: só adia a escrita do silêncio, que o
+    /// pacote seguinte corrige. Margem pequena demais destrói áudio. Por isso o
+    /// piso é generoso e o valor acompanha o pior atraso já visto.
+    /// </para>
+    /// <para>
+    /// O piso é de <b>500 ms</b> e não de 200 porque a adaptação só começa
+    /// depois do primeiro pacote: com piso de 200 ms, os primeiros instantes de
+    /// uma captura Bluetooth já perdiam áudio antes de haver o que medir.
+    /// </para>
+    /// </remarks>
+    public long MargemOciosa =>
+        Math.Max(QpcPorSegundo / 2, _atrasoObservado + QpcPorSegundo / 10);
 
     public int PacotesComDescontinuidade { get; private set; }
     public int PacotesComErroDeTimestamp { get; private set; }
@@ -75,8 +110,18 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     /// Quadros deste pacote <b>já convertidos para a taxa alvo</b>. Quem chama
     /// sabe a razão; a linha do tempo trabalha só em amostras de saída.
     /// </param>
-    public DecisaoPacote Chegou(long qpc, int quadrosAlvo, AnomaliaPacote flags)
+    /// <param name="qpcAgora">
+    /// O relógio no instante em que o pacote foi recebido, para medir o atraso
+    /// do dispositivo. Omitir (−1) só desliga a adaptação da margem ociosa.
+    /// </param>
+    public DecisaoPacote Chegou(long qpc, int quadrosAlvo, AnomaliaPacote flags,
+                                long qpcAgora = -1)
     {
+        // Quanto este dispositivo atrasa entre digitalizar e entregar. Medido, e
+        // não presumido, porque a diferença entre placa e Bluetooth é de uma
+        // ordem de grandeza — ver MargemOciosa.
+        if (qpcAgora > 0) _atrasoObservado = Math.Max(_atrasoObservado, qpcAgora - qpc);
+
         if (flags.HasFlag(AnomaliaPacote.Silencio)) PacotesDeSilencio++;
         if (flags.HasFlag(AnomaliaPacote.Descontinuidade)) PacotesComDescontinuidade++;
         if (flags.HasFlag(AnomaliaPacote.ErroDeTimestamp)) PacotesComErroDeTimestamp++;
@@ -132,9 +177,14 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     /// captura de 20 s produziu 0 s na faixa do sistema.
     /// A camada de captura consulta o relógio do dispositivo quando o polling
     /// não traz pacote e chama isto para preencher.
+    /// <para>
+    /// Recebe o relógio <b>cru</b>: a <see cref="MargemOciosa"/> é descontada
+    /// aqui dentro, porque é aqui que se sabe o atraso do dispositivo.
+    /// </para>
     /// </remarks>
-    public int SilencioAte(long qpc)
+    public int SilencioAte(long qpcAgora)
     {
+        long qpc = qpcAgora - MargemOciosa;
         if (_qpcInicial < 0) { _qpcInicial = qpc; return 0; }
 
         long alvo = QpcParaAmostras(qpc - _qpcInicial);

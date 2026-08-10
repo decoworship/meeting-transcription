@@ -66,9 +66,12 @@ public sealed class PacketTimelineTests
         long inicio = Ms(1000);
         t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
 
+        // O relógio vai cru: a linha do tempo desconta a margem que ela mede, e
+        // preenche até "agora menos a margem" — nunca até agora.
         int silencio = t.SilencioAte(inicio + Ms(5000));
 
-        Assert.Equal(5 * Alvo - 160, silencio);
+        long margemAmostras = t.QpcParaAmostras(t.MargemOciosa);
+        Assert.Equal(5 * Alvo - 160 - margemAmostras, silencio);
     }
 
     [Fact]
@@ -91,10 +94,11 @@ public sealed class PacketTimelineTests
         t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);
         t.SilencioAte(inicio + Ms(5000));
 
-        // O pacote seguinte chega logo após o preenchimento: não deve inserir
-        // mais silêncio nem descartar o que já foi escrito.
+        // O preenchimento parou uma margem antes de "agora", então o pacote
+        // carimbado exatamente em 5 s encontra um buraco legítimo do tamanho da
+        // margem — e não pode fazer a posição regredir.
         var d = t.Chegou(inicio + Ms(5000), 160, AnomaliaPacote.Nenhuma);
-        Assert.Equal(0, d.SilencioAntes);
+        Assert.Equal(t.QpcParaAmostras(t.MargemOciosa), d.SilencioAntes);
         Assert.Equal(5 * Alvo + 160, d.PosicaoAlvo);
     }
 
@@ -110,17 +114,18 @@ public sealed class PacketTimelineTests
         long inicio = Ms(1000);
         t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);          // cobre 0-10 ms
 
-        // Ocioso preenche só até 500 ms, deixando margem.
-        t.SilencioAte(inicio + Ms(500));
+        // O laço chama o ocioso com o relógio em 900 ms; com a margem de 500 ms
+        // o preenchimento vai só até 400 ms, deixando o futuro livre.
+        t.SilencioAte(inicio + Ms(900));
 
-        // Pacote atrasado, carimbado em 400 ms: já está coberto, e a posição não
-        // pode recuar a ponto de a âncora ver excesso de escrita.
+        // Pacote carimbado em 400 ms: exatamente onde o preenchimento parou, sem
+        // buraco e sem sobreposição.
         var d = t.Chegou(inicio + Ms(400), 160, AnomaliaPacote.Nenhuma);
         Assert.Equal(0, d.SilencioAntes);
 
-        // O caso correto: o próximo pacote vem depois do preenchimento.
+        // O caso correto: o próximo pacote vem depois, e o buraco é real.
         var d2 = t.Chegou(inicio + Ms(600), 160, AnomaliaPacote.Nenhuma);
-        Assert.Equal(Alvo * 100 / 1000, d2.SilencioAntes);       // 100 ms de buraco
+        Assert.Equal(Alvo * 190 / 1000, d2.SilencioAntes);       // 190 ms de buraco
     }
 
     [Fact]

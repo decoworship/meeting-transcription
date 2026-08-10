@@ -258,6 +258,47 @@ disse "está ruim" — e o ouvido estava certo. Nenhuma das três media *timbre*
 Quando o usuário relata um sintoma que as métricas não veem, a hipótese certa é
 que **falta métrica**, não que falta problema.
 
+### E o craquelado continuou: a segunda causa, que era a principal
+
+Corrigido o resampler, uma gravação nova no mesmo headset **ainda craquejava** —
+e a lição acima se repetiu, agora contra o meu próprio diagnóstico. Os números
+da gravação `2026-08-10_10-06-09` (56 s, AN01) contra o Python simultâneo:
+
+| | C# | Python |
+|---|---|---|
+| correções de âncora | **790** | 2 |
+| descarte líquido | **−126.400 amostras (7,9 s, 14%)** | +118.920 |
+| cliques detectados | 1.207 (21,6/s) | 460 (8,3/s) |
+
+**A causa.** Pacotes descrevem o passado: o carimbo é de quando o hardware
+digitalizou, e ele chega depois. O preenchimento ocioso avançava até "agora
+menos 200 ms" — margem que cobria a placa integrada e **não cobria o headset
+Bluetooth, que entrega com ~400 ms de atraso**. O silêncio era escrito por cima
+do tempo que o pacote real ia ocupar; a âncora via a faixa adiantada e
+**descartava o áudio verdadeiro** para compensar. Cada descarte, um corte
+abrupto no meio da fala.
+
+Reprodução sem hardware, em
+`DriftAnchorTests.PreenchimentoOciosoNaoFazAAncoraDescartarAudioReal`: com
+400 ms de atraso simulado, a âncora descartava **4,6 s de áudio em 5 s** de
+captura, com 460 correções; com 100 ms, zero. O teste roda nos dois regimes.
+
+**A correção**: a margem passou a ser **medida**, não presumida —
+`PacketTimeline.MargemOciosa` acompanha o pior atraso já observado entre o
+carimbo do pacote e o relógio, com piso de 500 ms (e não de 200, porque a
+adaptação só começa depois do primeiro pacote, e até lá uma captura Bluetooth
+já perderia áudio). Margem grande demais é inofensiva: só adia a escrita do
+silêncio, que o pacote seguinte corrige. Margem pequena demais destrói áudio.
+
+**Medido depois, no mesmo headset Bluetooth** (`tools/teste_de_descarte.ps1`,
+125 s):
+
+| | antes | depois |
+|---|---|---|
+| correções de âncora | 790 em 56 s (14/s) | **6 em 124,7 s (0,05/s)** |
+| descarte | 7,9 s (14%) | **0,06 s (0,05%)** |
+| marcadores preservados | — | **120 de 120**, intervalo 1,0005 s |
+
 Fica aberto, sem bloquear nada: **por que o Bluetooth exige 38 mil correções**
 onde o HDMI exige 1. A explicação provável é o clock livre do A2DP, e a âncora
 está fazendo exatamente o que deveria — mas o número nunca foi medido de

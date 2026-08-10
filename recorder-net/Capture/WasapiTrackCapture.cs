@@ -177,7 +177,9 @@ public sealed class WasapiTrackCapture : IDisposable
         // Os quadros vêm no mix format; a linha do tempo só trabalha em amostras
         // de saída. Converter aqui mantém a aritmética de taxa fora dela.
         int quadrosAlvo = (int)Math.Round(quadros * (double)CrashSafeWavWriter.TaxaAlvo / TaxaNativa);
-        var decisao = _linha!.Chegou(qpc, quadrosAlvo, anomalias);
+        // O relógio de agora vai junto: é a diferença para o carimbo do pacote
+        // que revela o atraso do dispositivo, e é dela que sai a margem ociosa.
+        var decisao = _linha!.Chegou(qpc, quadrosAlvo, anomalias, QpcAgora());
 
         // Requisito 3.5: DATA_DISCONTINUITY significa que o driver perdeu
         // amostras antes de nos entregar. Preferimos perder áudio a travar o
@@ -260,29 +262,20 @@ public sealed class WasapiTrackCapture : IDisposable
     /// silêncio zero. Duas fontes de tempo numa mesma linha é o tipo de erro que
     /// só aparece em execução.
     /// </remarks>
-    /// <summary>
-    /// Margem de segurança do preenchimento ocioso.
-    /// </summary>
     /// <remarks>
-    /// Pacotes sempre descrevem o <b>passado</b>: o carimbo é do instante em que
-    /// o hardware digitalizou, e ele só chega até 100 ms depois (o tamanho do
-    /// buffer). Preencher silêncio até "agora" garante escrever por cima do
-    /// intervalo que o próximo pacote vai cobrir.
-    ///
-    /// Medido antes desta margem: 4849 correções de deriva em 100 s, cada uma
-    /// descartando exatos 160 quadros — um pacote inteiro, escrito duas vezes.
+    /// A margem de segurança vive na <see cref="PacketTimeline.MargemOciosa"/>,
+    /// que a mede pelo atraso real do dispositivo — a constante de 200 ms que
+    /// havia aqui cobria a placa integrada e destruía áudio no Bluetooth.
     /// </remarks>
-    private static readonly long MargemOciosa = PacketTimeline.QpcPorSegundo / 5;   // 200 ms
-
     private void PreencherOcioso()
     {
-        long qpc = QpcAgora() - MargemOciosa;
-
-        int silencio = _linha!.SilencioAte(qpc);
+        int silencio = _linha!.SilencioAte(QpcAgora());
         if (Diagnostico && silencio > 0 && _pacotesVistos < 12)
         {
             _pacotesVistos++;
-            Console.WriteLine($"\n  [{_stats.Nome}] OCIOSO qpc_relogio={qpc} -> silencio={silencio}");
+            Console.WriteLine($"\n  [{_stats.Nome}] OCIOSO margem_ms="
+                              + $"{_linha.MargemOciosa * 1000.0 / PacketTimeline.QpcPorSegundo:F0}"
+                              + $" -> silencio={silencio}");
         }
         if (silencio <= 0) return;
 
