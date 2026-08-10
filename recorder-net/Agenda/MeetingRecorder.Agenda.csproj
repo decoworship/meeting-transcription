@@ -27,4 +27,20 @@
     <ProjectReference Include="..\Core\MeetingRecorder.Core.csproj" />
   </ItemGroup>
 
+  <!-- Credenciais do Google embutidas no binário publicado, para quem recebe o
+       app não precisar criar um cliente OAuth. O arquivo NÃO vive no
+       repositório: o build pega o do perfil de quem publica, e simplesmente não
+       embute nada se ele não estiver lá. Ver Agenda/FonteDoSegredo.cs.
+
+       Publicando do WSL, o $(USERPROFILE) não existe; passe o caminho:
+         dotnet publish ... -p:SegredoDoGoogle=/mnt/c/Users/<voce>/.meeting-recorder/google_client_secret.json -->
+  <PropertyGroup>
+    <SegredoDoGoogle Condition="'$(SegredoDoGoogle)' == ''">$(USERPROFILE)\.meeting-recorder\google_client_secret.json</SegredoDoGoogle>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(SegredoDoGoogle)')">
+    <EmbeddedResource Include="$(SegredoDoGoogle)"
+                      LogicalName="MeetingRecorder.Agenda.google_client_secret.json" />
+  </ItemGroup>
+
 </Project>

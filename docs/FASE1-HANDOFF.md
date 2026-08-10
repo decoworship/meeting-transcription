@@ -123,13 +123,27 @@ Win32 que este projeto escrever (a Fase 2 vai precisar de uma).
    *refresh* — o do dia a dia — está provado contra a API real. O de autorização
    inicial abre navegador e não dá para exercitar sem um clique humano. Falta
    alguém abrir o menu → Google Calendar → "Conectar conta...".
-2. **A UI nova não foi vista por olhos humanos.** A validação automatizada
-   cobre janela, ícone, timer, captura e `meta.json`; **menu, balão de
-   notificação e diálogo de pasta exigem interação** e não foram exercitados.
-   São exatamente as três peças reescritas do zero. Checagem de 2 minutos:
-   botão direito no ícone (menu e submenus aparecem, fecham ao clicar fora),
-   "Escolher outra pasta..." (o diálogo abre na pasta atual), e um clique no
-   ícone durante a gravação (ícone fica laranja).
+
+   > **Credenciais embutidas (10/08/2026).** O `google_client_secret.json`
+   > deixou de ser obrigatório na máquina de quem usa: o build embute o do
+   > perfil de quem publica, e o arquivo local continua tendo precedência para
+   > quem já configurou o seu. O repositório segue sem o segredo — o `.csproj`
+   > só embute se o arquivo existir, e o caminho é passado por
+   > `-p:SegredoDoGoogle=...`. É aceitável porque, em cliente OAuth do tipo
+   > "aplicativo instalado", o Google documenta que o segredo não é secreto:
+   > quem protege o fluxo é o PKCE, que já está implementado.
+   >
+   > **O que isso NÃO resolve, e é o que aparece na tela de quem recebe o app:**
+   > um projeto em modo *Testing* no Google Cloud só autoriza contas
+   > cadastradas como testadoras e **expira todo refresh token em 7 dias**. Para
+   > outra pessoa usar o calendário é preciso adicionar o e-mail dela em
+   > *OAuth consent screen → Test users*, ou publicar o app — e publicar com o
+   > escopo `calendar.readonly` exige passar pela verificação do Google.
+2. ~~**A UI nova não foi vista por olhos humanos.**~~ **Resolvido
+   (10/08/2026)**: o menu Win32 foi visto funcionando em outra máquina, com
+   submenus, item padrão em negrito, marcador em "Notificações" e o estado da
+   gravação em duas linhas. Falta só o diálogo de pasta (`IFileOpenDialog`),
+   que ninguém abriu ainda.
 3. **Sugestão fora de escopo, registrada para não se perder:** o `disconnected`
    novo no `meta.json` não é lido por ninguém ainda. O lugar natural é
    `Recording.avisos()` em `src/web/recordings.py`, junto de `no_audio` e

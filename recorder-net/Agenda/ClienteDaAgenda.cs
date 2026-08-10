@@ -60,7 +60,11 @@ public sealed class ClienteDaAgenda : IDisposable
         _cred = new Credenciais(_http);
     }
 
-    public static bool EstaConfigurado() => File.Exists(Caminhos.SegredoDoCliente);
+    /// <summary>
+    /// Há credencial do Google — do arquivo do usuário ou embutida no
+    /// executável. Ver <see cref="FonteDoSegredo"/>.
+    /// </summary>
+    public static bool EstaConfigurado() => FonteDoSegredo.Existe();
     public static bool EstaAutorizado() => File.Exists(Caminhos.Token);
 
     /// <summary>E-mail da conta conectada, ou string vazia. Nunca faz rede.</summary>

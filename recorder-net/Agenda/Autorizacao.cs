@@ -196,8 +196,10 @@ public static class Autorizacao
     {
         try
         {
-            var s = JsonSerializer.Deserialize(File.ReadAllText(Caminhos.SegredoDoCliente),
-                                               AgendaJson.Default.SegredoDoCliente);
+            string? json = FonteDoSegredo.Ler();
+            if (json is null) return null;
+
+            var s = JsonSerializer.Deserialize(json, AgendaJson.Default.SegredoDoCliente);
             return s?.Installed ?? s?.Web;
         }
         catch (Exception)

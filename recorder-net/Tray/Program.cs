@@ -203,6 +203,8 @@ internal static class Programa
 
         if (!ClienteDaAgenda.EstaConfigurado())
         {
+            // Só aparece em build publicado sem credencial embutida — quem monta
+            // o próprio executável precisa saber onde pôr o arquivo.
             raiz.Item("Falta google_client_secret.json em", habilitado: false);
             raiz.Item(@"%USERPROFILE%\.meeting-recorder", habilitado: false);
             return;

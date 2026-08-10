@@ -58,9 +58,27 @@ as cinco ou regride. A divisão núcleo/motor segue a leitura do próprio
 FEATURES: núcleo é dono de A, B, E, F, G e de D2/D3/D5/D6/D7; motores entregam
 C1–C3, C6 e D1.
 
-UI: AA Design System com os componentes React, agora sem o Gradio no caminho
-(a fase 3 do redesign vira a via normal — PLANO §3). Idioma: pt-BR, seguindo o
-design system.
+UI: AA Design System, agora sem o Gradio no caminho (a fase 3 do redesign vira
+a via normal — PLANO §3). Idioma: pt-BR, seguindo o design system.
+
+> **Desvio da carta, decidido em 10/08/2026: sem React.** A carta previa "os
+> componentes React do design system". Eles **não existem** — o que o design
+> system tem, e o que está copiado em `src/web/assets/ds/`, é CSS puro: tokens,
+> fontes auto-hospedadas e uma biblioteca de classes (`.aa-btn`, `.aa-cartao`,
+> `.aa-abas`, `.aa-alerta`, `.aa-etiqueta`…) que cobre a interface inteira.
+>
+> Sem componentes prontos para reaproveitar, React entraria só como
+> infraestrutura: um build de node no caminho, mais peças no instalador da
+> Fase 4, e um passo a mais entre editar e ver. A UI é HTML + as classes do
+> design system + JavaScript de módulo, servido de arquivos embutidos no
+> executável. Zero build, e o CSP do WebView2 fica trivial porque nada vem de
+> fora.
+>
+> O que se perde é estado declarativo na lista de segmentos, que é a tela mais
+> complexa (pode passar de mil itens, com edição no lugar). A mitigação é
+> renderização por delegação de evento e atualização pontual do nó editado —
+> se isso apertar, trocar por um framework depois é local, porque o CSS e o
+> contrato com o núcleo não mudam.
 
 ## Dados e migração
 
