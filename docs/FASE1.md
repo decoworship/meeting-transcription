@@ -66,6 +66,34 @@ NativeAOT), Inno Setup fica para a Fase 4. Nesta fase o executável basta.
    correção espúria. No C#, usar a posição do dispositivo que o WASAPI expõe
    (`IAudioClock`/QPC). Refinamento: aplicar inserção/descarte
    preferencialmente em trechos silenciosos, nunca no meio de fala.
+
+> **Requisito 3.1 revertido, com medição (10/08/2026).** Foi implementado como
+> a carta pedia e **falhou em campo**, no caso que mais importa: headset
+> Bluetooth em modo mãos-livres, que é o que o usuário usa todo dia. Ali os
+> carimbos QPC avançam 11,2 ms para cada 10 ms de áudio entregue, e ancorar
+> cada pacote no próprio carimbo virava 1125 correções em 70 s, 13,4 s de
+> silêncio inventado e 11,3 s de áudio real descartado — audível como
+> craquelado. O gravador Python, que compara o total escrito com o relógio uma
+> vez por bloco e tolera 50 ms, fazia 2 correções no mesmo cenário.
+>
+> Vale a régua da fase: o velho ganhou, então o desenho novo sai. A âncora
+> passou a ser a do Python — relógio acumulado desde a origem, tolerância de
+> 50 ms —, mantendo dois refinamentos nossos que não custam nada: a correção
+> entra em trecho silencioso quando existe um, e o preenchimento por relógio
+> continua para o loopback que não entrega pacote nenhum (requisito 3.6), agora
+> só depois de 1 s de silêncio absoluto.
+>
+> Medido depois, no mesmo headset, 125 s com as duas faixas: **1 correção na
+> faixa do sistema e 3 na do microfone**, 0,0 clique por segundo (eram 11,3) e
+> **12,6 ms de desalinhamento entre as faixas** — contra 206,7 ms do desenho
+> por carimbo e 17 minutos do Python numa gravação longa.
+>
+> **O que fica para melhorar depois**, decidido com o dono do produto: a
+> hipótese de que o carimbo por pacote é superior continua de pé para
+> dispositivos que o reportam com honestidade, e o desenho ideal usaria o
+> carimbo quando ele é confiável e o relógio quando não é. Isso exige detectar
+> a confiabilidade em tempo real, e não valia o risco agora — o áudio limpo
+> vale mais que a elegância.
 2. **WAV crash-safe.** O `wave`/`WaveFileWriter` só finaliza o header no
    close — um crash perde a reunião. Flush periódico com patch do header (a
    cada ~10 s), ou PCM cru + finalização no stop.

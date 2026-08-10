@@ -169,13 +169,14 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
         // silêncio real (ninguém falando); em qualquer faixa também pode ser
         // glitch. De todo modo a faixa precisa acompanhar, senão encolhe e
         // desalinha da outra.
+        // O buraco é calculado e informado, mas quem decide escrevê-lo é a
+        // captura — e desde a mudança do requisito 3.1 ela não escreve mais,
+        // porque no mãos-livres do Bluetooth o carimbo inventa buraco onde não
+        // há. Por isso ele NÃO entra em SilencioInserido, que conta o que de
+        // fato foi para o arquivo.
         int silencio = 0;
         long buraco = inicioAlvo - _fimEscritoAlvo;
-        if (buraco > 0)
-        {
-            silencio = (int)buraco;
-            SilencioInserido += silencio;
-        }
+        if (buraco > 0) silencio = (int)buraco;
         // Buraco negativo é jitter do carimbo, não áudio sobrando: não se
         // insere silêncio, mas a linha do tempo continua ancorada no QPC.
 
@@ -231,5 +232,10 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     }
 
     public long QpcParaAmostras(long deltaQpc) =>
+        (long)Math.Round(deltaQpc * (double)taxaAlvo / QpcPorSegundo);
+
+    /// <summary>A mesma conversão, para quem não tem uma linha do tempo em mãos.</summary>
+    public static long QpcParaAmostrasEstatico(long deltaQpc,
+                                               int taxaAlvo = CrashSafeWavWriter.TaxaAlvo) =>
         (long)Math.Round(deltaQpc * (double)taxaAlvo / QpcPorSegundo);
 }

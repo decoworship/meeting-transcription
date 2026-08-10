@@ -36,6 +36,7 @@ public sealed class WasapiTrackCapture : IDisposable
     private readonly CancellationTokenSource _parar = new();
 
     private AudioClient? _cliente;
+    private long _qpcOrigem;
     private PacketTimeline? _linha;
     private StreamingResampler? _resampler;
     private DriftAnchor? _ancora;
@@ -98,6 +99,7 @@ public sealed class WasapiTrackCapture : IDisposable
             // parada.
             refTimesPerSecond, 0, formato, Guid.Empty);
 
+        _qpcOrigem = qpcOrigem;
         _linha = new PacketTimeline(qpcOrigem);
         _resampler = new StreamingResampler(TaxaNativa);
         _ancora = new DriftAnchor();
@@ -197,14 +199,15 @@ public sealed class WasapiTrackCapture : IDisposable
                               $"qpc_ms={msQpc:F1} escritas={_stats.AmostrasEscritas} flags={flags}");
         }
 
-        // Buraco: o hardware digitalizou áudio que não nos foi entregue (no
-        // loopback, silêncio). O tempo passou e a faixa tem que acompanhar,
-        // senão encolhe e desalinha da outra.
-        if (decisao.SilencioAntes > 0)
-        {
-            if (!Escrever(new float[decisao.SilencioAntes])) return;
-            _stats.AmostrasEscritas += decisao.SilencioAntes;
-        }
+        // O buraco medido pelo carimbo do pacote NÃO é preenchido aqui.
+        //
+        // Era, e foi o que quebrou no headset Bluetooth em modo mãos-livres: ali
+        // os carimbos avançam 11,2 ms para cada 10 ms de áudio entregue, então
+        // cada pacote parecia deixar um buraco, e a faixa recebia 13,4 s de
+        // silêncio em 70 s — que a âncora depois tentava desfazer descartando
+        // áudio real. Quem cobre o tempo agora é a âncora, comparando o total
+        // escrito com o relógio uma vez por bloco; buraco de verdade aparece
+        // como deriva e é corrigido do mesmo jeito. Ver docs/FASE1-HANDOFF.md.
 
         // SILENT: o WASAPI garante que o conteúdo é silêncio. Converter seria
         // trabalho jogado fora, e ler o buffer nem é obrigatório.
@@ -235,8 +238,12 @@ public sealed class WasapiTrackCapture : IDisposable
         var reamostrado = _resampler!.Processar(mono);
         if (reamostrado.Length == 0) return;      // o filtro ainda está enchendo
 
-        long correcao = _ancora!.Calcular(decisao.PosicaoAlvo,
-                                          _stats.AmostrasEscritas, reamostrado.Length);
+        // Referência de tempo: o relógio desde a origem comum das duas faixas,
+        // e não a posição carimbada neste pacote. É a mesma escolha do gravador
+        // Python, adotada depois de o desenho por carimbo se mostrar frágil no
+        // mãos-livres do Bluetooth — ver a nota do requisito 3.1 no handoff.
+        long esperado = PacketTimeline.QpcParaAmostrasEstatico(QpcAgora() - _qpcOrigem);
+        long correcao = _ancora!.Calcular(esperado, _stats.AmostrasEscritas, reamostrado.Length);
         var final = correcao == 0 ? reamostrado : DriftAnchor.Aplicar(reamostrado, correcao);
 
         if (!Escrever(final)) return;

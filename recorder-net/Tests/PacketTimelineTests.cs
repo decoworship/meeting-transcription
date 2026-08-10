@@ -51,9 +51,11 @@ public sealed class PacketTimelineTests
         // chega 30 s à frente no QPC.
         var d = t.Chegou(inicio + Ms(30_000), 160, AnomaliaPacote.Nenhuma);
 
-        // 30 s menos os 10 ms do primeiro pacote já escritos.
+        // 30 s menos os 10 ms do primeiro pacote já escritos. O buraco continua
+        // sendo calculado e informado; quem não o escreve mais é a captura, e
+        // por isso ele não conta como silêncio inserido no arquivo.
         Assert.Equal(30 * Alvo - 160, d.SilencioAntes);
-        Assert.Equal(30 * Alvo - 160, t.SilencioInserido);
+        Assert.Equal(0, t.SilencioInserido);
     }
 
     [Fact]

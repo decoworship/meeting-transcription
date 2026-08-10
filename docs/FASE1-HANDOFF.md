@@ -299,6 +299,46 @@ silêncio, que o pacote seguinte corrige. Margem pequena demais destrói áudio.
 | descarte | 7,9 s (14%) | **0,06 s (0,05%)** |
 | marcadores preservados | — | **120 de 120**, intervalo 1,0005 s |
 
+### E ainda não era o fim: o modo mãos-livres
+
+A gravação seguinte do usuário **continuou craquejando**, e o motivo de eu ter
+errado duas vezes seguidas estava no método: eu vinha testando com **uma faixa
+só**. Com as duas, o headset comuta de A2DP para mãos-livres, e o quadro muda:
+
+| | uma faixa (A2DP) | duas faixas (mãos-livres) |
+|---|---|---|
+| correções de âncora | 6 em 125 s | **1125 em 70 s** |
+| silêncio inserido | ~0 | **13,4 s** |
+| áudio descartado | 0,06 s | **11,3 s** |
+
+No mãos-livres os carimbos QPC avançam **11,2 ms para cada 10 ms de áudio
+entregue**. Cada pacote parecia deixar um buraco; a faixa recebia silêncio que
+não existia, e a âncora descartava áudio real para caber. O desenho ancorado no
+carimbo amplificava a irregularidade em vez de absorvê-la.
+
+**A decisão foi do dono do produto**: adotar a solução do gravador Python, que
+nunca teve esse problema, e marcar a melhoria para depois. Ver a nota do
+requisito 3.1 na [FASE1.md](FASE1.md) — o desenho por carimbo foi revertido, e
+o que ficou é o do Python (relógio acumulado, tolerância de 50 ms) mais dois
+refinamentos nossos que não custam nada: correção em trecho silencioso quando
+há um, e preenchimento por relógio só depois de 1 s sem pacote nenhum, para o
+requisito 3.6 continuar valendo.
+
+**Medido depois, mesmo headset, 125 s, duas faixas:**
+
+| | antes | depois |
+|---|---|---|
+| correções (system / mic) | 1125 / 1109 | **1 / 3** |
+| áudio descartado | 11,3 s | **nenhum** (as correções são inserção) |
+| cliques por segundo | 11,3 | **0,0** |
+| desalinhamento entre faixas | 206,7 ms | **12,6 ms** |
+
+**A lição de método, de novo, e mais cara desta vez:** o teste que eu usava
+para validar (uma faixa, sinal sintético) não reproduzia o cenário do usuário
+(duas faixas, mãos-livres). Duas correções foram publicadas com base nele, e as
+duas eram consertos reais de problemas reais — mas nenhuma era *o* problema. Um
+teste que não reproduz o caso do usuário aprova qualquer coisa.
+
 Fica aberto, sem bloquear nada: **por que o Bluetooth exige 38 mil correções**
 onde o HDMI exige 1. A explicação provável é o clock livre do A2DP, e a âncora
 está fazendo exatamente o que deveria — mas o número nunca foi medido de
