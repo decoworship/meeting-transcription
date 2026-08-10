@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<!-- Nada vem de fora: todo o conteúdo é servido de dentro do executável, então
+     a política pode ser fechada. 'unsafe-inline' fica de fora de propósito —
+     estilo e script moram em arquivos. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self';
+               font-src 'self'; img-src 'self' data:; connect-src 'none'">
+<title>Reuniões</title>
+<link rel="stylesheet" href="/ds.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<div class="aa-pagina">
+  <header class="cabecalho">
+    <h1>Reuniões</h1>
+    <p class="sub" id="resumo">Carregando…</p>
+  </header>
+
+  <!-- Preenchido por app.js. O esqueleto do design system evita o salto de
+       layout enquanto a lista não chegou. -->
+  <main id="lista" aria-busy="true">
+    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
+    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
+    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
+  </main>
+</div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

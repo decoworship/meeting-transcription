@@ -132,6 +132,11 @@ benchmarks), resumo por LLM, Teams, transcrição ao vivo, Linux/Mac.
 3. UI por cima, na ordem do fluxo do usuário: escolher gravação → rodar →
    ler/corrigir (E1–E5) → exportar. Histórico, vozes e projetos depois do
    fluxo principal.
+   **Esqueleto em pé (10/08/2026)**: janela Win32 crua hospedando o WebView2,
+   conteúdo servido de dentro do executável, ponte JSON com o núcleo e a
+   primeira tela — a lista de gravações — funcionando sobre o acervo real
+   (29 gravações, com os avisos de faixa muda lidos do `meta.json`). Falta o
+   resto do fluxo.
 4. **Correção fonética + filtro de silêncio no núcleo** — **FEITO
    (09/08/2026)**, em `app-net/Nucleo/`. Ligados por opção no CLI
    (`--vocabulario`, `--filtrar-silencio`) e **desligados por padrão**: os dois
@@ -226,6 +231,28 @@ Também verificado, porque a hipótese óbvia estava errada: a diarização **é
 determinística** entre execuções (321 trechos e 3 falantes em duas rodadas
 independentes) e **não é contaminada** por rodar o ASR antes no mesmo processo.
 A divergência era do porte, não do modelo.
+
+### O que a primeira tela já decidiu (10/08/2026)
+
+- **Sem WinForms nem WPF, de novo.** O pacote do WebView2 traz invólucros para
+  os dois, e referenciá-los arrastaria o `Microsoft.WindowsDesktop.App` — o
+  mesmo que custou 140 MB na bandeja e recusa trimming. O `.csproj` exclui os
+  ativos do pacote e referencia só o `Microsoft.Web.WebView2.Core`, mais o
+  `WebView2Loader.dll` nativo. Sem isso o build já acusava `MSB3277`, conflito
+  entre duas versões de `WindowsBase`.
+- **A interface inteira vai embutida no executável** e é servida por um host
+  falso (`https://app.local/`) que o WebView2 intercepta antes de qualquer
+  rede. Isso permite um CSP fechado (`default-src 'none'`, sem
+  `'unsafe-inline'`) e mata a classe de bug em que a interface e o binário saem
+  de versões diferentes.
+- **O app não referencia o assembly do gravador.** Para achar as gravações ele
+  lê o mesmo `settings.json`, à mão. Os dois executáveis são separados por
+  desenho (princípio 1) e se encontram pelos arquivos; acoplar os binários por
+  causa de uma chave seria trocar o desenho por conveniência.
+- **Gravação em andamento não aparece na lista**, porque o `meta.json` só é
+  escrito no fim. Verificado sem querer: uma gravação estava em curso durante o
+  teste e foi corretamente omitida. Se isso confundir na prática, o conserto é
+  a lista mostrar "gravando agora" a partir dos `.wav` sem `meta.json`.
 
 **O achado que vale para todo motor futuro**: `torch`, `pyannote` e amigos
 escrevem no `stdout` sem pedir licença, e uma linha dessas corrompe o

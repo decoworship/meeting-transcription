@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>MeetingApp</AssemblyName>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Exigido pelo gerador do LibraryImport, como na bandeja. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Ver a bandeja: SelfContained só na linha de comando, para o loop de
+         desenvolvimento ficar rápido. -->
+    <SelfContained>false</SelfContained>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <TrimMode>partial</TrimMode>
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
+    <ApplicationIcon>..\..\assets\logo.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Só o núcleo do WebView2, nunca os invólucros.
+       O pacote traz Microsoft.Web.WebView2.WinForms.dll e .Wpf.dll junto, e
+       referenciá-los arrastaria o framework WindowsDesktop de volta — o mesmo
+       que custou 140 MB na bandeja e recusa trimming (NETSDK1175). Também
+       produzia MSB3277, conflito entre duas versões de WindowsBase.
+       ExcludeAssets="all" desliga a referência automática; o Reference abaixo
+       traz só o Core, e o Content traz o carregador nativo. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40"
+                      GeneratePathProperty="true" ExcludeAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>$(PkgMicrosoft_Web_WebView2)\lib_manual\netcoreapp3.0\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll"
+             Link="WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nucleo\MeetingApp.Nucleo.csproj" />
+    <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
+  </ItemGroup>
+
+  <!-- A interface inteira vai embutida: um arquivo solto ao lado do .exe seria
+       mais uma coisa para o instalador acertar, e o WebView2 serve tudo de
+       memória por SetVirtualHostNameToFolderMapping ou pelo nosso handler.
+       O design system vem de src/web/assets/ds — a mesma cópia que o app
+       Gradio usa, para os dois não divergirem enquanto convivem. -->
+  <!-- Sem recursão de propósito: com subpastas o %(RecursiveDir) entraria no
+       nome do recurso com barras, que não é o separador que o Conteudo usa.
+       Enquanto a interface couber em arquivos planos, isto é o mais simples que
+       funciona — inclusive publicando do Linux, onde a barra invertida do
+       MSBuild não expande glob. -->
+  <ItemGroup>
+    <EmbeddedResource Include="web/*.*"
+                      LogicalName="MeetingApp.web.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- O design system entra sob /ds/, preservando a estrutura de pastas: os
+       @font-face dele usam caminhos relativos ('fonts/Fraunces/...'), então o
+       nome do recurso tem que bater com a URL que o navegador vai pedir. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../src/web/assets/ds/tokens/tokens.css"
+                      LogicalName="MeetingApp.web.ds.tokens.tokens.css" />
+    <EmbeddedResource Include="../../src/web/assets/ds/colors_and_type.css"
+                      LogicalName="MeetingApp.web.ds.colors_and_type.css" />
+    <EmbeddedResource Include="../../src/web/assets/ds/componentes.css"
+                      LogicalName="MeetingApp.web.ds.componentes.css" />
+    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Fraunces/Fraunces-VariableFont.ttf"
+                      LogicalName="MeetingApp.web.ds.fonts.Fraunces.Fraunces-VariableFont.ttf" />
+    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Fraunces/Fraunces-Italic-VariableFont.ttf"
+                      LogicalName="MeetingApp.web.ds.fonts.Fraunces.Fraunces-Italic-VariableFont.ttf" />
+    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf"
+                      LogicalName="MeetingApp.web.ds.fonts.Hanken_Grotesk.HankenGrotesk-VariableFont_wght.ttf" />
+    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf"
+                      LogicalName="MeetingApp.web.ds.fonts.Hanken_Grotesk.HankenGrotesk-Italic-VariableFont_wght.ttf" />
+  </ItemGroup>
+
+</Project>
