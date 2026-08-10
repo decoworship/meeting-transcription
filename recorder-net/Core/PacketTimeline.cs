@@ -63,6 +63,34 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     private long _qpcInicial = qpcOrigem;
     private long _fimEscritoAlvo;
     private long _atrasoObservado;
+    private long _ultimoPacote = -1;
+
+    /// <summary>
+    /// Silêncio sem pacote nenhum antes de o preenchimento por relógio agir.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O preenchimento existe para um caso extremo — loopback que <b>nunca</b>
+    /// entrega pacote porque nada está tocando (requisito 3.6). Ele não pode
+    /// competir com um fluxo normal de pacotes, e era isso que acontecia: o
+    /// Bluetooth entrega em <b>rajadas</b>, com pausas de centenas de
+    /// milissegundos entre elas, e o preenchimento tratava cada pausa como
+    /// silêncio real. Depois a rajada chegava carimbada no passado e a âncora
+    /// descartava áudio verdadeiro para caber.
+    /// </para>
+    /// <para>
+    /// Medido com as duas faixas no AN01 (o microfone ativo põe o headset em
+    /// modo mãos-livres, que piora a irregularidade): <b>13,4 s de silêncio
+    /// inserido e 11,3 s de áudio descartado em 70 s</b>, com 1130 correções de
+    /// âncora. Uma faixa só, sem o mãos-livres, dava 6 correções — a diferença
+    /// entre os dois casos é o que escondia o defeito.
+    /// </para>
+    /// <para>
+    /// Um segundo é folgado de propósito: durante fala normal nunca há um
+    /// segundo sem pacote, então o preenchimento simplesmente não age.
+    /// </para>
+    /// </remarks>
+    public static readonly long OciosoMinimo = QpcPorSegundo;
 
     /// <summary>
     /// Até onde o preenchimento por relógio pode avançar sem roubar o lugar de
@@ -121,6 +149,7 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
         // não presumido, porque a diferença entre placa e Bluetooth é de uma
         // ordem de grandeza — ver MargemOciosa.
         if (qpcAgora > 0) _atrasoObservado = Math.Max(_atrasoObservado, qpcAgora - qpc);
+        _ultimoPacote = Math.Max(_ultimoPacote, qpcAgora > 0 ? qpcAgora : qpc);
 
         if (flags.HasFlag(AnomaliaPacote.Silencio)) PacotesDeSilencio++;
         if (flags.HasFlag(AnomaliaPacote.Descontinuidade)) PacotesComDescontinuidade++;
@@ -184,6 +213,11 @@ public sealed class PacketTimeline(long qpcOrigem = -1, int taxaAlvo = CrashSafe
     /// </remarks>
     public int SilencioAte(long qpcAgora)
     {
+        // Enquanto o dispositivo estiver entregando, quem manda na linha do
+        // tempo são os pacotes. Preencher no meio de um fluxo em rajadas é o que
+        // fazia a âncora descartar áudio real — ver OciosoMinimo.
+        if (_ultimoPacote > 0 && qpcAgora - _ultimoPacote < OciosoMinimo) return 0;
+
         long qpc = qpcAgora - MargemOciosa;
         if (_qpcInicial < 0) { _qpcInicial = qpc; return 0; }
 

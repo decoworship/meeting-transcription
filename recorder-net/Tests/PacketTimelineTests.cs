@@ -103,29 +103,41 @@ public sealed class PacketTimelineTests
     }
 
     [Fact]
-    public void PreenchimentoOciosoNaoPodeCobrirOFuturoDosPacotes()
+    public void PreenchimentoOciosoNaoAgeEnquantoChegamPacotes()
     {
-        // A interação que 100 s de captura expuseram: pacotes descrevem o
-        // passado (o carimbo é de quando o hardware digitalizou, e ele chega até
-        // 100 ms depois). Se o preenchimento ocioso avança até "agora", o pacote
-        // seguinte cobre um intervalo já preenchido e o áudio é escrito duas
-        // vezes — 4849 correções descartando 160 quadros cada.
+        // A interação que 70 s de captura Bluetooth expuseram: o dispositivo
+        // entrega em rajadas, com pausas de centenas de ms. Tratar cada pausa
+        // como silêncio real escrevia sobre o tempo que a rajada seguinte ia
+        // ocupar, e a âncora descartava o áudio verdadeiro para caber —
+        // 13,4 s de silêncio inserido e 11,3 s de áudio jogado fora em 70 s.
         var t = new PacketTimeline();
         long inicio = Ms(1000);
-        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma);          // cobre 0-10 ms
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma, qpcAgora: inicio);
 
-        // O laço chama o ocioso com o relógio em 900 ms; com a margem de 500 ms
-        // o preenchimento vai só até 400 ms, deixando o futuro livre.
-        t.SilencioAte(inicio + Ms(900));
+        // Pausa de 900 ms: é rajada, não silêncio. O preenchimento fica quieto.
+        Assert.Equal(0, t.SilencioAte(inicio + Ms(900)));
 
-        // Pacote carimbado em 400 ms: exatamente onde o preenchimento parou, sem
-        // buraco e sem sobreposição.
-        var d = t.Chegou(inicio + Ms(400), 160, AnomaliaPacote.Nenhuma);
-        Assert.Equal(0, d.SilencioAntes);
+        // E a rajada atrasada encontra a linha do tempo intacta: o buraco é o
+        // tempo real decorrido, não um resto do que o preenchimento comeu.
+        var d = t.Chegou(inicio + Ms(400), 160, AnomaliaPacote.Nenhuma,
+                         qpcAgora: inicio + Ms(900));
+        Assert.Equal(Alvo * 400 / 1000 - 160, d.SilencioAntes);
+    }
 
-        // O caso correto: o próximo pacote vem depois, e o buraco é real.
-        var d2 = t.Chegou(inicio + Ms(600), 160, AnomaliaPacote.Nenhuma);
-        Assert.Equal(Alvo * 190 / 1000, d2.SilencioAntes);       // 190 ms de buraco
+    [Fact]
+    public void SemPacoteNenhumPorMuitoTempoOPreenchimentoVolta()
+    {
+        // O requisito 3.6 continua valendo: loopback com nada tocando não
+        // entrega pacote nenhum, e a faixa não pode ficar vazia.
+        var t = new PacketTimeline();
+        long inicio = Ms(1000);
+        t.Chegou(inicio, 160, AnomaliaPacote.Nenhuma, qpcAgora: inicio);
+
+        int silencio = t.SilencioAte(inicio + Ms(5000));
+        Assert.True(silencio > 0, "sem pacote por 5 s, o silêncio tem que ser escrito");
+
+        long margem = t.QpcParaAmostras(t.MargemOciosa);
+        Assert.Equal(5 * Alvo - 160 - margem, silencio);
     }
 
     [Fact]
