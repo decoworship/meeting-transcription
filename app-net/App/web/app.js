@@ -291,6 +291,22 @@ export async function abrirGravacao(g) {
   fecharGavetas();
   if (!g.transcrita) return telaDePreparo(g);
 
+  // Refazer é ação de exceção: some da tela a menos que tenha sido ligada nas
+  // configurações. Ver ConfiguracoesDoApp.PermitirRetranscrever.
+  const { config } = await pedir("config");
+  if (config?.permitir_retranscrever) {
+    const r = await pedir("transcricao", { gravacao: g.caminho });
+    if (r.transcricao) {
+      cabecalho(tituloDe(g), "carregando…", true);
+      tela.replaceChildren();
+      telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela, aoRefazer: () => {
+        g.transcrita = false;
+        telaDePreparo(g);
+      } });
+      return;
+    }
+  }
+
   cabecalho(tituloDe(g), "carregando a transcrição…", true);
   tela.replaceChildren();
   const r = await pedir("transcricao", { gravacao: g.caminho });
@@ -305,58 +321,109 @@ export async function abrirGravacao(g) {
 
 async function telaDeConfiguracoes() {
   const corpo = document.getElementById("corpo-config");
+  document.querySelector("#gaveta-config h2").textContent = "Configurações";
   corpo.replaceChildren();
 
+  const { config } = await pedir("config");
+  const { clientes } = await pedir("clientes");
+
+  const estado = document.createElement("p");
+  estado.className = "campo__dica";
+
+  /** Grava a cada mudança: um botão "salvar" só criaria como esquecer. */
+  async function gravar(mudanca) {
+    Object.assign(config, mudanca);
+    estado.textContent = "salvando…";
+    try {
+      await pedir("salvar-config", { config });
+      estado.textContent = "salvo";
+    } catch (e) {
+      estado.textContent = `não salvou: ${e.message}`;
+    }
+  }
+
+  // ---- gravações
   const pastas = secao("Gravações");
-  pastas.append(
-    campo("Pasta das gravações", "input", {
-      id: "cfg-pasta",
-      valor: "%USERPROFILE%\\Documents\\MeetingRecordings",
-    }),
-  );
+  const campoPasta = campo("Pasta das gravações", "input", {
+    id: "cfg-pasta",
+    valor: config.pasta_das_gravacoes ?? "",
+    dica: "vazio = a mesma do gravador",
+  });
+  campoPasta.querySelector("input").addEventListener("change", (e) =>
+    gravar({ pasta_das_gravacoes: e.target.value.trim() }));
+
   const dica = document.createElement("p");
   dica.className = "campo__dica";
-  dica.textContent = "É a mesma pasta que o gravador usa — mudar aqui muda nos dois.";
-  pastas.appendChild(dica);
+  dica.textContent = "Deixe vazio para seguir a pasta configurada no gravador.";
+  pastas.append(campoPasta, dica);
 
+  // ---- motores
   const motores = secao("Motores");
-  motores.append(
-    campo("Modelo padrão", "select", {
-      id: "cfg-modelo",
-      opcoes: ["large-v3", "medium", "small"],
-    }),
-    campo("Modelo de diarização", "select", {
-      id: "cfg-diar",
-      opcoes: ["community-1", "3.1"],
-    }),
-    campo("Token do HuggingFace", "input", {
-      id: "cfg-hf",
-      tipo: "password",
-      valor: "",
-    }),
-  );
-  const dicaHf = document.createElement("p");
-  dicaHf.className = "campo__dica";
-  dicaHf.textContent = "Só é necessário na primeira execução, para baixar o modelo de falantes.";
-  motores.appendChild(dicaHf);
+  const campoModelo = campo("Modelo padrão", "select", {
+    id: "cfg-modelo",
+    opcoes: ["large-v3", "medium", "small", "base", "tiny"],
+  });
+  campoModelo.querySelector("select").value = config.modelo_padrao ?? "large-v3";
+  campoModelo.querySelector("select").addEventListener("change", (e) =>
+    gravar({ modelo_padrao: e.target.value }));
 
-  const { clientes } = await pedir("clientes");
+  const campoDiar = campo("Modelo de diarização", "select", {
+    id: "cfg-diar",
+    opcoes: ["community-1", "3.1"],
+  });
+  campoDiar.querySelector("select").value = config.diarizacao_padrao ?? "community-1";
+  campoDiar.querySelector("select").addEventListener("change", (e) =>
+    gravar({ diarizacao_padrao: e.target.value }));
+
+  motores.append(campoModelo, campoDiar);
+
+  const notaToken = document.createElement("p");
+  notaToken.className = "campo__dica";
+  notaToken.textContent =
+    "O acesso aos modelos já vem configurado no aplicativo — nada a fazer aqui.";
+  motores.appendChild(notaToken);
+
+  // ---- transcrição
+  const avancado = secao("Transcrição");
+  const toggle = document.createElement("label");
+  toggle.className = "campo campo--linha";
+  const caixa = document.createElement("input");
+  caixa.type = "checkbox";
+  caixa.checked = config.permitir_retranscrever === true;
+  caixa.addEventListener("change", (e) =>
+    gravar({ permitir_retranscrever: e.target.checked }));
+  const rotulo = document.createElement("span");
+  rotulo.textContent = "Permitir transcrever de novo uma reunião já transcrita";
+  toggle.append(caixa, rotulo);
+
+  const aviso = document.createElement("p");
+  aviso.className = "campo__dica";
+  // O porquê fica na tela, não só no código: quem liga isto precisa saber o
+  // que arrisca.
+  aviso.textContent =
+    "Refazer descarta os nomes de falante e as correções de texto daquela "
+    + "reunião, e reprocessa o áudio inteiro.";
+  avancado.append(toggle, aviso);
+
+  // ---- cadastros
   const nClientes = Object.keys(clientes).length;
   const nProjetos = Object.values(clientes).reduce((s, p) => s + p.length, 0);
 
   const listas = secao("Cadastros");
-  for (const [rotulo, texto] of [
+  for (const [rotuloBotao, texto] of [
     ["Clientes e projetos",
      `${nClientes} ${nClientes === 1 ? "cliente" : "clientes"}, `
      + `${nProjetos} ${nProjetos === 1 ? "projeto" : "projetos"}`],
-    ["Vozes conhecidas", "nenhuma voz salva"],
+    ["Vozes conhecidas", "as vozes aprendidas ao nomear falantes"],
   ]) {
     const linha = document.createElement("div");
     linha.className = "acoes";
     const b = document.createElement("button");
     b.className = "aa-btn aa-btn-secundario";
     b.type = "button";
-    b.textContent = rotulo;
+    b.textContent = rotuloBotao;
+    b.disabled = true;
+    b.title = "Tela ainda não construída";
     const t = document.createElement("span");
     t.className = "campo__dica";
     t.textContent = texto;
@@ -364,7 +431,7 @@ async function telaDeConfiguracoes() {
     listas.appendChild(linha);
   }
 
-  corpo.append(pastas, motores, listas);
+  corpo.append(pastas, motores, avancado, listas, estado);
   abrirGaveta("gaveta-config");
 }
 

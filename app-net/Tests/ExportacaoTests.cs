@@ -147,6 +147,57 @@ public sealed class ExportacaoTests : IDisposable
         Assert.Contains("Júri", xml.ToString());
     }
 
+    private static Cabecalho CabecalhoDeExemplo() => new()
+    {
+        Titulo = "Algar - Impedimentos",
+        Cliente = "Algar",
+        Projeto = "Agentes",
+        Data = "2026-08-10",
+        DuracaoS = 3725,
+        Idioma = "pt",
+        Falantes = ["Vanessa", "You"],
+    };
+
+    [Fact]
+    public void OTxtAbreComOsDadosDaReuniao()
+    {
+        // Um TXT que chega por e-mail sem dizer de que reunião é obriga quem
+        // recebe a perguntar.
+        string txt = Exportacao.Txt(Exemplo(), true, CabecalhoDeExemplo());
+
+        Assert.StartsWith("Algar - Impedimentos", txt);
+        Assert.Contains("Cliente: Algar", txt);
+        Assert.Contains("Projeto: Agentes", txt);
+        Assert.Contains("Duração: 1h 02min", txt);
+        Assert.Contains("Falantes: 2 — Vanessa, You", txt);
+        // E o texto continua vindo depois do cabeçalho.
+        Assert.Contains("[00:08] Vanessa: Bom dia, Júri.", txt);
+    }
+
+    [Fact]
+    public void OCabecalhoDaLegendaNaoQuebraOFormato()
+    {
+        // SRT não tem campo de metadado: o cabeçalho vira uma legenda zero que
+        // termina antes do primeiro milissegundo, e os índices reais continuam
+        // começando em 1.
+        string srt = Exportacao.Srt(Exemplo(), true, CabecalhoDeExemplo());
+        Assert.StartsWith("0\n00:00:00,000 --> 00:00:00,001", srt);
+        Assert.Contains("\n1\n00:00:08,200", srt);
+
+        // No VTT o lugar certo é o bloco NOTE, que o player ignora.
+        string vtt = Exportacao.Vtt(Exemplo(), true, CabecalhoDeExemplo());
+        Assert.StartsWith("WEBVTT", vtt);
+        Assert.Contains("NOTE\nAlgar - Impedimentos", vtt);
+    }
+
+    [Fact]
+    public void SemCabecalhoOArquivoSaiComoAntes()
+    {
+        // Quem exporta para legendar um vídeo não quer metadado no arquivo.
+        Assert.StartsWith("[00:08]", Exportacao.Txt(Exemplo()));
+        Assert.StartsWith("1\n", Exportacao.Srt(Exemplo()));
+    }
+
     [Fact]
     public void ONomeDeArquivoNaoCarregaCaractereProibido()
     {

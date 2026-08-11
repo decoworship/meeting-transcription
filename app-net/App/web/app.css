@@ -102,6 +102,8 @@ body {
 }
 
 .campo { display: grid; gap: var(--espaco-2); }
+/* Caixa de seleção ao lado do rótulo, e não embaixo. */
+.campo--linha { grid-template-columns: auto 1fr; align-items: center; }
 .campo > span { font-size: var(--texto-pequeno); font-weight: 600; }
 .campo__dica { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); margin: 0; }
 
@@ -128,7 +130,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * rolar de volta para desligar um falante anula o filtro. */
 .ferramentas {
   display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto auto;
   gap: var(--espaco-3);
   align-items: center;
   padding: var(--espaco-2) 0;

@@ -81,7 +81,7 @@ export function abrirPainel(qual) {
   else if (qual.startsWith("editar")) editar(Number(qual.split(":")[1] ?? 0));
 }
 
-export function telaDeRevisao(gravacao, dados, { cabecalho, tela }) {
+export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer }) {
   audio.pause();
   audio.removeAttribute("src");
 
@@ -150,6 +150,20 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela }) {
   estadoSalvo.id = "estado-salvo";
 
   ferramentas.append(busca, parar, estadoSalvo, botaoFalantes, botaoExportar);
+
+  if (aoRefazer) {
+    const refazer = document.createElement("button");
+    refazer.className = "aa-btn aa-btn-texto";
+    refazer.type = "button";
+    refazer.textContent = "Transcrever de novo";
+    refazer.addEventListener("click", () => {
+      // Confirmação porque o custo é assimétrico: refazer descarta a revisão
+      // inteira e reprocessa o áudio, e o clique distraído não avisa antes.
+      if (confirm("Isto descarta os nomes e as correções desta reunião. Continuar?"))
+        aoRefazer();
+    });
+    ferramentas.appendChild(refazer);
+  }
 
   const corpo = document.createElement("div");
   corpo.className = "transcricao";
@@ -460,15 +474,23 @@ function abrirExportacao() {
 
   const s = secao("Formato");
 
-  const comFalantes = document.createElement("label");
-  comFalantes.className = "campo";
-  const caixa = document.createElement("input");
-  caixa.type = "checkbox";
-  caixa.checked = true;
-  caixa.id = "com-falantes";
-  const rotulo = document.createElement("span");
-  rotulo.textContent = "Incluir os nomes dos falantes";
-  comFalantes.append(rotulo, caixa);
+  const opcoes = document.createElement("div");
+  opcoes.className = "secao";
+  for (const [id, texto, marcado] of [
+    ["com-falantes", "Incluir os nomes dos falantes", true],
+    ["com-copia", "Salvar também uma cópia em outra pasta", false],
+  ]) {
+    const l = document.createElement("label");
+    l.className = "campo campo--linha";
+    const c = document.createElement("input");
+    c.type = "checkbox";
+    c.checked = marcado;
+    c.id = id;
+    const r = document.createElement("span");
+    r.textContent = texto;
+    l.append(c, r);
+    opcoes.appendChild(l);
+  }
 
   const resultado = document.createElement("p");
   resultado.className = "campo__dica";
@@ -494,10 +516,16 @@ function abrirExportacao() {
           formato,
           nome: estado.gravacao.titulo || estado.gravacao.nome,
           com_falantes: document.getElementById("com-falantes").checked,
+          copiar: document.getElementById("com-copia").checked,
+          // Vão para o cabeçalho do arquivo: um TXT que chega por e-mail sem
+          // dizer de que reunião é obriga quem recebe a perguntar.
+          cliente: estado.gravacao.cliente ?? "",
+          projeto: estado.gravacao.projeto ?? "",
+          data: (estado.gravacao.nome.match(/^\d{4}-\d{2}-\d{2}/) ?? [""])[0],
         });
         // O caminho inteiro, e não só "pronto": quem exporta precisa achar o
         // arquivo, e ele fica junto da gravação — não em Downloads.
-        resultado.textContent = r.arquivo;
+        resultado.textContent = r.copia ? `${r.arquivo}\ne uma cópia em ${r.copia}` : r.arquivo;
       } catch (e) {
         resultado.textContent = `não deu: ${e.message}`;
       }
@@ -511,7 +539,7 @@ function abrirExportacao() {
     s.appendChild(linha);
   }
 
-  s.append(comFalantes, resultado);
+  s.append(opcoes, resultado);
   corpo.appendChild(s);
   abrirGaveta("gaveta-config");
 }

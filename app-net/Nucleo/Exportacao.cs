@@ -24,9 +24,20 @@ public static class Exportacao
     }
 
     /// <summary>Texto corrido com marca de tempo e quem falou.</summary>
-    public static string Txt(ResultadoDaTranscricao r, bool comFalantes = true)
+    public static string Txt(ResultadoDaTranscricao r, bool comFalantes = true,
+                             Cabecalho? cabecalho = null)
     {
         var sb = new StringBuilder();
+
+        if (cabecalho is not null)
+        {
+            if (cabecalho.Titulo is { Length: > 0 } t)
+                sb.AppendLine(t).AppendLine(new string('=', Math.Min(t.Length, 60)));
+            foreach (var (rotulo, valor) in cabecalho.Linhas())
+                sb.Append(rotulo).Append(": ").AppendLine(valor);
+            sb.AppendLine(new string('-', 60)).AppendLine();
+        }
+
         foreach (var s in r.Segments)
         {
             var t = TimeSpan.FromSeconds(s.Start);
@@ -44,9 +55,19 @@ public static class Exportacao
     }
 
     /// <summary>Legenda SRT: numerada, com vírgula nos milissegundos.</summary>
-    public static string Srt(ResultadoDaTranscricao r, bool comFalantes = true)
+    public static string Srt(ResultadoDaTranscricao r, bool comFalantes = true,
+                             Cabecalho? cabecalho = null)
     {
         var sb = new StringBuilder();
+
+        // Legenda não tem campo de metadado, então o cabeçalho entra como uma
+        // "legenda zero" que aparece antes do primeiro segundo. Players a
+        // exibem; quem abre o arquivo em editor lê direto.
+        if (cabecalho is not null && Resumo(cabecalho) is { Length: > 0 } resumo)
+        {
+            sb.Append("0\n00:00:00,000 --> 00:00:00,001\n").Append(resumo).Append("\n\n");
+        }
+
         for (int i = 0; i < r.Segments.Count; i++)
         {
             var s = r.Segments[i];
@@ -59,9 +80,15 @@ public static class Exportacao
     }
 
     /// <summary>Legenda WebVTT: cabeçalho obrigatório e ponto nos milissegundos.</summary>
-    public static string Vtt(ResultadoDaTranscricao r, bool comFalantes = true)
+    public static string Vtt(ResultadoDaTranscricao r, bool comFalantes = true,
+                             Cabecalho? cabecalho = null)
     {
         var sb = new StringBuilder("WEBVTT\n\n");
+
+        // NOTE é o bloco de comentário do WebVTT: fica no arquivo, não vai para
+        // a tela, e é exatamente onde metadado deve morar.
+        if (cabecalho is not null && Resumo(cabecalho) is { Length: > 0 } resumo)
+            sb.Append("NOTE\n").Append(resumo).Append("\n\n");
         foreach (var s in r.Segments)
         {
             sb.Append(Marca(s.Start, '.')).Append(" --> ").Append(Marca(s.End, '.')).Append('\n');
@@ -81,12 +108,26 @@ public static class Exportacao
     /// trecho.
     /// </remarks>
     public static void Docx(ResultadoDaTranscricao r, string destino,
-                            string titulo, bool comFalantes = true)
+                            string titulo, bool comFalantes = true,
+                            Cabecalho? cabecalho = null)
     {
         var cores = CoresPorFalante(r);
 
         var corpo = new StringBuilder();
         corpo.Append(Paragrafo(titulo, negrito: true, cor: null, tamanho: 32));
+
+        if (cabecalho is not null)
+        {
+            foreach (var (rotulo, valor) in cabecalho.Linhas())
+            {
+                corpo.Append("<w:p><w:r><w:rPr><w:b/><w:sz w:val=\"20\"/></w:rPr>")
+                     .Append("<w:t xml:space=\"preserve\">").Append(Escapar(rotulo))
+                     .Append(": </w:t></w:r>");
+                corpo.Append("<w:r><w:rPr><w:sz w:val=\"20\"/></w:rPr><w:t xml:space=\"preserve\">")
+                     .Append(Escapar(valor)).Append("</w:t></w:r></w:p>");
+            }
+            corpo.Append(Paragrafo(new string('_', 60), negrito: false, cor: "AAAAAA", tamanho: 16));
+        }
 
         foreach (var s in r.Segments)
         {
@@ -141,6 +182,15 @@ public static class Exportacao
             mapa[quem] = quem == "You" ? paleta[0] : paleta[1 + (mapa.Count % (paleta.Length - 1))];
         }
         return mapa;
+    }
+
+    /// <summary>O cabeçalho em uma linha por campo, para formatos sem metadado.</summary>
+    private static string Resumo(Cabecalho c)
+    {
+        var sb = new StringBuilder();
+        if (c.Titulo is { Length: > 0 }) sb.AppendLine(c.Titulo);
+        foreach (var (rotulo, valor) in c.Linhas()) sb.Append(rotulo).Append(": ").AppendLine(valor);
+        return sb.ToString().TrimEnd();
     }
 
     private static string Escapar(string s) =>

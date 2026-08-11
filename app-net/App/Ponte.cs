@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
 
 namespace MeetingApp.App;
@@ -23,6 +24,7 @@ internal sealed class Pedido
     [JsonPropertyName("modelo")] public string? Modelo { get; init; }
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+    [JsonPropertyName("data")] public string? Data { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Rótulo do falante e o nome dado a ele, para aprender a voz.</summary>
@@ -32,6 +34,11 @@ internal sealed class Pedido
     /// <summary>"txt", "srt", "vtt" ou "docx".</summary>
     [JsonPropertyName("formato")] public string? Formato { get; init; }
     [JsonPropertyName("com_falantes")] public bool? ComFalantes { get; init; }
+
+    /// <summary>Também salvar uma cópia numa pasta escolhida pelo usuário.</summary>
+    [JsonPropertyName("copiar")] public bool? Copiar { get; init; }
+
+    [JsonPropertyName("config")] public ConfiguracoesDoApp? Config { get; init; }
 
     /// <summary>A transcrição inteira, como a página a tem depois de editada.</summary>
     [JsonPropertyName("conteudo")] public string? Conteudo { get; init; }
@@ -59,6 +66,11 @@ internal sealed class Resposta
 
     /// <summary>Onde o arquivo exportado foi parar.</summary>
     [JsonPropertyName("arquivo")] public string? Arquivo { get; init; }
+
+    /// <summary>A cópia, quando pedida.</summary>
+    [JsonPropertyName("copia")] public string? Copia { get; init; }
+
+    [JsonPropertyName("config")] public ConfiguracoesDoApp? Config { get; init; }
 
     /// <summary>O que aconteceu ao aprender uma voz, para a UI poder dizer.</summary>
     [JsonPropertyName("voz")] public string? Voz { get; init; }
@@ -90,6 +102,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(Pedido))]
 [JsonSerializable(typeof(Resposta))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
+[JsonSerializable(typeof(ConfiguracoesDoApp))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -159,9 +172,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
-                case "exportar":
-                    Responder(new Resposta { Id = p.Id, Arquivo = Exportar(p) });
+                case "config":
+                    Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
                     break;
+
+                case "salvar-config":
+                    p.Config?.Salvar();
+                    Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
+                    break;
+
+                case "exportar":
+                {
+                    var (arquivo, copia) = Exportar(p);
+                    Responder(new Resposta { Id = p.Id, Arquivo = arquivo, Copia = copia });
+                    break;
+                }
 
                 case "aprender-voz":
                     await AprenderVozAsync(p);
@@ -235,7 +260,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
     /// reunião, e quem procurar por ele daqui a um mês vai procurar na pasta
     /// dela. O caminho volta para a UI poder mostrar onde ficou.
     /// </remarks>
-    private static string Exportar(Pedido p)
+    private static (string Arquivo, string? Copia) Exportar(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)
             throw new InvalidOperationException("sem gravação");
@@ -249,17 +274,44 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         string titulo = p.Nome is { Length: > 0 } ? p.Nome : Path.GetFileName(pasta);
         string formato = p.Formato ?? "txt";
 
+        var cabecalho = Cabecalho.De(dados, titulo, p.Cliente, p.Projeto, p.Data);
         string destino = Path.Combine(pasta, Exportacao.NomeDeArquivo(titulo, formato));
 
         switch (formato)
         {
-            case "txt": File.WriteAllText(destino, Exportacao.Txt(dados, comFalantes)); break;
-            case "srt": File.WriteAllText(destino, Exportacao.Srt(dados, comFalantes)); break;
-            case "vtt": File.WriteAllText(destino, Exportacao.Vtt(dados, comFalantes)); break;
-            case "docx": Exportacao.Docx(dados, destino, titulo, comFalantes); break;
+            case "txt": File.WriteAllText(destino, Exportacao.Txt(dados, comFalantes, cabecalho)); break;
+            case "srt": File.WriteAllText(destino, Exportacao.Srt(dados, comFalantes, cabecalho)); break;
+            case "vtt": File.WriteAllText(destino, Exportacao.Vtt(dados, comFalantes, cabecalho)); break;
+            case "docx": Exportacao.Docx(dados, destino, titulo, comFalantes, cabecalho); break;
             default: throw new InvalidOperationException($"formato desconhecido: {formato}");
         }
-        return destino;
+
+        // A cópia é secundária de propósito: o original fica sempre junto da
+        // gravação, e a pasta escolhida é para levar o arquivo a outro lugar —
+        // rede, nuvem, Downloads. Se a cópia falhar, a exportação já aconteceu.
+        string? copia = null;
+        if (p.Copiar == true)
+        {
+            var cfg = ConfiguracoesDoApp.Carregar();
+            string? escolhida = cfg.PastaDeExportacao;
+
+            if (escolhida is not { Length: > 0 } || !Directory.Exists(escolhida))
+                escolhida = SeletorDePasta.Escolher(IntPtr.Zero,
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "Onde salvar a cópia");
+
+            if (escolhida is { Length: > 0 })
+            {
+                copia = Path.Combine(escolhida, Path.GetFileName(destino));
+                File.Copy(destino, copia, overwrite: true);
+
+                // Lembrar a escolha: quem exporta uma vez para a pasta do
+                // cliente costuma exportar as próximas para lá também.
+                cfg.PastaDeExportacao = escolhida;
+                cfg.Salvar();
+            }
+        }
+        return (destino, copia);
     }
 
     /// <summary>
