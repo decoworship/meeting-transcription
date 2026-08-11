@@ -125,7 +125,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .ferramentas {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   gap: var(--espaco-3);
   align-items: center;
   position: sticky;

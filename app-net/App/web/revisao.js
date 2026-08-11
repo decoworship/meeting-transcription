@@ -10,9 +10,50 @@
 // * os falantes ficam numa gaveta lateral pelo mesmo motivo — dá para nomear
 //   todo mundo sem sair de onde se estava lendo.
 
+import { pedir } from "/ponte.js";
 import { corDoFalante, abrirGaveta, secao, campo, alerta } from "/pecas.js";
 
 let estado = null;
+let aguardando = null;
+
+/**
+ * Grava a transcrição, juntando edições próximas numa escrita só.
+ *
+ * Sem espera, renomear três falantes seguidos daria três gravações do arquivo
+ * inteiro. Com ela, o trabalho de revisão vira uma escrita a cada segundo
+ * parado — e nada se perde, porque cada edição reinicia a contagem.
+ */
+function salvar() {
+  marcarEstado("salvando…");
+  clearTimeout(aguardando);
+  aguardando = setTimeout(async () => {
+    try {
+      // Os nomes entram nos segmentos só na hora de gravar: durante a revisão
+      // eles vivem à parte, para renomear em massa ser trocar uma entrada.
+      const copia = {
+        ...estado.dados,
+        segments: estado.dados.segments.map((s) => ({
+          ...s,
+          speaker: nomeDe(s.speaker ?? "Unknown"),
+        })),
+      };
+      await pedir("salvar-transcricao", {
+        gravacao: estado.gravacao.caminho,
+        conteudo: JSON.stringify(copia, null, 2),
+      });
+      marcarEstado("salvo");
+    } catch (e) {
+      marcarEstado(`não salvou: ${e.message}`, true);
+    }
+  }, 800);
+}
+
+function marcarEstado(texto, erro = false) {
+  const el = document.getElementById("estado-salvo");
+  if (!el) return;
+  el.textContent = texto;
+  el.style.color = erro ? "var(--cor-erro)" : "var(--cor-texto-suave)";
+}
 
 export function abrirPainel(qual) {
   if (qual === "falantes") abrirFalantes();
@@ -70,7 +111,11 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela }) {
   botaoExportar.textContent = "Exportar";
   botaoExportar.addEventListener("click", abrirExportacao);
 
-  ferramentas.append(busca, botaoFalantes, botaoExportar);
+  const estadoSalvo = document.createElement("span");
+  estadoSalvo.className = "campo__dica";
+  estadoSalvo.id = "estado-salvo";
+
+  ferramentas.append(busca, estadoSalvo, botaoFalantes, botaoExportar);
 
   const corpo = document.createElement("div");
   corpo.className = "transcricao";
@@ -226,6 +271,7 @@ modal.addEventListener("close", () => {
   seg.text = " " + document.getElementById("campo-texto").value.trim();
   seg.speaker = document.getElementById("campo-falante").value;
   redesenhar();
+  salvar();
 });
 
 // ───────────────────────────────────────────────────── falantes
@@ -269,6 +315,7 @@ function abrirFalantes() {
       if (v && v !== cru) estado.nomes.set(cru, v);
       else estado.nomes.delete(cru);
       redesenhar();
+      salvar();
     });
     nome.appendChild(entrada);
 
@@ -312,6 +359,22 @@ function abrirFalantes() {
   b.className = "aa-btn aa-btn-secundario";
   b.type = "button";
   b.textContent = "Fundir";
+  b.addEventListener("click", () => {
+    const de = falantes[document.getElementById("fundir-de").selectedIndex];
+    const para = falantes[document.getElementById("fundir-para").selectedIndex];
+    if (de === para) return;
+
+    // Fundir é reescrever o rótulo nos segmentos, e não criar um apelido: os
+    // dois falantes deixam de existir separados, inclusive para o filtro.
+    for (const s of estado.dados.segments)
+      if ((s.speaker ?? "Unknown") === de) s.speaker = para;
+    estado.nomes.delete(de);
+    estado.escondidos.delete(de);
+
+    redesenhar();
+    salvar();
+    abrirFalantes();
+  });
   acao.appendChild(b);
   fundir.append(explicacao, linha, acao);
 

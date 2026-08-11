@@ -22,6 +22,9 @@ internal sealed class Pedido
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
+
+    /// <summary>A transcrição inteira, como a página a tem depois de editada.</summary>
+    [JsonPropertyName("conteudo")] public string? Conteudo { get; init; }
 }
 
 internal sealed class Resposta
@@ -140,6 +143,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
+                case "salvar-transcricao":
+                    SalvarTranscricao(p.Gravacao, p.Conteudo);
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+
                 case "transcricao":
                     Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
                     break;
@@ -192,6 +200,29 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         var mapa = new Dictionary<string, List<string>>();
         foreach (string c in _projetos.ListarClientes()) mapa[c] = _projetos.ListarProjetos(c);
         return mapa;
+    }
+
+    /// <summary>
+    /// Grava a transcrição editada por cima da que estava lá.
+    /// </summary>
+    /// <remarks>
+    /// Escrita atômica pelo mesmo motivo do resto do projeto: a alternativa é
+    /// um desligamento no meio deixar o arquivo pela metade, e aqui isso
+    /// custaria a revisão inteira de uma reunião.
+    /// </remarks>
+    private static void SalvarTranscricao(string? pasta, string? conteudo)
+    {
+        if (pasta is not { Length: > 0 } || conteudo is not { Length: > 0 })
+            throw new InvalidOperationException("nada para salvar");
+
+        // Conferir que é JSON antes de gravar: escrever lixo aqui apagaria a
+        // transcrição, e o erro só apareceria na próxima abertura.
+        using (JsonDocument.Parse(conteudo)) { }
+
+        string destino = Path.Combine(pasta, "transcricao.json");
+        string tmp = destino + ".tmp";
+        File.WriteAllText(tmp, conteudo);
+        File.Move(tmp, destino, overwrite: true);
     }
 
     private static string? LerTranscricao(string? pasta)
