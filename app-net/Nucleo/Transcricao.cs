@@ -28,6 +28,22 @@ public sealed class ResultadoDaTranscricao
 {
     [JsonPropertyName("language")] public string? Language { get; init; }
     [JsonPropertyName("duration")] public double? Duration { get; init; }
+
+    /// <summary>
+    /// De que reunião esta transcrição é.
+    /// </summary>
+    /// <remarks>
+    /// Os mesmos nomes que o <c>history/</c> do app Python usa. Sem eles, o
+    /// cliente e o projeto escolhidos antes de transcrever se perdiam ao sair
+    /// da tela — e o cabeçalho do arquivo exportado saía sem dizer de quem era
+    /// a reunião, que foi como o defeito apareceu.
+    /// </remarks>
+    [JsonPropertyName("client")] public string? Client { get; set; }
+    [JsonPropertyName("project")] public string? Project { get; set; }
+
+    /// <summary>Data e hora da reunião, em ISO. Vem da agenda quando existe.</summary>
+    [JsonPropertyName("date")] public string? Date { get; set; }
+
     [JsonPropertyName("segments")] public required List<SegmentoFinal> Segments { get; init; }
 
     public string ParaJson() =>

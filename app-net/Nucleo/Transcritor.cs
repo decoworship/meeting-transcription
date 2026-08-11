@@ -116,6 +116,42 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
 public sealed class Transcritor(Motores motores)
 {
     /// <param name="progresso">Chamado na thread do pipeline, não na da UI.</param>
+    /// <summary>
+    /// Quando a reunião foi, em ISO com hora.
+    /// </summary>
+    /// <remarks>
+    /// Prefere o horário da agenda ao do arquivo: a reunião marcada para as 9h
+    /// é o que as pessoas lembram, mesmo que a gravação tenha começado 9h03. Só
+    /// cai no nome da pasta quando não houve evento.
+    /// </remarks>
+    public static string? DataDaReuniao(string pastaDaGravacao)
+    {
+        try
+        {
+            string meta = Path.Combine(pastaDaGravacao, "meta.json");
+            if (File.Exists(meta))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(meta));
+                if (doc.RootElement.TryGetProperty("meeting", out var reuniao)
+                    && reuniao.TryGetProperty("start", out var inicio)
+                    && inicio.ValueKind == System.Text.Json.JsonValueKind.String
+                    && inicio.GetString() is { Length: > 0 } quando)
+                    return quando;
+            }
+        }
+        catch (Exception)
+        {
+            // meta.json ilegível não pode impedir a exportação.
+        }
+
+        // "2026-08-11_08-02-40" -> "2026-08-11T08:02:40"
+        string nome = Path.GetFileName(pastaDaGravacao);
+        var m = System.Text.RegularExpressions.Regex.Match(
+            nome, @"^(\d{4}-\d{2}-\d{2})_(\d{2})-(\d{2})-(\d{2})");
+        return m.Success ? $"{m.Groups[1].Value}T{m.Groups[2].Value}:{m.Groups[3].Value}:{m.Groups[4].Value}"
+                         : null;
+    }
+
     /// <param name="modelo">
     /// Tamanho do modelo de ASR. Vem da tela, que por sua vez o carrega das
     /// preferências do projeto — modelo menor é a saída para quem precisa de
@@ -124,7 +160,8 @@ public sealed class Transcritor(Motores motores)
     public async Task<ResultadoDaTranscricao> ExecutarAsync(
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
-        string? modelo = null, CancellationToken ct = default)
+        string? modelo = null, string? cliente = null, string? projeto = null,
+        CancellationToken ct = default)
     {
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
 
@@ -216,6 +253,9 @@ public sealed class Transcritor(Motores motores)
         {
             Language = transcricao.Idioma,
             Duration = transcricao.Duracao,
+            Client = cliente,
+            Project = projeto,
+            Date = DataDaReuniao(pastaDaGravacao),
             Segments = segmentos,
         };
 

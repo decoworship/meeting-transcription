@@ -232,7 +232,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         // enquanto há progresso a mostrar.
         var resultado = await Task.Run(() => _transcritor.ExecutarAsync(
             pasta, p.Vocabulario, p.Idioma,
-            modelo: p.Modelo,
+            modelo: p.Modelo, cliente: p.Cliente, projeto: p.Projeto,
             progresso: e => Responder(new Resposta
             {
                 Id = p.Id,
@@ -274,8 +274,26 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         string titulo = p.Nome is { Length: > 0 } ? p.Nome : Path.GetFileName(pasta);
         string formato = p.Formato ?? "txt";
 
-        var cabecalho = Cabecalho.De(dados, titulo, p.Cliente, p.Projeto, p.Data);
-        string destino = Path.Combine(pasta, Exportacao.NomeDeArquivo(titulo, formato));
+        // O que a tela mandou tem precedência: ela mostra o que estava
+        // guardado e deixa corrigir, então o valor que chega aqui é o que a
+        // pessoa acabou de confirmar. E o que ela preencher volta para o
+        // arquivo, senão precisaria digitar de novo na próxima exportação.
+        string? cliente = p.Cliente is { Length: > 0 } ? p.Cliente : dados.Client;
+        string? projeto = p.Projeto is { Length: > 0 } ? p.Projeto : dados.Project;
+        string? data = dados.Date ?? Transcritor.DataDaReuniao(pasta);
+
+        if (cliente != dados.Client || projeto != dados.Project || data != dados.Date)
+        {
+            dados.Client = cliente;
+            dados.Project = projeto;
+            dados.Date = data;
+            SalvarTranscricao(pasta, dados.ParaJson());
+        }
+
+        var cabecalho = Cabecalho.De(dados, titulo, cliente, projeto, data);
+
+        string destino = Path.Combine(pasta,
+            Exportacao.NomeDeArquivo(titulo, formato, cabecalho.Data));
 
         switch (formato)
         {

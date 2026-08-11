@@ -26,11 +26,36 @@ public sealed class Cabecalho
     {
         if (Cliente is { Length: > 0 }) yield return ("Cliente", Cliente);
         if (Projeto is { Length: > 0 }) yield return ("Projeto", Projeto);
-        if (Data is { Length: > 0 }) yield return ("Data", Data);
+        if (Data is { Length: > 0 }) yield return ("Data", DataLegivel(Data));
         if (DuracaoS is > 0) yield return ("Duração", Duracao(DuracaoS.Value));
         if (Idioma is { Length: > 0 }) yield return ("Idioma", Idioma);
         if (Falantes.Count > 0)
             yield return ("Falantes", $"{Falantes.Count} — {string.Join(", ", Falantes)}");
+    }
+
+    /// <summary>
+    /// "2026-08-11T08:02:40" vira "11/08/2026 às 08:02".
+    /// </summary>
+    /// <remarks>
+    /// Com hora, e não só a data: numa semana com três reuniões do mesmo
+    /// projeto, a data sozinha não diz qual delas é.
+    /// </remarks>
+    public static string DataLegivel(string iso)
+    {
+        return DateTimeOffset.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out var quando)
+            ? quando.ToString("dd/MM/yyyy 'às' HH:mm")
+            : iso;
+    }
+
+    /// <summary>Só a data, para nome de arquivo: "2026-08-11".</summary>
+    public static string? DataCurta(string? iso)
+    {
+        if (iso is not { Length: > 0 }) return null;
+        return DateTimeOffset.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out var quando)
+            ? quando.ToString("yyyy-MM-dd")
+            : iso[..Math.Min(10, iso.Length)];
     }
 
     public static string Duracao(double segundos)

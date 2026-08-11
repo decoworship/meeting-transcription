@@ -11,7 +11,8 @@
 //   todo mundo sem sair de onde se estava lendo.
 
 import { pedir } from "/ponte.js";
-import { corDoFalante, abrirGaveta, secao, campo, alerta } from "/pecas.js";
+import { corDoFalante, abrirGaveta, secao, campo, alerta,
+         campoComSugestoes, preencherSugestoes } from "/pecas.js";
 
 let estado = null;
 let aguardando = null;
@@ -467,10 +468,30 @@ function abrirFalantes() {
 
 // ───────────────────────────────────────────────────── exportar
 
-function abrirExportacao() {
+async function abrirExportacao() {
   const corpo = document.getElementById("corpo-config");
   corpo.replaceChildren();
   document.querySelector("#gaveta-config h2").textContent = "Exportar";
+
+  // Cliente e projeto vêm da transcrição quando ela os tem — as feitas antes
+  // deste campo existir não têm, e é aqui que dá para preencher sem refazer
+  // nada. O que for digitado volta para o arquivo.
+  const { clientes } = await pedir("clientes");
+  const reuniao = secao("Reunião");
+  const linha = document.createElement("div");
+  linha.className = "linha";
+  linha.append(
+    campoComSugestoes("Cliente", "exp-cliente", Object.keys(clientes),
+                      estado.dados.client ?? ""),
+    campoComSugestoes("Projeto", "exp-projeto",
+                      clientes[estado.dados.client] ?? [], estado.dados.project ?? ""),
+  );
+  reuniao.appendChild(linha);
+
+  // Trocar o cliente troca a lista de projetos sugeridos.
+  linha.querySelector("#exp-cliente").addEventListener("input", (e) =>
+    preencherSugestoes(document.getElementById("exp-projeto-lista"),
+                       clientes[e.target.value] ?? []));
 
   const s = secao("Formato");
 
@@ -519,9 +540,8 @@ function abrirExportacao() {
           copiar: document.getElementById("com-copia").checked,
           // Vão para o cabeçalho do arquivo: um TXT que chega por e-mail sem
           // dizer de que reunião é obriga quem recebe a perguntar.
-          cliente: estado.gravacao.cliente ?? "",
-          projeto: estado.gravacao.projeto ?? "",
-          data: (estado.gravacao.nome.match(/^\d{4}-\d{2}-\d{2}/) ?? [""])[0],
+          cliente: document.getElementById("exp-cliente").value.trim(),
+          projeto: document.getElementById("exp-projeto").value.trim(),
         });
         // O caminho inteiro, e não só "pronto": quem exporta precisa achar o
         // arquivo, e ele fica junto da gravação — não em Downloads.
@@ -540,6 +560,6 @@ function abrirExportacao() {
   }
 
   s.append(opcoes, resultado);
-  corpo.appendChild(s);
+  corpo.append(reuniao, s);
   abrirGaveta("gaveta-config");
 }

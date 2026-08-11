@@ -217,8 +217,15 @@ public static class Exportacao
         + "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\"/>"
         + "</Relationships>";
 
-    /// <summary>Nome de arquivo seguro a partir do título da reunião.</summary>
-    public static string NomeDeArquivo(string titulo, string extensao)
+    /// <summary>
+    /// Nome de arquivo seguro, com a data da reunião na frente.
+    /// </summary>
+    /// <remarks>
+    /// A data primeiro porque é o que ordena: numa pasta com um ano de
+    /// exportações, "2026-08-11 BI-Weekly" cai no lugar certo sozinho, e três
+    /// reuniões do mesmo projeto deixam de ter o mesmo nome.
+    /// </remarks>
+    public static string NomeDeArquivo(string titulo, string extensao, string? dataIso = null)
     {
         var limpo = new StringBuilder();
         foreach (char c in titulo)
@@ -226,6 +233,8 @@ public static class Exportacao
 
         string nome = limpo.ToString().Trim();
         if (nome.Length == 0) nome = "transcricao";
-        return $"{nome}.{extensao}";
+
+        string data = Cabecalho.DataCurta(dataIso) is { Length: > 0 } d ? d + " " : "";
+        return $"{data}{nome}.{extensao}";
     }
 }

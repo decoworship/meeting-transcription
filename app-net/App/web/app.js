@@ -274,6 +274,10 @@ async function transcrever(g, botao, painel) {
       // nenhum: o motor caía no padrão e detectava o idioma sozinho.
       idioma: document.getElementById("idioma").value.trim(),
       modelo: document.getElementById("modelo").value,
+      // Guardados com a transcrição: sem isto o cabeçalho do arquivo exportado
+      // saía sem dizer de que cliente e projeto era a reunião.
+      cliente: document.getElementById("cliente").value.trim(),
+      projeto: document.getElementById("projeto").value.trim(),
     }, (p) => {
       estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
       preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;

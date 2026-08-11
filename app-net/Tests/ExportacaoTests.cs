@@ -208,4 +208,49 @@ public sealed class ExportacaoTests : IDisposable
         // O acento fica: ele é válido em nome de arquivo e é o que o usuário lê.
         Assert.Contains("liberação", nome);
     }
+
+    [Fact]
+    public void ONomeDeArquivoComecaPelaDataDaReuniao()
+    {
+        // Numa pasta com um ano de exportações, a data na frente é o que faz o
+        // arquivo cair no lugar certo sozinho — e o que distingue três reuniões
+        // do mesmo projeto na mesma semana.
+        string nome = Exportacao.NomeDeArquivo("BI-Weekly", "docx", "2026-08-11T08:02:40");
+        Assert.Equal("2026-08-11 BI-Weekly.docx", nome);
+
+        // Sem data, o nome continua como era.
+        Assert.Equal("BI-Weekly.docx", Exportacao.NomeDeArquivo("BI-Weekly", "docx"));
+    }
+
+    [Fact]
+    public void ADataDoCabecalhoTemDiaEHora()
+    {
+        // Só a data não distingue três reuniões do mesmo projeto na semana.
+        Assert.Equal("11/08/2026 às 08:02", Cabecalho.DataLegivel("2026-08-11T08:02:40"));
+
+        // O que não for data reconhecível sai como veio, em vez de sumir.
+        Assert.Equal("qualquer coisa", Cabecalho.DataLegivel("qualquer coisa"));
+    }
+
+    [Fact]
+    public void OCabecalhoTrazClienteEProjetoDaTranscricao()
+    {
+        // O defeito que motivou tudo isto: o cliente e o projeto escolhidos
+        // antes de transcrever se perdiam, e o arquivo exportado saía sem dizer
+        // de quem era a reunião.
+        var r = new ResultadoDaTranscricao
+        {
+            Client = "Algar",
+            Project = "Agentes",
+            Date = "2026-08-11T08:02:40",
+            Segments = [new SegmentoFinal { Start = 0, End = 1, Text = " oi", Speaker = "X" }],
+        };
+
+        var c = Cabecalho.De(r, "Reunião", r.Client, r.Project, r.Date);
+        string txt = Exportacao.Txt(r, true, c);
+
+        Assert.Contains("Cliente: Algar", txt);
+        Assert.Contains("Projeto: Agentes", txt);
+        Assert.Contains("Data: 11/08/2026 às 08:02", txt);
+    }
 }
