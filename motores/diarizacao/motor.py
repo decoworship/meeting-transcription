@@ -25,7 +25,12 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
-VERSAO = "1"
+VERSAO = "2"
+
+# O mesmo modelo que o app Python usa. Trocar mudaria o espaço vetorial e
+# invalidaria toda voz já aprendida — os vetores de modelos diferentes não são
+# comparáveis, e a comparação não falha: ela só passa a errar.
+MODELO_DE_VOZ = "pyannote/wespeaker-voxceleb-resnet34-LM"
 
 
 def _enviar(**campos) -> None:
@@ -42,6 +47,7 @@ class Pipeline:
 
     def __init__(self) -> None:
         self._pipeline = None
+        self._voz = None
         self.dispositivo = "?"
 
     def carregar(self, id_req: int) -> None:
@@ -66,6 +72,50 @@ class Pipeline:
         self.dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
         self._pipeline.to(torch.device(self.dispositivo))
         _log(f"pipeline carregado em {self.dispositivo}")
+
+    def vetor_de_voz(self, caminho: str, trechos: list[dict], id_req: int) -> list[float]:
+        """O vetor que identifica uma voz, extraído dos trechos indicados.
+
+        Recebe intervalos e não um arquivo recortado porque quem escolhe os
+        trechos é o núcleo, que sabe quais são limpos: fala sem sobreposição,
+        na faixa certa, somando o mínimo de segundos. Ver VOZES.md §2.
+        """
+        _enviar(id=id_req, tipo="progresso", pct=0.1, texto="carregando o modelo de voz")
+
+        from pyannote.audio import Model, Inference
+        import numpy as np
+        import torch
+
+        if self._voz is None:
+            import torch as _t
+            if self.dispositivo == "?":
+                self.dispositivo = "cuda" if _t.cuda.is_available() else "cpu"
+            token = os.environ.get("HF_TOKEN")
+            modelo = Model.from_pretrained(MODELO_DE_VOZ, token=token)
+            if torch.cuda.is_available():
+                modelo = modelo.to(torch.device("cuda"))
+            self._voz = Inference(modelo, window="whole")
+            _log(f"modelo de voz carregado em {self.dispositivo}")
+
+        audio = self._ler_wav(caminho)
+        onda, taxa = audio["waveform"], audio["sample_rate"]
+
+        # Concatenar os trechos limpos em vez de embedar o mais longo: o piso
+        # de duração é sobre o total de fala da pessoa, e um único trecho curto
+        # produz vetor ruidoso — que contamina em silêncio.
+        pedacos = []
+        for t in trechos:
+            a, b = int(t["inicio"] * taxa), int(t["fim"] * taxa)
+            if b > a:
+                pedacos.append(onda[:, a:b])
+        if not pedacos:
+            raise RuntimeError("nenhum trecho utilizável para extrair a voz")
+
+        junto = torch.cat(pedacos, dim=1)
+        _enviar(id=id_req, tipo="progresso", pct=0.6, texto="extraindo a voz")
+
+        vetor = self._voz({"waveform": junto, "sample_rate": taxa})
+        return np.asarray(vetor).astype(float).ravel().tolist()
 
     def diarizar(self, caminho: str, id_req: int) -> list[dict]:
         self.carregar(id_req)
@@ -131,15 +181,20 @@ def main() -> int:
 
         id_req = req.get("id")
         try:
-            if req.get("op") != "diarizar":
-                raise RuntimeError(f"operação desconhecida: {req.get('op')!r}")
+            op = req.get("op")
+            if op not in ("diarizar", "voz"):
+                raise RuntimeError(f"operação desconhecida: {op!r}")
 
             caminho = req.get("audio") or ""
             if not os.path.isfile(caminho):
                 raise RuntimeError(f"áudio não encontrado: {caminho}")
 
-            segmentos = pipeline.diarizar(caminho, id_req)
-            _enviar(id=id_req, tipo="resultado", segmentos=segmentos)
+            if op == "voz":
+                vetor = pipeline.vetor_de_voz(caminho, req.get("trechos") or [], id_req)
+                _enviar(id=id_req, tipo="resultado", vetor=vetor)
+            else:
+                segmentos = pipeline.diarizar(caminho, id_req)
+                _enviar(id=id_req, tipo="resultado", segmentos=segmentos)
 
         except Exception as e:
             # Erro encerra a requisição, não o motor: o processo continua vivo
