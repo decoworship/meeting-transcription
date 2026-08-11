@@ -4,6 +4,9 @@ Registro da direção decidida ao fim da Fase 1, para a fase não depender de
 nenhuma conversa. Contexto: [FASE1-HANDOFF.md](FASE1-HANDOFF.md) (o que resta
 da Fase 1), [FASE0-RESULTADOS.md](FASE0-RESULTADOS.md) (as decisões de motor).
 
+> **Estado da execução:** ver [FASE2-HANDOFF.md](FASE2-HANDOFF.md) — o que
+> está pronto, o que nunca rodou de verdade, e as armadilhas já mapeadas.
+
 ## A fusão que define a fase
 
 As Fases 2 e 3 do [PLANO.md](PLANO.md) viraram uma só. A Fase 0 decidiu que os
