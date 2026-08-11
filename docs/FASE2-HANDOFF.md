@@ -135,10 +135,12 @@ export PATH="$HOME/.dotnet:$PATH"
 # testes — 72, sempre verdes antes de commitar
 dotnet test app-net/Tests/MeetingApp.Tests.csproj
 
-# publicar o app (do WSL; ver a armadilha do token abaixo)
+# publicar o app. As três flags e o token são obrigatórios — ver §7.
 dotnet publish app-net/App/MeetingApp.App.csproj -c Release -r win-x64 \
-  -p:TokenHuggingFace=/mnt/c/Users/andre/.meeting-recorder/hf_token.txt
-cp app-net/App/bin/.../publish/MeetingApp.exe /mnt/c/Users/andre/MeetingApp/
+  --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true \
+  -p:TokenHuggingFace=/mnt/c/Users/andre/.meeting-recorder/hf_token.txt \
+  -o <saida>
+cp <saida>/MeetingApp.exe /mnt/c/Users/andre/MeetingApp/
 
 # iterar na interface sem recompilar
 MeetingApp.exe --web C:\caminho\para\app-net\App\web
@@ -147,8 +149,11 @@ MeetingApp.exe --web C:\caminho\para\app-net\App\web
 Os motores ficam em `C:\Users\andre\MeetingApp\motores` (4,3 GB, fora do
 repositório), montados por `tools/empacotar_motores.sh` a partir do WSL — o
 `uv` baixa wheels `win_amd64` daqui com `--python-platform x86_64-pc-windows-msvc`.
-O `MeetingApp.exe` publicado tem 193 KB porque **não** é self-contained; o
-runtime .NET é pré-requisito, e isso muda quando a Fase 4 fizer o instalador.
+
+O `.exe` publicado corretamente tem **~15,7 MB** e roda numa máquina sem .NET
+instalado. É a mesma escolha da bandeja, pelo mesmo motivo: `SelfContained` fica
+`false` no `.csproj` para o loop de desenvolvimento ficar rápido, e só a linha
+de comando de publicação o liga.
 
 ### A cultura, em quatro linhas
 
@@ -182,11 +187,27 @@ valendo — a janela do app é a mesma técnica. Estas são da Fase 2:
 - **Screenshot e clique sintético foram abandonados.** As janelas abriam em
   telas arbitrárias e os cliques acertavam o editor do usuário. Peça para uma
   pessoa olhar.
+- **`dotnet publish` sem as flags produz um app que não abre.** O `.csproj` tem
+  `SelfContained=false` de propósito, e publicar sem
+  `--self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true`
+  gera um `.exe` de 193 KB que depende de DLLs soltas — sozinho, ele não abre.
+  A régua está no tamanho: **~15,7 MB é certo, menos de 1 MB é errado.**
 - **O `USERPROFILE` do MSBuild é vazio no WSL.** Publicar sem
   `-p:TokenHuggingFace=...` produz um binário **sem o token embutido**, que
-  compila, publica e só falha na diarização, na máquina do usuário. Aconteceu
-  hoje. Confira com
-  `strings publish/MeetingApp.Nucleo.dll | grep -c hf_token` (tem que dar 1).
+  compila, publica e só falha na diarização, na máquina do usuário. Confira com
+  `strings MeetingApp.exe | grep -c hf_token` (tem que dar 1).
+- **As duas armadilhas acima aconteceram no mesmo dia (11/08), e as duas foram
+  entregues ao usuário.** As duas se evitam pelo mesmo hábito, que é o resto
+  deste projeto inteiro: depois de publicar, **abra o app e veja**. Custa oito
+  segundos, e é a diferença entre "publiquei" e "funciona".
+  ```powershell
+  $p = Start-Process 'C:\Users\andre\MeetingApp\MeetingApp.exe' -PassThru
+  Start-Sleep -Seconds 8
+  if ($p.HasExited) { "MORREU: $($p.ExitCode)" }
+  else { (Get-Process -Id $p.Id).MainWindowTitle; Stop-Process -Id $p.Id -Force }
+  ```
+  Feche o que você abrir — janela deixada aberta já foi confundida com o
+  resultado do próprio usuário, que editou a gravação errada por causa disso.
 
 ---
 
