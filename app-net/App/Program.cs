@@ -21,16 +21,25 @@ internal static class Programa
     /// <c>--gravacoes &lt;pasta&gt;</c> sobrepõe a pasta configurada. Existe para
     /// abrir um acervo que não é o da máquina — teste, suporte, ou uma pasta de
     /// rede — sem mexer no <c>settings.json</c> de quem grava.
+    /// <para>
+    /// <c>--web &lt;pasta&gt;</c> serve a interface do disco em vez dos recursos
+    /// embutidos, para desenhar sem recompilar. Ver <see cref="Conteudo"/>.
+    /// </para>
     /// </param>
     [STAThread]
     private static int Main(string[] args)
     {
         try
         {
-            int i = Array.IndexOf(args, "--gravacoes");
-            string? pasta = i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+            string? Opcao(string nome)
+            {
+                int i = Array.IndexOf(args, nome);
+                return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+            }
 
-            using var janela = new JanelaDoApp("Reuniões", pasta);
+            Conteudo.PastaDeDesenvolvimento = Opcao("--web");
+
+            using var janela = new JanelaDoApp("Reuniões", Opcao("--gravacoes"));
             janela.Rodar();
             return 0;
         }

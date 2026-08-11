@@ -25,11 +25,32 @@ internal static class Conteudo
 
     private static readonly Assembly Assembly = typeof(Conteudo).Assembly;
 
+    /// <summary>
+    /// Pasta de onde servir a interface em vez dos recursos embutidos.
+    /// </summary>
+    /// <remarks>
+    /// Existe só para encurtar o ciclo de desenho: com ela, mudar um CSS e
+    /// apertar F5 leva segundos, contra os dois minutos de recompilar,
+    /// republicar e recopiar o executável. O app publicado nunca a define, e aí
+    /// tudo vem de dentro do binário — que é o que garante que a interface e o
+    /// código não saiam de versões diferentes.
+    /// </remarks>
+    public static string? PastaDeDesenvolvimento { get; set; }
+
     /// <summary>Bytes de um caminho de URL, ou <c>null</c> se não existe.</summary>
     public static (byte[] Bytes, string Tipo)? Buscar(string caminho)
     {
         caminho = caminho.Trim('/');
         if (caminho.Length == 0) caminho = "index.html";
+
+        if (PastaDeDesenvolvimento is { Length: > 0 } pasta)
+        {
+            // O design system continua vindo do repositório, não da pasta de
+            // trabalho: é a mesma cópia que o app Gradio usa.
+            string doDisco = Path.Combine(pasta, caminho.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(doDisco))
+                return (File.ReadAllBytes(doDisco), TipoDe(caminho));
+        }
 
         // "ds/tokens.css" -> "MeetingApp.web.ds.tokens.css". Os recursos
         // embutidos já são nomeados com ponto pelo próprio MSBuild.
