@@ -19,6 +19,9 @@ internal sealed class Pedido
     [JsonPropertyName("op")] public string? Op { get; init; }
     [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
     [JsonPropertyName("vocabulario")] public string? Vocabulario { get; init; }
+    [JsonPropertyName("cliente")] public string? Cliente { get; init; }
+    [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+    [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 }
 
 internal sealed class Resposta
@@ -40,6 +43,10 @@ internal sealed class Resposta
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
     [JsonPropertyName("transcricao")] public string? Transcricao { get; init; }
+
+    /// <summary>Cliente → seus projetos. A UI precisa dos dois para o cadastro.</summary>
+    [JsonPropertyName("clientes")] public Dictionary<string, List<string>>? Clientes { get; init; }
+    [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 }
 
 /// <summary>Uma gravação como a lista precisa mostrá-la.</summary>
@@ -63,6 +70,7 @@ internal sealed class GravacaoResumo
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Pedido))]
 [JsonSerializable(typeof(Resposta))]
+[JsonSerializable(typeof(PreferenciasDoProjeto))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -83,6 +91,7 @@ internal static class PonteJson
 internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
 {
     private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
+    private readonly Projetos _projetos = new();
 
     public async Task AtenderAsync(string mensagem)
     {
@@ -108,6 +117,27 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
             {
                 case "gravacoes":
                     Responder(new Resposta { Id = p.Id, Gravacoes = Listar() });
+                    break;
+
+                case "clientes":
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
+                    break;
+
+                case "prefs":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Prefs = _projetos.Preferencias(p.Cliente ?? "", p.Projeto ?? ""),
+                    });
+                    break;
+
+                case "salvar-projeto":
+                    // Cliente e projeto novos nascem aqui: digitar um nome
+                    // inédito e transcrever é o fluxo do app Python que o
+                    // usuário pediu para manter.
+                    _projetos.Salvar(p.Cliente ?? "", p.Projeto ?? "",
+                                     p.Prefs ?? new PreferenciasDoProjeto());
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
                 case "transcricao":
@@ -155,6 +185,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
             })));
 
         Responder(new Resposta { Id = p.Id, Transcricao = resultado.ParaJson() });
+    }
+
+    private Dictionary<string, List<string>> MapaDeClientes()
+    {
+        var mapa = new Dictionary<string, List<string>>();
+        foreach (string c in _projetos.ListarClientes()) mapa[c] = _projetos.ListarProjetos(c);
+        return mapa;
     }
 
     private static string? LerTranscricao(string? pasta)

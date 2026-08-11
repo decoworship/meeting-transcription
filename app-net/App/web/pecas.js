@@ -60,6 +60,45 @@ export function campo(rotulo, tipo, opcoes = {}) {
   return label;
 }
 
+/**
+ * Campo que escolhe de uma lista mas aceita um nome novo digitado.
+ *
+ * É um input com datalist, e não um select: no app Python dá para digitar um
+ * cliente que ainda não existe e sair transcrevendo, e perder isso obrigaria a
+ * um "cadastrar antes" que ninguém quer fazer no meio do trabalho.
+ */
+export function campoComSugestoes(rotulo, id, valores, valor = "") {
+  const label = document.createElement("label");
+  label.className = "campo";
+
+  const span = document.createElement("span");
+  span.textContent = rotulo;
+
+  const entrada = document.createElement("input");
+  entrada.className = "aa-entrada";
+  entrada.id = id;
+  entrada.value = valor;
+  entrada.setAttribute("list", `${id}-lista`);
+  entrada.placeholder = "escolha ou digite um novo";
+  entrada.autocomplete = "off";
+
+  const lista = document.createElement("datalist");
+  lista.id = `${id}-lista`;
+  preencherSugestoes(lista, valores);
+
+  label.append(span, entrada, lista);
+  return label;
+}
+
+export function preencherSugestoes(lista, valores) {
+  lista.replaceChildren();
+  for (const v of valores) {
+    const o = document.createElement("option");
+    o.value = v;
+    lista.appendChild(o);
+  }
+}
+
 // ──────────────────────────────────────────── gavetas que abrem por cima
 
 const veu = document.getElementById("veu");

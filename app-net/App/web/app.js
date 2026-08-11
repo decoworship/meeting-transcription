@@ -1,6 +1,7 @@
 import { pedir } from "/ponte.js";
 import { telaDeRevisao, abrirPainel } from "/revisao.js";
-import { abrirGaveta, fecharGavetas, alerta, campo, secao } from "/pecas.js";
+import { abrirGaveta, fecharGavetas, alerta, campo, secao,
+         campoComSugestoes, preencherSugestoes } from "/pecas.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -119,19 +120,23 @@ async function telaDePreparo(g) {
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
 
+  const { clientes } = await pedir("clientes");
+
   const forma = document.createElement("div");
   forma.className = "secao";
 
+  // ---- reunião: cliente e projeto aceitam nome novo digitado
   const reuniao = secao("Reunião");
   const linha1 = document.createElement("div");
   linha1.className = "linha";
   linha1.append(
-    campo("Cliente", "select", { id: "cliente", opcoes: ["—", "Vivo", "Claro"] }),
-    campo("Projeto", "select", { id: "projeto", opcoes: ["—", "Faturamento B2B"] }),
+    campoComSugestoes("Cliente", "cliente", Object.keys(clientes)),
+    campoComSugestoes("Projeto", "projeto", []),
     campo("Data", "input", { id: "data", tipo: "date", valor: dataDe(g.nome) }),
   );
   reuniao.appendChild(linha1);
 
+  // ---- motor
   const motor = secao("Motor");
   const linha2 = document.createElement("div");
   linha2.className = "linha";
@@ -141,15 +146,16 @@ async function telaDePreparo(g) {
       opcoes: ["large-v3", "medium", "small", "base", "tiny"],
     }),
     campo("Idioma", "input", { id: "idioma", valor: "pt" }),
+    campo("Separar falantes", "select", {
+      id: "diarizacao",
+      opcoes: ["community-1", "3.1", "não separar"],
+    }),
   );
   motor.appendChild(linha2);
 
+  // ---- vocabulário
   const vocab = secao("Vocabulário");
-  const caixa = campo("Termos do projeto", "textarea", {
-    id: "vocabulario",
-    linhas: 4,
-    valor: "",
-  });
+  const caixa = campo("Termos do projeto", "textarea", { id: "vocabulario", linhas: 4 });
   const dica = document.createElement("p");
   dica.className = "campo__dica";
   // O aviso de 224 tokens do app antigo morreu de propósito: a correção
@@ -166,12 +172,48 @@ async function telaDePreparo(g) {
   botao.className = "aa-btn aa-btn-primario aa-btn--grande";
   botao.type = "button";
   botao.textContent = "Transcrever";
-  acoes.appendChild(botao);
+
+  const aviso = document.createElement("span");
+  aviso.className = "campo__dica";
+  acoes.append(botao, aviso);
 
   const painel = document.createElement("div");
-
   forma.append(reuniao, motor, vocab, acoes, painel);
   tela.appendChild(forma);
+
+  // ---- ligações entre os campos
+  const campoCliente = document.getElementById("cliente");
+  const campoProjeto = document.getElementById("projeto");
+
+  function atualizarProjetos() {
+    const projetos = clientes[campoCliente.value] ?? [];
+    preencherSugestoes(document.getElementById("projeto-lista"), projetos);
+    aviso.textContent = clientes[campoCliente.value]
+      ? "" : campoCliente.value ? "cliente novo — será criado ao transcrever" : "";
+  }
+
+  /** Ao escolher um projeto conhecido, suas preferências voltam. */
+  async function carregarPreferencias() {
+    if (!campoCliente.value || !campoProjeto.value) return;
+    const { prefs } = await pedir("prefs", {
+      cliente: campoCliente.value,
+      projeto: campoProjeto.value,
+    });
+    if (!prefs) {
+      aviso.textContent = "projeto novo — será criado ao transcrever";
+      return;
+    }
+    aviso.textContent = "preferências do projeto carregadas";
+    if (prefs.model_size) document.getElementById("modelo").value = prefs.model_size;
+    if (prefs.language) document.getElementById("idioma").value = prefs.language;
+    document.getElementById("diarizacao").value =
+      prefs.diarization === false ? "não separar" : (prefs.diar_model ?? "community-1");
+    document.getElementById("vocabulario").value = prefs.initial_prompt ?? "";
+  }
+
+  campoCliente.addEventListener("change", () => { atualizarProjetos(); carregarPreferencias(); });
+  campoCliente.addEventListener("input", atualizarProjetos);
+  campoProjeto.addEventListener("change", carregarPreferencias);
 
   botao.addEventListener("click", () => transcrever(g, botao, painel));
 }
@@ -204,6 +246,27 @@ async function transcrever(g, botao, painel) {
 
   try {
     const vocabulario = document.getElementById("vocabulario").value.trim();
+    const diar = document.getElementById("diarizacao").value;
+
+    // Guardar antes de transcrever, e não depois: se a transcrição falhar, o
+    // que foi digitado aqui não pode se perder junto.
+    const cliente = document.getElementById("cliente").value.trim();
+    const projeto = document.getElementById("projeto").value.trim();
+    if (cliente && projeto) {
+      await pedir("salvar-projeto", {
+        cliente, projeto,
+        prefs: {
+          language: document.getElementById("idioma").value.trim(),
+          model_size: document.getElementById("modelo").value,
+          engine: "faster-whisper",
+          diarization: diar !== "não separar",
+          diar_model: diar === "não separar" ? "community-1" : diar,
+          condition_on_previous_text: false,
+          initial_prompt: vocabulario,
+        },
+      });
+    }
+
     const r = await pedir("transcrever", { gravacao: g.caminho, vocabulario }, (p) => {
       estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
       preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;
@@ -233,7 +296,7 @@ export async function abrirGravacao(g) {
 
 // ──────────────────────────────────────────────────── configurações
 
-function telaDeConfiguracoes() {
+async function telaDeConfiguracoes() {
   const corpo = document.getElementById("corpo-config");
   corpo.replaceChildren();
 
@@ -270,9 +333,15 @@ function telaDeConfiguracoes() {
   dicaHf.textContent = "Só é necessário na primeira execução, para baixar o modelo de falantes.";
   motores.appendChild(dicaHf);
 
+  const { clientes } = await pedir("clientes");
+  const nClientes = Object.keys(clientes).length;
+  const nProjetos = Object.values(clientes).reduce((s, p) => s + p.length, 0);
+
   const listas = secao("Cadastros");
   for (const [rotulo, texto] of [
-    ["Clientes e projetos", "2 clientes, 3 projetos"],
+    ["Clientes e projetos",
+     `${nClientes} ${nClientes === 1 ? "cliente" : "clientes"}, `
+     + `${nProjetos} ${nProjetos === 1 ? "projeto" : "projetos"}`],
     ["Vozes conhecidas", "nenhuma voz salva"],
   ]) {
     const linha = document.createElement("div");
