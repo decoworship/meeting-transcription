@@ -1,11 +1,14 @@
 import { pedir } from "/ponte.js";
+import { telaDeRevisao, abrirPainel } from "/revisao.js";
+import { abrirGaveta, fecharGavetas, alerta, campo, secao } from "/pecas.js";
 
-const lista = document.getElementById("lista");
-const resumo = document.getElementById("resumo");
-const cabecalho = document.getElementById("cabecalho");
+const tela = document.getElementById("tela");
+const titulo = document.getElementById("titulo");
+const subtitulo = document.getElementById("subtitulo");
+const voltar = document.getElementById("voltar");
 
 /** "1h 02min" ou "3min 20s" — a duração é para dar noção, não para cronometrar. */
-function duracao(segundos) {
+export function duracao(segundos) {
   const s = Math.round(segundos);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -15,24 +18,19 @@ function duracao(segundos) {
 }
 
 /** "2026-08-10_08-08-10" -> "10/08/2026 às 08:08". */
-function quando(nome) {
+export function quando(nome) {
   const m = nome.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})/);
   if (!m) return nome;
   const [, ano, mes, dia, hora, min] = m;
   return `${dia}/${mes}/${ano} às ${hora}:${min}`;
 }
 
-function titulo(g) {
-  return g.titulo || quando(g.nome);
-}
+export const tituloDe = (g) => g.titulo || quando(g.nome);
 
-function alerta(texto, variacao = "atencao") {
-  const el = document.createElement("div");
-  el.className = `aa-alerta aa-alerta--${variacao}`;
-  const ponto = document.createElement("span");
-  ponto.className = "aa-alerta__ponto";
-  el.append(ponto, document.createTextNode(texto));
-  return el;
+function cabecalho(t, sub, comVoltar) {
+  titulo.textContent = t;
+  subtitulo.textContent = sub ?? "";
+  voltar.hidden = !comVoltar;
 }
 
 // ─────────────────────────────────────────────────────────── lista
@@ -41,13 +39,13 @@ function cartao(g) {
   const botao = document.createElement("button");
   botao.className = "aa-cartao gravacao";
   botao.type = "button";
-  botao.addEventListener("click", () => abrir(g));
+  botao.addEventListener("click", () => abrirGravacao(g));
 
   const esquerda = document.createElement("div");
 
   const t = document.createElement("p");
   t.className = "gravacao__titulo";
-  t.textContent = titulo(g);
+  t.textContent = tituloDe(g);
   esquerda.appendChild(t);
 
   const meta = document.createElement("p");
@@ -72,97 +70,118 @@ function cartao(g) {
   }
 
   const etiqueta = document.createElement("span");
-  etiqueta.className = g.transcrita
-    ? "aa-etiqueta aa-etiqueta--sucesso"
-    : "aa-etiqueta";
+  etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
   etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
 
   botao.append(esquerda, etiqueta);
   return botao;
 }
 
-async function carregar() {
+export async function telaDeLista() {
+  fecharGavetas();
+  cabecalho("Reuniões", "", false);
+  tela.setAttribute("aria-busy", "true");
+  tela.replaceChildren();
+
   try {
     const { gravacoes } = await pedir("gravacoes");
-    lista.setAttribute("aria-busy", "false");
-    lista.replaceChildren();
+    tela.setAttribute("aria-busy", "false");
+    tela.replaceChildren();
 
     if (gravacoes.length === 0) {
-      resumo.textContent = "Nenhuma gravação encontrada.";
+      cabecalho("Reuniões", "Nenhuma gravação encontrada", false);
       const vazio = document.createElement("p");
       vazio.className = "vazio";
-      vazio.textContent =
-        "Grave uma reunião com o MeetingRecorder e ela aparece aqui.";
-      lista.appendChild(vazio);
+      vazio.textContent = "Grave uma reunião com o MeetingRecorder e ela aparece aqui.";
+      tela.appendChild(vazio);
       return;
     }
 
-    resumo.textContent =
-      gravacoes.length === 1 ? "1 gravação" : `${gravacoes.length} gravações`;
-    for (const g of gravacoes) lista.appendChild(cartao(g));
+    cabecalho("Reuniões",
+      gravacoes.length === 1 ? "1 gravação" : `${gravacoes.length} gravações`, false);
+    for (const g of gravacoes) tela.appendChild(cartao(g));
   } catch (e) {
-    lista.setAttribute("aria-busy", "false");
-    resumo.textContent = "Não foi possível listar as gravações.";
-    lista.replaceChildren(alerta(e.message, "erro"));
+    tela.setAttribute("aria-busy", "false");
+    tela.replaceChildren(alerta(e.message, "erro"));
   }
 }
 
-// ────────────────────────────────────────────────────────── detalhe
+// ───────────────────────────────────────────── preparar / transcrever
 
-/** Estado mínimo: qual gravação está aberta. A lista é recarregada ao voltar. */
-let aberta = null;
+/**
+ * A tela de antes da transcrição.
+ *
+ * Reproduz o formulário do app Python, mas já preenchido com o que a gravação
+ * sabe de si: título e convidados vêm da agenda, e cliente/projeto vêm do
+ * último uso. O que o usuário faz aqui é conferir, não digitar do zero.
+ */
+async function telaDePreparo(g) {
+  cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
+  tela.replaceChildren();
 
-async function abrir(g) {
-  aberta = g;
-  cabecalho.hidden = true;
-  lista.replaceChildren();
+  const forma = document.createElement("div");
+  forma.className = "secao";
 
-  const voltar = document.createElement("button");
-  voltar.className = "aa-btn aa-btn-texto voltar";
-  voltar.type = "button";
-  voltar.textContent = "← Todas as reuniões";
-  voltar.addEventListener("click", fechar);
+  const reuniao = secao("Reunião");
+  const linha1 = document.createElement("div");
+  linha1.className = "linha";
+  linha1.append(
+    campo("Cliente", "select", { id: "cliente", opcoes: ["—", "Vivo", "Claro"] }),
+    campo("Projeto", "select", { id: "projeto", opcoes: ["—", "Faturamento B2B"] }),
+    campo("Data", "input", { id: "data", tipo: "date", valor: dataDe(g.nome) }),
+  );
+  reuniao.appendChild(linha1);
 
-  const topo = document.createElement("div");
-  const h = document.createElement("h1");
-  h.textContent = titulo(g);
-  const sub = document.createElement("p");
-  sub.className = "sub";
-  sub.textContent = [duracao(g.duracao_s), quando(g.nome)].join(" · ");
-  topo.append(h, sub);
+  const motor = secao("Motor");
+  const linha2 = document.createElement("div");
+  linha2.className = "linha";
+  linha2.append(
+    campo("Modelo", "select", {
+      id: "modelo",
+      opcoes: ["large-v3", "medium", "small", "base", "tiny"],
+    }),
+    campo("Idioma", "input", { id: "idioma", valor: "pt" }),
+  );
+  motor.appendChild(linha2);
+
+  const vocab = secao("Vocabulário");
+  const caixa = campo("Termos do projeto", "textarea", {
+    id: "vocabulario",
+    linhas: 4,
+    valor: "",
+  });
+  const dica = document.createElement("p");
+  dica.className = "campo__dica";
+  // O aviso de 224 tokens do app antigo morreu de propósito: a correção
+  // fonética a jusante recupera o termo mesmo quando o modelo erra a grafia,
+  // então a lista não tem mais teto (FASE0 5-A).
+  dica.textContent =
+    "Nomes de pessoas, jargão, nomes de sistemas. Sem limite de tamanho — "
+    + "o que o modelo escrever parecido é corrigido depois.";
+  vocab.append(caixa, dica);
 
   const acoes = document.createElement("div");
   acoes.className = "acoes";
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-primario aa-btn--grande";
+  botao.type = "button";
+  botao.textContent = "Transcrever";
+  acoes.appendChild(botao);
 
   const painel = document.createElement("div");
-  painel.className = "painel";
 
-  lista.append(voltar, topo, acoes, painel);
+  forma.append(reuniao, motor, vocab, acoes, painel);
+  tela.appendChild(forma);
 
-  if (g.transcrita) {
-    mostrarTranscricao(painel, g);
-    return;
-  }
-
-  const transcrever = document.createElement("button");
-  transcrever.className = "aa-btn aa-btn-primario aa-btn--grande";
-  transcrever.type = "button";
-  transcrever.textContent = "Transcrever";
-  transcrever.addEventListener("click", () =>
-    executar(g, transcrever, painel),
-  );
-  acoes.appendChild(transcrever);
+  botao.addEventListener("click", () => transcrever(g, botao, painel));
 }
 
-function fechar() {
-  aberta = null;
-  cabecalho.hidden = false;
-  lista.setAttribute("aria-busy", "true");
-  lista.replaceChildren();
-  carregar();
+function dataDe(nome) {
+  const m = nome.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : "";
 }
 
-async function executar(g, botao, painel) {
+async function transcrever(g, botao, painel) {
   botao.disabled = true;
   botao.textContent = "Transcrevendo…";
 
@@ -172,34 +191,25 @@ async function executar(g, botao, painel) {
   barra.appendChild(preenchimento);
 
   const estado = document.createElement("p");
-  estado.className = "sub";
+  estado.className = "campo__dica";
   estado.textContent = "preparando…";
-
   painel.replaceChildren(barra, estado);
 
-  try {
-    const r = await pedir(
-      "transcrever",
-      { gravacao: g.caminho },
-      (p) => {
-        // As etapas não têm a mesma duração; mostrar a fração dentro da etapa
-        // com o nome dela é mais honesto que inventar um total.
-        const nomes = {
-          mix: "Somando as faixas",
-          asr: "Transcrevendo",
-          diarizacao: "Separando os falantes",
-          montagem: "Montando o resultado",
-        };
-        estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
-        const pct = p.fracao >= 0 ? Math.round(p.fracao * 100) : 0;
-        preenchimento.style.width = `${pct}%`;
-      },
-    );
+  const nomes = {
+    mix: "Somando as faixas",
+    asr: "Transcrevendo",
+    diarizacao: "Separando os falantes",
+    montagem: "Montando o resultado",
+  };
 
+  try {
+    const vocabulario = document.getElementById("vocabulario").value.trim();
+    const r = await pedir("transcrever", { gravacao: g.caminho, vocabulario }, (p) => {
+      estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
+      preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;
+    });
     g.transcrita = true;
-    botao.remove();
-    painel.replaceChildren();
-    mostrarTranscricao(painel, g, r.transcricao);
+    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
   } catch (e) {
     botao.disabled = false;
     botao.textContent = "Tentar de novo";
@@ -207,46 +217,118 @@ async function executar(g, botao, painel) {
   }
 }
 
-function mostrarTranscricao(painel, g, json) {
-  const render = (texto) => {
-    if (!texto) {
-      painel.replaceChildren(alerta("A transcrição não foi encontrada.", "erro"));
-      return;
-    }
-    const dados = JSON.parse(texto);
-    painel.replaceChildren();
+export async function abrirGravacao(g) {
+  fecharGavetas();
+  if (!g.transcrita) return telaDePreparo(g);
 
-    const resumoLinha = document.createElement("p");
-    resumoLinha.className = "sub";
-    const falantes = new Set(
-      dados.segments.map((s) => s.speaker).filter(Boolean),
-    );
-    resumoLinha.textContent =
-      `${dados.segments.length} trechos · ${falantes.size} falantes` +
-      (dados.language ? ` · ${dados.language}` : "");
-    painel.appendChild(resumoLinha);
-
-    const corpo = document.createElement("div");
-    corpo.className = "transcricao";
-    for (const s of dados.segments) {
-      const linha = document.createElement("p");
-      linha.className = "segmento";
-
-      const quem = document.createElement("span");
-      quem.className = "segmento__falante";
-      quem.textContent = s.speaker ?? "—";
-
-      const fala = document.createElement("span");
-      fala.textContent = s.text.trim();
-
-      linha.append(quem, fala);
-      corpo.appendChild(linha);
-    }
-    painel.appendChild(corpo);
-  };
-
-  if (json) render(json);
-  else pedir("transcricao", { gravacao: g.caminho }).then((r) => render(r.transcricao));
+  cabecalho(tituloDe(g), "carregando a transcrição…", true);
+  tela.replaceChildren();
+  const r = await pedir("transcricao", { gravacao: g.caminho });
+  if (!r.transcricao) {
+    tela.replaceChildren(alerta("A transcrição não foi encontrada.", "erro"));
+    return;
+  }
+  telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
 }
 
-carregar();
+// ──────────────────────────────────────────────────── configurações
+
+function telaDeConfiguracoes() {
+  const corpo = document.getElementById("corpo-config");
+  corpo.replaceChildren();
+
+  const pastas = secao("Gravações");
+  pastas.append(
+    campo("Pasta das gravações", "input", {
+      id: "cfg-pasta",
+      valor: "%USERPROFILE%\\Documents\\MeetingRecordings",
+    }),
+  );
+  const dica = document.createElement("p");
+  dica.className = "campo__dica";
+  dica.textContent = "É a mesma pasta que o gravador usa — mudar aqui muda nos dois.";
+  pastas.appendChild(dica);
+
+  const motores = secao("Motores");
+  motores.append(
+    campo("Modelo padrão", "select", {
+      id: "cfg-modelo",
+      opcoes: ["large-v3", "medium", "small"],
+    }),
+    campo("Modelo de diarização", "select", {
+      id: "cfg-diar",
+      opcoes: ["community-1", "3.1"],
+    }),
+    campo("Token do HuggingFace", "input", {
+      id: "cfg-hf",
+      tipo: "password",
+      valor: "",
+    }),
+  );
+  const dicaHf = document.createElement("p");
+  dicaHf.className = "campo__dica";
+  dicaHf.textContent = "Só é necessário na primeira execução, para baixar o modelo de falantes.";
+  motores.appendChild(dicaHf);
+
+  const listas = secao("Cadastros");
+  for (const [rotulo, texto] of [
+    ["Clientes e projetos", "2 clientes, 3 projetos"],
+    ["Vozes conhecidas", "nenhuma voz salva"],
+  ]) {
+    const linha = document.createElement("div");
+    linha.className = "acoes";
+    const b = document.createElement("button");
+    b.className = "aa-btn aa-btn-secundario";
+    b.type = "button";
+    b.textContent = rotulo;
+    const t = document.createElement("span");
+    t.className = "campo__dica";
+    t.textContent = texto;
+    linha.append(b, t);
+    listas.appendChild(linha);
+  }
+
+  corpo.append(pastas, motores, listas);
+  abrirGaveta("gaveta-config");
+}
+
+// ─────────────────────────────────────────────────────────── ligação
+
+document.getElementById("abrir-config").addEventListener("click", telaDeConfiguracoes);
+voltar.addEventListener("click", telaDeLista);
+
+for (const b of document.querySelectorAll("[data-fechar]"))
+  b.addEventListener("click", fecharGavetas);
+document.getElementById("veu").addEventListener("click", fecharGavetas);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharGavetas(); });
+
+/**
+ * Abre direto numa tela quando o app foi iniciado com --tela.
+ *
+ * Existe para desenhar e fotografar cada estado sem depender de clique — e
+ * clique automatizado, quando tentado, acertou a janela errada.
+ */
+async function inicio() {
+  const hash = location.hash.slice(1);
+  if (!hash) return telaDeLista();
+
+  // "revisao=1&falantes" — a parte depois do & abre um painel por cima, que é
+  // o que não dá para alcançar sem clique.
+  const [principal, extra] = hash.split("&");
+  const [tela, arg] = principal.split("=");
+  const { gravacoes } = await pedir("gravacoes");
+  const g = gravacoes[Number(arg) || 0];
+
+  if (tela === "config") { telaDeLista(); telaDeConfiguracoes(); return; }
+  if (!g) return telaDeLista();
+
+  if (tela === "preparo") { g.transcrita = false; return abrirGravacao(g); }
+  if (tela === "revisao") {
+    await abrirGravacao(g);
+    if (extra) abrirPainel(extra);
+    return;
+  }
+  return telaDeLista();
+}
+
+inicio();

@@ -1,5 +1,11 @@
-/* O que é desta tela, e só. Tudo que puder ser classe do design system é
- * classe do design system — o que sobra aqui é layout específico. */
+/* O que é desta aplicação, e só. Tudo que puder ser classe do design system é
+ * classe do design system; o que sobra aqui é layout e as peças que o DS não
+ * tem (gaveta, modal, transcrição). */
+
+/* O atributo hidden precisa vencer qualquer display declarado depois: sem
+ * isto, .gaveta{display:grid} e .aa-btn{display:inline-flex} mantêm o elemento
+ * na tela mesmo escondido. */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -8,20 +14,43 @@ body {
   font-family: var(--fonte-ui);
 }
 
-.cabecalho { margin-bottom: var(--espaco-6); }
+/* ───────────────────────────────────────────────────────────── barra */
 
-.cabecalho h1 {
-  font-family: var(--fonte-display);
-  font-size: var(--texto-titulo, 2rem);
-  margin: 0 0 var(--espaco-2);
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "voltar titulo config" "voltar sub config";
+  align-items: center;
+  gap: 0 var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-6);
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
 }
 
-.sub { color: var(--cor-texto-suave); margin: 0; }
+.barra__voltar { grid-area: voltar; padding-left: 0; }
+.barra__config { grid-area: config; font-size: 1.25rem; }
 
-#lista { display: grid; gap: var(--espaco-3); }
+.barra__titulo {
+  grid-area: titulo;
+  font-family: var(--fonte-display);
+  font-size: 1.5rem;
+  margin: 0;
+}
 
-/* O cartão inteiro é o alvo do clique: a gravação é a unidade de trabalho, e
- * exigir mira num botão pequeno seria pior em tela sensível ao toque. */
+.barra__sub {
+  grid-area: sub;
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+}
+
+/* ─────────────────────────────────────────────────────── lista */
+
+#tela { display: grid; gap: var(--espaco-3); align-content: start; }
+
 .gravacao {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -38,10 +67,7 @@ body {
 .gravacao:hover { border-color: var(--cor-borda-forte); }
 .gravacao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
 
-.gravacao__titulo {
-  font-weight: 600;
-  margin: 0 0 var(--espaco-1);
-}
+.gravacao__titulo { font-weight: 600; margin: 0 0 var(--espaco-1); }
 
 .gravacao__meta {
   color: var(--cor-texto-suave);
@@ -56,15 +82,33 @@ body {
 
 .vazio { color: var(--cor-texto-suave); }
 
-/* ---- tela de detalhe ---- */
+/* ──────────────────────────────────────────── preparar a transcrição */
 
-/* justify-self porque o #lista é um grid: sem isto o botão é esticado para a
- * largura da coluna e o texto aparece centralizado no meio da tela. */
-.voltar { padding-left: 0; margin-bottom: var(--espaco-4); justify-self: start; }
+.secao { display: grid; gap: var(--espaco-4); }
 
-.acoes { margin: var(--espaco-5) 0; display: flex; gap: var(--espaco-3); justify-self: start; }
+.secao__titulo {
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--cor-texto-suave);
+  margin: 0;
+}
 
-.painel { display: grid; gap: var(--espaco-4); }
+.linha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--espaco-4);
+}
+
+.campo { display: grid; gap: var(--espaco-2); }
+.campo > span { font-size: var(--texto-pequeno); font-weight: 600; }
+.campo__dica { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); margin: 0; }
+
+select.aa-entrada { appearance: auto; }
+textarea.aa-entrada { font-family: inherit; resize: vertical; }
+
+.acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
 
 /* A barra usa o .aa-progresso do design system; o preenchimento é o filho. */
 .aa-progresso > div {
@@ -75,19 +119,152 @@ body {
   transition: width .3s ease;
 }
 
-.transcricao { display: grid; gap: var(--espaco-3); }
+/* ─────────────────────────────────────────────────────── transcrição */
 
-.segmento {
+.revisao { display: grid; gap: var(--espaco-4); }
+
+.ferramentas {
   display: grid;
-  grid-template-columns: 10rem 1fr;
-  gap: var(--espaco-4);
-  margin: 0;
-  align-items: start;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--espaco-3);
+  align-items: center;
+  position: sticky;
+  top: 5.5rem;
+  z-index: 5;
+  background: var(--cor-fundo);
+  padding: var(--espaco-2) 0;
 }
 
-.segmento__falante {
-  color: var(--cor-texto-suave);
-  font-size: var(--texto-pequeno);
+.filtros { display: flex; gap: var(--espaco-2); flex-wrap: wrap; }
+
+/* O filtro é uma etiqueta clicável: ocupa menos que caixa de seleção e deixa
+ * ver de relance quem está ligado. */
+.filtro {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
   font-weight: 600;
-  text-align: right;
+  padding: 4px 12px;
+  border-radius: var(--raio-pilula);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
+
+.filtro[aria-pressed="false"] { opacity: .45; }
+.filtro__ponto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+.transcricao {
+  display: grid;
+  gap: 2px;
+  font-size: var(--texto-pequeno);
+  line-height: 1.7;
+}
+
+/* Cada trecho é uma linha só: tempo, quem falou, o que disse. É a forma que o
+ * app antigo usa e que o usuário lê rápido — trocar por cartões separaria o
+ * texto de quem fala e dobraria a altura a percorrer. */
+.trecho {
+  display: grid;
+  grid-template-columns: 3.5rem 8rem 1fr;
+  gap: var(--espaco-3);
+  padding: 3px var(--espaco-2);
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.trecho:hover { background: var(--cor-superficie-2); }
+.trecho[data-selecionado="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+.trecho[hidden] { display: none; }
+
+.trecho__tempo {
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.trecho__falante { font-weight: 600; }
+.trecho__texto { margin: 0; }
+.trecho__texto mark { background: var(--cor-destaque-bg); color: inherit; border-radius: 3px; }
+
+/* ─────────────────────────────────────────────── gaveta e modal */
+
+.veu {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / .35);
+  z-index: 20;
+}
+
+.gaveta {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(28rem, 92vw);
+  z-index: 21;
+  background: var(--cor-superficie);
+  border-left: 1px solid var(--cor-borda);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-shadow: -8px 0 32px rgb(0 0 0 / .12);
+}
+
+.gaveta--larga { width: min(46rem, 96vw); }
+
+.gaveta__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--espaco-4) var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.gaveta__topo h2 { margin: 0; font-family: var(--fonte-display); font-size: 1.25rem; }
+
+.gaveta__corpo {
+  padding: var(--espaco-5);
+  overflow: auto;
+  display: grid;
+  gap: var(--espaco-5);
+  align-content: start;
+}
+
+.modal {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  padding: 0;
+  width: min(38rem, 94vw);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+.modal::backdrop { background: rgb(0 0 0 / .35); }
+.modal__corpo { padding: var(--espaco-5); display: grid; gap: var(--espaco-4); }
+.modal__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.15rem; }
+.modal__acoes { display: flex; gap: var(--espaco-3); justify-content: flex-end; }
+
+/* ───────────────────────────────────────────────────── falantes */
+
+.tabela-falantes { width: 100%; border-collapse: collapse; font-size: var(--texto-pequeno); }
+
+.tabela-falantes th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--cor-texto-suave);
+  padding: 0 var(--espaco-3) var(--espaco-2);
+  font-weight: 600;
+}
+
+.tabela-falantes td { padding: var(--espaco-2) var(--espaco-3); border-top: 1px solid var(--cor-borda); }
+.tabela-falantes input { width: 100%; }
+.numero { text-align: right; font-family: var(--fonte-mono); }
+
+.barra-share { height: 6px; border-radius: 3px; background: var(--cor-superficie-2); }
+.barra-share > div { height: 100%; border-radius: inherit; }

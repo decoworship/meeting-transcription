@@ -18,6 +18,7 @@ internal sealed class JanelaDoApp : IDisposable
     private readonly Win32.WndProc _wndProc;
     private Ponte? _ponte;
     private readonly string _pastaDasGravacoes;
+    private readonly string? _telaInicial;
 
     private CoreWebView2Controller? _controlador;
     private CoreWebView2? _web;
@@ -32,11 +33,13 @@ internal sealed class JanelaDoApp : IDisposable
 
     public IntPtr Hwnd { get; }
 
-    public JanelaDoApp(string titulo, string? pastaDasGravacoes = null)
+    public JanelaDoApp(string titulo, string? pastaDasGravacoes = null,
+                       string? telaInicial = null)
     {
         Win32.SetProcessDpiAwarenessContext(Win32.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
         _pastaDasGravacoes = pastaDasGravacoes ?? PastaPadraoDasGravacoes();
+        _telaInicial = telaInicial;
         _wndProc = Processar;
 
         var classe = new Win32.WNDCLASSEX
@@ -111,7 +114,8 @@ internal sealed class JanelaDoApp : IDisposable
             _ = _ponte!.AtenderAsync(pedido);
         };
 
-        _web.Navigate(Conteudo.Raiz);
+        _web.Navigate(_telaInicial is { Length: > 0 } t
+            ? $"{Conteudo.Raiz}#{t}" : Conteudo.Raiz);
     }
 
     private static void Servir(CoreWebView2Environment ambiente,

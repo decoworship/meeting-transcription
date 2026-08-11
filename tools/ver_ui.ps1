@@ -5,7 +5,8 @@
 # que estiver por cima — e trazer a janela para frente roubaria o foco de quem
 # estiver trabalhando na máquina.
 param([string]$Saida = 'C:\Users\andre\MeetingApp\ui.png', [int]$Espera = 9,
-      [string]$Gravacoes = '\\wsl$\Ubuntu\home\andre\projects\meeting-transcription\data\recordings')
+      [string]$Tela = '',
+      [string]$Gravacoes = 'C:\Users\andre\Documents\MeetingRecordings')
 Add-Type -AssemblyName System.Drawing
 Add-Type @'
 using System; using System.Runtime.InteropServices;
@@ -20,7 +21,7 @@ Get-Process MeetingApp -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 800
 $web = '\\wsl$\Ubuntu\home\andre\projects\meeting-transcription\app-net\App\web'
 $p = Start-Process 'C:\Users\andre\MeetingApp\MeetingApp.exe' -PassThru `
-     -ArgumentList '--web',$web,'--gravacoes',$Gravacoes
+     -ArgumentList (@('--web',$web,'--gravacoes',$Gravacoes) + $(if ($Tela) { @('--tela',$Tela) } else { @() }))
 Start-Sleep -Seconds $Espera
 if ($p.HasExited) { "MORREU: " + $p.ExitCode; exit 1 }
 $h = [V]::FindWindowW('MeetingApp.Janela', [NullString]::Value)

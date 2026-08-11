@@ -39,7 +39,9 @@ internal static class Programa
 
             Conteudo.PastaDeDesenvolvimento = Opcao("--web");
 
-            using var janela = new JanelaDoApp("Reuniões", Opcao("--gravacoes"));
+            // --tela abre direto numa tela, sem clicar. Serve para desenhar e
+            // para fotografar cada estado; o app normal sempre abre na lista.
+            using var janela = new JanelaDoApp("Reuniões", Opcao("--gravacoes"), Opcao("--tela"));
             janela.Rodar();
             return 0;
         }

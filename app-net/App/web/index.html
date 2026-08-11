@@ -7,27 +7,69 @@
      estilo e script moram em arquivos. -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self';
-               font-src 'self'; img-src 'self' data:; connect-src 'none'">
+               font-src 'self'; img-src 'self' data:; media-src 'self' app:;
+               connect-src 'none'">
 <title>Reuniões</title>
 <link rel="stylesheet" href="/ds.css">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 
-<div class="aa-pagina">
-  <header class="cabecalho" id="cabecalho">
-    <h1>Reuniões</h1>
-    <p class="sub" id="resumo">Carregando…</p>
-  </header>
+<!-- A barra fica fora do fluxo das telas: é o único elemento sempre presente,
+     e é por ela que se chega às configurações de qualquer lugar. -->
+<header class="barra">
+  <button class="barra__voltar aa-btn aa-btn-texto" id="voltar" hidden>← Reuniões</button>
+  <h1 class="barra__titulo" id="titulo">Reuniões</h1>
+  <p class="barra__sub" id="subtitulo"></p>
+  <button class="aa-btn aa-btn-texto barra__config" id="abrir-config"
+          title="Configurações" aria-label="Configurações">⚙</button>
+</header>
 
-  <!-- Preenchido por app.js. O esqueleto do design system evita o salto de
-       layout enquanto a lista não chegou. -->
-  <main id="lista" aria-busy="true">
-    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
-    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
-    <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
-  </main>
-</div>
+<main class="aa-pagina" id="tela" aria-busy="true">
+  <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
+  <div class="aa-cartao aa-esqueleto" style="height:5rem"></div>
+</main>
+
+<!-- Painéis que abrem por cima. Ficam no HTML e não são criados por JS porque
+     a estrutura deles é fixa; o que muda é o conteúdo. -->
+<div class="veu" id="veu" hidden></div>
+
+<aside class="gaveta" id="gaveta-config" hidden aria-label="Configurações">
+  <div class="gaveta__topo">
+    <h2>Configurações</h2>
+    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
+  </div>
+  <div class="gaveta__corpo" id="corpo-config"></div>
+</aside>
+
+<aside class="gaveta gaveta--larga" id="gaveta-falantes" hidden aria-label="Falantes">
+  <div class="gaveta__topo">
+    <h2>Falantes</h2>
+    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
+  </div>
+  <div class="gaveta__corpo" id="corpo-falantes"></div>
+</aside>
+
+<dialog class="modal" id="modal-segmento">
+  <form method="dialog" class="modal__corpo" id="form-segmento">
+    <h2 class="modal__titulo" id="titulo-segmento">Editar trecho</h2>
+
+    <label class="campo">
+      <span>Texto</span>
+      <textarea id="campo-texto" rows="4" class="aa-entrada"></textarea>
+    </label>
+
+    <label class="campo">
+      <span>Falante</span>
+      <select id="campo-falante" class="aa-entrada"></select>
+    </label>
+
+    <div class="modal__acoes">
+      <button class="aa-btn aa-btn-secundario" value="cancelar" formnovalidate>Cancelar</button>
+      <button class="aa-btn aa-btn-primario" value="salvar" id="salvar-segmento">Salvar</button>
+    </div>
+  </form>
+</dialog>
 
 <script type="module" src="/app.js"></script>
 </body>
