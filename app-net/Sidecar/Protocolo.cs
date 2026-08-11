@@ -43,6 +43,9 @@ internal sealed class Mensagem
     [JsonPropertyName("idioma")] public string? Idioma { get; init; }
     [JsonPropertyName("duracao")] public double? Duracao { get; init; }
 
+    /// <summary>O vetor que identifica uma voz (operação "voz").</summary>
+    [JsonPropertyName("vetor")] public float[]? Vetor { get; init; }
+
     // "erro"
     [JsonPropertyName("mensagem")] public string? MensagemDeErro { get; init; }
 }
@@ -80,6 +83,15 @@ internal sealed class Requisicao
     [JsonPropertyName("vocabulario")] public string? Vocabulario { get; init; }
 
     [JsonPropertyName("idioma")] public string? Idioma { get; init; }
+
+    /// <summary>Intervalos de fala, para a operação de extrair voz.</summary>
+    [JsonPropertyName("trechos")] public List<TrechoJson>? Trechos { get; init; }
+}
+
+internal sealed class TrechoJson
+{
+    [JsonPropertyName("inicio")] public double Inicio { get; init; }
+    [JsonPropertyName("fim")] public double Fim { get; init; }
 }
 
 /// <remarks>

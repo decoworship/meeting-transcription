@@ -32,6 +32,10 @@ public sealed class ResultadoDaTranscricao
 
     public string ParaJson() =>
         JsonSerializer.Serialize(this, TranscricaoJson.Default.ResultadoDaTranscricao);
+
+    /// <summary>Lê o que <see cref="ParaJson"/> escreveu.</summary>
+    public static ResultadoDaTranscricao? DeJson(string json) =>
+        JsonSerializer.Deserialize(json, TranscricaoJson.Default.ResultadoDaTranscricao);
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true,

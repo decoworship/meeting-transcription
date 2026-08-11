@@ -25,6 +25,14 @@ internal sealed class Pedido
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
+    /// <summary>Rótulo do falante e o nome dado a ele, para aprender a voz.</summary>
+    [JsonPropertyName("falante")] public string? Falante { get; init; }
+    [JsonPropertyName("nome")] public string? Nome { get; init; }
+
+    /// <summary>"txt", "srt", "vtt" ou "docx".</summary>
+    [JsonPropertyName("formato")] public string? Formato { get; init; }
+    [JsonPropertyName("com_falantes")] public bool? ComFalantes { get; init; }
+
     /// <summary>A transcrição inteira, como a página a tem depois de editada.</summary>
     [JsonPropertyName("conteudo")] public string? Conteudo { get; init; }
 }
@@ -48,6 +56,12 @@ internal sealed class Resposta
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
     [JsonPropertyName("transcricao")] public string? Transcricao { get; init; }
+
+    /// <summary>Onde o arquivo exportado foi parar.</summary>
+    [JsonPropertyName("arquivo")] public string? Arquivo { get; init; }
+
+    /// <summary>O que aconteceu ao aprender uma voz, para a UI poder dizer.</summary>
+    [JsonPropertyName("voz")] public string? Voz { get; init; }
 
     /// <summary>Cliente → seus projetos. A UI precisa dos dois para o cadastro.</summary>
     [JsonPropertyName("clientes")] public Dictionary<string, List<string>>? Clientes { get; init; }
@@ -145,6 +159,14 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
+                case "exportar":
+                    Responder(new Resposta { Id = p.Id, Arquivo = Exportar(p) });
+                    break;
+
+                case "aprender-voz":
+                    await AprenderVozAsync(p);
+                    break;
+
                 case "salvar-transcricao":
                     SalvarTranscricao(p.Gravacao, p.Conteudo);
                     Responder(new Resposta { Id = p.Id });
@@ -203,6 +225,86 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         var mapa = new Dictionary<string, List<string>>();
         foreach (string c in _projetos.ListarClientes()) mapa[c] = _projetos.ListarProjetos(c);
         return mapa;
+    }
+
+    /// <summary>
+    /// Escreve a transcrição no formato pedido, ao lado da gravação.
+    /// </summary>
+    /// <remarks>
+    /// Ao lado da gravação, e não em Downloads: o arquivo pertence àquela
+    /// reunião, e quem procurar por ele daqui a um mês vai procurar na pasta
+    /// dela. O caminho volta para a UI poder mostrar onde ficou.
+    /// </remarks>
+    private static string Exportar(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+            throw new InvalidOperationException("sem gravação");
+
+        string json = LerTranscricao(pasta)
+            ?? throw new InvalidOperationException("esta gravação ainda não foi transcrita");
+        var dados = ResultadoDaTranscricao.DeJson(json)
+            ?? throw new InvalidOperationException("transcrição ilegível");
+
+        bool comFalantes = p.ComFalantes ?? true;
+        string titulo = p.Nome is { Length: > 0 } ? p.Nome : Path.GetFileName(pasta);
+        string formato = p.Formato ?? "txt";
+
+        string destino = Path.Combine(pasta, Exportacao.NomeDeArquivo(titulo, formato));
+
+        switch (formato)
+        {
+            case "txt": File.WriteAllText(destino, Exportacao.Txt(dados, comFalantes)); break;
+            case "srt": File.WriteAllText(destino, Exportacao.Srt(dados, comFalantes)); break;
+            case "vtt": File.WriteAllText(destino, Exportacao.Vtt(dados, comFalantes)); break;
+            case "docx": Exportacao.Docx(dados, destino, titulo, comFalantes); break;
+            default: throw new InvalidOperationException($"formato desconhecido: {formato}");
+        }
+        return destino;
+    }
+
+    /// <summary>
+    /// Aprende a voz de um falante recém-nomeado.
+    /// </summary>
+    /// <remarks>
+    /// Roda fora da thread da UI e nunca lança para fora: o nome já foi
+    /// aplicado à transcrição, e falhar em aprender a voz não pode desfazer
+    /// isso nem travar a janela.
+    /// </remarks>
+    private async Task AprenderVozAsync(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta
+            || p.Falante is not { Length: > 0 } falante
+            || p.Nome is not { Length: > 0 } nome)
+        {
+            Responder(new Resposta { Id = p.Id, Voz = "" });
+            return;
+        }
+
+        string? json = LerTranscricao(pasta);
+        if (json is null)
+        {
+            Responder(new Resposta { Id = p.Id, Voz = "" });
+            return;
+        }
+
+        var dados = ResultadoDaTranscricao.DeJson(json);
+        if (dados is null)
+        {
+            Responder(new Resposta { Id = p.Id, Voz = "" });
+            return;
+        }
+
+        var amostra = await Task.Run(() => new AprendizadoDeVozes(
+            Motores.AoLadoDoExecutavel(), new Vozes())
+            .AprenderAsync(pasta, dados.Segments, falante, nome));
+
+        Responder(new Resposta
+        {
+            Id = p.Id,
+            Voz = amostra is null ? "pouca fala limpa para aprender a voz"
+                : amostra.Quarentena ? $"voz de {nome} guardada, aguardando revisão"
+                : $"voz de {nome} aprendida",
+        });
     }
 
     /// <summary>

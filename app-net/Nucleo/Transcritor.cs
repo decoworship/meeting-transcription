@@ -194,6 +194,24 @@ public sealed class Transcritor(Motores motores)
         Montagem.AtribuirFalantes(segmentos, diarizacao);
         Montagem.AtribuirDono(segmentos, faixas);
 
+        // Quem já foi nomeado antes chega nomeado. Roda depois de tudo porque
+        // precisa dos falantes montados, e nunca derruba a transcrição: não
+        // reconhecer é o estado normal de quem nunca foi apresentado.
+        try
+        {
+            progresso?.Invoke(new Progresso("montagem", 0.5, "procurando vozes conhecidas"));
+            var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
+                .ReconhecerAsync(pastaDaGravacao, segmentos, ct);
+
+            foreach (var seg in segmentos)
+                if (seg.Speaker is { } r && conhecidos.TryGetValue(r, out string? nome))
+                    seg.Speaker = nome;
+        }
+        catch (Exception)
+        {
+            // Reconhecer voz é um extra sobre a transcrição, não um requisito.
+        }
+
         var resultado = new ResultadoDaTranscricao
         {
             Language = transcricao.Idioma,

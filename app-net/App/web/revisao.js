@@ -331,6 +331,12 @@ function abrirFalantes() {
   const total = estado.dados.segments.reduce((s, x) => s + (x.end - x.start), 0);
 
   const s = secao("Nomear");
+
+  const aviso = document.createElement("p");
+  aviso.className = "campo__dica";
+  aviso.textContent =
+    "Ao nomear alguém, a voz é aprendida e reconhecida nas próximas reuniões.";
+
   const tabela = document.createElement("table");
   tabela.className = "tabela-falantes";
 
@@ -357,12 +363,28 @@ function abrirFalantes() {
     const entrada = document.createElement("input");
     entrada.className = "aa-entrada";
     entrada.value = nomeDe(cru);
-    entrada.addEventListener("change", () => {
+    entrada.addEventListener("change", async () => {
       const v = entrada.value.trim();
       if (v && v !== cru) estado.nomes.set(cru, v);
       else estado.nomes.delete(cru);
       redesenhar();
       salvar();
+
+      if (!v || v === cru) return;
+
+      // Aprender a voz vem depois de gravar o nome, e não junto: o nome é o que
+      // o usuário pediu, e a voz é o extra. Se extrair falhar, o nome fica.
+      aviso.textContent = "aprendendo a voz…";
+      try {
+        const r = await pedir("aprender-voz", {
+          gravacao: estado.gravacao.caminho,
+          falante: cru,
+          nome: v,
+        });
+        aviso.textContent = r.voz ?? "";
+      } catch (e) {
+        aviso.textContent = `não aprendeu a voz: ${e.message}`;
+      }
     });
     nome.appendChild(entrada);
 
@@ -386,7 +408,7 @@ function abrirFalantes() {
     tr.append(id, nome, n, td, parte);
     tabela.appendChild(tr);
   });
-  s.appendChild(tabela);
+  s.append(aviso, tabela);
 
   // ---- fundir dois falantes
   const fundir = secao("Fundir");
@@ -437,25 +459,59 @@ function abrirExportacao() {
   document.querySelector("#gaveta-config h2").textContent = "Exportar";
 
   const s = secao("Formato");
-  for (const [rotulo, descricao] of [
-    ["Texto (.txt)", "com marcas de tempo e nomes"],
-    ["Legenda (.srt)", "para vídeo"],
-    ["Legenda (.vtt)", "para web"],
-    ["Documento (.docx)", "formatado, com cor por falante"],
+
+  const comFalantes = document.createElement("label");
+  comFalantes.className = "campo";
+  const caixa = document.createElement("input");
+  caixa.type = "checkbox";
+  caixa.checked = true;
+  caixa.id = "com-falantes";
+  const rotulo = document.createElement("span");
+  rotulo.textContent = "Incluir os nomes dos falantes";
+  comFalantes.append(rotulo, caixa);
+
+  const resultado = document.createElement("p");
+  resultado.className = "campo__dica";
+
+  for (const [formato, rotuloBotao, descricao] of [
+    ["txt", "Texto (.txt)", "com marcas de tempo"],
+    ["srt", "Legenda (.srt)", "para vídeo"],
+    ["vtt", "Legenda (.vtt)", "para web"],
+    ["docx", "Documento (.docx)", "formatado, com cor por falante"],
   ]) {
     const linha = document.createElement("div");
     linha.className = "acoes";
+
     const b = document.createElement("button");
     b.className = "aa-btn aa-btn-secundario";
     b.type = "button";
-    b.textContent = rotulo;
+    b.textContent = rotuloBotao;
+    b.addEventListener("click", async () => {
+      resultado.textContent = "gerando…";
+      try {
+        const r = await pedir("exportar", {
+          gravacao: estado.gravacao.caminho,
+          formato,
+          nome: estado.gravacao.titulo || estado.gravacao.nome,
+          com_falantes: document.getElementById("com-falantes").checked,
+        });
+        // O caminho inteiro, e não só "pronto": quem exporta precisa achar o
+        // arquivo, e ele fica junto da gravação — não em Downloads.
+        resultado.textContent = r.arquivo;
+      } catch (e) {
+        resultado.textContent = `não deu: ${e.message}`;
+      }
+    });
+
     const d = document.createElement("span");
     d.className = "campo__dica";
     d.textContent = descricao;
+
     linha.append(b, d);
     s.appendChild(linha);
   }
 
+  s.append(comFalantes, resultado);
   corpo.appendChild(s);
   abrirGaveta("gaveta-config");
 }

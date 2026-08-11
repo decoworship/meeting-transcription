@@ -145,6 +145,30 @@ public sealed class MotorSidecar : IDisposable
             m.Idioma, m.Duracao ?? 0);
     }
 
+    /// <summary>
+    /// O vetor que identifica a voz de quem fala nos trechos indicados.
+    /// </summary>
+    /// <remarks>
+    /// Quem escolhe os trechos é o núcleo: quais representam a pessoa é decisão
+    /// de produto, e o motor só sabe transformar áudio em vetor.
+    /// </remarks>
+    public async Task<float[]> VozAsync(
+        string caminhoDoAudio, IReadOnlyList<(double Inicio, double Fim)> trechos,
+        CancellationToken ct = default)
+    {
+        var m = await ExecutarAsync(
+            new Requisicao
+            {
+                Id = _proximoId++,
+                Op = "voz",
+                Audio = caminhoDoAudio,
+                Trechos = [.. trechos.Select(t => new TrechoJson { Inicio = t.Inicio, Fim = t.Fim })],
+            },
+            null, ct);
+
+        return m.Vetor ?? throw new MotorException("o motor não devolveu vetor de voz.");
+    }
+
     /// <summary>Envia uma requisição e devolve a mensagem de resultado dela.</summary>
     private async Task<Mensagem> ExecutarAsync(
         Requisicao requisicao, Action<double, string>? progresso, CancellationToken ct)
