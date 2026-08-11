@@ -100,6 +100,14 @@ internal sealed class JanelaDoApp : IDisposable
 
         // Tudo que a página pede é servido de dentro do executável; nada sai
         // para a rede. Ver Conteudo.
+        // O áudio vem da pasta das gravações por mapeamento de host, e não pelo
+        // nosso handler: assim o WebView2 serve o arquivo direto do disco, com
+        // suporte nativo a Range — que é o que faz "pular para 12:34" funcionar
+        // num WAV de 200 MB sem carregá-lo inteiro na memória.
+        _web.SetVirtualHostNameToFolderMapping(
+            "gravacoes.local", _pastaDasGravacoes,
+            CoreWebView2HostResourceAccessKind.Allow);
+
         _web.AddWebResourceRequestedFilter($"{Conteudo.Raiz}*",
                                            CoreWebView2WebResourceContext.All);
         _web.WebResourceRequested += (_, e) => Servir(ambiente, e);

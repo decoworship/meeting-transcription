@@ -17,8 +17,13 @@ public static class V {
   public struct RECT { public int L, T, R, B; }
 }
 '@
-Get-Process MeetingApp -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Sleep -Milliseconds 800
+# NUNCA matar um MeetingApp que já esteja rodando: ele pode estar no meio de
+# uma transcrição de meia hora, e derrubá-lo perde o trabalho sem aviso. Já
+# aconteceu — 11/08/2026, transcrição de 25 min morta na metade.
+if (Get-Process MeetingApp -ErrorAction SilentlyContinue) {
+  Write-Host "ja existe um MeetingApp aberto; feche-o antes (nao vou matar)."
+  exit 1
+}
 $web = '\\wsl$\Ubuntu\home\andre\projects\meeting-transcription\app-net\App\web'
 $p = Start-Process 'C:\Users\andre\MeetingApp\MeetingApp.exe' -PassThru `
      -ArgumentList (@('--web',$web,'--gravacoes',$Gravacoes) + $(if ($Tela) { @('--tela',$Tela) } else { @() }))
@@ -34,4 +39,8 @@ $dc = $g.GetHdc()
 [void][V]::PrintWindow($h, $dc, 2)
 $g.ReleaseHdc($dc)
 $bmp.Save($Saida, [Drawing.Imaging.ImageFormat]::Png)
+
+# Fechar o que este script abriu. Deixar a janela aberta numa tela arbitrária
+# fez o usuário confundi-la com o resultado da própria transcrição.
+Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
 "ok: $Saida"

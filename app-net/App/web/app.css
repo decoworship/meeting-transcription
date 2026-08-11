@@ -123,19 +123,29 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .revisao { display: grid; gap: var(--espaco-4); }
 
+/* Busca, estado e botões ficam colados no topo junto com os filtros: são as
+ * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
+ * rolar de volta para desligar um falante anula o filtro. */
 .ferramentas {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   gap: var(--espaco-3);
   align-items: center;
-  position: sticky;
-  top: 5.5rem;
-  z-index: 5;
-  background: var(--cor-fundo);
   padding: var(--espaco-2) 0;
 }
 
-.filtros { display: flex; gap: var(--espaco-2); flex-wrap: wrap; }
+.filtros { display: flex; gap: var(--espaco-2); flex-wrap: wrap; padding-bottom: var(--espaco-2); }
+
+/* O bloco inteiro gruda abaixo da barra do topo, e não cada peça por si: com
+ * position:sticky em irmãos separados eles se sobrepõem ao rolar. */
+.controles {
+  position: sticky;
+  top: 4.75rem;
+  z-index: 5;
+  background: var(--cor-fundo);
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: var(--espaco-3);
+}
 
 /* O filtro é uma etiqueta clicável: ocupa menos que caixa de seleção e deixa
  * ver de relance quem está ligado. */
@@ -178,6 +188,13 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .trecho:hover { background: var(--cor-superficie-2); }
 .trecho[data-selecionado="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+
+/* O trecho que está tocando fica marcado: sem isso, com o áudio correndo, não
+ * dá para saber de onde veio o que se está ouvindo. */
+.trecho[data-tocando="true"] {
+  background: var(--cor-acao-suave);
+  border-color: var(--cor-acao);
+}
 .trecho[hidden] { display: none; }
 
 .trecho__tempo {

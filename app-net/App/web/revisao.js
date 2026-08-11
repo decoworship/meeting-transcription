@@ -16,6 +16,26 @@ import { corDoFalante, abrirGaveta, secao, campo, alerta } from "/pecas.js";
 let estado = null;
 let aguardando = null;
 
+const audio = document.getElementById("audio");
+
+/**
+ * Toca a gravação a partir de um instante.
+ *
+ * O arquivo é o mix — a mesma soma das faixas que o ASR ouviu —, então os
+ * tempos da transcrição batem com o que se escuta. Sem isso, conferir se o
+ * falante está certo exigiria abrir o WAV noutro programa e procurar o minuto
+ * na mão.
+ */
+function ouvirA(segundos) {
+  if (!audio.src) {
+    // Mapeado em JanelaDoApp: o WebView2 serve direto do disco, com Range, que
+    // é o que faz pular para o meio de um WAV de 200 MB ser instantâneo.
+    audio.src = `https://gravacoes.local/${encodeURIComponent(estado.gravacao.nome)}/mix.wav`;
+  }
+  audio.currentTime = segundos;
+  audio.play().catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
+}
+
 /**
  * Grava a transcrição, juntando edições próximas numa escrita só.
  *
@@ -62,6 +82,9 @@ export function abrirPainel(qual) {
 }
 
 export function telaDeRevisao(gravacao, dados, { cabecalho, tela }) {
+  audio.pause();
+  audio.removeAttribute("src");
+
   estado = {
     gravacao,
     dados,
@@ -111,17 +134,33 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela }) {
   botaoExportar.textContent = "Exportar";
   botaoExportar.addEventListener("click", abrirExportacao);
 
+  const parar = document.createElement("button");
+  parar.className = "aa-btn aa-btn-texto";
+  parar.type = "button";
+  parar.textContent = "⏸";
+  parar.title = "Parar o áudio";
+  parar.addEventListener("click", () => {
+    audio.pause();
+    for (const o of document.querySelectorAll("[data-tocando]"))
+      o.removeAttribute("data-tocando");
+  });
+
   const estadoSalvo = document.createElement("span");
   estadoSalvo.className = "campo__dica";
   estadoSalvo.id = "estado-salvo";
 
-  ferramentas.append(busca, estadoSalvo, botaoFalantes, botaoExportar);
+  ferramentas.append(busca, parar, estadoSalvo, botaoFalantes, botaoExportar);
 
   const corpo = document.createElement("div");
   corpo.className = "transcricao";
   corpo.id = "corpo-transcricao";
 
-  raiz.append(ferramentas, filtros, corpo);
+  // Ferramentas e filtros num invólucro só: é ele que gruda no topo.
+  const controles = document.createElement("div");
+  controles.className = "controles";
+  controles.append(ferramentas, filtros);
+
+  raiz.append(controles, corpo);
   tela.replaceChildren(raiz);
 
   estado.filtros = filtros;
@@ -205,8 +244,16 @@ function desenharTrechos() {
     marcar(texto, seg.text.trim(), alvo);
 
     linha.append(t, quem, texto);
-    // Duplo clique abre o diálogo; o clique simples fica reservado para
-    // "ouvir daqui", que é o que o app antigo faz.
+
+    // Clique simples ouve daqui; duplo clique edita. É a divisão do app
+    // antigo, e a que faz sentido: conferir o falante é o gesto frequente,
+    // corrigir o texto é o raro.
+    linha.addEventListener("click", () => {
+      for (const o of corpo.querySelectorAll("[data-tocando]"))
+        o.removeAttribute("data-tocando");
+      linha.dataset.tocando = "true";
+      ouvirA(seg.start);
+    });
     linha.addEventListener("dblclick", () => editar(indice));
     corpo.appendChild(linha);
   });

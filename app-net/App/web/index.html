@@ -7,7 +7,7 @@
      estilo e script moram em arquivos. -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self'; style-src 'self';
-               font-src 'self'; img-src 'self' data:; media-src 'self' app:;
+               font-src 'self'; img-src 'self' data:; media-src https://gravacoes.local;
                connect-src 'none'">
 <title>Reuniões</title>
 <link rel="stylesheet" href="/ds.css">
@@ -49,6 +49,10 @@
   </div>
   <div class="gaveta__corpo" id="corpo-falantes"></div>
 </aside>
+
+<!-- O áudio da gravação aberta. Fica fora das telas porque continuar tocando
+     ao abrir uma gaveta é o comportamento certo. -->
+<audio id="audio" preload="none"></audio>
 
 <dialog class="modal" id="modal-segmento">
   <form method="dialog" class="modal__corpo" id="form-segmento">
