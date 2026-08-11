@@ -30,15 +30,27 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Procura primeiro no ambiente e depois em
-    /// <c>%USERPROFILE%\.meeting-recorder\.env</c> — o mesmo lugar onde já vivem
-    /// as credenciais do Google. Quem instala o app não tem variável de ambiente
-    /// configurada, e mandá-lo criar uma seria pedir trabalho de administrador
-    /// para usar um programa de gravar reunião.
+    /// Três fontes, nesta ordem: a variável de ambiente, o arquivo
+    /// <c>%USERPROFILE%\.meeting-recorder\.env</c>, e o <b>token embutido no
+    /// executável</b>. As duas primeiras existem para quem desenvolve poder
+    /// sobrepor; a terceira é a que faz o app funcionar na máquina de quem só
+    /// quer transcrever uma reunião.
     /// </para>
     /// <para>
-    /// Só é necessário na <b>primeira</b> execução de cada máquina: depois o
-    /// modelo fica no cache do HuggingFace e o pyannote não pede mais nada.
+    /// <b>Por que embutir.</b> Criar conta no HuggingFace, aceitar os termos do
+    /// modelo e gerar um token é trabalho de desenvolvedor, e o app não pode
+    /// exigir isso de quem grava reunião — foi a decisão do dono do produto,
+    /// pelo mesmo caminho que as credenciais do Google já tinham seguido. O
+    /// token fica no binário publicado, e nunca no repositório: o
+    /// <c>.csproj</c> só o embute se o arquivo existir na máquina de quem
+    /// publica.
+    /// </para>
+    /// <para>
+    /// Diferente do segredo OAuth do Google, <b>este token é secreto de
+    /// verdade</b> — ele dá acesso à conta HuggingFace de quem publica. Deve
+    /// ser um token de leitura, criado só para isto, e revogável sem afetar
+    /// mais nada. Só é usado na primeira execução de cada máquina, para baixar
+    /// o modelo; depois ele fica no cache local.
     /// </para>
     /// </remarks>
     public static string? TokenDoHuggingFace()
@@ -51,21 +63,31 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             ".meeting-recorder", ".env");
         try
         {
-            if (!File.Exists(env)) return null;
-            foreach (string linha in File.ReadAllLines(env))
-            {
-                var partes = linha.Split('=', 2);
-                if (partes.Length == 2 && partes[0].Trim() == "HF_TOKEN")
-                    return partes[1].Trim().Trim('"', '\'');
-            }
+            if (File.Exists(env))
+                foreach (string linha in File.ReadAllLines(env))
+                {
+                    var partes = linha.Split('=', 2);
+                    if (partes.Length == 2 && partes[0].Trim() == "HF_TOKEN")
+                        return partes[1].Trim().Trim('"', '\'');
+                }
         }
         catch (IOException)
         {
-            // Arquivo ilegível não pode derrubar a transcrição: o motor dirá que
-            // falta o token, que é uma mensagem melhor que "não consegui ler um
-            // arquivo que você nem sabia que existia".
+            // Arquivo ilegível não pode derrubar a transcrição: cai no embutido.
         }
-        return null;
+        return Embutido();
+    }
+
+    internal const string RecursoDoToken = "MeetingApp.hf_token.txt";
+
+    private static string? Embutido()
+    {
+        using var fluxo = typeof(Motores).Assembly.GetManifestResourceStream(RecursoDoToken);
+        if (fluxo is null) return null;
+
+        using var leitor = new StreamReader(fluxo);
+        string token = leitor.ReadToEnd().Trim();
+        return token.Length > 0 ? token : null;
     }
 
     /// <summary>Diz o que falta, ou <c>null</c> se está tudo no lugar.</summary>
@@ -94,10 +116,15 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
 public sealed class Transcritor(Motores motores)
 {
     /// <param name="progresso">Chamado na thread do pipeline, não na da UI.</param>
+    /// <param name="modelo">
+    /// Tamanho do modelo de ASR. Vem da tela, que por sua vez o carrega das
+    /// preferências do projeto — modelo menor é a saída para quem precisa de
+    /// rapidez mais que de exatidão.
+    /// </param>
     public async Task<ResultadoDaTranscricao> ExecutarAsync(
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
-        CancellationToken ct = default)
+        string? modelo = null, CancellationToken ct = default)
     {
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
 
@@ -124,8 +151,12 @@ public sealed class Transcritor(Motores motores)
         if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
 
         Transcricao transcricao;
+        string[] argsAsr = modelo is { Length: > 0 }
+            ? [motores.ScriptAsr, "--modelo", modelo]
+            : [motores.ScriptAsr];
+
         using (var asr = await MotorSidecar.IniciarAsync(
-                   motores.Python, [motores.ScriptAsr], ct, ambiente))
+                   motores.Python, argsAsr, ct, ambiente))
         {
             transcricao = await asr.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
                 (pct, texto) => progresso?.Invoke(new Progresso("asr", pct, texto)), ct);

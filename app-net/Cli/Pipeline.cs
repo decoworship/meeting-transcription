@@ -34,7 +34,7 @@ internal static class Pipeline
         var resultado = await transcritor.ExecutarAsync(
             pasta, vocabulario, idioma, filtrarSilencio,
             p => Console.Write($"\r  {p.Etapa}: {p.Fracao,6:P0} {p.Texto}          "),
-            ct);
+            ct: ct);
 
         Console.WriteLine($"\n\n{resultado.Segments.Count} segmentos, "
                           + $"idioma {resultado.Language}, "

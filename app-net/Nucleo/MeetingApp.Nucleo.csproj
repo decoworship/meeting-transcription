@@ -12,4 +12,24 @@
     <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
   </ItemGroup>
 
+
+  <!-- Token do HuggingFace embutido no binário publicado, para quem recebe o
+       app não precisar criar conta, aceitar termos de modelo e gerar token.
+       O arquivo NÃO vive no repositório: o build pega o do perfil de quem
+       publica, e simplesmente não embute nada se ele não estiver lá.
+
+       Publicando do WSL, onde não há USERPROFILE, passe o caminho:
+         dotnet publish ... -p:TokenHuggingFace=/mnt/c/Users/<voce>/.meeting-recorder/hf_token.txt
+
+       ATENÇÃO: este token dá acesso à conta HuggingFace de quem publica —
+       diferente do segredo OAuth do Google, que não é secreto para apps
+       instalados. Use um token só de leitura, criado para isto e revogável. -->
+  <PropertyGroup>
+    <TokenHuggingFace Condition="'$(TokenHuggingFace)' == ''">$(USERPROFILE)\.meeting-recorder\hf_token.txt</TokenHuggingFace>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(TokenHuggingFace)')">
+    <EmbeddedResource Include="$(TokenHuggingFace)" LogicalName="MeetingApp.hf_token.txt" />
+  </ItemGroup>
+
 </Project>

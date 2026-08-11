@@ -267,7 +267,14 @@ async function transcrever(g, botao, painel) {
       });
     }
 
-    const r = await pedir("transcrever", { gravacao: g.caminho, vocabulario }, (p) => {
+    const r = await pedir("transcrever", {
+      gravacao: g.caminho,
+      vocabulario,
+      // Sem estes dois, escolher modelo e idioma na tela não tinha efeito
+      // nenhum: o motor caía no padrão e detectava o idioma sozinho.
+      idioma: document.getElementById("idioma").value.trim(),
+      modelo: document.getElementById("modelo").value,
+    }, (p) => {
       estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
       preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;
     });

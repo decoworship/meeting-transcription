@@ -19,6 +19,8 @@ internal sealed class Pedido
     [JsonPropertyName("op")] public string? Op { get; init; }
     [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
     [JsonPropertyName("vocabulario")] public string? Vocabulario { get; init; }
+    [JsonPropertyName("idioma")] public string? Idioma { get; init; }
+    [JsonPropertyName("modelo")] public string? Modelo { get; init; }
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
@@ -182,7 +184,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
         // desenha a janela: sem isto a barra de progresso congelaria justamente
         // enquanto há progresso a mostrar.
         var resultado = await Task.Run(() => _transcritor.ExecutarAsync(
-            pasta, p.Vocabulario,
+            pasta, p.Vocabulario, p.Idioma,
+            modelo: p.Modelo,
             progresso: e => Responder(new Resposta
             {
                 Id = p.Id,
