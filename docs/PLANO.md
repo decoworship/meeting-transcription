@@ -700,6 +700,12 @@ mesma interface de hoje (`BaseTranscriber`), produzindo o mesmo
 **Fase 3 — a UI em WebView2.** Reescrever a interface com o AA Design System, aí
 sim com os componentes React disponíveis. Maior esforço, menor risco técnico.
 
+**Fase 2.5 — um app só.** Juntar o gravador e o app de transcrição num
+executável, com bandeja e janela no mesmo processo. **Não estava neste plano** e
+foi acrescentada em 12/08/2026, quando o dono do produto notou a lacuna: as fases
+1 e 2 entregaram dois programas que não se conhecem. Carta em
+[FASE2.5.md](FASE2.5.md).
+
 **Fase 4 — instalador.** Inno Setup, download dos modelos na primeira execução,
 migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
 código se e quando sair da própria máquina.
