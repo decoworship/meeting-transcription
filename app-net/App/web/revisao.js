@@ -82,7 +82,7 @@ export function abrirPainel(qual) {
   else if (qual.startsWith("editar")) editar(Number(qual.split(":")[1] ?? 0));
 }
 
-export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer }) {
+export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoApagar }) {
   audio.pause();
   audio.removeAttribute("src");
 
@@ -166,6 +166,10 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer }) {
     ferramentas.appendChild(refazer);
   }
 
+  // Apagar fica ao lado de refazer: são as duas ações que destroem trabalho, e
+  // manter as duas no mesmo canto é mais legível que espalhá-las.
+  if (aoApagar) ferramentas.appendChild(aoApagar);
+
   const corpo = document.createElement("div");
   corpo.className = "transcricao";
   corpo.id = "corpo-transcricao";
@@ -202,6 +206,28 @@ function redesenhar() {
 function desenharFiltros() {
   const falantes = ordemDosFalantes(estado.dados.segments);
   estado.filtros.replaceChildren();
+
+  // O filtro das correções vem primeiro e só aparece quando houve alguma. É o
+  // que torna as trocas inspecionáveis de verdade: sem ele, conferir 12 trocas
+  // numa reunião de 400 trechos seria caçá-las uma a uma.
+  const corrigidos = estado.dados.segments.filter((s) => s.swaps?.length).length;
+  if (corrigidos > 0) {
+    const b = document.createElement("button");
+    b.className = "filtro filtro--troca";
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(!!estado.soCorrigidos));
+    b.textContent = `✎ ${corrigidos} ${corrigidos === 1 ? "correção" : "correções"}`;
+    b.title = "Trocas feitas pelo vocabulário do projeto. Clique para ver só elas.";
+    b.addEventListener("click", () => {
+      estado.soCorrigidos = !estado.soCorrigidos;
+      redesenhar();
+    });
+    estado.filtros.appendChild(b);
+  } else if (estado.soCorrigidos) {
+    // A última troca foi desfeita: sair do filtro sozinho, senão a tela fica
+    // vazia sem explicar por quê.
+    estado.soCorrigidos = false;
+  }
 
   falantes.forEach((cru, i) => {
     const b = document.createElement("button");
@@ -240,6 +266,7 @@ function desenharTrechos() {
     const cru = seg.speaker ?? "Unknown";
     if (estado.escondidos.has(cru)) return;
     if (alvo && !seg.text.toLowerCase().includes(alvo)) return;
+    if (estado.soCorrigidos && !seg.swaps?.length) return;
 
     const linha = document.createElement("div");
     linha.className = "trecho";
@@ -258,6 +285,24 @@ function desenharTrechos() {
     texto.className = "trecho__texto";
     marcar(texto, seg.text.trim(), alvo);
 
+    // A correção fonética é um palpite, e palpite tem que poder ser conferido.
+    // Sem esta marca o texto parece ter saído assim do modelo, e uma troca
+    // errada — palavra comum virando nome do vocabulário — passa despercebida.
+    if (seg.swaps?.length) {
+      const marca = document.createElement("button");
+      marca.className = "troca";
+      marca.type = "button";
+      marca.textContent = "✎";
+      marca.title = seg.swaps.map((s) => `"${s.from}" → "${s.to}"`).join("\n")
+        + "\n\nCorreção pelo vocabulário do projeto. Clique para desfazer.";
+      marca.setAttribute("aria-label", "Ver as correções deste trecho");
+      marca.addEventListener("click", (e) => {
+        e.stopPropagation();        // não tocar o áudio ao clicar na marca
+        desfazerTrocas(indice);
+      });
+      texto.appendChild(marca);
+    }
+
     linha.append(t, quem, texto);
 
     // Clique simples ouve daqui; duplo clique edita. É a divisão do app
@@ -275,6 +320,33 @@ function desenharTrechos() {
 
   if (corpo.children.length === 0)
     corpo.appendChild(alerta("Nenhum trecho corresponde ao filtro.", "atencao"));
+}
+
+/**
+ * Reverte as trocas da correção fonética num trecho.
+ *
+ * Troca ao contrário no texto atual, em vez de guardar o original: entre a
+ * correção e este clique o usuário pode ter editado o trecho à mão, e restaurar
+ * um original guardado apagaria essa edição. Reverter só as palavras deixa o
+ * resto como está.
+ */
+function desfazerTrocas(indice) {
+  const seg = estado.dados.segments[indice];
+  if (!seg.swaps?.length) return;
+
+  const lista = seg.swaps.map((s) => `"${s.to}" volta a ser "${s.from}"`).join("\n");
+  if (!confirm(`Desfazer a correção deste trecho?\n\n${lista}`)) return;
+
+  for (const s of seg.swaps) {
+    // Só palavra inteira: sem isto, desfazer "Dimi"→"Dimitri" estragaria
+    // qualquer outra palavra que contivesse as letras.
+    const escapado = s.to.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    seg.text = seg.text.replace(new RegExp(`\\b${escapado}\\b`, "g"), s.from);
+  }
+  delete seg.swaps;
+
+  desenharTrechos();
+  salvar();
 }
 
 /** Escreve o texto destacando as ocorrências da busca, sem innerHTML. */
@@ -469,9 +541,11 @@ function abrirFalantes() {
 // ───────────────────────────────────────────────────── exportar
 
 async function abrirExportacao() {
-  const corpo = document.getElementById("corpo-config");
+  // Gaveta própria desde que as configurações viraram tela. Antes ela pegava a
+  // gaveta de configurações emprestada e trocava o título — o que funcionava e
+  // deixava duas telas sem dono do mesmo espaço.
+  const corpo = document.getElementById("corpo-exportar");
   corpo.replaceChildren();
-  document.querySelector("#gaveta-config h2").textContent = "Exportar";
 
   // Cliente e projeto vêm da transcrição quando ela os tem — as feitas antes
   // deste campo existir não têm, e é aqui que dá para preencher sem refazer
@@ -561,5 +635,5 @@ async function abrirExportacao() {
 
   s.append(opcoes, resultado);
   corpo.append(reuniao, s);
-  abrirGaveta("gaveta-config");
+  abrirGaveta("gaveta-exportar");
 }

@@ -7,12 +7,85 @@
  * na tela mesmo escondido. */
 [hidden] { display: none !important; }
 
+/* A altura da barra do topo, num lugar só.
+ *
+ * Dois blocos grudam abaixo dela — os controles da revisão e as abas dos
+ * ajustes —, e cada um chutava o próprio valor. Um chute errado não quebra
+ * nada visivelmente: o bloco só desliza para trás da barra e some, que foi
+ * exatamente o defeito das abas em 12/08. */
+:root { --altura-da-barra: 4.75rem; }
+
 body {
   margin: 0;
   background: var(--cor-fundo);
   color: var(--cor-texto);
   font-family: var(--fonte-ui);
 }
+
+/* O sprite de ícones: presente no DOM, fora do fluxo e sem tamanho.
+ *
+ * `position:absolute` e não `display:none` porque o segundo já quebrou
+ * referências de <use> em navegadores; este par é o que se usa na prática.
+ *
+ * A regra mora aqui, e não num atributo style no HTML, porque a CSP da página é
+ * `style-src 'self'` sem `'unsafe-inline'`: atributo style é descartado em
+ * silêncio, e o sprite volta ao fluxo criando uma linha de 23 px que empurra a
+ * janela inteira. Foi exatamente esse o defeito de 12/08. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Pelo mesmo motivo: a altura do esqueleto estava num atributo style e nunca
+ * valeu nada. */
+.esqueleto--cartao { height: 5rem; }
+
+/* ──────────────────────────────────────────────── trilho e esqueleto */
+
+/* O trilho não rola com a página: ele é o chão, e o conteúdo é o que se move
+ * por cima. Por isso a altura fixa aqui e o overflow no filho, e não no body. */
+.app {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  height: 100vh;
+}
+
+.conteudo { overflow: auto; display: grid; grid-template-rows: auto 1fr; align-content: start; }
+
+.trilho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-2);
+  background: var(--cor-superficie);
+  border-right: 1px solid var(--cor-borda);
+}
+
+/* Ícone com o nome embaixo, e não ícone sozinho: o trilho tem três destinos e
+ * um deles é uma palavra que ninguém adivinha por desenho. Cabe o rótulo, e
+ * rótulo que cabe não se troca por tooltip. */
+.trilho__item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 4.5rem;
+  padding: var(--espaco-2) 0;
+  border: 0;
+  border-radius: var(--raio-medio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trilho__item svg { width: 22px; height: 22px; }
+.trilho__item:hover:not(:disabled) { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.trilho__item:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.trilho__item[aria-current="page"] { background: var(--cor-acao-suave); color: var(--cor-acao); }
+.trilho__item:disabled { opacity: .38; cursor: default; }
+
+/* Ajustes desce para o rodapé do trilho: é o destino que se visita de vez em
+ * quando, e misturá-lo com os de todo dia disputaria atenção com eles. */
+.trilho__item--fim { margin-top: auto; }
 
 /* ───────────────────────────────────────────────────────────── barra */
 
@@ -21,8 +94,8 @@ body {
   top: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "voltar titulo config" "voltar sub config";
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "voltar titulo" "voltar sub";
   align-items: center;
   gap: 0 var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-6);
@@ -31,7 +104,6 @@ body {
 }
 
 .barra__voltar { grid-area: voltar; padding-left: 0; }
-.barra__config { grid-area: config; font-size: 1.25rem; }
 
 .barra__titulo {
   grid-area: titulo;
@@ -142,7 +214,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * position:sticky em irmãos separados eles se sobrepõem ao rolar. */
 .controles {
   position: sticky;
-  top: 4.75rem;
+  top: var(--altura-da-barra);
   z-index: 5;
   background: var(--cor-fundo);
   border-bottom: 1px solid var(--cor-borda);
@@ -167,6 +239,34 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .filtro[aria-pressed="false"] { opacity: .45; }
 .filtro__ponto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+/* O filtro das correções não é um falante: cor própria, e separado dos outros
+ * por uma borda, para não parecer mais um nome na fileira. */
+.filtro--troca {
+  color: var(--cor-destaque-texto);
+  background: var(--cor-destaque-bg);
+  border-color: var(--cor-destaque);
+  margin-right: var(--espaco-2);
+}
+
+/* A marca no trecho corrigido. Discreta de propósito: ela informa, não
+ * interrompe a leitura — quem está lendo a ata não quer um alerta por trecho. */
+.troca {
+  border: 0;
+  background: var(--cor-destaque-bg);
+  color: var(--cor-destaque-texto);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  margin-left: 6px;
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.troca:hover { background: var(--cor-destaque); color: var(--cor-texto-invertido); }
+.troca:focus-visible { outline: var(--anel-foco); outline-offset: 1px; }
 
 .transcricao {
   display: grid;
@@ -287,3 +387,227 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .barra-share { height: 6px; border-radius: 3px; background: var(--cor-superficie-2); }
 .barra-share > div { height: 100%; border-radius: inherit; }
+
+/* ─────────────────────────────────────────────────── configurações */
+
+/* Abas à esquerda, e não no topo: são cinco, duas delas (Clientes e Vozes) são
+ * telas de trabalho com lista longa, e coluna dá para crescer sem virar duas
+ * fileiras de aba. O topo fica livre para o título do que se está ajustando. */
+.ajustes {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: var(--espaco-6);
+  align-items: start;
+}
+
+/* As abas acompanham a rolagem do painel: com Clientes ou Vozes longos, ter de
+ * voltar ao topo só para trocar de aba é o incômodo que sticky existe para
+ * resolver. O topo é a altura da barra — encostar em zero as esconde atrás
+ * dela. */
+.abas {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  position: sticky;
+  top: var(--altura-da-barra);
+  /* O painel pode ser mais alto que a janela; as abas nunca. Sem isto, uma
+   * lista de abas maior que a tela ficaria com a última inalcançável. */
+  max-height: calc(100vh - var(--altura-da-barra) - var(--espaco-6));
+  overflow: auto;
+}
+
+.aba {
+  text-align: left;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-medio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aba:hover { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.aba:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.aba[aria-selected="true"] { background: var(--cor-acao-suave); color: var(--cor-acao); }
+
+.painel { display: grid; gap: var(--espaco-6); align-content: start; }
+
+/* Um bloco por assunto, com o título dentro do cartão. É a forma da referência
+ * do Meetily, e ela funciona porque cada bloco fica legível sozinho — dá para
+ * mudar uma coisa sem ler as outras. */
+.bloco {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-superficie);
+}
+
+.bloco__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.05rem; }
+.bloco__texto { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+/* Título e descrição à esquerda, controle à direita — o padrão da referência
+ * para as opções de ligar e desligar. */
+.bloco--chave { grid-template-columns: 1fr auto; align-items: center; gap: var(--espaco-4); }
+.bloco--chave > .bloco__titulo, .bloco--chave > .bloco__texto { grid-column: 1; }
+
+/* ──────────────────────────────────────────────── cartões de modelo */
+
+.modelo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+}
+
+.modelo[data-em-uso="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+.modelo__nome { margin: 0; font-weight: 600; display: flex; align-items: center; gap: var(--espaco-2); }
+.modelo__desc { margin: 2px 0 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+/* Tamanho, estado e a nota do que medimos, numa linha só. É o que o cartão do
+ * Meetily faz com badges — a diferença é que aqui os números são nossos. */
+.modelo__fatos {
+  margin: var(--espaco-2) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+  font-size: 11px;
+  color: var(--cor-texto-suave);
+}
+
+.modelo__fatos b { font-weight: 600; color: var(--cor-texto); }
+
+/* A coluna da direita cresce para baixo durante o download: botão, barra e o
+ * "412 MB de 3090 MB". Largura fixa para o cartão não pular de tamanho quando
+ * o texto de andamento aparece. */
+.modelo__acao {
+  display: grid;
+  gap: var(--espaco-2);
+  justify-items: end;
+  width: 9rem;
+}
+
+.modelo__acao .aa-progresso { width: 100%; height: 6px; }
+.modelo__acao .campo__dica { font-size: 11px; text-align: right; }
+
+/* ─────────────────────────────────────────────────────────── vozes */
+
+.pessoa { display: grid; gap: var(--espaco-2); }
+
+.pessoa__topo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.pessoa__nome { margin: 0; font-weight: 600; }
+
+.amostra {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+  font-size: var(--texto-pequeno);
+}
+
+.amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
+.amostra__proc { color: var(--cor-texto-suave); font-family: var(--fonte-mono); font-size: 11px; }
+.amostra__acoes { display: flex; gap: var(--espaco-2); }
+
+/* O play de cada amostra é um botão de ícone: ele repete por linha, e o nome
+ * escrito em cada uma delas viraria ruído. */
+.tocar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--cor-borda);
+  border-radius: 50%;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+}
+
+.tocar svg { width: 13px; height: 13px; }
+.tocar:hover:not(:disabled) { border-color: var(--cor-acao); color: var(--cor-acao); }
+.tocar:disabled { opacity: .35; cursor: default; }
+
+/* O que está tocando fica marcado: com várias amostras da mesma pessoa, saber
+ * qual delas se está ouvindo é o ponto inteiro de ouvir. */
+.tocar[data-tocando] {
+  border-color: var(--cor-acao);
+  background: var(--cor-acao);
+  color: var(--cor-texto-invertido);
+}
+
+/* ────────────────────────────────────── clientes e projetos */
+
+/* Campo e botões lado a lado, o campo esticando. */
+.campo-pasta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--espaco-3);
+  align-items: end;
+}
+
+.projeto { border-top: 1px solid var(--cor-borda); }
+
+/* O topo é um botão que ocupa a linha toda, e as ações ficam ao lado dele —
+ * fora, porque botão dentro de botão é HTML inválido. */
+.projeto__linha { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+.projeto__acoes { padding-right: var(--espaco-3); }
+
+.projeto__topo {
+  display: grid;
+  grid-template-columns: 1rem auto 1fr;
+  gap: var(--espaco-2);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  text-align: left;
+  cursor: pointer;
+}
+
+.projeto__topo:hover { background: var(--cor-superficie-2); }
+.projeto__topo:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.projeto__seta { color: var(--cor-texto-suave); font-size: 10px; }
+.projeto__topo .campo__dica { justify-self: end; }
+
+.projeto__corpo {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-3) var(--espaco-5) 2rem;
+}
+
+/* ─────────────────────────────────────── o que ainda não existe */
+
+/* Um aviso de obra, e não um botão morto. Botão desabilitado convida ao clique
+ * e não explica nada; isto ocupa o lugar da funcionalidade dizendo o que falta
+ * e o que já dá para fazer sem ela. */
+.obra {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+  border: 1px dashed var(--cor-borda-forte);
+  border-radius: var(--raio-medio);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+}
+
+.obra strong { color: var(--cor-texto); }

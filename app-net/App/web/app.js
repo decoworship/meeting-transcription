@@ -1,5 +1,6 @@
 import { pedir } from "/ponte.js";
 import { telaDeRevisao, abrirPainel } from "/revisao.js";
+import { telaDeAjustes } from "/configuracoes.js";
 import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 
@@ -32,6 +33,19 @@ function cabecalho(t, sub, comVoltar) {
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;
+}
+
+/**
+ * Marca no trilho onde estamos.
+ *
+ * Reuniões, preparo e revisão são o mesmo destino: quem está revisando uma
+ * transcrição continua "em Reuniões", e acender outra coisa mentiria sobre
+ * onde o ← voltar leva.
+ */
+function destino(qual) {
+  for (const b of document.querySelectorAll(".trilho__item"))
+    b.removeAttribute("aria-current");
+  document.getElementById(qual)?.setAttribute("aria-current", "page");
 }
 
 // ─────────────────────────────────────────────────────────── lista
@@ -80,6 +94,7 @@ function cartao(g) {
 
 export async function telaDeLista() {
   fecharGavetas();
+  destino("ir-reunioes");
   cabecalho("Reuniões", "", false);
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
@@ -105,6 +120,41 @@ export async function telaDeLista() {
     tela.setAttribute("aria-busy", "false");
     tela.replaceChildren(alerta(e.message, "erro"));
   }
+}
+
+/**
+ * Apaga a gravação inteira — áudio, metadados e transcrição.
+ *
+ * Mora <b>dentro</b> da gravação aberta, e não na lista. Um botão de apagar em
+ * cada cartão põe a ação mais destrutiva do app a um clique errado de distância,
+ * numa tela que se percorre rápido; abrir a gravação primeiro custa um clique e
+ * garante que quem apaga está olhando para o que apaga.
+ *
+ * A confirmação nomeia a gravação e diz o que não volta. O áudio original não se
+ * refaz: não há lixeira, e o gravador não guarda cópia.
+ */
+export function botaoApagarGravacao(g) {
+  const b = document.createElement("button");
+  b.className = "aa-btn aa-btn-texto";
+  b.type = "button";
+  b.textContent = "Apagar gravação";
+  b.addEventListener("click", async () => {
+    if (!confirm(
+      `Apagar "${tituloDe(g)}"?\n\n`
+      + "Isto apaga o áudio, os metadados e a transcrição desta reunião. "
+      + "O áudio original não pode ser recuperado.")) return;
+
+    b.disabled = true;
+    try {
+      await pedir("apagar-gravacao", { gravacao: g.caminho });
+    } catch (e) {
+      alert(`não apagou: ${e.message}`);
+      b.disabled = false;
+      return;
+    }
+    telaDeLista();
+  });
+  return b;
 }
 
 // ───────────────────────────────────────────── preparar / transcrever
@@ -175,7 +225,7 @@ async function telaDePreparo(g) {
 
   const aviso = document.createElement("span");
   aviso.className = "campo__dica";
-  acoes.append(botao, aviso);
+  acoes.append(botao, aviso, botaoApagarGravacao(g));
 
   const painel = document.createElement("div");
   forma.append(reuniao, motor, vocab, acoes, painel);
@@ -303,10 +353,11 @@ export async function abrirGravacao(g) {
     if (r.transcricao) {
       cabecalho(tituloDe(g), "carregando…", true);
       tela.replaceChildren();
-      telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela, aoRefazer: () => {
-        g.transcrita = false;
-        telaDePreparo(g);
-      } });
+      telaDeRevisao(g, JSON.parse(r.transcricao), {
+        cabecalho, tela,
+        aoRefazer: () => { g.transcrita = false; telaDePreparo(g); },
+        aoApagar: botaoApagarGravacao(g),
+      });
       return;
     }
   }
@@ -318,130 +369,29 @@ export async function abrirGravacao(g) {
     tela.replaceChildren(alerta("A transcrição não foi encontrada.", "erro"));
     return;
   }
-  telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+  telaDeRevisao(g, JSON.parse(r.transcricao), {
+    cabecalho, tela, aoApagar: botaoApagarGravacao(g),
+  });
 }
 
-// ──────────────────────────────────────────────────── configurações
+// ──────────────────────────────────────────────────────── ajustes
 
-async function telaDeConfiguracoes() {
-  const corpo = document.getElementById("corpo-config");
-  document.querySelector("#gaveta-config h2").textContent = "Configurações";
-  corpo.replaceChildren();
-
-  const { config } = await pedir("config");
-  const { clientes } = await pedir("clientes");
-
-  const estado = document.createElement("p");
-  estado.className = "campo__dica";
-
-  /** Grava a cada mudança: um botão "salvar" só criaria como esquecer. */
-  async function gravar(mudanca) {
-    Object.assign(config, mudanca);
-    estado.textContent = "salvando…";
-    try {
-      await pedir("salvar-config", { config });
-      estado.textContent = "salvo";
-    } catch (e) {
-      estado.textContent = `não salvou: ${e.message}`;
-    }
-  }
-
-  // ---- gravações
-  const pastas = secao("Gravações");
-  const campoPasta = campo("Pasta das gravações", "input", {
-    id: "cfg-pasta",
-    valor: config.pasta_das_gravacoes ?? "",
-    dica: "vazio = a mesma do gravador",
-  });
-  campoPasta.querySelector("input").addEventListener("change", (e) =>
-    gravar({ pasta_das_gravacoes: e.target.value.trim() }));
-
-  const dica = document.createElement("p");
-  dica.className = "campo__dica";
-  dica.textContent = "Deixe vazio para seguir a pasta configurada no gravador.";
-  pastas.append(campoPasta, dica);
-
-  // ---- motores
-  const motores = secao("Motores");
-  const campoModelo = campo("Modelo padrão", "select", {
-    id: "cfg-modelo",
-    opcoes: ["large-v3", "medium", "small", "base", "tiny"],
-  });
-  campoModelo.querySelector("select").value = config.modelo_padrao ?? "large-v3";
-  campoModelo.querySelector("select").addEventListener("change", (e) =>
-    gravar({ modelo_padrao: e.target.value }));
-
-  const campoDiar = campo("Modelo de diarização", "select", {
-    id: "cfg-diar",
-    opcoes: ["community-1", "3.1"],
-  });
-  campoDiar.querySelector("select").value = config.diarizacao_padrao ?? "community-1";
-  campoDiar.querySelector("select").addEventListener("change", (e) =>
-    gravar({ diarizacao_padrao: e.target.value }));
-
-  motores.append(campoModelo, campoDiar);
-
-  const notaToken = document.createElement("p");
-  notaToken.className = "campo__dica";
-  notaToken.textContent =
-    "O acesso aos modelos já vem configurado no aplicativo — nada a fazer aqui.";
-  motores.appendChild(notaToken);
-
-  // ---- transcrição
-  const avancado = secao("Transcrição");
-  const toggle = document.createElement("label");
-  toggle.className = "campo campo--linha";
-  const caixa = document.createElement("input");
-  caixa.type = "checkbox";
-  caixa.checked = config.permitir_retranscrever === true;
-  caixa.addEventListener("change", (e) =>
-    gravar({ permitir_retranscrever: e.target.checked }));
-  const rotulo = document.createElement("span");
-  rotulo.textContent = "Permitir transcrever de novo uma reunião já transcrita";
-  toggle.append(caixa, rotulo);
-
-  const aviso = document.createElement("p");
-  aviso.className = "campo__dica";
-  // O porquê fica na tela, não só no código: quem liga isto precisa saber o
-  // que arrisca.
-  aviso.textContent =
-    "Refazer descarta os nomes de falante e as correções de texto daquela "
-    + "reunião, e reprocessa o áudio inteiro.";
-  avancado.append(toggle, aviso);
-
-  // ---- cadastros
-  const nClientes = Object.keys(clientes).length;
-  const nProjetos = Object.values(clientes).reduce((s, p) => s + p.length, 0);
-
-  const listas = secao("Cadastros");
-  for (const [rotuloBotao, texto] of [
-    ["Clientes e projetos",
-     `${nClientes} ${nClientes === 1 ? "cliente" : "clientes"}, `
-     + `${nProjetos} ${nProjetos === 1 ? "projeto" : "projetos"}`],
-    ["Vozes conhecidas", "as vozes aprendidas ao nomear falantes"],
-  ]) {
-    const linha = document.createElement("div");
-    linha.className = "acoes";
-    const b = document.createElement("button");
-    b.className = "aa-btn aa-btn-secundario";
-    b.type = "button";
-    b.textContent = rotuloBotao;
-    b.disabled = true;
-    b.title = "Tela ainda não construída";
-    const t = document.createElement("span");
-    t.className = "campo__dica";
-    t.textContent = texto;
-    linha.append(b, t);
-    listas.appendChild(linha);
-  }
-
-  corpo.append(pastas, motores, avancado, listas, estado);
-  abrirGaveta("gaveta-config");
+/**
+ * A tela de ajustes mora em configuracoes.js.
+ *
+ * Ela precisa do cabeçalho e do <main> daqui, e não os importa: passar os dois
+ * como contexto mantém o app.js como o único lugar que sabe da moldura.
+ */
+export function abrirAjustes(aba) {
+  fecharGavetas();
+  destino("ir-config");
+  return telaDeAjustes({ cabecalho, tela }, aba);
 }
 
 // ─────────────────────────────────────────────────────────── ligação
 
-document.getElementById("abrir-config").addEventListener("click", telaDeConfiguracoes);
+document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
+document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
 
 for (const b of document.querySelectorAll("[data-fechar]"))
@@ -463,10 +413,13 @@ async function inicio() {
   // o que não dá para alcançar sem clique.
   const [principal, extra] = hash.split("&");
   const [tela, arg] = principal.split("=");
+
+  // Os ajustes não dependem de gravação nenhuma, e pedir a lista antes atrasaria
+  // a tela por nada. "#config=vozes" cai direto na aba.
+  if (tela === "config") return abrirAjustes(arg || "geral");
+
   const { gravacoes } = await pedir("gravacoes");
   const g = gravacoes[Number(arg) || 0];
-
-  if (tela === "config") { telaDeLista(); telaDeConfiguracoes(); return; }
   if (!g) return telaDeLista();
 
   if (tela === "preparo") { g.transcrita = false; return abrirGravacao(g); }
