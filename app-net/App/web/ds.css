@@ -1,0 +1,13 @@
+/* O AA Design System, na ordem em que ele espera ser carregado.
+ *
+ * Os arquivos vêm de src/web/assets/ds — a mesma cópia que o app Gradio usa,
+ * para os dois não divergirem enquanto convivem. A procedência está em
+ * PROCEDENCIA.txt, ao lado deles.
+ *
+ * Os @import apontam para /ds/, e não para os arquivos concatenados, porque os
+ * @font-face do design system usam caminhos relativos: resolvidos a partir de
+ * /ds/colors_and_type.css eles caem em /ds/fonts/..., que é exatamente onde os
+ * recursos embutidos estão. */
+@import url("/ds/tokens/tokens.css");
+@import url("/ds/colors_and_type.css");
+@import url("/ds/componentes.css");

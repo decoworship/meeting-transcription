@@ -1,0 +1,613 @@
+/* O que é desta aplicação, e só. Tudo que puder ser classe do design system é
+ * classe do design system; o que sobra aqui é layout e as peças que o DS não
+ * tem (gaveta, modal, transcrição). */
+
+/* O atributo hidden precisa vencer qualquer display declarado depois: sem
+ * isto, .gaveta{display:grid} e .aa-btn{display:inline-flex} mantêm o elemento
+ * na tela mesmo escondido. */
+[hidden] { display: none !important; }
+
+/* A altura da barra do topo, num lugar só.
+ *
+ * Dois blocos grudam abaixo dela — os controles da revisão e as abas dos
+ * ajustes —, e cada um chutava o próprio valor. Um chute errado não quebra
+ * nada visivelmente: o bloco só desliza para trás da barra e some, que foi
+ * exatamente o defeito das abas em 12/08. */
+:root { --altura-da-barra: 4.75rem; }
+
+body {
+  margin: 0;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  font-family: var(--fonte-ui);
+}
+
+/* O sprite de ícones: presente no DOM, fora do fluxo e sem tamanho.
+ *
+ * `position:absolute` e não `display:none` porque o segundo já quebrou
+ * referências de <use> em navegadores; este par é o que se usa na prática.
+ *
+ * A regra mora aqui, e não num atributo style no HTML, porque a CSP da página é
+ * `style-src 'self'` sem `'unsafe-inline'`: atributo style é descartado em
+ * silêncio, e o sprite volta ao fluxo criando uma linha de 23 px que empurra a
+ * janela inteira. Foi exatamente esse o defeito de 12/08. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Pelo mesmo motivo: a altura do esqueleto estava num atributo style e nunca
+ * valeu nada. */
+.esqueleto--cartao { height: 5rem; }
+
+/* ──────────────────────────────────────────────── trilho e esqueleto */
+
+/* O trilho não rola com a página: ele é o chão, e o conteúdo é o que se move
+ * por cima. Por isso a altura fixa aqui e o overflow no filho, e não no body. */
+.app {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  height: 100vh;
+}
+
+.conteudo { overflow: auto; display: grid; grid-template-rows: auto 1fr; align-content: start; }
+
+.trilho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-2);
+  background: var(--cor-superficie);
+  border-right: 1px solid var(--cor-borda);
+}
+
+/* Ícone com o nome embaixo, e não ícone sozinho: o trilho tem três destinos e
+ * um deles é uma palavra que ninguém adivinha por desenho. Cabe o rótulo, e
+ * rótulo que cabe não se troca por tooltip. */
+.trilho__item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 4.5rem;
+  padding: var(--espaco-2) 0;
+  border: 0;
+  border-radius: var(--raio-medio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trilho__item svg { width: 22px; height: 22px; }
+.trilho__item:hover:not(:disabled) { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.trilho__item:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.trilho__item[aria-current="page"] { background: var(--cor-acao-suave); color: var(--cor-acao); }
+.trilho__item:disabled { opacity: .38; cursor: default; }
+
+/* Ajustes desce para o rodapé do trilho: é o destino que se visita de vez em
+ * quando, e misturá-lo com os de todo dia disputaria atenção com eles. */
+.trilho__item--fim { margin-top: auto; }
+
+/* ───────────────────────────────────────────────────────────── barra */
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "voltar titulo" "voltar sub";
+  align-items: center;
+  gap: 0 var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-6);
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.barra__voltar { grid-area: voltar; padding-left: 0; }
+
+.barra__titulo {
+  grid-area: titulo;
+  font-family: var(--fonte-display);
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.barra__sub {
+  grid-area: sub;
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+}
+
+/* ─────────────────────────────────────────────────────── lista */
+
+#tela { display: grid; gap: var(--espaco-3); align-content: start; }
+
+.gravacao {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--espaco-4);
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--cor-borda);
+}
+
+.gravacao:hover { border-color: var(--cor-borda-forte); }
+.gravacao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+
+.gravacao__titulo { font-weight: 600; margin: 0 0 var(--espaco-1); }
+
+.gravacao__meta {
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+  margin: 0;
+  display: flex;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.gravacao__avisos { margin-top: var(--espaco-3); display: grid; gap: var(--espaco-2); }
+
+.vazio { color: var(--cor-texto-suave); }
+
+/* ──────────────────────────────────────────── preparar a transcrição */
+
+.secao { display: grid; gap: var(--espaco-4); }
+
+.secao__titulo {
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--cor-texto-suave);
+  margin: 0;
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: var(--espaco-4);
+}
+
+.campo { display: grid; gap: var(--espaco-2); }
+/* Caixa de seleção ao lado do rótulo, e não embaixo. */
+.campo--linha { grid-template-columns: auto 1fr; align-items: center; }
+.campo > span { font-size: var(--texto-pequeno); font-weight: 600; }
+.campo__dica { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); margin: 0; }
+
+select.aa-entrada { appearance: auto; }
+textarea.aa-entrada { font-family: inherit; resize: vertical; }
+
+.acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
+
+/* A barra usa o .aa-progresso do design system; o preenchimento é o filho. */
+.aa-progresso > div {
+  height: 100%;
+  width: 0;
+  background: var(--cor-acao);
+  border-radius: inherit;
+  transition: width .3s ease;
+}
+
+/* ─────────────────────────────────────────────────────── transcrição */
+
+.revisao { display: grid; gap: var(--espaco-4); }
+
+/* Busca, estado e botões ficam colados no topo junto com os filtros: são as
+ * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
+ * rolar de volta para desligar um falante anula o filtro. */
+.ferramentas {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto auto;
+  gap: var(--espaco-3);
+  align-items: center;
+  padding: var(--espaco-2) 0;
+}
+
+.filtros { display: flex; gap: var(--espaco-2); flex-wrap: wrap; padding-bottom: var(--espaco-2); }
+
+/* O bloco inteiro gruda abaixo da barra do topo, e não cada peça por si: com
+ * position:sticky em irmãos separados eles se sobrepõem ao rolar. */
+.controles {
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: 5;
+  background: var(--cor-fundo);
+  border-bottom: 1px solid var(--cor-borda);
+  margin-bottom: var(--espaco-3);
+}
+
+/* O filtro é uma etiqueta clicável: ocupa menos que caixa de seleção e deixa
+ * ver de relance quem está ligado. */
+.filtro {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--raio-pilula);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filtro[aria-pressed="false"] { opacity: .45; }
+.filtro__ponto { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+/* O filtro das correções não é um falante: cor própria, e separado dos outros
+ * por uma borda, para não parecer mais um nome na fileira. */
+.filtro--troca {
+  color: var(--cor-destaque-texto);
+  background: var(--cor-destaque-bg);
+  border-color: var(--cor-destaque);
+  margin-right: var(--espaco-2);
+}
+
+/* A marca no trecho corrigido. Discreta de propósito: ela informa, não
+ * interrompe a leitura — quem está lendo a ata não quer um alerta por trecho. */
+.troca {
+  border: 0;
+  background: var(--cor-destaque-bg);
+  color: var(--cor-destaque-texto);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  margin-left: 6px;
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.troca:hover { background: var(--cor-destaque); color: var(--cor-texto-invertido); }
+.troca:focus-visible { outline: var(--anel-foco); outline-offset: 1px; }
+
+.transcricao {
+  display: grid;
+  gap: 2px;
+  font-size: var(--texto-pequeno);
+  line-height: 1.7;
+}
+
+/* Cada trecho é uma linha só: tempo, quem falou, o que disse. É a forma que o
+ * app antigo usa e que o usuário lê rápido — trocar por cartões separaria o
+ * texto de quem fala e dobraria a altura a percorrer. */
+.trecho {
+  display: grid;
+  grid-template-columns: 3.5rem 8rem 1fr;
+  gap: var(--espaco-3);
+  padding: 3px var(--espaco-2);
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.trecho:hover { background: var(--cor-superficie-2); }
+.trecho[data-selecionado="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+
+/* O trecho que está tocando fica marcado: sem isso, com o áudio correndo, não
+ * dá para saber de onde veio o que se está ouvindo. */
+.trecho[data-tocando="true"] {
+  background: var(--cor-acao-suave);
+  border-color: var(--cor-acao);
+}
+.trecho[hidden] { display: none; }
+
+.trecho__tempo {
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  padding-top: 2px;
+}
+
+.trecho__falante { font-weight: 600; }
+.trecho__texto { margin: 0; }
+.trecho__texto mark { background: var(--cor-destaque-bg); color: inherit; border-radius: 3px; }
+
+/* ─────────────────────────────────────────────── gaveta e modal */
+
+.veu {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / .35);
+  z-index: 20;
+}
+
+.gaveta {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(28rem, 92vw);
+  z-index: 21;
+  background: var(--cor-superficie);
+  border-left: 1px solid var(--cor-borda);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-shadow: -8px 0 32px rgb(0 0 0 / .12);
+}
+
+.gaveta--larga { width: min(46rem, 96vw); }
+
+.gaveta__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--espaco-4) var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.gaveta__topo h2 { margin: 0; font-family: var(--fonte-display); font-size: 1.25rem; }
+
+.gaveta__corpo {
+  padding: var(--espaco-5);
+  overflow: auto;
+  display: grid;
+  gap: var(--espaco-5);
+  align-content: start;
+}
+
+.modal {
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  padding: 0;
+  width: min(38rem, 94vw);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+}
+
+.modal::backdrop { background: rgb(0 0 0 / .35); }
+.modal__corpo { padding: var(--espaco-5); display: grid; gap: var(--espaco-4); }
+.modal__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.15rem; }
+.modal__acoes { display: flex; gap: var(--espaco-3); justify-content: flex-end; }
+
+/* ───────────────────────────────────────────────────── falantes */
+
+.tabela-falantes { width: 100%; border-collapse: collapse; font-size: var(--texto-pequeno); }
+
+.tabela-falantes th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--cor-texto-suave);
+  padding: 0 var(--espaco-3) var(--espaco-2);
+  font-weight: 600;
+}
+
+.tabela-falantes td { padding: var(--espaco-2) var(--espaco-3); border-top: 1px solid var(--cor-borda); }
+.tabela-falantes input { width: 100%; }
+.numero { text-align: right; font-family: var(--fonte-mono); }
+
+.barra-share { height: 6px; border-radius: 3px; background: var(--cor-superficie-2); }
+.barra-share > div { height: 100%; border-radius: inherit; }
+
+/* ─────────────────────────────────────────────────── configurações */
+
+/* Abas à esquerda, e não no topo: são cinco, duas delas (Clientes e Vozes) são
+ * telas de trabalho com lista longa, e coluna dá para crescer sem virar duas
+ * fileiras de aba. O topo fica livre para o título do que se está ajustando. */
+.ajustes {
+  display: grid;
+  grid-template-columns: 12rem 1fr;
+  gap: var(--espaco-6);
+  align-items: start;
+}
+
+/* As abas acompanham a rolagem do painel: com Clientes ou Vozes longos, ter de
+ * voltar ao topo só para trocar de aba é o incômodo que sticky existe para
+ * resolver. O topo é a altura da barra — encostar em zero as esconde atrás
+ * dela. */
+.abas {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  position: sticky;
+  top: var(--altura-da-barra);
+  /* O painel pode ser mais alto que a janela; as abas nunca. Sem isto, uma
+   * lista de abas maior que a tela ficaria com a última inalcançável. */
+  max-height: calc(100vh - var(--altura-da-barra) - var(--espaco-6));
+  overflow: auto;
+}
+
+.aba {
+  text-align: left;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-medio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aba:hover { background: var(--cor-superficie-2); color: var(--cor-texto); }
+.aba:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.aba[aria-selected="true"] { background: var(--cor-acao-suave); color: var(--cor-acao); }
+
+.painel { display: grid; gap: var(--espaco-6); align-content: start; }
+
+/* Um bloco por assunto, com o título dentro do cartão. É a forma da referência
+ * do Meetily, e ela funciona porque cada bloco fica legível sozinho — dá para
+ * mudar uma coisa sem ler as outras. */
+.bloco {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-superficie);
+}
+
+.bloco__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.05rem; }
+.bloco__texto { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+/* Título e descrição à esquerda, controle à direita — o padrão da referência
+ * para as opções de ligar e desligar. */
+.bloco--chave { grid-template-columns: 1fr auto; align-items: center; gap: var(--espaco-4); }
+.bloco--chave > .bloco__titulo, .bloco--chave > .bloco__texto { grid-column: 1; }
+
+/* ──────────────────────────────────────────────── cartões de modelo */
+
+.modelo {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+}
+
+.modelo[data-em-uso="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+.modelo__nome { margin: 0; font-weight: 600; display: flex; align-items: center; gap: var(--espaco-2); }
+.modelo__desc { margin: 2px 0 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+/* Tamanho, estado e a nota do que medimos, numa linha só. É o que o cartão do
+ * Meetily faz com badges — a diferença é que aqui os números são nossos. */
+.modelo__fatos {
+  margin: var(--espaco-2) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+  font-size: 11px;
+  color: var(--cor-texto-suave);
+}
+
+.modelo__fatos b { font-weight: 600; color: var(--cor-texto); }
+
+/* A coluna da direita cresce para baixo durante o download: botão, barra e o
+ * "412 MB de 3090 MB". Largura fixa para o cartão não pular de tamanho quando
+ * o texto de andamento aparece. */
+.modelo__acao {
+  display: grid;
+  gap: var(--espaco-2);
+  justify-items: end;
+  width: 9rem;
+}
+
+.modelo__acao .aa-progresso { width: 100%; height: 6px; }
+.modelo__acao .campo__dica { font-size: 11px; text-align: right; }
+
+/* ─────────────────────────────────────────────────────────── vozes */
+
+.pessoa { display: grid; gap: var(--espaco-2); }
+
+.pessoa__topo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.pessoa__nome { margin: 0; font-weight: 600; }
+
+.amostra {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+  font-size: var(--texto-pequeno);
+}
+
+.amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
+.amostra__proc { color: var(--cor-texto-suave); font-family: var(--fonte-mono); font-size: 11px; }
+.amostra__acoes { display: flex; gap: var(--espaco-2); }
+
+/* O play de cada amostra é um botão de ícone: ele repete por linha, e o nome
+ * escrito em cada uma delas viraria ruído. */
+.tocar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--cor-borda);
+  border-radius: 50%;
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  cursor: pointer;
+}
+
+.tocar svg { width: 13px; height: 13px; }
+.tocar:hover:not(:disabled) { border-color: var(--cor-acao); color: var(--cor-acao); }
+.tocar:disabled { opacity: .35; cursor: default; }
+
+/* O que está tocando fica marcado: com várias amostras da mesma pessoa, saber
+ * qual delas se está ouvindo é o ponto inteiro de ouvir. */
+.tocar[data-tocando] {
+  border-color: var(--cor-acao);
+  background: var(--cor-acao);
+  color: var(--cor-texto-invertido);
+}
+
+/* ────────────────────────────────────── clientes e projetos */
+
+/* Campo e botões lado a lado, o campo esticando. */
+.campo-pasta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--espaco-3);
+  align-items: end;
+}
+
+.projeto { border-top: 1px solid var(--cor-borda); }
+
+/* O topo é um botão que ocupa a linha toda, e as ações ficam ao lado dele —
+ * fora, porque botão dentro de botão é HTML inválido. */
+.projeto__linha { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+.projeto__acoes { padding-right: var(--espaco-3); }
+
+.projeto__topo {
+  display: grid;
+  grid-template-columns: 1rem auto 1fr;
+  gap: var(--espaco-2);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  text-align: left;
+  cursor: pointer;
+}
+
+.projeto__topo:hover { background: var(--cor-superficie-2); }
+.projeto__topo:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
+.projeto__seta { color: var(--cor-texto-suave); font-size: 10px; }
+.projeto__topo .campo__dica { justify-self: end; }
+
+.projeto__corpo {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-3) var(--espaco-5) 2rem;
+}
+
+/* ─────────────────────────────────────── o que ainda não existe */
+
+/* Um aviso de obra, e não um botão morto. Botão desabilitado convida ao clique
+ * e não explica nada; isto ocupa o lugar da funcionalidade dizendo o que falta
+ * e o que já dá para fazer sem ela. */
+.obra {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+  border: 1px dashed var(--cor-borda-forte);
+  border-radius: var(--raio-medio);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-pequeno);
+}
+
+.obra strong { color: var(--cor-texto); }

@@ -952,6 +952,11 @@ class MeetingTranscriptionApp(ctk.CTk):
             if self._cancel_requested:
                 return
 
+            # Free the ASR weights before diarization loads: nothing below needs
+            # them, and sharing the card makes diarization spill to host memory.
+            transcriber.unload_model()
+            transcriber = None
+
             # Step 4: Speaker diarization (optional)
             if use_diarization:
                 self._set_pipeline_step("diarization")

@@ -42,7 +42,14 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # changes don't invalidate the heavier dependency cache.
 COPY src/ src/
 COPY assets/ assets/
-COPY web.py main.py README.md ./
+# LICENSE is required by the final `uv sync`: pyproject.toml declares
+# license = { file = "LICENSE" }, and hatchling errors out if it is missing.
+COPY web.py main.py README.md LICENSE ./
+
+# Stamp the build so the running image can be identified from the UI. Placed
+# after the source COPY on purpose: the layer cache invalidates whenever the
+# code changes, so the timestamp tracks the code it was built from.
+RUN date -u +"%Y-%m-%d %H:%M UTC" > /app/BUILD_INFO
 
 # Final install step — package the project itself (no deps, already done).
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -5,6 +5,7 @@ import logging
 import os
 import queue
 import re
+import subprocess
 import tempfile
 import threading
 import time
@@ -32,7 +33,7 @@ from ..transcription.faster_whisper_transcriber import FasterWhisperTranscriber
 from ..transcription.whisperx_transcriber import WhisperXTranscriber
 from ..diarization.speaker_diarizer import SpeakerDiarizer
 from ..utils.gpu_detector import is_cuda_available, get_device_info, enable_gpu_optimizations
-from . import history, projects, voices
+from . import history, projects, recordings, voices
 from .exporters import to_srt, to_vtt, write_docx
 
 logger = logging.getLogger(__name__)
@@ -121,6 +122,7 @@ def save_config(
     initial_prompt: str = "",
     recognize_voices: bool = True,
     voice_threshold: float = 0.65,
+    user_label: str = "You",
 ):
     config = {
         "model_size": model_size,
@@ -134,6 +136,7 @@ def save_config(
         "initial_prompt": initial_prompt,
         "recognize_voices": recognize_voices,
         "voice_threshold": float(voice_threshold),
+        "user_label": user_label,
     }
     if hf_token:
         config["hf_token"] = hf_token
@@ -213,11 +216,7 @@ def format_transcript_html(
     filter_set = set(speaker_filter) if speaker_filter else None
 
     rows = []
-    rows.append(
-        '<div id="mt-transcript" style="font-family: ui-monospace, Menlo, Consolas, monospace; '
-        'line-height: 1.7; padding: 14px; background: var(--block-background-fill, transparent); '
-        'border-radius: 8px; max-height: 600px; overflow-y: auto;">'
-    )
+    rows.append('<div id="mt-transcript" class="mt-transcript">')
 
     match_count = 0
     visible_count = 0
@@ -245,7 +244,7 @@ def format_transcript_html(
                 for i, part in enumerate(parts):
                     rebuilt.append(escape(part))
                     if i < len(matches):
-                        rebuilt.append(f'<mark style="background:#fde68a;color:#1f2937;padding:0 2px;border-radius:2px;">{escape(matches[i])}</mark>')
+                        rebuilt.append(f'<mark class="mt-hit">{escape(matches[i])}</mark>')
                 text_escaped = "".join(rebuilt)
             except re.error:
                 pass
@@ -254,13 +253,12 @@ def format_transcript_html(
         if include_speakers and seg.speaker:
             name = escape(speaker_names.get(seg.speaker, seg.speaker))
             color = colors.get(seg.speaker, "#666")
-            speaker_html = f'<strong style="color: {color};">{name}:</strong> '
+            speaker_html = f'<strong class="mt-speaker" style="color:{color};">{name}:</strong> '
 
         rows.append(
             f'<div class="mt-segment" data-idx="{idx}" data-start="{seg.start:.3f}" '
-            f'style="margin-bottom: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer;" '
             f'title="Click to seek audio &middot; double-click to edit">'
-            f'<span style="color: #94a3b8; font-size: 0.85em;">[{ts}]</span> '
+            f'<span class="mt-ts">[{ts}]</span> '
             f'{speaker_html}'
             f'<span>{text_escaped}</span>'
             f'</div>'
@@ -268,7 +266,7 @@ def format_transcript_html(
         visible_count += 1
 
     if visible_count == 0:
-        rows.append('<div style="color:#94a3b8;text-align:center;padding:20px;">No matching segments.</div>')
+        rows.append('<div class="mt-empty">No matching segments.</div>')
 
     rows.append('</div>')
     return "".join(rows), (match_count if has_search else -1)
@@ -311,34 +309,31 @@ def compute_speaker_stats(
 
 
 def render_steps_html(active_idx: int = -1, done: bool = False, elapsed: Optional[float] = None) -> str:
-    """Render pipeline step badges + elapsed time as HTML."""
+    """Render pipeline step badges + elapsed time as HTML.
+
+    Styling lives in CSS classes (see theme.py) rather than inline: the colours
+    have to follow the design system's tokens, which change with the theme, and
+    an inline hex cannot.
+    """
     parts = []
     for i, step in enumerate(PIPELINE_STEPS):
-        if done:
-            style = "background:#2ecc71;color:white;"
-            label = f"&#10003; {step}"
-        elif i < active_idx:
-            style = "background:#2ecc71;color:white;"
-            label = f"&#10003; {step}"
+        if done or i < active_idx:
+            cls, label = "mt-step mt-step--done", f"&#10003; {step}"
         elif i == active_idx:
-            style = "background:#3b82f6;color:white;font-weight:bold;"
-            label = f"&#9654; {step}"
+            cls, label = "mt-step mt-step--active", f"&#9654; {step}"
         else:
-            style = "background:#e5e7eb;color:#6b7280;"
-            label = step
+            cls, label = "mt-step", step
 
-        parts.append(
-            f'<span style="{style}display:inline-block;padding:4px 14px;'
-            f'border-radius:14px;margin:0 3px;font-size:13px;">{label}</span>'
-        )
+        parts.append(f'<span class="{cls}">{label}</span>')
         if i < len(PIPELINE_STEPS) - 1:
-            parts.append('<span style="color:#9ca3af;font-size:12px;">&#x2500;&#x2500;</span>')
+            parts.append('<span class="mt-step-sep">&#x2500;&#x2500;</span>')
 
     elapsed_html = ""
     if elapsed is not None:
-        elapsed_html = f'<div style="text-align:center;color:#6b7280;font-size:12px;margin-top:4px;">Elapsed: {format_time(elapsed)}</div>'
+        elapsed_html = (f'<div class="mt-elapsed">Elapsed: '
+                        f'{format_time(elapsed)}</div>')
 
-    return f'<div style="text-align:center;padding:8px 0;">{"".join(parts)}</div>{elapsed_html}'
+    return f'<div class="mt-steps">{"".join(parts)}</div>{elapsed_html}'
 
 
 def extract_date_from_filename(filepath: str) -> Optional[str]:
@@ -497,6 +492,8 @@ def transcribe_pipeline(
     initial_prompt: str,
     recognize_voices: bool,
     voice_threshold: float,
+    recording_sel: str = "",
+    user_label: str = "You",
 ):
     """Run the full transcription pipeline. Yields intermediate updates.
 
@@ -506,7 +503,7 @@ def transcribe_pipeline(
     save_config(
         model_size, engine, language, diarization, hf_token,
         condition_prev, diar_model, client, project, initial_prompt,
-        recognize_voices, voice_threshold,
+        recognize_voices, voice_threshold, user_label,
     )
 
     # Persist per-project settings (only if both fields are filled)
@@ -526,12 +523,23 @@ def transcribe_pipeline(
 
     empty = (render_steps_html(-1), "", "", [], [], "", None, {}, None, None, None)
 
-    if file_obj is None:
-        gr.Warning("Please upload a media file.")
+    # A dual-track recording takes precedence over the upload box: it carries
+    # strictly more information (which of the two tracks each utterance came
+    # from), so there is no reason to fall back to the mixdown when both exist.
+    dual: "recordings.Recording | None" = None
+    if recording_sel:
+        dual = recordings.find(recording_sel)
+        if dual is None:
+            gr.Warning(f"Recording '{recording_sel}' not found.")
+            yield empty
+            return
+
+    if dual is None and file_obj is None:
+        gr.Warning("Please upload a media file or pick a recording.")
         yield empty
         return
 
-    file_path = file_obj if isinstance(file_obj, str) else file_obj.name
+    file_path = None if dual else (file_obj if isinstance(file_obj, str) else file_obj.name)
     language_norm = language.strip() or None
     initial_prompt_norm = initial_prompt.strip() or None
     pipeline_start = time.time()
@@ -550,8 +558,15 @@ def transcribe_pipeline(
             # Step 1: Audio extraction
             event_q.put(("step", 0))
             t0 = time.time()
-            extractor = AudioExtractor()
-            audio_path = extractor.extract(file_path)
+            if dual:
+                # The tracks are already 16kHz mono and aligned by the recorder;
+                # transcription still runs on the sum so overlapping speech reads
+                # the same as it always did.
+                audio_path = str(recordings.mix_tracks(
+                    dual, Path(tempfile.gettempdir()) / f"mix_{dual.name}.wav"))
+            else:
+                extractor = AudioExtractor()
+                audio_path = extractor.extract(file_path)
             timings["Audio extraction"] = time.time() - t0
 
             # Step 2: Load model
@@ -575,6 +590,13 @@ def transcribe_pipeline(
             )
             timings["Transcription"] = time.time() - t0
 
+            # The stages run sequentially and nothing below needs the ASR weights.
+            # Keeping them resident forces diarization to share the card; on a small
+            # GPU that spills into host memory over PCIe instead of failing loudly,
+            # which shows up as a mysteriously slow diarization step.
+            transcriber.unload_model()
+            transcriber = None
+
             # Step 4: Diarization (optional)
             if diarization:
                 event_q.put(("step", 3))
@@ -583,12 +605,28 @@ def transcribe_pipeline(
                     token = hf_token.strip() if hf_token else None
                     diarizer = SpeakerDiarizer(hf_token=token, model=diar_model)
                     diarizer.load_model()
-                    diar_segments = diarizer.diarize(audio_path)
+                    # With two tracks, diarize only the system side: the mic
+                    # track is known to be the user, so making pyannote guess at
+                    # it only creates opportunities to confuse them.
+                    diar_target = str(dual.system) if dual else audio_path
+                    diar_segments = diarizer.diarize(diar_target)
                     result = diarizer.assign_speakers(result, diar_segments)
+                    if dual:
+                        mine, total = recordings.assign_owner(
+                            result, dual, user_label=user_label or "You")
+                        timings["Own-voice tagging"] = 0.0
+                        logger.info(f"dual-track: {mine}/{total} segments tagged "
+                                    f"as '{user_label}'")
                     timings["Diarization"] = time.time() - t0
                 except Exception as e:
                     logger.warning(f"Diarization failed: {e}")
                     event_q.put(("warn", f"Diarization failed: {e}. Continuing without speakers."))
+                finally:
+                    # Voice fingerprinting loads its own embedding model next.
+                    try:
+                        diarizer.unload_model()
+                    except (NameError, AttributeError):
+                        pass
 
             # Step 5: Output
             event_q.put(("step", 4))
@@ -622,7 +660,7 @@ def transcribe_pipeline(
             transcript_html, _ = format_transcript_html(result, speaker_names, diarization)
             transcript_text = format_transcript_text(result, speaker_names, diarization)
             stats = compute_speaker_stats(result, speaker_names=speaker_names, voice_matches=voice_matches)
-            thumbs = extract_speaker_thumbnails(file_path, result) if diarization else []
+            thumbs = extract_speaker_thumbnails(file_path, result) if (diarization and file_path) else []
 
             total = sum(timings.values())
             timing_lines = [f"{'Step':<22} {'Time':>8}", "─" * 32]
@@ -643,7 +681,7 @@ def transcribe_pipeline(
                     project=project,
                     meeting_date=meeting_date,
                     audio_path=audio_path,
-                    source_file=file_path,
+                    source_file=file_path or str(dual.path),
                 )
             except Exception as e:
                 logger.warning(f"History save failed: {e}")
@@ -1159,7 +1197,65 @@ def on_file_change(file_obj):
     return gr.update()
 
 
+def on_recording_change(recording_sel: str, vocabulary: str = ""):
+    """Preenche data e vocabulário ao escolher uma gravação.
+
+    A data vem de `recorded_at` no meta.json e não do nome da pasta: é o
+    instante real e sobrevive a um rename. O vocabulário recebe os
+    participantes que o gravador colheu da agenda -- nomes próprios são a
+    maior fonte de erro da transcrição, e aqui eles chegam de graça.
+    """
+    rec = recordings.find(recording_sel or "")
+    if rec is None:
+        return gr.update(), gr.update()
+
+    vocab = rec.merge_vocabulary(vocabulary)
+    vocab_update = (gr.update(value=vocab) if vocab != (vocabulary or "").strip()
+                    else gr.update())
+    stamp = rec.meta.get("recorded_at")
+    if stamp:
+        try:
+            # ISO em UTC -> data local, que e o que o usuario reconhece.
+            dt = datetime.fromisoformat(stamp)
+            if dt.tzinfo is not None:
+                dt = dt.astimezone()
+            return gr.update(value=dt.strftime("%Y-%m-%d")), vocab_update
+        except ValueError:
+            logger.debug(f"recorded_at ilegivel em {rec.name}: {stamp!r}")
+    date = extract_date_from_filename(rec.name)
+    return (gr.update(value=date) if date else gr.update()), vocab_update
+
+
 # ── Build Gradio app ─────────────────────────────────────────────────
+
+
+def get_build_label() -> str:
+    """Identify the running code, so a stale container is visible at a glance.
+
+    Docker bakes /app/BUILD_INFO at build time. Running from source there is no
+    stamp, so fall back to the current git commit.
+    """
+    stamp = Path("/app/BUILD_INFO")
+    if stamp.is_file():
+        try:
+            text = stamp.read_text().strip()
+            if text:
+                return f"build {text}"
+        except OSError:
+            pass
+
+    try:
+        sha = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+            cwd=Path(__file__).resolve().parents[2],
+        )
+        if sha.returncode == 0 and sha.stdout.strip():
+            return f"source @ {sha.stdout.strip()}"
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    return "source (unversioned)"
 
 
 def create_app() -> gr.Blocks:
@@ -1171,18 +1267,22 @@ def create_app() -> gr.Blocks:
 
     config = load_config()
     logo_svg = get_logo_inline_svg()
+    build_label = get_build_label()
+    logger.info(f"Running {build_label}")
 
     # Header HTML with inline logo
     header_html = f"""
-    <div style="display: flex; align-items: center; gap: 16px; padding: 8px 0; margin-bottom: 8px;">
-        <div style="width: 56px; height: 56px; flex-shrink: 0; color: var(--body-text-color, currentColor);">
-            {logo_svg}
-        </div>
+    <header class="mt-header">
+        <div class="mt-logo">{logo_svg}</div>
         <div>
-            <h1 style="margin: 0; font-size: 1.6rem;">Meeting Transcription</h1>
-            <div style="color: #94a3b8; font-size: 0.9rem;">Transcribe meetings with speaker diarization &mdash; <strong>{gpu_label}</strong></div>
+            <h1 class="mt-title">Meeting Transcription</h1>
+            <div class="mt-subtitle">Transcribe meetings with speaker diarization
+                <span class="mt-dot">&middot;</span>
+                <span class="aa-etiqueta aa-etiqueta--info">{gpu_label}</span>
+                <span class="aa-etiqueta" title="Which code this container is running. After a rebuild, recreate the container (docker compose up -d) or this will not change.">{escape(build_label)}</span>
+            </div>
         </div>
-    </div>
+    </header>
     """
 
     # JS attached on load:
@@ -1302,6 +1402,29 @@ def create_app() -> gr.Blocks:
             type="filepath",
         )
 
+        # ── Dual-track recordings from the Windows recorder ──
+        with gr.Accordion("From the recorder (two tracks)", open=False):
+            gr.Markdown(
+                "Recordings made by the Windows tray recorder keep your mic and "
+                "the meeting audio on separate tracks. Picking one here means "
+                "your own speech is identified from the mic track instead of "
+                "being guessed at by diarization."
+            )
+            with gr.Row():
+                recording_input = gr.Dropdown(
+                    label="Recording",
+                    choices=[r.label() for r in recordings.list_recordings()],
+                    value=None,
+                    interactive=True,
+                    scale=4,
+                )
+                refresh_recordings_btn = gr.Button("Refresh", scale=1)
+            user_label_input = gr.Textbox(
+                label="Your name on the mic track",
+                value=config.get("user_label", "You"),
+                placeholder="How segments from your microphone get labelled",
+            )
+
         # ── Recent Transcriptions ──
         with gr.Accordion("Recent transcriptions", open=False):
             history_table = gr.Dataframe(
@@ -1392,6 +1515,11 @@ def create_app() -> gr.Blocks:
             initial_prompt_input = gr.Textbox(
                 label="Custom vocabulary / context",
                 placeholder="Names, jargon, technical terms (e.g., 'Acme Corp, Project Atlas, Jane Smith, API REST'). Helps the model recognize domain-specific words.",
+                info=(
+                    "Only include words that are actually spoken out loud — table and "
+                    "field names waste the budget. Keep it under ~220 tokens (roughly "
+                    "150 words); anything beyond that is silently dropped."
+                ),
                 value=config.get("initial_prompt", ""),
                 lines=2,
                 max_lines=4,
@@ -1617,6 +1745,8 @@ def create_app() -> gr.Blocks:
                 initial_prompt_input,
                 recognize_voices_input,
                 voice_threshold_input,
+                recording_input,
+                user_label_input,
             ],
             outputs=[
                 steps_html,
@@ -1635,6 +1765,19 @@ def create_app() -> gr.Blocks:
 
         # Cancel button — cancels the start event
         cancel_btn.click(fn=lambda: None, cancels=[start_event])
+
+        # Re-scan the recordings folder without reloading the page: the recorder
+        # writes into it while this app is up.
+        refresh_recordings_btn.click(
+            fn=lambda: gr.update(
+                choices=[r.label() for r in recordings.list_recordings()]),
+            outputs=[recording_input],
+        )
+
+        recording_input.change(
+            fn=on_recording_change,
+            inputs=[recording_input, initial_prompt_input],
+            outputs=[date_input, initial_prompt_input])
 
         # Apply speaker name changes (also learns voice profiles)
         apply_names_btn.click(

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- net8.0-windows: WASAPI é Windows-only. É a fronteira do que não dá para
+       testar sem hardware — por isso o Core ficou net8.0 portátil e concentra
+       toda a aritmética. EnableWindowsTargeting permite compilar isto a partir
+       do WSL; o binário resultante roda pelo interop. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <ProjectReference Include="..\Core\MeetingRecorder.Core.csproj" />
+  </ItemGroup>
+
+</Project>

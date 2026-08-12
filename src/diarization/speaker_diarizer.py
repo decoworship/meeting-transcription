@@ -1,5 +1,6 @@
 """Speaker diarization using pyannote-audio."""
 
+import gc
 import logging
 import os
 from dataclasses import dataclass
@@ -91,6 +92,21 @@ class SpeakerDiarizer:
     @property
     def is_loaded(self) -> bool:
         return self._pipeline is not None
+
+    def unload_model(self) -> None:
+        """Unload the pipeline and release its VRAM.
+
+        Voice fingerprinting loads a third model after this stage, so on a small
+        card the pipeline has to get out of the way first.
+        """
+        self._pipeline = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     def diarize(
         self,

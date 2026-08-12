@@ -16,6 +16,9 @@ services:
       - ./data/meeting-transcription:/root/.meeting-transcription
       # Model cache — first run downloads ~5–10 GB; subsequent runs reuse.
       - ./data/huggingface:/root/.cache/huggingface
+      # Recordings dropped by the Windows recorder (recorder/). Read-only: the
+      # app consumes them, the recorder owns them.
+      - ./data/recordings:/root/recordings:ro
     # GPU passthrough — needs nvidia-container-toolkit on the host.
     # Comment out this whole `deploy:` block to run CPU-only.
     deploy:

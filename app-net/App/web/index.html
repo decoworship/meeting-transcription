@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<!-- Nada vem de fora: todo o conteúdo é servido de dentro do executável, então
+     a política pode ser fechada. 'unsafe-inline' fica de fora de propósito —
+     estilo e script moram em arquivos. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self';
+               font-src 'self'; img-src 'self' data:;
+               media-src https://gravacoes.local https://vozes.local;
+               connect-src 'none'">
+<title>Reuniões</title>
+<link rel="stylesheet" href="/ds.css">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<!-- Os ícones ficam aqui uma vez e são usados por referência. Sem biblioteca de
+     ícones — o design system não tem uma — e sem arquivo por ícone, que a esta
+     quantidade só multiplicaria requisições. -->
+<!-- A classe tira o sprite do fluxo. Não use atributo style aqui: a CSP desta
+     página é style-src 'self', sem 'unsafe-inline', então o atributo é
+     silenciosamente ignorado — e um sprite em fluxo cria uma linha de texto de
+     23 px que empurra a página inteira para baixo da janela. -->
+<svg class="sprite" aria-hidden="true">
+  <defs>
+    <g id="i-reunioes" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/>
+      <path d="M3 9h18M8 4v3M16 4v3M7 13h5M7 16h8"/>
+    </g>
+    <g id="i-gravador" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="3" width="6" height="11" rx="3"/>
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
+    </g>
+    <g id="i-config" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>
+    </g>
+    <g id="i-tocar" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 5l11 7-11 7z"/>
+    </g>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- O trilho é o único elemento que nunca sai da tela. É por ele que se troca
+       de destino; a barra de cima é do destino em que se está.
+       O gravador já tem lugar reservado: ele hoje vive só na bandeja, e o
+       espelho dele dentro do app é uma decisão tomada e ainda não construída —
+       deixar o buraco à vista é mais honesto que fingir que ele não existe. -->
+  <nav class="trilho" aria-label="Seções">
+    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
+      <span>Reuniões</span>
+    </button>
+    <button class="trilho__item" id="ir-gravador" type="button" disabled
+            title="O gravador ainda vive só na bandeja do Windows">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
+      <span>Gravador</span>
+    </button>
+    <button class="trilho__item trilho__item--fim" id="ir-config" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-config"/></svg>
+      <span>Ajustes</span>
+    </button>
+  </nav>
+
+  <div class="conteudo">
+    <header class="barra">
+      <button class="barra__voltar aa-btn aa-btn-texto" id="voltar" hidden>← Reuniões</button>
+      <h1 class="barra__titulo" id="titulo">Reuniões</h1>
+      <p class="barra__sub" id="subtitulo"></p>
+    </header>
+
+    <main class="aa-pagina" id="tela" aria-busy="true">
+      <div class="aa-cartao aa-esqueleto esqueleto--cartao"></div>
+      <div class="aa-cartao aa-esqueleto esqueleto--cartao"></div>
+    </main>
+  </div>
+</div>
+
+<!-- Painéis que abrem por cima. Ficam no HTML e não são criados por JS porque
+     a estrutura deles é fixa; o que muda é o conteúdo.
+     Só sobrou a de falantes: as configurações viraram tela, porque a gestão de
+     vozes precisa de largura que gaveta nenhuma dá. A de falantes continua
+     gaveta pelo motivo de sempre — mexer em quem falou sem perder o lugar no
+     texto. -->
+<div class="veu" id="veu" hidden></div>
+
+<aside class="gaveta gaveta--larga" id="gaveta-falantes" hidden aria-label="Falantes">
+  <div class="gaveta__topo">
+    <h2>Falantes</h2>
+    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
+  </div>
+  <div class="gaveta__corpo" id="corpo-falantes"></div>
+</aside>
+
+<aside class="gaveta" id="gaveta-exportar" hidden aria-label="Exportar">
+  <div class="gaveta__topo">
+    <h2>Exportar</h2>
+    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
+  </div>
+  <div class="gaveta__corpo" id="corpo-exportar"></div>
+</aside>
+
+<!-- O áudio da gravação aberta. Fica fora das telas porque continuar tocando
+     ao abrir uma gaveta é o comportamento certo. -->
+<audio id="audio" preload="none"></audio>
+
+<dialog class="modal" id="modal-segmento">
+  <form method="dialog" class="modal__corpo" id="form-segmento">
+    <h2 class="modal__titulo" id="titulo-segmento">Editar trecho</h2>
+
+    <label class="campo">
+      <span>Texto</span>
+      <textarea id="campo-texto" rows="4" class="aa-entrada"></textarea>
+    </label>
+
+    <label class="campo">
+      <span>Falante</span>
+      <select id="campo-falante" class="aa-entrada"></select>
+    </label>
+
+    <div class="modal__acoes">
+      <button class="aa-btn aa-btn-secundario" value="cancelar" formnovalidate>Cancelar</button>
+      <button class="aa-btn aa-btn-primario" value="salvar" id="salvar-segmento">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

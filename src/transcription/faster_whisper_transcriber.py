@@ -92,11 +92,29 @@ class FasterWhisperTranscriber(BaseTranscriber):
                 language=language,
                 beam_size=5,
                 condition_on_previous_text=condition_on_previous_text,
+                # Word-level timestamps split long utterances into short segments.
+                # Essential for diarization: assign_speakers() matches by temporal
+                # overlap, so a segment spanning several speaker turns is guaranteed
+                # to be misattributed.
+                word_timestamps=True,
+                hallucination_silence_threshold=2.0,
                 vad_filter=True,
-                vad_parameters=dict(min_silence_duration_ms=500),
+                vad_parameters=dict(
+                    min_silence_duration_ms=500,
+                    # Caps runaway segments; without it a dense stretch of speech
+                    # can collapse into a single block and lose content.
+                    max_speech_duration_s=25,
+                    threshold=0.35,
+                ),
             )
             if initial_prompt:
-                transcribe_kwargs["initial_prompt"] = initial_prompt
+                # Passed as `hotwords`, not `initial_prompt`. faster-whisper resets
+                # the prompt after every 30s window when condition_on_previous_text
+                # is False, so initial_prompt only ever biases the first window --
+                # and it is truncated to the last 223 tokens, silently dropping
+                # whatever comes first (typically the speaker names). `hotwords` is
+                # re-injected into every window instead.
+                transcribe_kwargs["hotwords"] = initial_prompt
 
             segments_gen, info = self._model.transcribe(audio_path, **transcribe_kwargs)
 
