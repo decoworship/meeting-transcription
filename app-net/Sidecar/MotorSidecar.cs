@@ -71,6 +71,11 @@ public sealed class MotorSidecar : IDisposable
         var processo = Process.Start(info)
             ?? throw new MotorException($"não foi possível iniciar o motor: {comando}");
 
+        // Imediatamente depois de subir, e antes de qualquer await: se o app for
+        // morto entre o Start e a adoção, o motor fica órfão — que é justamente
+        // o buraco que o job fecha. Ver JobDosMotores.
+        JobDosMotores.Adotar(processo);
+
         var registro = new List<string>();
         _ = Task.Run(async () =>
         {
@@ -167,6 +172,30 @@ public sealed class MotorSidecar : IDisposable
             null, ct);
 
         return m.Vetor ?? throw new MotorException("o motor não devolveu vetor de voz.");
+    }
+
+    /// <summary>
+    /// Baixa um repositório de modelo para o cache local.
+    /// </summary>
+    /// <remarks>
+    /// Não devolve nada: o que interessa é o efeito no disco, e quem responde
+    /// "está aí?" é o <c>Catalogo</c>, lendo o cache. Ter o motor devolver o
+    /// caminho criaria uma segunda fonte da mesma verdade.
+    /// </remarks>
+    public async Task BaixarAsync(
+        string repositorio, string pasta, long tamanhoEsperado,
+        Action<double, string>? progresso, CancellationToken ct = default)
+    {
+        await ExecutarAsync(
+            new Requisicao
+            {
+                Id = _proximoId++,
+                Op = "baixar",
+                Repositorio = repositorio,
+                Pasta = pasta,
+                TamanhoEsperado = tamanhoEsperado,
+            },
+            progresso, ct);
     }
 
     /// <summary>Envia uma requisição e devolve a mensagem de resultado dela.</summary>

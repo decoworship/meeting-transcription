@@ -108,6 +108,16 @@ internal sealed class JanelaDoApp : IDisposable
             "gravacoes.local", _pastaDasGravacoes,
             CoreWebView2HostResourceAccessKind.Allow);
 
+        // Os trechos de voz, pelo mesmo mecanismo. São 4 segundos de WAV, então
+        // o Range importa pouco aqui; o que importa é que a tela de vozes possa
+        // tocá-los sem a ponte ter de carregar áudio em base64 dentro de um
+        // JSON. Ninguém julga um vetor de 256 dimensões — qualquer um julga
+        // quatro segundos de áudio, e é isso que torna a limpeza possível.
+        Directory.CreateDirectory(Vozes.PastaPadrao);
+        _web.SetVirtualHostNameToFolderMapping(
+            "vozes.local", Vozes.PastaPadrao,
+            CoreWebView2HostResourceAccessKind.Allow);
+
         _web.AddWebResourceRequestedFilter($"{Conteudo.Raiz}*",
                                            CoreWebView2WebResourceContext.All);
         _web.WebResourceRequested += (_, e) => Servir(ambiente, e);

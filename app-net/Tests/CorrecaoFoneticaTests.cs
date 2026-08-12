@@ -105,4 +105,34 @@ public sealed class CorrecaoFoneticaTests
     {
         Assert.Equal(CorrecaoFonetica.Foneticar("Elio"), CorrecaoFonetica.Foneticar("Élio"));
     }
+    [Fact]
+    public void AsTrocasChegamAoArquivoQueAUiLe()
+    {
+        // O critério D da carta: a correção era aplicada e a lista de trocas
+        // descartada, então o texto chegava corrigido sem dizer que fora
+        // corrigido. Este teste é a régua de que o rastro sobrevive à
+        // serialização — é por ele que a tela consegue marcar e desfazer.
+        var seg = new SegmentoFinal { Start = 0, End = 1, Text = "ontem o Jimmy falou disso" };
+
+        var (texto, trocas) = CorrecaoFonetica.Corrigir(seg.Text, ["Dimi"]);
+        seg.Text = texto;
+        seg.Swaps = [.. trocas.Select(t => new TrocaFeita { De = t.De, Para = t.Para })];
+
+        var resultado = new ResultadoDaTranscricao { Segments = [seg] };
+        var lido = ResultadoDaTranscricao.DeJson(resultado.ParaJson());
+
+        var swap = Assert.Single(lido!.Segments[0].Swaps!);
+        Assert.Equal("Jimmy", swap.De);
+        Assert.Equal("Dimi", swap.Para);
+    }
+
+    [Fact]
+    public void TrechoSemTrocaNaoGanhaListaVazia()
+    {
+        // Nulo, e não lista vazia: a tela decide mostrar a marca por
+        // `swaps?.length`, e uma lista vazia em todo trecho engordaria o
+        // transcricao.json de uma reunião de duas horas por nada.
+        var (_, trocas) = CorrecaoFonetica.Corrigir("ontem o Marcelo falou disso", ["Dimi"]);
+        Assert.Empty(trocas);
+    }
 }

@@ -131,4 +131,92 @@ public sealed class ProjetosTests : IDisposable
         Assert.NotEmpty(clientes);
         Assert.All(clientes, c => Assert.NotEmpty(p.ListarProjetos(c)));
     }
+    [Fact]
+    public void RenomearClienteLevaOsProjetosEAsChavesDesconhecidas()
+    {
+        Semear("""
+        {
+          "clients": {
+            "Algar": {
+              "projects": {
+                "Agentes": { "language": "pt", "chave_do_python": 42 }
+              }
+            }
+          }
+        }
+        """);
+
+        var p = new Projetos(Caminho);
+        Assert.True(p.RenomearCliente("Algar", "Algar Telecom"));
+
+        var lido = new Projetos(Caminho);
+        Assert.Equal(["Algar Telecom"], lido.ListarClientes());
+        Assert.Equal(["Agentes"], lido.ListarProjetos("Algar Telecom"));
+        Assert.Equal("pt", lido.Preferencias("Algar Telecom", "Agentes")!.Language);
+
+        // A chave que este código não modela sobrevive: o app Python ainda lê o
+        // mesmo arquivo, e renomear não pode ser uma forma de apagar o que ele
+        // escreveu.
+        Assert.Contains("chave_do_python", File.ReadAllText(Caminho));
+    }
+
+    [Fact]
+    public void RenomearParaUmNomeQueJaExisteNaoFundeNemSobrescreve()
+    {
+        Semear("""
+        {
+          "clients": {
+            "Algar":  { "projects": { "Agentes": { "language": "pt" } } },
+            "Outro":  { "projects": { "Coisa":   { "language": "en" } } }
+          }
+        }
+        """);
+
+        var p = new Projetos(Caminho);
+
+        // Silenciosamente fundir dois cadastros seria pior que recusar: o
+        // vocabulário de um cliente passaria a valer para o outro.
+        Assert.False(p.RenomearCliente("Algar", "Outro"));
+
+        var lido = new Projetos(Caminho);
+        Assert.Equal(["Algar", "Outro"], lido.ListarClientes());
+        Assert.Equal("en", lido.Preferencias("Outro", "Coisa")!.Language);
+    }
+
+    [Fact]
+    public void ApagarProjetoNaoLevaOsIrmaos()
+    {
+        Semear("""
+        {
+          "clients": {
+            "Algar": {
+              "projects": {
+                "Agentes": { "language": "pt" },
+                "Fixa":    { "language": "pt" }
+              }
+            }
+          }
+        }
+        """);
+
+        var p = new Projetos(Caminho);
+        Assert.True(p.ApagarProjeto("Algar", "Agentes"));
+
+        var lido = new Projetos(Caminho);
+        Assert.Equal(["Fixa"], lido.ListarProjetos("Algar"));
+        Assert.Equal(["Algar"], lido.ListarClientes());   // o cliente fica
+    }
+
+    [Fact]
+    public void ApagarOQueNaoExisteDevolveFalsoEmVezDeExplodir()
+    {
+        Semear("""{ "clients": {} }""");
+        var p = new Projetos(Caminho);
+
+        // A tela pode pedir para apagar algo que outra janela já apagou. Isso é
+        // rotina, não erro — e não pode virar exceção na cara do usuário.
+        Assert.False(p.ApagarCliente("Fantasma"));
+        Assert.False(p.ApagarProjeto("Fantasma", "Nenhum"));
+        Assert.False(p.RenomearProjeto("Fantasma", "Nenhum", "Outro"));
+    }
 }

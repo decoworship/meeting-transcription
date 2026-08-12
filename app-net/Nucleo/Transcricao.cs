@@ -21,6 +21,33 @@ public sealed class SegmentoFinal
     // no lugar (E3 do FEATURES) vai reescrevê-lo de novo.
     [JsonPropertyName("text")] public required string Text { get; set; }
     [JsonPropertyName("speaker")] public string? Speaker { get; set; }
+
+    /// <summary>
+    /// O que a correção fonética trocou neste trecho.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Guardado porque a correção é um palpite, e palpite que ninguém pode
+    /// conferir é um defeito esperando. Ela existe para recuperar "Dimi" de
+    /// "Jimmy"; a mesma régua um pouco frouxa transforma uma palavra comum num
+    /// nome do vocabulário, e sem esta lista o usuário lê o resultado sem saber
+    /// que houve troca — o texto parece simplesmente ter saído assim do modelo.
+    /// </para>
+    /// <para>
+    /// A posição não é guardada. Ela é do texto <b>antes</b> da correção, e o
+    /// texto que a UI mostra é o de depois — pior ainda, a edição manual o
+    /// reescreve de novo. Um índice que aponta para um texto que não existe
+    /// mais marcaria a palavra errada, que é pior que não marcar nada.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("swaps")] public List<TrocaFeita>? Swaps { get; set; }
+}
+
+/// <summary>Uma troca da correção fonética, como o arquivo a guarda.</summary>
+public sealed class TrocaFeita
+{
+    [JsonPropertyName("from")] public required string De { get; init; }
+    [JsonPropertyName("to")] public required string Para { get; init; }
 }
 
 /// <summary>O resultado que a UI consome e o histórico persiste.</summary>

@@ -28,7 +28,10 @@ public sealed class TranscritorTests : IDisposable
         if (python) File.WriteAllText(p, "");
         if (asr) File.WriteAllText(a, "");
         if (diar) File.WriteAllText(d, "");
-        return new Motores(p, a, d);
+        // O motor de modelos não entra no OQueFalta: ele só é exigido para
+        // baixar, e faltar não pode impedir uma transcrição com o modelo que
+        // já está no disco.
+        return new Motores(p, a, d, Path.Combine(_pasta, "modelos.py"));
     }
 
     [Fact]

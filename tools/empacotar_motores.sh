@@ -10,6 +10,7 @@
 #   motores/python/Lib/site-packages faster-whisper, pyannote e dependências
 #   motores/asr/motor.py             o sidecar de transcrição
 #   motores/diarizacao/motor.py      o sidecar de diarização
+#   motores/modelos/motor.py         o sidecar que baixa modelo sob controle
 #
 # Um Python só para os dois motores, e não um por motor: o app aponta para um
 # `python.exe` (ver Nucleo/Transcritor.cs), e separar os ambientes só valeria
@@ -80,9 +81,12 @@ rm -rf "$DESTINO/python/Lib/site-packages/torch/include" \
        "$DESTINO/python/Lib/site-packages/torch/test"
 
 echo "==> os sidecars"
-mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao"
+mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos"
 cp "$RAIZ/motores/asr/motor.py" "$DESTINO/asr/"
 cp "$RAIZ/motores/diarizacao/motor.py" "$DESTINO/diarizacao/"
+# O motor de modelos não traz dependência nova: a huggingface_hub já vem
+# junto do faster-whisper e do pyannote, que a baixam por conta própria.
+cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
 
 echo
 du -sh "$DESTINO"

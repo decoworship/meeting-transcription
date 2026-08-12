@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
+using MeetingApp.Sidecar;
 
 namespace MeetingApp.App;
 
@@ -42,6 +43,13 @@ internal sealed class Pedido
 
     /// <summary>A transcrição inteira, como a página a tem depois de editada.</summary>
     [JsonPropertyName("conteudo")] public string? Conteudo { get; init; }
+
+    /// <summary>Qual pessoa e qual amostra dela, na tela de vozes.</summary>
+    [JsonPropertyName("pessoa")] public string? Pessoa { get; init; }
+    [JsonPropertyName("indice")] public int? Indice { get; init; }
+
+    /// <summary>De onde o diálogo de pasta começa.</summary>
+    [JsonPropertyName("pasta")] public string? Pasta { get; init; }
 }
 
 internal sealed class Resposta
@@ -78,6 +86,52 @@ internal sealed class Resposta
     /// <summary>Cliente → seus projetos. A UI precisa dos dois para o cadastro.</summary>
     [JsonPropertyName("clientes")] public Dictionary<string, List<string>>? Clientes { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
+
+    /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
+    [JsonPropertyName("catalogo")] public List<PacoteComEstado>? Catalogo { get; init; }
+
+    /// <summary>A biblioteca de vozes como a tela precisa vê-la.</summary>
+    [JsonPropertyName("vozes")] public List<PessoaResumo>? Vozes { get; init; }
+
+    /// <summary>A pasta escolhida no diálogo, ou nulo se foi cancelado.</summary>
+    [JsonPropertyName("pasta")] public string? Pasta { get; init; }
+}
+
+/// <summary>Uma pessoa conhecida, e as amostras que o sistema guarda dela.</summary>
+/// <remarks>
+/// O vetor <b>não</b> vem junto de propósito: são 256 floats por amostra que a
+/// tela não tem como usar e que só engordariam cada mensagem. O que a tela
+/// precisa é da procedência — é ela que permite tocar o trecho, e é ouvindo
+/// quatro segundos que uma pessoa julga o que nenhum número mostra.
+/// </remarks>
+internal sealed class PessoaResumo
+{
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("amostras")] public List<AmostraResumo> Amostras { get; init; } = [];
+}
+
+internal sealed class AmostraResumo
+{
+    /// <summary>A posição dentro do perfil: é por ela que se aprova ou esquece.</summary>
+    [JsonPropertyName("indice")] public int Indice { get; init; }
+    [JsonPropertyName("criada_em")] public required string CriadaEm { get; init; }
+    [JsonPropertyName("duracao_s")] public double DuracaoS { get; init; }
+    [JsonPropertyName("gravacao")] public required string Gravacao { get; init; }
+    [JsonPropertyName("faixa")] public required string Faixa { get; init; }
+    [JsonPropertyName("t0")] public double T0 { get; init; }
+    [JsonPropertyName("t1")] public double T1 { get; init; }
+    [JsonPropertyName("dispositivo")] public string? Dispositivo { get; init; }
+    [JsonPropertyName("quarentena")] public bool Quarentena { get; init; }
+
+    /// <summary>
+    /// O caminho do trecho relativo à pasta de vozes, ou nulo se não houver.
+    /// </summary>
+    /// <remarks>
+    /// Relativo, e não absoluto: a página o concatena em <c>vozes.local</c>,
+    /// que é a pasta mapeada. Mandar o caminho absoluto obrigaria a tela a
+    /// conhecer a estrutura de disco do app.
+    /// </remarks>
+    [JsonPropertyName("trecho")] public string? Trecho { get; init; }
 }
 
 /// <summary>Uma gravação como a lista precisa mostrá-la.</summary>
@@ -101,6 +155,8 @@ internal sealed class GravacaoResumo
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Pedido))]
 [JsonSerializable(typeof(Resposta))]
+[JsonSerializable(typeof(PacoteComEstado))]
+[JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
@@ -174,6 +230,70 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
 
                 case "config":
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
+                    break;
+
+                case "escolher-pasta":
+                    Responder(new Resposta { Id = p.Id, Pasta = EscolherPasta(p.Pasta) });
+                    break;
+
+                case "renomear-cliente":
+                    _projetos.RenomearCliente(p.Cliente ?? "", p.Nome ?? "");
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
+                    break;
+
+                case "renomear-projeto":
+                    _projetos.RenomearProjeto(p.Cliente ?? "", p.Projeto ?? "", p.Nome ?? "");
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
+                    break;
+
+                case "apagar-cliente":
+                    _projetos.ApagarCliente(p.Cliente ?? "");
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
+                    break;
+
+                case "apagar-projeto":
+                    _projetos.ApagarProjeto(p.Cliente ?? "", p.Projeto ?? "");
+                    Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
+                    break;
+
+                case "apagar-gravacao":
+                    ApagarGravacao(p.Gravacao);
+                    Responder(new Resposta { Id = p.Id, Gravacoes = Listar() });
+                    break;
+
+                case "catalogo":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Catalogo = Catalogo.Listar(ConfiguracoesDoApp.Carregar()),
+                    });
+                    break;
+
+                case "baixar-pacote":
+                    await BaixarPacoteAsync(p);
+                    break;
+
+                case "remover-pacote":
+                    RemoverPacote(p.Modelo);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Catalogo = Catalogo.Listar(ConfiguracoesDoApp.Carregar()),
+                    });
+                    break;
+
+                case "vozes":
+                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    break;
+
+                case "aprovar-voz":
+                    new Vozes().Aprovar(p.Pessoa ?? "", p.Indice ?? -1);
+                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    break;
+
+                case "esquecer-voz":
+                    new Vozes().Esquecer(p.Pessoa ?? "", p.Indice ?? -1);
+                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
                     break;
 
                 case "salvar-config":
@@ -375,6 +495,172 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
                 : amostra.Quarentena ? $"voz de {nome} guardada, aguardando revisão"
                 : $"voz de {nome} aprendida",
         });
+    }
+
+    /// <summary>Abre o diálogo de pasta do Windows e devolve o que foi escolhido.</summary>
+    /// <remarks>
+    /// Digitar caminho à mão é onde os erros moram — barra invertida trocada,
+    /// espaço no fim, pasta que não existe. O diálogo do sistema não erra
+    /// nenhum dos três, e é o mesmo que a exportação já usava.
+    /// </remarks>
+    private static string? EscolherPasta(string? inicial)
+    {
+        string ponto = inicial is { Length: > 0 } && Directory.Exists(inicial)
+            ? inicial
+            : Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        return SeletorDePasta.Escolher(IntPtr.Zero, ponto, "Escolher pasta");
+    }
+
+    /// <summary>
+    /// Apaga uma gravação inteira: os WAVs, o meta e a transcrição.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A pasta é conferida contra a raiz das gravações antes de qualquer coisa.
+    /// A página manda um caminho, e caminho vindo da tela que chega direto a um
+    /// <c>Directory.Delete(recursive)</c> é um apagador de disco controlado pelo
+    /// HTML — basta um <c>..\..\</c> para virar outra coisa.
+    /// </para>
+    /// <para>
+    /// É a operação mais destrutiva do app: leva junto o áudio original, que não
+    /// se refaz. Quem chama é responsável por confirmar antes.
+    /// </para>
+    /// </remarks>
+    private void ApagarGravacao(string? pasta)
+    {
+        if (pasta is not { Length: > 0 })
+            throw new InvalidOperationException("sem gravação");
+
+        string alvo = Path.GetFullPath(pasta);
+        string raiz = Path.GetFullPath(pastaDasGravacoes);
+
+        // O separador no fim impede que "…/gravacoes-antigas" passe por estar
+        // sob "…/gravacoes" por prefixo de texto.
+        if (!alvo.StartsWith(raiz + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "esta pasta não está na pasta das gravações");
+
+        if (alvo.TrimEnd(Path.DirectorySeparatorChar)
+                .Equals(raiz.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("isso apagaria todas as gravações");
+
+        if (!Directory.Exists(alvo))
+            throw new InvalidOperationException("a gravação não está mais lá");
+
+        Directory.Delete(alvo, recursive: true);
+    }
+
+    /// <summary>
+    /// Baixa um pacote de modelo, relatando andamento à tela.
+    /// </summary>
+    /// <remarks>
+    /// O motor de modelos sobe e cai por download: diferente do ASR e da
+    /// diarização, não há nada quente para preservar entre chamadas, e um
+    /// processo Python parado à toa é memória sem contrapartida.
+    /// </remarks>
+    private async Task BaixarPacoteAsync(Pedido p)
+    {
+        var pacote = Catalogo.Pacotes.FirstOrDefault(x => x.Id == p.Modelo)
+            ?? throw new InvalidOperationException($"não conheço o pacote {p.Modelo}");
+
+        var motores = Motores.AoLadoDoExecutavel();
+        if (!File.Exists(motores.ScriptModelos))
+            throw new MotorException(
+                $"o motor de modelos não está em {motores.ScriptModelos}");
+
+        var ambiente = new Dictionary<string, string>();
+        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
+
+        using (var motor = await MotorSidecar.IniciarAsync(
+                   motores.Python, [motores.ScriptModelos], CancellationToken.None, ambiente))
+        {
+            await motor.BaixarAsync(
+                pacote.Repositorio,
+                Catalogo.PastaDoPacote(pacote),
+                pacote.TamanhoEsperadoBytes,
+                (pct, texto) =>
+                Responder(new Resposta
+                {
+                    Id = p.Id,
+                    Tipo = "progresso",
+                    Etapa = "baixando",
+                    Fracao = pct,
+                    Texto = texto,
+                }));
+        }
+
+        // O catálogo relê o disco: a tela nunca acredita no que o download
+        // disse ter feito, só no que está lá.
+        Responder(new Resposta
+        {
+            Id = p.Id,
+            Catalogo = Catalogo.Listar(ConfiguracoesDoApp.Carregar()),
+        });
+    }
+
+    /// <summary>Apaga um pacote do cache.</summary>
+    /// <remarks>
+    /// Só apaga pasta de pacote que está no catálogo, e o caminho é montado
+    /// aqui a partir do repositório conhecido — nunca vem da página. Um
+    /// caminho vindo da tela seria um apagador recursivo controlado pelo HTML.
+    /// </remarks>
+    private static void RemoverPacote(string? id)
+    {
+        var pacote = Catalogo.Pacotes.FirstOrDefault(x => x.Id == id)
+            ?? throw new InvalidOperationException($"não conheço o pacote {id}");
+
+        string pasta = Catalogo.PastaDoPacote(pacote);
+        if (Directory.Exists(pasta)) Directory.Delete(pasta, recursive: true);
+    }
+
+    /// <summary>
+    /// A biblioteca de vozes achatada para a tela.
+    /// </summary>
+    /// <remarks>
+    /// A quarentena aparece <b>junto</b> das demais amostras da pessoa, e não
+    /// numa lista à parte: quem decide se a amostra estranha é contaminação ou
+    /// uma condição nova legítima precisa ver as outras amostras da mesma pessoa
+    /// ao lado. Separar em duas telas obrigaria a decidir sem a comparação, que
+    /// é justamente o que a decisão exige.
+    /// </remarks>
+    private static List<PessoaResumo> VozesConhecidas()
+    {
+        var vozes = new Vozes();
+        var lista = new List<PessoaResumo>();
+
+        foreach (string pessoa in vozes.Pessoas())
+        {
+            var perfil = vozes.Perfil(pessoa);
+            if (perfil is null) continue;
+
+            var resumo = new PessoaResumo { Nome = pessoa };
+            for (int i = 0; i < perfil.Amostras.Count; i++)
+            {
+                var a = perfil.Amostras[i];
+                resumo.Amostras.Add(new AmostraResumo
+                {
+                    Indice = i,
+                    CriadaEm = a.CriadaEm,
+                    DuracaoS = a.DuracaoS,
+                    Gravacao = a.Origem.Gravacao,
+                    Faixa = a.Origem.Faixa,
+                    T0 = a.Origem.T0,
+                    T1 = a.Origem.T1,
+                    Dispositivo = a.Origem.Dispositivo,
+                    Quarentena = a.Quarentena,
+                    // Conferir que o arquivo existe, e não só que o campo está
+                    // preenchido: amostra antiga pode apontar para um recorte
+                    // que foi apagado, e a tela precisa desabilitar o play em
+                    // vez de oferecer um som que não vem.
+                    Trecho = a.Trecho is { Length: > 0 }
+                             && File.Exists(vozes.CaminhoDoTrecho(a.Trecho))
+                                 ? a.Trecho.Replace('\\', '/') : null,
+                });
+            }
+            lista.Add(resumo);
+        }
+        return lista;
     }
 
     /// <summary>

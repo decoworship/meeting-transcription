@@ -142,6 +142,65 @@ public sealed class Projetos
         Gravar();
     }
 
+    /// <summary>Renomeia um cliente, levando os projetos dele junto.</summary>
+    /// <remarks>
+    /// Move o nó inteiro em vez de recriá-lo campo a campo: assim as chaves que
+    /// o app Python escreve e este código não modela vão junto, que é a mesma
+    /// razão de o <see cref="Salvar"/> mesclar em vez de sobrescrever.
+    /// </remarks>
+    /// <returns>Falso se o cliente não existe, ou se o nome novo já está em uso.</returns>
+    public bool RenomearCliente(string de, string para)
+    {
+        if (string.IsNullOrWhiteSpace(para) || de == para) return false;
+        if (Clientes[de] is not JsonObject no) return false;
+        if (Clientes[para] is not null) return false;
+
+        Clientes.Remove(de);
+        Clientes[para] = no.DeepClone();
+        Gravar();
+        return true;
+    }
+
+    public bool RenomearProjeto(string cliente, string de, string para)
+    {
+        if (string.IsNullOrWhiteSpace(para) || de == para) return false;
+        if (Clientes[cliente] is not JsonObject c || c["projects"] is not JsonObject ps)
+            return false;
+        if (ps[de] is not JsonObject no || ps[para] is not null) return false;
+
+        ps.Remove(de);
+        ps[para] = no.DeepClone();
+        Gravar();
+        return true;
+    }
+
+    /// <summary>
+    /// Apaga um cliente e todos os projetos dele.
+    /// </summary>
+    /// <remarks>
+    /// Some com o cadastro, e <b>não</b> com as transcrições: elas moram junto
+    /// das gravações e guardam o nome do cliente dentro de si. Apagar aqui é
+    /// esquecer o vocabulário e as preferências, não perder reunião.
+    /// </remarks>
+    public bool ApagarCliente(string cliente)
+    {
+        if (Clientes[cliente] is null) return false;
+        Clientes.Remove(cliente);
+        Gravar();
+        return true;
+    }
+
+    public bool ApagarProjeto(string cliente, string projeto)
+    {
+        if (Clientes[cliente] is not JsonObject c || c["projects"] is not JsonObject ps)
+            return false;
+        if (ps[projeto] is null) return false;
+
+        ps.Remove(projeto);
+        Gravar();
+        return true;
+    }
+
     private void Gravar()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_caminho))!);

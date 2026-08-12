@@ -13,7 +13,8 @@ public readonly record struct Progresso(string Etapa, double Fracao, string Text
 /// chegar, os motores virão numa pasta conhecida ao lado do executável, e até
 /// lá dá para apontar para um ambiente de desenvolvimento sem mudar código.
 /// </remarks>
-public sealed record Motores(string Python, string ScriptAsr, string ScriptDiarizacao)
+public sealed record Motores(string Python, string ScriptAsr, string ScriptDiarizacao,
+                             string ScriptModelos)
 {
     /// <summary>O arranjo esperado do app instalado: <c>motores/</c> ao lado do .exe.</summary>
     public static Motores AoLadoDoExecutavel()
@@ -22,7 +23,8 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
         return new Motores(
             Path.Combine(raiz, "python", "python.exe"),
             Path.Combine(raiz, "asr", "motor.py"),
-            Path.Combine(raiz, "diarizacao", "motor.py"));
+            Path.Combine(raiz, "diarizacao", "motor.py"),
+            Path.Combine(raiz, "modelos", "motor.py"));
     }
 
     /// <summary>
@@ -224,7 +226,15 @@ public sealed class Transcritor(Motores motores)
             foreach (var seg in segmentos)
             {
                 var (texto, trocas) = CorrecaoFonetica.Corrigir(seg.Text, termos);
-                if (trocas.Count > 0) seg.Text = texto;
+                if (trocas.Count > 0)
+                {
+                    seg.Text = texto;
+                    // A lista vai junto para o arquivo: é o que permite à tela
+                    // mostrar o que foi trocado e desfazer o que estiver errado.
+                    // Antes ela era descartada aqui, e a correção acontecia sem
+                    // deixar rastro.
+                    seg.Swaps = [.. trocas.Select(t => new TrocaFeita { De = t.De, Para = t.Para })];
+                }
             }
         }
 
