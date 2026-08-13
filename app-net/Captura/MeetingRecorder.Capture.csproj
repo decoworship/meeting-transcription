@@ -15,7 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
-    <ProjectReference Include="..\Core\MeetingRecorder.Core.csproj" />
+    <ProjectReference Include="..\Gravacao\MeetingRecorder.Core.csproj" />
   </ItemGroup>
 
 </Project>

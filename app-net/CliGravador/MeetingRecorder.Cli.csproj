@@ -47,7 +47,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Capture\MeetingRecorder.Capture.csproj" />
+    <ProjectReference Include="..\Captura\MeetingRecorder.Capture.csproj" />
   </ItemGroup>
 
 </Project>

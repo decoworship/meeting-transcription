@@ -45,6 +45,34 @@
   <ItemGroup>
     <ProjectReference Include="..\Nucleo\MeetingApp.Nucleo.csproj" />
     <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
+    <!-- O gravador, desde a Fase 2.5. Captura arrasta Gravacao (o antigo Core)
+         por referência de projeto; Agenda entra explícito porque a captura não
+         depende dela — quem depende é o menu, para rotular a reunião. -->
+    <ProjectReference Include="..\Captura\MeetingRecorder.Capture.csproj" />
+    <ProjectReference Include="..\Agenda\MeetingRecorder.Agenda.csproj" />
+  </ItemGroup>
+
+  <!-- Os ícones da bandeja, um por cor de estado, gerados pelo
+       tools/gerar_icone.py. Embutidos pelo mesmo motivo da interface: um arquivo
+       solto ao lado do .exe é mais uma coisa para o instalador acertar, e some
+       se alguém copiar só o binário. O prefixo mudou de MeetingRecorder.Tray
+       para MeetingApp junto com o assembly — ver IconesDaBandeja.
+
+       Barra normal, e não invertida: com "..\..\assets\bandeja-*.ico" o MSBuild
+       no Linux não expande o glob e não embute nada. Compila, publica, passa
+       nos testes, e o app sobe sem ícone na bandeja — sem ícone não há menu, e
+       sem menu não há como sair dele. É o mesmo tipo de defeito silencioso que
+       o token do HuggingFace já tinha dado; a régua do publicar.sh existe
+       porque este aqui foi assim que apareceu. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../assets/bandeja-amarelo.ico"
+                      LogicalName="MeetingApp.bandeja-amarelo.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-cinza.ico"
+                      LogicalName="MeetingApp.bandeja-cinza.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-laranja.ico"
+                      LogicalName="MeetingApp.bandeja-laranja.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-vermelho.ico"
+                      LogicalName="MeetingApp.bandeja-vermelho.ico" />
   </ItemGroup>
 
   <!-- A interface inteira vai embutida: um arquivo solto ao lado do .exe seria

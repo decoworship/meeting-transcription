@@ -50,6 +50,15 @@ internal sealed class Pedido
 
     /// <summary>De onde o diálogo de pasta começa.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
+
+    /// <summary>"mic" ou "loopback", nas operações do gravador.</summary>
+    [JsonPropertyName("faixa")] public string? Faixa { get; init; }
+
+    /// <summary>O id WASAPI escolhido, ou nulo para o padrão do Windows.</summary>
+    [JsonPropertyName("dispositivo")] public string? Dispositivo { get; init; }
+
+    /// <summary>Liga/desliga, nas opções do gravador.</summary>
+    [JsonPropertyName("ligado")] public bool? Ligado { get; init; }
 }
 
 internal sealed class Resposta
@@ -95,6 +104,88 @@ internal sealed class Resposta
 
     /// <summary>A pasta escolhida no diálogo, ou nulo se foi cancelado.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
+
+    /// <summary>O gravador como a tela precisa vê-lo.</summary>
+    [JsonPropertyName("gravador")] public EstadoDoGravador? Gravador { get; init; }
+
+    /// <summary>Os dispositivos de áudio, para a tela poder escolher.</summary>
+    [JsonPropertyName("dispositivos")] public DispositivosDisponiveis? Dispositivos { get; init; }
+}
+
+/// <summary>
+/// O gravador num instante: o que a bandeja diz num tooltip, aberto em campos.
+/// </summary>
+/// <remarks>
+/// Chega à página de dois jeitos — como resposta a <c>gravador</c> e empurrado a
+/// cada 200 ms enquanto a janela está aberta e gravando. É o mesmo objeto nos
+/// dois casos de propósito: a tela desenha do estado que recebeu, sem precisar
+/// saber se pediu ou se foi avisada.
+/// </remarks>
+internal sealed class EstadoDoGravador
+{
+    [JsonPropertyName("gravando")] public bool Gravando { get; init; }
+    [JsonPropertyName("mudo")] public bool Mudo { get; init; }
+
+    /// <summary>Há quanto tempo está mudo. Mute esquecido é o modo de falha mais provável.</summary>
+    [JsonPropertyName("mudo_ha_s")] public double MudoHaS { get; init; }
+
+    /// <summary>"cinza", "vermelho", "laranja" ou "amarelo" — a cor da bandeja.</summary>
+    /// <remarks>
+    /// A tela usa a <b>mesma</b> escala de cor do ícone, e não uma própria:
+    /// laranja é você tendo mutado, amarelo é um canal sem áudio sem ninguém ter
+    /// pedido. Inventar outra linguagem na janela obrigaria a traduzir de cabeça
+    /// entre dois lugares que mostram a mesma coisa.
+    /// </remarks>
+    [JsonPropertyName("cor")] public required string Cor { get; init; }
+
+    /// <summary>O texto de status pronto, do EstadoDaBandeja.</summary>
+    [JsonPropertyName("status")] public required string Status { get; init; }
+
+    [JsonPropertyName("duracao_s")] public double DuracaoS { get; init; }
+    [JsonPropertyName("pasta")] public required string Pasta { get; init; }
+
+    /// <summary>A reunião da agenda que está sendo gravada, quando há uma.</summary>
+    [JsonPropertyName("titulo")] public string? Titulo { get; init; }
+    [JsonPropertyName("participantes")] public List<string>? Participantes { get; init; }
+
+    [JsonPropertyName("notificacoes")] public bool Notificacoes { get; init; }
+    [JsonPropertyName("usar_agenda")] public bool UsarAgenda { get; init; }
+    [JsonPropertyName("conta")] public string? Conta { get; init; }
+    [JsonPropertyName("agenda_configurada")] public bool AgendaConfigurada { get; init; }
+
+    [JsonPropertyName("faixas")] public List<FaixaAoVivo> Faixas { get; init; } = [];
+}
+
+/// <summary>Uma faixa enquanto grava — é daqui que sai o medidor de nível.</summary>
+internal sealed class FaixaAoVivo
+{
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("dispositivo")] public required string Dispositivo { get; init; }
+
+    /// <summary>RMS instantâneo, 0 a 1. Ver WasapiTrackCapture.Nivel.</summary>
+    [JsonPropertyName("nivel")] public double Nivel { get; init; }
+    [JsonPropertyName("ja_ouviu")] public bool JaOuviu { get; init; }
+    [JsonPropertyName("mudo")] public bool Mudo { get; init; }
+    [JsonPropertyName("silencio_s")] public double SilencioS { get; init; }
+    [JsonPropertyName("desconectado")] public bool Desconectado { get; init; }
+    [JsonPropertyName("falha")] public string? Falha { get; init; }
+}
+
+internal sealed class DispositivosDisponiveis
+{
+    [JsonPropertyName("entradas")] public List<DispositivoResumo> Entradas { get; init; } = [];
+    [JsonPropertyName("saidas")] public List<DispositivoResumo> Saidas { get; init; } = [];
+
+    /// <summary>Os escolhidos, ou nulo para "padrão do Windows".</summary>
+    [JsonPropertyName("mic_id")] public string? MicId { get; init; }
+    [JsonPropertyName("loopback_id")] public string? LoopbackId { get; init; }
+}
+
+internal sealed class DispositivoResumo
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("padrao")] public bool Padrao { get; init; }
 }
 
 /// <summary>Uma pessoa conhecida, e as amostras que o sistema guarda dela.</summary>
@@ -156,6 +247,8 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(Pedido))]
 [JsonSerializable(typeof(Resposta))]
 [JsonSerializable(typeof(PacoteComEstado))]
+[JsonSerializable(typeof(EstadoDoGravador))]
+[JsonSerializable(typeof(DispositivosDisponiveis))]
 [JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
@@ -176,7 +269,12 @@ internal static class PonteJson
 /// Envia uma mensagem à página. Chamado mais de uma vez por pedido quando há
 /// progresso, e sempre na thread da UI — quem passa o delegate garante isso.
 /// </param>
-internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
+/// <param name="gravador">
+/// O gravador do mesmo processo. A ponte não o comanda de longe: chama métodos,
+/// e o efeito aparece na bandeja e na janela pelo mesmo evento.
+/// </param>
+internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
+                            Bandeja.Gravador gravador)
 {
     private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
     private readonly Projetos _projetos = new();
@@ -325,6 +423,75 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
                     await TranscreverAsync(p);
                     break;
 
+                // ─────────────────────────────────── gravador
+                //
+                // Todas devolvem o estado inteiro, e não um "ok": a tela desenha
+                // do estado que recebeu, e uma resposta vazia a obrigaria a
+                // adivinhar o que mudou — ou a pedir de novo logo em seguida.
+
+                case "gravador":
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "gravar":
+                    gravador.Iniciar();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "parar-gravacao":
+                    gravador.Parar();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "mutar":
+                    gravador.AlternarMudo();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "dispositivos":
+                    Responder(new Resposta { Id = p.Id, Dispositivos = Disponiveis(gravador) });
+                    break;
+
+                case "escolher-dispositivo":
+                    gravador.EscolherDispositivo(p.Faixa ?? "mic",
+                        p.Dispositivo is { Length: > 0 } ? p.Dispositivo : null);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Gravador = Instantaneo(gravador),
+                        Dispositivos = Disponiveis(gravador),
+                    });
+                    break;
+
+                case "pasta-das-gravacoes":
+                    DefinirPastaDasGravacoes(p.Pasta);
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "notificacoes":
+                    if ((p.Ligado ?? true) != gravador.Estado.NotificacoesLigadas)
+                        gravador.AlternarNotificacoes();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "usar-agenda":
+                    gravador.UsarAgenda(p.Ligado ?? true);
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "conectar-agenda":
+                    // Abre o navegador e volta na hora: a autorização acontece
+                    // fora do app, e travar a tela até o usuário terminar de
+                    // clicar num site seria travá-la por minutos.
+                    gravador.Autorizar();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "desconectar-agenda":
+                    MeetingRecorder.Agenda.ClienteDaAgenda.Desconectar();
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
                 default:
                     Responder(new Resposta { Id = p.Id, Erro = $"operação desconhecida: {p.Op}" });
                     break;
@@ -336,6 +503,101 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder)
             // de uma pasta ilegível seria pior que a falha original.
             Responder(new Resposta { Id = p.Id, Erro = e.Message });
         }
+    }
+
+    // ───────────────────────────────────────────────────────── gravador
+
+    /// <summary>
+    /// O evento empurrado à página: o mesmo estado, com <c>id</c> zero.
+    /// </summary>
+    /// <remarks>
+    /// Zero porque não responde a pedido nenhum, e a página casa pedidos e
+    /// respostas pelo id — um id inventado casaria com uma promessa alheia. O
+    /// <c>tipo</c> é o que a <c>ponte.js</c> usa para roteá-lo aos assinantes em
+    /// vez de a uma promessa.
+    /// </remarks>
+    public static string EventoDoGravador(Bandeja.Gravador g) =>
+        JsonSerializer.Serialize(
+            new Resposta { Id = 0, Tipo = "gravador", Gravador = Instantaneo(g) },
+            PonteJson.Default.Resposta);
+
+    private static EstadoDoGravador Instantaneo(Bandeja.Gravador g)
+    {
+        var faixas = new List<FaixaAoVivo>();
+        foreach (var c in g.Capturas)
+            faixas.Add(new FaixaAoVivo
+            {
+                Nome = c.Stats.Nome,
+                Dispositivo = c.NomeDispositivo,
+                Nivel = c.Nivel,
+                JaOuviu = c.Stats.JaOuviu,
+                Mudo = c.Mudo,
+                SilencioS = c.Stats.SilencioAtualS,
+                Desconectado = c.Desconectado,
+                Falha = c.FalhaDeEscrita ? c.MotivoDaFalha : null,
+            });
+
+        return new EstadoDoGravador
+        {
+            Gravando = g.Estado.Gravando,
+            Mudo = g.Estado.Mudo,
+            MudoHaS = g.Estado.MudoHaS(DateTime.UtcNow),
+            Cor = g.Estado.Cor.ToString().ToLowerInvariant(),
+            Status = g.Estado.TextoDeStatus(g.DuracaoAtual, null).Split('\n')[0],
+            DuracaoS = g.DuracaoAtual,
+            Pasta = g.PastaDeSaida,
+            Titulo = g.Evento?.Titulo,
+            Participantes = g.Evento?.NomesDosParticipantes().ToList(),
+            Notificacoes = g.Estado.NotificacoesLigadas,
+            UsarAgenda = g.Cfg.UseCalendar,
+            AgendaConfigurada = MeetingRecorder.Agenda.ClienteDaAgenda.EstaConfigurado(),
+            Conta = MeetingRecorder.Agenda.ClienteDaAgenda.EstaAutorizado()
+                ? MeetingRecorder.Agenda.ClienteDaAgenda.EmailDaConta() : null,
+            Faixas = faixas,
+        };
+    }
+
+    private static DispositivosDisponiveis Disponiveis(Bandeja.Gravador g)
+    {
+        var cat = g.Dispositivos.Atual;
+        static List<DispositivoResumo> Mapear(
+            IReadOnlyList<MeetingRecorder.Capture.Dispositivo> lista) =>
+            [.. lista.Select(d => new DispositivoResumo
+            {
+                Id = d.Id, Nome = d.Nome, Padrao = d.EhPadrao,
+            })];
+
+        return new DispositivosDisponiveis
+        {
+            Entradas = Mapear(cat.Entradas),
+            Saidas = Mapear(cat.Saidas),
+            MicId = g.Cfg.MicId,
+            LoopbackId = g.Cfg.LoopbackId,
+        };
+    }
+
+    /// <summary>
+    /// Troca a pasta onde o gravador salva — a mesma que o app lê.
+    /// </summary>
+    /// <remarks>
+    /// Confere a escrita antes de aceitar, como o menu da bandeja: descobrir que
+    /// a pasta é somente leitura no meio de uma reunião seria tarde demais. Uma
+    /// pasta vazia restaura o padrão.
+    /// </remarks>
+    private void DefinirPastaDasGravacoes(string? pasta)
+    {
+        if (gravador.Estado.Gravando)
+            throw new InvalidOperationException(
+                "não dá para trocar a pasta durante uma gravação");
+
+        if (gravador.PastaForcada is not null)
+            throw new InvalidOperationException(
+                "esta sessão foi aberta com --gravacoes; a pasta está fixa");
+
+        if (pasta is { Length: > 0 } && !Bandeja.Bandeja.PodeEscrever(pasta, out string? erro))
+            throw new InvalidOperationException($"não dá para escrever nessa pasta: {erro}");
+
+        gravador.DefinirPastaDeSaida(pasta);
     }
 
     /// <summary>Roda o pipeline, reportando andamento pelo mesmo id.</summary>

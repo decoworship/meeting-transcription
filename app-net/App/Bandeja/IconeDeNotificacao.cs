@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using MeetingApp.App.Nativo;
 
-namespace MeetingRecorder.Tray.Nativo;
+namespace MeetingApp.App.Bandeja;
 
 /// <summary>
 /// O ícone na bandeja via <c>Shell_NotifyIcon</c>. Substitui o <c>NotifyIcon</c>

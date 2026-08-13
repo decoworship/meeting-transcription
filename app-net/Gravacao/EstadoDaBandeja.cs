@@ -127,6 +127,16 @@ public sealed class EstadoDaBandeja
         return null;
     }
 
+    /// <summary>Há quantos segundos o microfone está mudo; zero se não está.</summary>
+    /// <remarks>
+    /// A bandeja não precisava disto: ela avisa por balão nos marcos do
+    /// <see cref="LembreteDeMute"/> e some. A janela precisa, porque ela mostra
+    /// o estado <em>continuamente</em> — e "mudo" sem dizer há quanto tempo é a
+    /// informação que menos ajuda quem esqueceu.
+    /// </remarks>
+    public double MudoHaS(DateTime agora) =>
+        _mudoDesde is { } desde ? (agora - desde).TotalSeconds : 0;
+
     public string TextoDeStatus(double duracaoS, string? dispositivoMic) =>
         !Gravando
             ? "Parado"

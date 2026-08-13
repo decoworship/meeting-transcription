@@ -175,15 +175,13 @@ tirar o `recorder/` Python de uso**. O soak de 1 h foi refeito e passou.
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-# testes — 72, sempre verdes antes de commitar
+# testes — sempre verdes antes de commitar
 dotnet test app-net/Tests/MeetingApp.Tests.csproj
 
-# publicar o app. As três flags e o token são obrigatórios — ver §7.
-dotnet publish app-net/App/MeetingApp.App.csproj -c Release -r win-x64 \
-  --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true \
-  -p:TokenHuggingFace=/mnt/c/Users/andre/.meeting-recorder/hf_token.txt \
-  -o <saida>
-cp <saida>/MeetingApp.exe /mnt/c/Users/andre/MeetingApp/
+# publicar e instalar. Desde a Fase 2.5 sempre por aqui: o script confere as
+# réguas (tamanho, token, ícones da bandeja) antes de copiar, e o destino
+# padrão é a pasta de teste, não a instalação em uso.
+tools/publicar.sh
 
 # iterar na interface sem recompilar
 MeetingApp.exe --web C:\caminho\para\app-net\App\web

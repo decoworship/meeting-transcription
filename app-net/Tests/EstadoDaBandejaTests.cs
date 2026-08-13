@@ -128,6 +128,25 @@ public sealed class EstadoDaBandejaTests
         Assert.Equal(CorDaBandeja.Cinza, e.Cor);
     }
 
+    /// <remarks>
+    /// A janela mostra o mute continuamente, e "mudo" sem dizer há quanto tempo
+    /// é a informação que menos ajuda quem esqueceu. A bandeja não precisava
+    /// disto porque avisa por balão nos marcos e some.
+    /// </remarks>
+    [Fact]
+    public void MudoHaSContaDesdeQuandoFoiMutado()
+    {
+        var e = new EstadoDaBandeja();
+        e.Iniciou();
+        Assert.Equal(0, e.MudoHaS(T0));
+
+        e.DefinirMudo(true, T0);
+        Assert.Equal(300, e.MudoHaS(T0.AddMinutes(5)));
+
+        e.DefinirMudo(false, T0.AddMinutes(5));
+        Assert.Equal(0, e.MudoHaS(T0.AddMinutes(6)));
+    }
+
     [Fact]
     public void StatusMostraDuracaoEDispositivo()
     {

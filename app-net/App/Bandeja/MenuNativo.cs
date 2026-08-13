@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
+using MeetingApp.App.Nativo;
 
-namespace MeetingRecorder.Tray.Nativo;
+namespace MeetingApp.App.Bandeja;
 
 /// <summary>
 /// O menu de contexto via <c>CreatePopupMenu</c>/<c>TrackPopupMenuEx</c>.

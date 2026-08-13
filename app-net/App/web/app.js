@@ -1,6 +1,7 @@
 import { pedir } from "/ponte.js";
 import { telaDeRevisao, abrirPainel } from "/revisao.js";
 import { telaDeAjustes } from "/configuracoes.js";
+import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 
@@ -108,8 +109,16 @@ export async function telaDeLista() {
       cabecalho("Reuniões", "Nenhuma gravação encontrada", false);
       const vazio = document.createElement("p");
       vazio.className = "vazio";
-      vazio.textContent = "Grave uma reunião com o MeetingRecorder e ela aparece aqui.";
-      tela.appendChild(vazio);
+      // Não fala mais em "o MeetingRecorder": desde a Fase 2.5 o gravador é
+      // este mesmo app, e mandar a pessoa procurar outro programa era mandá-la
+      // procurar algo que não existe mais.
+      vazio.textContent = "Nenhuma gravação ainda. Comece uma em Gravador.";
+      const ir = document.createElement("button");
+      ir.className = "aa-btn aa-btn-primario";
+      ir.type = "button";
+      ir.textContent = "Ir para o Gravador";
+      ir.addEventListener("click", abrirGravador);
+      tela.append(vazio, ir);
       return;
     }
 
@@ -388,9 +397,23 @@ export function abrirAjustes(aba) {
   return telaDeAjustes({ cabecalho, tela }, aba);
 }
 
+// ─────────────────────────────────────────────────────── gravador
+
+/**
+ * A tela do Gravador mora em gravador.js, pelo mesmo motivo dos ajustes: o
+ * app.js é o único lugar que sabe da moldura, e as telas recebem o que
+ * precisam dela.
+ */
+export function abrirGravador() {
+  fecharGavetas();
+  destino("ir-gravador");
+  return telaDoGravador({ cabecalho, tela });
+}
+
 // ─────────────────────────────────────────────────────────── ligação
 
 document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
+document.getElementById("ir-gravador").addEventListener("click", abrirGravador);
 document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
 
@@ -417,6 +440,7 @@ async function inicio() {
   // Os ajustes não dependem de gravação nenhuma, e pedir a lista antes atrasaria
   // a tela por nada. "#config=vozes" cai direto na aba.
   if (tela === "config") return abrirAjustes(arg || "geral");
+  if (tela === "gravador") return abrirGravador();
 
   const { gravacoes } = await pedir("gravacoes");
   const g = gravacoes[Number(arg) || 0];

@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using System.Reflection;
 using MeetingRecorder.Core;
-using MeetingRecorder.Tray.Nativo;
+using MeetingApp.App.Nativo;
 
-namespace MeetingRecorder.Tray;
+namespace MeetingApp.App.Bandeja;
 
 /// <summary>
 /// Os ícones da bandeja, um por cor de estado, criados dos <c>.ico</c>
@@ -30,7 +30,7 @@ internal static class IconesDaBandeja
     {
         if (Cache.TryGetValue(cor, out var pronto)) return pronto;
 
-        string nome = $"MeetingRecorder.Tray.bandeja-{cor.ToString().ToLowerInvariant()}.ico";
+        string nome = $"MeetingApp.bandeja-{cor.ToString().ToLowerInvariant()}.ico";
         using var fluxo = Assembly.GetExecutingAssembly().GetManifestResourceStream(nome)
             ?? throw new InvalidOperationException($"recurso embutido ausente: {nome}");
         var dados = new byte[fluxo.Length];

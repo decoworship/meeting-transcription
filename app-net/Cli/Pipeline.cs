@@ -21,7 +21,8 @@ internal static class Pipeline
         // No desenvolvimento os motores estão no repositório e o Python é o do
         // ambiente; no app instalado eles vêm numa pasta ao lado do executável.
         var motores = new Motores(python, "motores/asr/motor.py",
-                                  "motores/diarizacao/motor.py");
+                                  "motores/diarizacao/motor.py",
+                                  "motores/modelos/motor.py");
         if (motores.OQueFalta() is { } falta)
         {
             Console.Error.WriteLine(falta);

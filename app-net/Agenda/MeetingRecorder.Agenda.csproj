@@ -20,11 +20,11 @@
     <!-- Credenciais.Expiry e Autorizacao.Query sao detalhes internos, mas cada
          um guarda uma regra que quebra em silencio se mudar: o formato que o
          google-auth ainda le, e o parsing do redirect do OAuth. -->
-    <InternalsVisibleTo Include="MeetingRecorder.Tests" />
+    <InternalsVisibleTo Include="MeetingApp.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Core\MeetingRecorder.Core.csproj" />
+    <ProjectReference Include="..\Gravacao\MeetingRecorder.Core.csproj" />
   </ItemGroup>
 
   <!-- Credenciais do Google embutidas no binário publicado, para quem recebe o

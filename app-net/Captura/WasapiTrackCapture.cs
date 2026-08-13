@@ -73,6 +73,23 @@ public sealed class WasapiTrackCapture : IDisposable
     /// <summary>Erro de escrita em disco (requisito 3.3): degrada, não morre.</summary>
     public volatile bool FalhaDeEscrita;
 
+    /// <summary>
+    /// O RMS do último bloco processado, para o medidor de nível da janela.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Acréscimo da Fase 2.5, e o menor possível: é o mesmo <c>rms</c> que o
+    /// <see cref="AtualizarEstatisticas"/> já calculava para decidir se a faixa
+    /// ouviu alguma coisa. Nada no caminho de escrita mudou.
+    /// </para>
+    /// <para>
+    /// Instantâneo e não acumulado — o acumulado é o <see cref="TrackStats.PicoRms"/>.
+    /// A janela lê isto cinco vezes por segundo; é o que teria denunciado o
+    /// microfone mudo de 06/08 no primeiro minuto, em vez de 36 minutos depois.
+    /// </para>
+    /// </remarks>
+    public volatile float Nivel;
+
     public WasapiTrackCapture(MMDevice dispositivo, bool loopback, string caminhoWav, string nome)
     {
         _dispositivo = dispositivo;
@@ -286,6 +303,10 @@ public sealed class WasapiTrackCapture : IDisposable
         }
         if (silencio <= 0) return;
 
+        // O dispositivo não entregou pacote: o medidor tem que cair a zero, e
+        // não congelar no último nível visto. Ver Nivel.
+        Nivel = 0f;
+
         if (!Escrever(new float[silencio])) return;
         _stats.AmostrasEscritas += silencio;
         _stats.TotalSilencioS += silencio / (double)CrashSafeWavWriter.TaxaAlvo;
@@ -327,12 +348,13 @@ public sealed class WasapiTrackCapture : IDisposable
     {
         double bloco = quadros / (double)TaxaNativa;
 
-        if (Mudo) { _stats.MudoS += bloco; return; }
+        if (Mudo) { _stats.MudoS += bloco; Nivel = 0f; return; }
 
         double soma = 0;
         foreach (float f in mono) soma += f * f;
         double rms = quadros > 0 ? Math.Sqrt(soma / quadros) : 0;
         _stats.PicoRms = Math.Max(_stats.PicoRms, rms);
+        Nivel = (float)rms;
 
         const double limiarSilencio = 1e-4;
         if (rms >= limiarSilencio)
