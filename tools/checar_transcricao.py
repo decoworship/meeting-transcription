@@ -1,0 +1,268 @@
+"""Exercita, num navegador real, a transcrição que sobrevive a trocar de tela.
+
+Existe porque os critérios A, B e C da Fase 3 são sobre *comportamento da
+página*, e nenhum teste de unidade os alcança: o registro em C# tem os seus
+(``RegistroDeTranscricoesTests``), mas a pergunta "sair da tela no meio e voltar
+mostra a mesma barra?" só o DOM responde. Foi exatamente aí que estava o defeito
+que a fase conserta — o progresso vivia numa closure sobre nós que o clique no
+trilho jogava fora.
+
+Sobe a página com a **mesma ponte falsa** da ideia do ``medir_layout.py``, só
+que esta sabe transcrever: aceita ``transcrever``, empurra eventos ``id: 0`` com
+andamento, e recusa a segunda transcrição como o núcleo recusa.
+
+Uso:
+    .venv/bin/python tools/checar_transcricao.py
+
+Requer o Chromium do Playwright (ver tools/ui_check.py para a instalação).
+"""
+
+from __future__ import annotations
+
+import socketserver
+import sys
+import threading
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from medir_layout import Servidor  # noqa: E402  (o servidor é o mesmo do outro tool)
+
+# A ponte falsa que transcreve.
+#
+# O andamento não corre sozinho: quem manda o tempo passar é o teste, por
+# ``window.__avancar()``. Um cronômetro de verdade tornaria o resultado
+# dependente de quanto o navegador demorou para pintar.
+PONTE_FALSA = """
+window.chrome = { webview: {
+  _ouvintes: [],
+  addEventListener(_, f) { this._ouvintes.push(f); },
+  _emitir(r) { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); },
+  postMessage(cru) {
+    const p = JSON.parse(cru);
+    const r = { id: p.id };
+    const w = window.chrome.webview;
+
+    // "transcrita" sai do disco no app de verdade — o núcleo olha se existe
+    // transcricao.json. Aqui sai do conjunto que o __terminar alimenta, para a
+    // lista mudar de etiqueta pelo mesmo motivo que muda lá.
+    if (p.op === 'gravacoes') r.gravacoes = [
+      { nome: '2026-08-12_09-00-00', caminho: 'C:/g/a', duracao_s: 3600,
+        titulo: 'Comitê de dados', convidados: 4,
+        transcrita: w._transcritas.has('C:/g/a'), avisos: [] },
+      { nome: '2026-08-11_14-00-00', caminho: 'C:/g/b', duracao_s: 1800,
+        titulo: 'Sprint', convidados: 3,
+        transcrita: w._transcritas.has('C:/g/b'), avisos: [] },
+    ];
+    // O Gravador entra porque é o destino usado para *sair* de Reuniões: o
+    // critério A é justamente trocar de destino e voltar.
+    else if (p.op === 'gravador') r.gravador = w._gravador;
+    else if (p.op === 'dispositivos') {
+      r.gravador = w._gravador;
+      r.dispositivos = { entradas: [], saidas: [], mic_id: null, loopback_id: null };
+    }
+    else if (p.op === 'clientes') r.clientes = { 'Cliente 1': ['Projeto A'] };
+    else if (p.op === 'prefs') r.prefs = { language: 'pt', model_size: 'large-v3' };
+    else if (p.op === 'config') r.config = {};
+    else if (p.op === 'salvar-projeto') r.clientes = {};
+    else if (p.op === 'transcricao') r.transcricao = JSON.stringify(
+      { language: 'pt', duration: 12,
+        segments: [{ start: 0, end: 2, text: ' bom dia', speaker: 'You' }] });
+    else if (p.op === 'transcricoes') r.transcricoes = w._registro;
+    else if (p.op === 'esquecer-transcricao') {
+      w._registro = { atual: w._registro.atual, ultimo: null };
+      r.transcricoes = w._registro;
+    }
+    else if (p.op === 'transcrever') {
+      if (w._registro.atual) {
+        // A mesma frase do núcleo: recusar sem nomear manda o usuário procurar
+        // sozinho qual reunião está ocupando a placa.
+        r.erro = 'já estou transcrevendo "' + w._registro.atual.nome + '". '
+               + 'Uma de cada vez: as duas disputariam a mesma placa de vídeo.';
+      } else {
+        w._registro = { atual: {
+          gravacao: p.gravacao, nome: p.gravacao === 'C:/g/a' ? 'Comitê de dados' : 'Sprint',
+          etapa: 'mix', fracao: 0.05, texto: 'somando',
+          comecou_em: '2026-08-13T10:00:00Z', terminou: false,
+        }, ultimo: null };
+        r.transcricoes = w._registro;
+        setTimeout(() => w._emitir(
+          { id: 0, tipo: 'transcricoes', transcricoes: w._registro }), 0);
+      }
+    }
+
+    setTimeout(() => w._emitir(r), 0);
+  },
+} };
+
+window.chrome.webview._registro = { atual: null, ultimo: null };
+window.chrome.webview._transcritas = new Set();
+window.chrome.webview._gravador = {
+  gravando: false, mudo: false, mudo_ha_s: 0, cor: 'cinza', status: 'Parado',
+  duracao_s: 0, pasta: 'C:/g', notificacoes: true, usar_agenda: false,
+  agenda_configurada: false, faixas: [],
+};
+
+/** O pipeline andando um passo, empurrado pelo teste. */
+window.__avancar = (etapa, fracao, texto) => {
+  const w = window.chrome.webview;
+  Object.assign(w._registro.atual, { etapa, fracao, texto });
+  w._emitir({ id: 0, tipo: 'transcricoes', transcricoes: w._registro });
+};
+
+/** O fim, bem ou mal. */
+window.__terminar = (erro) => {
+  const w = window.chrome.webview;
+  const t = w._registro.atual;
+  Object.assign(t, { terminou: true, erro: erro ?? null, fracao: erro ? t.fracao : 1 });
+  if (!erro) w._transcritas.add(t.gravacao);
+  w._registro = { atual: null, ultimo: t };
+  w._emitir({ id: 0, tipo: 'transcricoes', transcricoes: w._registro });
+};
+"""
+
+FALHAS: list[str] = []
+
+
+def conferir(nome: str, condicao: bool, detalhe: str = "") -> None:
+    print(f'{"ok  " if condicao else "FALHA"} {nome}' + (f"  ({detalhe})" if detalhe else ""))
+    if not condicao:
+        FALHAS.append(nome)
+
+
+def main() -> int:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("falta o playwright: uv pip install playwright "
+              "&& python -m playwright install chromium", file=sys.stderr)
+        return 2
+
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.TCPServer(("127.0.0.1", 0), Servidor) as srv:
+        porta = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+        with sync_playwright() as pw:
+            navegador = pw.chromium.launch()
+            pagina = navegador.new_page(viewport={"width": 1280, "height": 800})
+            # Um erro de JS não derruba a página: ele some no console e o teste
+            # morre depois, esperando um seletor que nunca aparece. Repetir aqui
+            # troca "timeout" por "TypeError na linha tal".
+            pagina.on("pageerror", lambda e: print(f"  js: {e}", file=sys.stderr))
+            pagina.add_init_script(PONTE_FALSA)
+            pagina.goto(f"http://127.0.0.1:{porta}/index.html", wait_until="load")
+            pagina.wait_for_selector(".gravacao")
+
+            ponto = "#ir-reunioes"
+            estado = lambda: pagina.get_attribute(ponto, "data-ocupado")  # noqa: E731
+
+            conferir("a bolinha começa apagada", estado() == "false")
+
+            # ---- começa a transcrição da primeira reunião
+            pagina.click('[data-gravacao="C:/g/a"]')
+            pagina.wait_for_selector("#vocabulario")
+            pagina.click("text=Transcrever")
+            pagina.wait_for_selector(".aa-progresso")
+
+            conferir("critério B: a bolinha acende ao começar", estado() == "true")
+
+            pagina.evaluate("window.__avancar('asr', 0.42, 'minuto 12 de 60')")
+            pagina.wait_for_timeout(50)
+            texto_no_meio = pagina.inner_text(".aa-progresso + .campo__dica")
+            # A largura pelo style inline, e não pelo computado: a barra tem
+            # transição, e medir em pixels no meio dela compara animação, não
+            # estado.
+            largura_no_meio = pagina.evaluate(
+                "document.querySelector('.aa-progresso div').style.width")
+            conferir("a etapa aparece em português", "Transcrevendo: minuto 12 de 60" in texto_no_meio,
+                     texto_no_meio)
+
+            # ---- critério A: sair e voltar
+            pagina.click("#ir-gravador")
+            pagina.wait_for_selector(".gravador")
+            conferir("a bolinha continua acesa fora de Reuniões", estado() == "true")
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            etiqueta = pagina.inner_text('[data-gravacao="C:/g/a"] .aa-etiqueta')
+            conferir("a lista diz que está transcrevendo", etiqueta == "Transcrevendo…", etiqueta)
+
+            pagina.click('[data-gravacao="C:/g/a"]')
+            pagina.wait_for_selector(".aa-progresso")
+            texto_de_volta = pagina.inner_text(".aa-progresso + .campo__dica")
+            largura_de_volta = pagina.evaluate(
+                "document.querySelector('.aa-progresso div').style.width")
+            conferir("critério A: volta na mesma etapa", texto_de_volta == texto_no_meio,
+                     texto_de_volta)
+            conferir("critério A: volta na mesma fração", largura_de_volta == largura_no_meio,
+                     f"{largura_no_meio} → {largura_de_volta}")
+
+            # ---- critério C: a segunda é recusada
+            pagina.click("#voltar")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector("#vocabulario")
+            pagina.click("text=Transcrever")
+            pagina.wait_for_selector(".aa-alerta, .alerta")
+            recusa = pagina.inner_text(".aa-pagina")
+            conferir("critério C: a recusa nomeia a reunião ocupada",
+                     "Comitê de dados" in recusa)
+
+            # ---- o fim chega com a tela em outro lugar
+            pagina.click("#ir-gravador")
+            pagina.wait_for_selector(".gravador")
+            pagina.evaluate("window.__terminar()")
+            pagina.wait_for_timeout(50)
+            conferir("critério B: a bolinha apaga ao terminar", estado() == "false")
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/a"]')
+            pagina.wait_for_selector(".revisao", timeout=5000)
+            conferir("a reunião pronta abre na revisão",
+                     pagina.locator(".revisao .trecho").count() > 0)
+
+            # ---- o erro sobrevive a ninguém estar olhando
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector("#vocabulario")
+            pagina.click("text=Transcrever")
+            pagina.wait_for_selector(".aa-progresso")
+            pagina.click("#ir-gravador")
+            pagina.wait_for_selector(".gravador")
+            pagina.evaluate("window.__terminar('o motor de ASR não respondeu')")
+            pagina.wait_for_timeout(50)
+            conferir("critério B: a bolinha apaga também quando falha", estado() == "false")
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector("#vocabulario")
+            pagina.wait_for_timeout(100)
+            texto = pagina.inner_text(".aa-pagina")
+            conferir("o erro espera na tela de preparo", "não respondeu" in texto)
+
+            # ---- e o caso simples, que continua tendo de valer: terminar com a
+            # tela aberta abre a revisão sozinho, sem passar pela lista.
+            # Numa tela remontada o botão volta a dizer "Transcrever": o "Tentar
+            # de novo" é do momento da falha, e quem chega agora está começando.
+            pagina.click("text=Transcrever")
+            pagina.wait_for_selector(".aa-progresso")
+            pagina.evaluate("window.__terminar()")
+            pagina.wait_for_selector(".revisao", timeout=5000)
+            conferir("terminar com a tela aberta abre a revisão",
+                     pagina.locator(".revisao .trecho").count() > 0)
+
+            navegador.close()
+        srv.shutdown()
+
+    if FALHAS:
+        print(f"\n{len(FALHAS)} falha(s): " + ", ".join(FALHAS), file=sys.stderr)
+        return 1
+    print("\ntudo certo.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -82,7 +82,12 @@ internal sealed class Aplicacao : IDisposable
 
         if (_janela is null)
         {
-            _janela = new JanelaDoApp("Reuniões", _gravador, _pastaDasGravacoes, _telaInicial)
+            // O aviso da transcrição pronta atravessa threads: quem o dispara é
+            // a tarefa do pipeline, e Shell_NotifyIcon só pode ser chamado da
+            // thread que criou o ícone. O Executar da âncora é o mesmo salto que
+            // o gravador já usa para tudo que vem de fora.
+            _janela = new JanelaDoApp("Reuniões", _gravador, _pastaDasGravacoes,
+                texto => _ancora.Executar(() => _bandeja.AvisarDoApp(texto)), _telaInicial)
             {
                 AoEsconder = () => _ancora.MedidoresLigados(false),
             };

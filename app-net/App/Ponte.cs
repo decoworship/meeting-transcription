@@ -108,6 +108,9 @@ internal sealed class Resposta
     /// <summary>O gravador como a tela precisa vê-lo.</summary>
     [JsonPropertyName("gravador")] public EstadoDoGravador? Gravador { get; init; }
 
+    /// <summary>O que está sendo transcrito, e o que acabou de terminar.</summary>
+    [JsonPropertyName("transcricoes")] public EstadoDasTranscricoes? Transcricoes { get; init; }
+
     /// <summary>Os dispositivos de áudio, para a tela poder escolher.</summary>
     [JsonPropertyName("dispositivos")] public DispositivosDisponiveis? Dispositivos { get; init; }
 }
@@ -169,6 +172,36 @@ internal sealed class FaixaAoVivo
     [JsonPropertyName("silencio_s")] public double SilencioS { get; init; }
     [JsonPropertyName("desconectado")] public bool Desconectado { get; init; }
     [JsonPropertyName("falha")] public string? Falha { get; init; }
+}
+
+/// <summary>
+/// As transcrições como a página precisa vê-las.
+/// </summary>
+/// <remarks>
+/// Chega de dois jeitos, como o gravador: como resposta a <c>transcricoes</c> e
+/// empurrado a cada aviso de andamento do pipeline. É o mesmo objeto nos dois
+/// casos, para a tela desenhar do que recebeu sem saber se pediu ou foi avisada.
+/// </remarks>
+internal sealed class EstadoDasTranscricoes
+{
+    /// <summary>A que está rodando agora, ou nulo. É ela que acende a bolinha.</summary>
+    [JsonPropertyName("atual")] public TranscricaoResumo? Atual { get; init; }
+
+    /// <summary>A última que terminou, para a tela poder mostrar como acabou.</summary>
+    [JsonPropertyName("ultimo")] public TranscricaoResumo? Ultimo { get; init; }
+}
+
+internal sealed class TranscricaoResumo
+{
+    /// <summary>A pasta da gravação: é por ela que a tela sabe se é a sua.</summary>
+    [JsonPropertyName("gravacao")] public required string Gravacao { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("etapa")] public required string Etapa { get; init; }
+    [JsonPropertyName("fracao")] public double Fracao { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+    [JsonPropertyName("comecou_em")] public required string ComecouEm { get; init; }
+    [JsonPropertyName("terminou")] public bool Terminou { get; init; }
+    [JsonPropertyName("erro")] public string? Erro { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -248,6 +281,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(Resposta))]
 [JsonSerializable(typeof(PacoteComEstado))]
 [JsonSerializable(typeof(EstadoDoGravador))]
+[JsonSerializable(typeof(EstadoDasTranscricoes))]
 [JsonSerializable(typeof(DispositivosDisponiveis))]
 [JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
@@ -273,11 +307,21 @@ internal static class PonteJson
 /// O gravador do mesmo processo. A ponte não o comanda de longe: chama métodos,
 /// e o efeito aparece na bandeja e na janela pelo mesmo evento.
 /// </param>
+/// <param name="avisar">
+/// Um balão da bandeja. Serve à transcrição que termina com a janela escondida —
+/// que é o caso normal, já que ela passou a rodar sem ninguém olhando.
+/// </param>
 internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
-                            Bandeja.Gravador gravador)
+                            Bandeja.Gravador gravador, Action<string> avisar)
 {
     private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
     private readonly Projetos _projetos = new();
+
+    /// <summary>
+    /// O que está sendo transcrito. Vive na ponte, e não na página, porque a
+    /// página troca de tela e o pipeline não pode saber disso (FASE3.md §2).
+    /// </summary>
+    private readonly RegistroDeTranscricoes _transcricoes = new();
 
     public async Task AtenderAsync(string mensagem)
     {
@@ -419,8 +463,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
                     break;
 
+                // Não espera o pipeline: responde "aceita" na hora, e o
+                // andamento passa a fluir pelo canal de eventos. É o que faz a
+                // transcrição sobreviver a trocar de tela — quem desenha a barra
+                // deixa de ser o dono da promessa (FASE3.md §2).
                 case "transcrever":
-                    await TranscreverAsync(p);
+                    Transcrever(p);
+                    break;
+
+                case "transcricoes":
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+                    break;
+
+                case "esquecer-transcricao":
+                    _transcricoes.EsquecerUltimo();
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
                     break;
 
                 // ─────────────────────────────────── gravador
@@ -600,8 +657,50 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         gravador.DefinirPastaDeSaida(pasta);
     }
 
-    /// <summary>Roda o pipeline, reportando andamento pelo mesmo id.</summary>
-    private async Task TranscreverAsync(Pedido p)
+    // ──────────────────────────────────────────────────── transcrições
+
+    /// <summary>O registro como a página o vê.</summary>
+    private EstadoDasTranscricoes Instantaneo() => new()
+    {
+        Atual = Resumir(_transcricoes.Atual),
+        Ultimo = Resumir(_transcricoes.Ultimo),
+    };
+
+    private static TranscricaoResumo? Resumir(TrabalhoDeTranscricao? t) => t is null ? null : new()
+    {
+        Gravacao = t.Gravacao,
+        Nome = t.Nome,
+        Etapa = t.Etapa,
+        Fracao = t.Fracao,
+        Texto = t.Texto,
+        ComecouEm = t.ComecouEm.ToString("o"),
+        Terminou = t.Terminou,
+        Erro = t.Erro,
+    };
+
+    /// <summary>Empurra o registro à página, sem ela ter pedido.</summary>
+    private void EmpurrarTranscricoes() =>
+        Responder(new Resposta { Id = 0, Tipo = "transcricoes", Transcricoes = Instantaneo() });
+
+    /// <summary>
+    /// Aceita a transcrição e devolve o controle na hora.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O pipeline roda solto: a resposta a este pedido diz apenas que foi
+    /// aceito, e etapa, fração e fim chegam pelo canal de eventos. Foi assim que
+    /// a transcrição deixou de morrer ao trocar de tela — antes, quem desenhava
+    /// a barra era o dono da promessa, e trocar de tela jogava fora o DOM em que
+    /// ela escrevia (FASE3.md §2).
+    /// </para>
+    /// <para>
+    /// <c>Task.Run</c> porque o pipeline bloquearia a thread da UI, que é a
+    /// mesma que desenha a janela <b>e</b> a que atende a bandeja: sem isto, a
+    /// barra congelaria justamente enquanto há progresso a mostrar, e o menu da
+    /// bandeja não abriria durante uma transcrição.
+    /// </para>
+    /// </remarks>
+    private void Transcrever(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)
         {
@@ -609,22 +708,51 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             return;
         }
 
-        // O pipeline é pesado e bloquearia a thread da UI, que é a mesma que
-        // desenha a janela: sem isto a barra de progresso congelaria justamente
-        // enquanto há progresso a mostrar.
-        var resultado = await Task.Run(() => _transcritor.ExecutarAsync(
-            pasta, p.Vocabulario, p.Idioma,
-            modelo: p.Modelo, cliente: p.Cliente, projeto: p.Projeto,
-            progresso: e => Responder(new Resposta
-            {
-                Id = p.Id,
-                Tipo = "progresso",
-                Etapa = e.Etapa,
-                Fracao = e.Fracao,
-                Texto = e.Texto,
-            })));
+        // Lança quando já há uma em curso, e a mensagem nomeia qual. O catch do
+        // AtenderAsync a transforma na resposta de erro que a tela mostra.
+        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta));
+        Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+        EmpurrarTranscricoes();
 
-        Responder(new Resposta { Id = p.Id, Transcricao = resultado.ParaJson() });
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _transcritor.ExecutarAsync(
+                    pasta, p.Vocabulario, p.Idioma,
+                    modelo: p.Modelo, cliente: p.Cliente, projeto: p.Projeto,
+                    progresso: e =>
+                    {
+                        _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
+                        EmpurrarTranscricoes();
+                    });
+                _transcricoes.Terminar(pasta);
+                Avisar($"Transcrição pronta: {trabalho.Nome}");
+            }
+            catch (Exception e)
+            {
+                // O erro vira estado, e não mensagem perdida: quem saiu da tela
+                // no meio precisa poder descobrir, ao voltar, que falhou.
+                _transcricoes.Terminar(pasta, e.Message);
+                Avisar($"A transcrição de {trabalho.Nome} falhou.");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// Como chamar a reunião numa frase: o título da agenda, ou a pasta.
+    /// </summary>
+    /// <remarks>
+    /// O mesmo nome que a lista mostra, para o aviso de "já estou transcrevendo
+    /// X" citar o que a pessoa vê na tela, e não um caminho de disco.
+    /// </remarks>
+    private string NomeDaGravacao(string pasta)
+    {
+        string nome = Path.GetFileName(pasta.TrimEnd(Path.DirectorySeparatorChar));
+        foreach (var g in Listar())
+            if (g.Caminho == pasta) return g.Titulo is { Length: > 0 } t ? t : g.Nome;
+        return nome;
     }
 
     private Dictionary<string, List<string>> MapaDeClientes()
@@ -957,6 +1085,22 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
     private void Responder(Resposta r) =>
         responder(JsonSerializer.Serialize(r, PonteJson.Default.Resposta));
+
+    /// <summary>
+    /// Um balão da bandeja, e nunca uma exceção que suba.
+    /// </summary>
+    /// <remarks>
+    /// O aviso é conveniência; a transcrição já terminou quando ele sai. Deixar
+    /// uma falha de Shell_NotifyIcon derrubar a tarefa perderia o
+    /// <c>EmpurrarTranscricoes</c> que vem depois — e aí a tela ficaria com a
+    /// barra parada para sempre, que é justamente o defeito que esta fase
+    /// conserta.
+    /// </remarks>
+    private void Avisar(string texto)
+    {
+        try { avisar(texto); }
+        catch { /* a bandeja pode estar indo embora; o estado já foi registrado */ }
+    }
 
     /// <summary>As gravações que o gravador deixou, mais recentes primeiro.</summary>
     private List<GravacaoResumo> Listar()

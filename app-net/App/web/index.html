@@ -54,8 +54,15 @@
        O Gravador deixou de ser um buraco na Fase 2.5: ele continua vivendo na
        bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
-    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
+    <!-- A bolinha marca transcrição em curso. Fica no destino Reuniões porque é
+         de lá que se transcreve e é para lá que se volta ver o resultado; o
+         ponto some quando o núcleo diz que acabou, e não por tempo. -->
+    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
+            data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
+        <span class="trilho__ponto" aria-hidden="true"></span>
+      </span>
       <span>Reuniões</span>
     </button>
     <button class="trilho__item" id="ir-gravador" type="button">

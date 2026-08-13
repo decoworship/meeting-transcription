@@ -4,6 +4,8 @@ import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
+import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
+         ultimoResultado, sincronizar } from "/transcricoes.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -55,6 +57,7 @@ function cartao(g) {
   const botao = document.createElement("button");
   botao.className = "aa-cartao gravacao";
   botao.type = "button";
+  botao.dataset.gravacao = g.caminho;
   botao.addEventListener("click", () => abrirGravacao(g));
 
   const esquerda = document.createElement("div");
@@ -85,12 +88,27 @@ function cartao(g) {
     esquerda.appendChild(caixa);
   }
 
-  const etiqueta = document.createElement("span");
-  etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
-  etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
-
-  botao.append(esquerda, etiqueta);
+  botao.append(esquerda, etiquetaDe(g));
   return botao;
+}
+
+/**
+ * O estado da gravação em uma palavra.
+ *
+ * "Transcrevendo…" tem precedência sobre "Não transcrita" porque a lista é o
+ * lugar onde se procura a reunião de novo depois de sair da tela dela — e ali
+ * "Não transcrita" ao lado de uma transcrição que está rodando é mentira.
+ */
+function etiquetaDe(g) {
+  const etiqueta = document.createElement("span");
+  if (emCurso(g.caminho)) {
+    etiqueta.className = "aa-etiqueta";
+    etiqueta.textContent = "Transcrevendo…";
+  } else {
+    etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
+    etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
+  }
+  return etiqueta;
 }
 
 export async function telaDeLista() {
@@ -125,6 +143,19 @@ export async function telaDeLista() {
     cabecalho("Reuniões",
       gravacoes.length === 1 ? "1 gravação" : `${gravacoes.length} gravações`, false);
     for (const g of gravacoes) tela.appendChild(cartao(g));
+
+    // A etiqueta acompanha: quem fica parado na lista enquanto uma transcrição
+    // termina vê "Transcrita" aparecer sozinha, sem precisar recarregar nada.
+    const cancelar = assinarTranscricoes(() => {
+      if (!tela.isConnected || !tela.querySelector(".gravacao")) { cancelar(); return; }
+      for (const g of gravacoes) {
+        const cartaoDela = tela.querySelector(`[data-gravacao="${CSS.escape(g.caminho)}"]`);
+        if (!cartaoDela) continue;
+        const fim = ultimoResultado(g.caminho);
+        if (!emCurso(g.caminho) && fim && !fim.erro) g.transcrita = true;
+        cartaoDela.lastElementChild.replaceWith(etiquetaDe(g));
+      }
+    });
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
     tela.replaceChildren(alerta(e.message, "erro"));
@@ -275,6 +306,14 @@ async function telaDePreparo(g) {
   campoProjeto.addEventListener("change", carregarPreferencias);
 
   botao.addEventListener("click", () => transcrever(g, botao, painel));
+
+  // Reencontrar uma transcrição já em curso é o motivo de esta tela existir do
+  // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa
+  // ver é a barra onde ela está — não um botão "Transcrever" que começaria tudo
+  // de novo. O erro da última tentativa aparece pelo mesmo caminho.
+  if (emCurso(g.caminho)) acompanhar(g, botao, painel);
+  else if (ultimoResultado(g.caminho)?.erro)
+    painel.replaceChildren(alerta(ultimoResultado(g.caminho).erro, "erro"));
 }
 
 function dataDe(nome) {
@@ -282,7 +321,22 @@ function dataDe(nome) {
   return m ? m[1] : "";
 }
 
-async function transcrever(g, botao, painel) {
+const ETAPAS = {
+  mix: "Somando as faixas",
+  asr: "Transcrevendo",
+  diarizacao: "Separando os falantes",
+  montagem: "Montando o resultado",
+};
+
+/**
+ * Desenha a transcrição desta gravação enquanto ela roda, esteja ela recém
+ * pedida ou já a meio caminho quando esta tela montou.
+ *
+ * O andamento vem do registro do núcleo, e não de uma promessa: é o que permite
+ * sair da tela e voltar sem perder a barra, e é o que faz o resultado chegar
+ * mesmo que ninguém estivesse olhando quando ele ficou pronto.
+ */
+function acompanhar(g, botao, painel) {
   botao.disabled = true;
   botao.textContent = "Transcrevendo…";
 
@@ -296,12 +350,50 @@ async function transcrever(g, botao, painel) {
   estado.textContent = "preparando…";
   painel.replaceChildren(barra, estado);
 
-  const nomes = {
-    mix: "Somando as faixas",
-    asr: "Transcrevendo",
-    diarizacao: "Separando os falantes",
-    montagem: "Montando o resultado",
-  };
+  function pintar(t) {
+    estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
+    preenchimento.style.width = `${t.fracao >= 0 ? Math.round(t.fracao * 100) : 0}%`;
+  }
+
+  const atual = emCurso(g.caminho);
+  if (atual) pintar(atual);
+
+  const cancelar = assinarTranscricoes(() => {
+    // A tela saiu do documento (trocou-se de destino): largar a assinatura e
+    // deixar o trabalho seguir. Quem voltar a esta gravação monta outra.
+    if (!painel.isConnected) { cancelar(); return; }
+
+    const rodando = emCurso(g.caminho);
+    if (rodando) { pintar(rodando); return; }
+
+    const fim = ultimoResultado(g.caminho);
+    if (!fim) return;              // é outra gravação que mudou de estado
+
+    cancelar();
+    if (fim.erro) {
+      botao.disabled = false;
+      botao.textContent = "Tentar de novo";
+      painel.replaceChildren(alerta(fim.erro, "erro"));
+      return;
+    }
+    abrirResultado(g);
+  });
+}
+
+/** Abre a revisão do que acabou de ficar pronto, lendo o que foi salvo em disco. */
+async function abrirResultado(g) {
+  try {
+    const r = await pedir("transcricao", { gravacao: g.caminho });
+    if (!r.transcricao) throw new Error("a transcrição não foi encontrada");
+    g.transcrita = true;
+    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+  } catch (e) {
+    tela.replaceChildren(alerta(e.message, "erro"));
+  }
+}
+
+async function transcrever(g, botao, painel) {
+  botao.disabled = true;
 
   try {
     const vocabulario = document.getElementById("vocabulario").value.trim();
@@ -326,7 +418,10 @@ async function transcrever(g, botao, painel) {
       });
     }
 
-    const r = await pedir("transcrever", {
+    // Volta na hora: daqui em diante o trabalho é do núcleo, e a tela passa a
+    // desenhar o que ele empurra. Recusa quando já há outra transcrição em
+    // curso, e a mensagem nomeia qual.
+    await pedirTranscricao({
       gravacao: g.caminho,
       vocabulario,
       // Sem estes dois, escolher modelo e idioma na tela não tinha efeito
@@ -337,12 +432,8 @@ async function transcrever(g, botao, painel) {
       // saía sem dizer de que cliente e projeto era a reunião.
       cliente: document.getElementById("cliente").value.trim(),
       projeto: document.getElementById("projeto").value.trim(),
-    }, (p) => {
-      estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
-      preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;
     });
-    g.transcrita = true;
-    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+    acompanhar(g, botao, painel);
   } catch (e) {
     botao.disabled = false;
     botao.textContent = "Tentar de novo";
@@ -429,6 +520,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharGave
  * clique automatizado, quando tentado, acertou a janela errada.
  */
 async function inicio() {
+  // Antes de qualquer tela: se já havia uma transcrição rodando quando esta
+  // página subiu, a bolinha tem que acender agora. Esperar o próximo evento
+  // pode custar minutos — as etapas longas do pipeline não reportam progresso
+  // contínuo.
+  await sincronizar().catch(() => {});
+
   const hash = location.hash.slice(1);
   if (!hash) return telaDeLista();
 

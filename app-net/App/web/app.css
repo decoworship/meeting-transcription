@@ -87,6 +87,45 @@ body {
  * quando, e misturá-lo com os de todo dia disputaria atenção com eles. */
 .trilho__item--fim { margin-top: auto; }
 
+/* ─────────────────────────────────────────── a bolinha de transcrevendo */
+
+/* O invólucro existe só para pendurar o ponto no canto do ícone: sem ele, o
+ * position:absolute subiria até o botão e o ponto ficaria no canto do rótulo. */
+.trilho__icone { position: relative; display: grid; }
+
+.trilho__ponto {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  /* Um anel da cor do trilho separa o ponto do desenho do ícone — sem ele, o
+   * ponto encosta na borda do calendário e vira um borrão. */
+  box-shadow: 0 0 0 2px var(--cor-superficie);
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity .15s, transform .15s;
+}
+
+.trilho__item[data-ocupado="true"] .trilho__ponto {
+  opacity: 1;
+  transform: none;
+  animation: pulsar 1.6s ease-in-out infinite;
+}
+
+@keyframes pulsar {
+  50% { opacity: .25; }
+}
+
+/* Este app fica aberto o dia inteiro, e uma transcrição longa passa de meia
+ * hora: um ponto piscando sem parar no canto da tela é exatamente o caso que
+ * esta media query existe para resolver. O ponto continua lá, parado. */
+@media (prefers-reduced-motion: reduce) {
+  .trilho__item[data-ocupado="true"] .trilho__ponto { animation: none; }
+}
+
 /* ───────────────────────────────────────────────────────────── barra */
 
 .barra {
