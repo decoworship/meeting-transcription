@@ -30,7 +30,7 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 WEB = RAIZ / "app-net" / "App" / "web"
-DS = RAIZ / "src" / "web" / "assets" / "ds"
+DS = RAIZ / "assets" / "ds"
 
 # Os mesmos tamanhos que uma janela real assume: notebook pequeno, tela cheia,
 # e um caso apertado de propósito.

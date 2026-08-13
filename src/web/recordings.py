@@ -34,9 +34,11 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Onde o docker-compose monta as gravações do gravador do Windows. Sobrescrever
-# com RECORDINGS_DIR permite rodar o app fora do container, onde esse caminho
-# não existe (ou não é legível).
+# O caminho onde o docker-compose montava as gravações. O container saiu em
+# 13/08/2026 junto com o Gradio, e este módulo sobreviveu como referência dos
+# formatos e para o comparar_pipeline.py — que sempre passou RECORDINGS_DIR.
+# O default abaixo, portanto, não aponta mais para lugar nenhum: quem usar isto
+# precisa definir a variável.
 RECORDINGS_DIR = Path(os.environ.get("RECORDINGS_DIR", "/root/recordings"))
 
 SAMPLE_RATE = 16000

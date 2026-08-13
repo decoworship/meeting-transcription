@@ -1,56 +1,107 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guia para o Claude Code (claude.ai/code) trabalhar neste repositório.
 
-## Project Overview
+## O que é
 
-Desktop GUI application for transcribing meeting recordings (video or audio) with speaker diarization. Built with CustomTkinter for the UI, Whisper/faster-whisper for transcription, and pyannote-audio for speaker identification.
+Aplicativo Windows nativo que grava reuniões em duas faixas e as transcreve com
+separação de falantes. **Um executável** (`MeetingApp.exe`) que é bandeja e
+janela ao mesmo tempo: C#/.NET 8 com a interface em WebView2, e os modelos
+rodando em sidecars Python.
 
-## Commands
+O projeto é **doc-driven**. Antes de mexer em qualquer coisa não trivial, leia
+`docs/` — as cartas de fase (`FASE1.md`, `FASE2.md`, `FASE2.5.md`) dizem o que
+se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e por quê. Muito
+comentário no código aponta para eles.
+
+## Comandos
 
 ```bash
-# Install dependencies and create virtual environment
-uv sync
+export PATH="$HOME/.dotnet:$PATH"
 
-# Run the application
-uv run python main.py
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 181 testes
+tools/publicar.sh --so-build                            # publica em dist/publicar
+tools/publicar.sh --destino /mnt/c/Users/andre/MeetingApp
+
+# a interface do disco, para desenhar sem recompilar
+MeetingApp.exe --web C:\caminho\para\app-net\App\web
+
+uv sync   # só para as ferramentas de medição em tools/
 ```
 
-## Prerequisites
+**Nunca publique com `dotnet publish` na mão.** As três flags
+(`--self-contained`, `PublishSingleFile`, `PublishTrimmed`), o token do
+HuggingFace e o segredo do Google são obrigatórios, e cada um deles já saiu
+faltando num binário entregue ao usuário. O `publicar.sh` confere as réguas
+antes de copiar.
 
-- FFmpeg must be installed and in PATH
-- For GPU acceleration: CUDA toolkit
-- For speaker diarization: HuggingFace token (accept terms at huggingface.co/pyannote/speaker-diarization-3.1)
+## Arquitetura
 
-## Architecture
+```
+app-net/
+  App/          a janela (WebView2), a ponte, e a bandeja em App/Bandeja/
+  Nucleo/       o pipeline de transcrição, projetos, vozes, exportação
+  Sidecar/      o protocolo com os motores Python
+  Gravacao/     o núcleo do gravador: deriva, WAV, contabilidade de pacotes
+  Captura/      WASAPI (Windows-only)
+  Agenda/       Google Calendar, OAuth com PKCE
+  Cli/          Sidecar.exe — o pipeline por linha de comando
+  CliGravador/  Capture.exe — captura sem interface, para medir
+  Tests/        as duas suítes, net8.0 portátil
+```
 
-### Processing Pipeline
+**Um processo, dois papéis, um laço de mensagens.** A `JanelaDeMensagens`
+(invisível, da bandeja) roda o único `GetMessage`, e ele despacha também a
+janela do app. Fechar a janela **esconde**; sair é só pelo menu da bandeja.
+Errar isso perde gravação — ver `Aplicacao.cs`.
 
-The transcription flow in `src/gui/app.py:_transcription_worker` follows this sequence:
-1. **Audio Processing** (0-20%): FFmpeg extracts/normalizes to 16kHz mono WAV (from video or audio input)
-2. **Model Loading** (20-30%): Load Whisper or faster-whisper model
-3. **Transcription** (30-70%): Generate timestamped segments
-4. **Diarization** (70-95%): pyannote identifies speakers, assigns labels via overlap matching
-5. **Output** (95-100%): Format with `[timestamp] Speaker N: text`
+**A gravação é serviço em processo; os motores são sidecars.** A captura não
+tem modelo pesado nem GPU, e não pode pagar a latência de um pipe entre o
+clique e o início do áudio. Os motores, que carregam modelo e disputam GPU,
+ficam isolados em processos Python que falam JSON por stdin/stdout
+(`docs/SIDECAR.md`).
 
-### Transcriber Strategy Pattern
+**A ponte** (`App/Ponte.cs` + `web/ponte.js`): a página manda `{id, op, ...}` e
+recebe `{id, ...}`. Respostas com `tipo: "progresso"` não encerram o pedido.
+**`id: 0` é evento empurrado pelo núcleo** — é como o nível de áudio chega à
+tela cinco vezes por segundo sem ninguém perguntar.
 
-Two interchangeable transcribers extend `BaseTranscriber`:
-- `WhisperTranscriber`: Uses openai-whisper (CPU-focused)
-- `FasterWhisperTranscriber`: Uses faster-whisper with CTranslate2 (GPU-accelerated)
+## O que não se reabre
 
-Selection is automatic based on CUDA availability, with manual override in GUI.
+Custou caro para acertar e é invisível quando está certo:
 
-### Thread-Safe UI Updates
+- `Gravacao/DriftAnchor.cs` — a âncora no relógio de parede. Já foi trocada por
+  uma versão "tecnicamente melhor" e **perdeu em campo**;
+- `Gravacao/StreamingResampler.cs` — `sinc_size: 256`. O usuário ouviu um
+  craquelado que três métricas objetivas não pegaram;
+- `Gravacao/CrashSafeWavWriter.cs`, `PacketTimeline.cs`, `TrackStats.cs`;
+- `Captura/WasapiTrackCapture.cs` — inclusive o preenchimento dos buracos
+  quando o loopback não dispara por não haver áudio tocando;
+- **mute escreve silêncio, não interrompe a escrita.** É o que mantém as duas
+  faixas alinhadas.
 
-Background processing uses a queue pattern (`_progress_queue`) to safely update the GUI from worker threads. The main thread polls this queue via `_process_queue()` scheduled with `self.after(100, ...)`.
+## Armadilhas medidas
 
-### Speaker Assignment
+- **`EmbeddedResource` com barra invertida não expande glob no MSBuild em
+  Linux.** Compila, publica, passa nos testes, e o recurso não está lá;
+- **torch e pyannote escrevem no stdout** e corrompem o protocolo do sidecar —
+  os motores duplicam o fd 1 antes de qualquer import;
+- **`--no-build` depois de editar** mede o binário velho;
+- **`strings | grep -q` com `set -o pipefail`** falha por SIGPIPE;
+- **`.ps1` com acento precisa de BOM UTF-8** para o PowerShell 5.1;
+- **`cmd.exe` chamado do WSL** precisa de `/s` (senão come as aspas) e de um
+  diretório atual que não seja UNC.
 
-`SpeakerDiarizer.assign_speakers()` uses overlap-based matching: each transcription segment gets the speaker label with the maximum temporal overlap from diarization results.
+## O Python que sobrou
 
-## Key Data Types
+Não há mais interface Python — o Gradio e o gravador Python saíram em
+13/08/2026. O que resta serve às ferramentas de medição:
 
-- `TranscriptionSegment`: Single utterance with start/end times, text, optional speaker
-- `TranscriptionResult`: Collection of segments with formatting methods
-- `DiarizationSegment`: Speaker turn with timing
+- `src/transcription/`, `src/diarization/`, `src/utils/` — os motores de
+  referência que cinco ferramentas de `tools/` importam. **Apagá-los quebra a
+  forma como este projeto se mede**;
+- `src/web/{recordings,projects,history,voices,exporters}.py` — a referência
+  escrita dos formatos em disco que o C# lê e escreve. Vários comentários em
+  C# apontam para eles;
+- `motores/` — os três sidecars. Rodam no Python embarcado do app, não no
+  `.venv` daqui.
