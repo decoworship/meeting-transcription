@@ -16,13 +16,18 @@
 #
 # ── Fase 2.5: o destino mudou de propósito ──────────────────────────────────
 #
-# O padrão agora é C:\Users\andre\MeetingUnificado, e NÃO a pasta do app nem a
-# do gravador. Enquanto o app fundido não for aprovado, os dois programas
-# antigos continuam sendo os que gravam reunião de verdade todo dia, e o
-# critério A da fase exige gravar com os dois ao mesmo tempo para comparar as
-# faixas. Publicar por cima deles apagaria a régua e o plano B no mesmo comando.
+# O padrão é C:\Users\andre\MeetingApp, que é o app de verdade — o que grava
+# reunião todo dia e o único que tem os 4,3 GB de motores ao lado.
 #
-# Depois de aprovado, é passar --destino '/mnt/c/Users/andre/MeetingApp'.
+# Durante a Fase 2.5 o padrão era uma pasta de teste, MeetingUnificado, porque
+# os dois programas antigos ainda eram os que gravavam e o critério A exigia
+# gravar com os dois ao mesmo tempo para comparar as faixas: publicar por cima
+# apagaria a régua e o plano B no mesmo comando. A fase foi aprovada em
+# 13/08/2026, a pasta de teste desfeita, e o dono do produto autorizou
+# sobrescrever — da Fase 3 em diante são melhorias sobre um app que funciona.
+#
+# O que segue valendo: **o app aberto é intocável** (a checagem logo abaixo), e
+# publicar continua sendo só por este script, com as três réguas.
 #
 # O que ele NÃO faz, de propósito: abrir o app para conferir. Screenshot e
 # clique sintético foram abandonados neste projeto (as janelas abriam em telas
@@ -30,7 +35,7 @@
 # peça para uma pessoa olhar.
 #
 # Uso:
-#   tools/publicar.sh                     # publica e instala no destino de teste
+#   tools/publicar.sh                     # publica e instala em C:\Users\andre\MeetingApp
 #   tools/publicar.sh --so-build          # publica em dist/publicar, sem instalar
 #   tools/publicar.sh --destino <pasta>   # instala em outra pasta
 
@@ -38,7 +43,7 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 SAIDA="$RAIZ/dist/publicar"
-DESTINO="/mnt/c/Users/andre/MeetingUnificado"
+DESTINO="/mnt/c/Users/andre/MeetingApp"
 TOKEN="/mnt/c/Users/andre/.meeting-recorder/hf_token.txt"
 SEGREDO="/mnt/c/Users/andre/.meeting-recorder/google_client_secret.json"
 
@@ -151,13 +156,14 @@ cp "$SAIDA/MeetingApp.exe" "$DESTINO/"
 cp "$SAIDA/WebView2Loader.dll" "$DESTINO/"
 ls -la "$DESTINO/MeetingApp.exe"
 
-# Os motores vão junto, mas o Python embarcado NÃO é copiado: são 4,3 GB, e o
-# destino de teste conviveria em disco com uma cópia idêntica da instalação
-# antiga. Uma junção do Windows resolve, e é reversível apagando a pasta.
+# Os motores vão junto, mas o Python embarcado NÃO é copiado: são 4,3 GB. No
+# destino padrão a pasta já está lá e este bloco não faz nada; ele existe para
+# quando se publica em OUTRA pasta — aí ela ganha uma junção do Windows para o
+# python/ da instalação, em vez de uma segunda cópia de 4,3 GB. Reversível
+# apagando a pasta.
 #
-# Só o python/ é compartilhado. Os três motor.py são cópias de verdade, e é
-# deliberado: com junção, publicar aqui reescreveria os sidecars do app que o
-# usuário ainda usa todo dia — exatamente o que esta pasta separada evita.
+# Só o python/ é compartilhado; os três motor.py são cópias de verdade, para uma
+# publicação de teste não reescrever os sidecars da instalação.
 if [[ ! -e "$DESTINO/motores/python" ]]; then
   if [[ -d "$MOTORES_FONTE/python" ]]; then
     echo "==> ligando motores/python por junção a $MOTORES_FONTE/python"
