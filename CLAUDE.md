@@ -10,9 +10,14 @@ janela ao mesmo tempo: C#/.NET 8 com a interface em WebView2, e os modelos
 rodando em sidecars Python.
 
 O projeto é **doc-driven**. Antes de mexer em qualquer coisa não trivial, leia
-`docs/` — as cartas de fase (`FASE1.md`, `FASE2.md`, `FASE2.5.md`) dizem o que
-se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e por quê. Muito
-comentário no código aponta para eles.
+`docs/` — as cartas de fase (`FASE1.md`, `FASE2.md`, `FASE2.5.md`, `FASE3.md`)
+dizem o que se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e
+por quê. Muito comentário no código aponta para eles.
+
+**A fase corrente é a 3** ([docs/FASE3.md](docs/FASE3.md)): notas de reunião,
+transcrição que sobrevive à navegação, e a ata por LLM local. Depois vêm o
+instalador (Fase 4) e só então o acabamento visual (Fase 5, que era a antiga
+Fase 3 — ver a reordenação em `docs/PLANO.md`).
 
 ## Comandos
 

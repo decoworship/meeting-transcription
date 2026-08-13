@@ -274,6 +274,12 @@ SIGPIPE, e com `set -o pipefail` ela reprovava justamente o binário correto.)*
 Continua valendo o §8 da carta: resumo e ata por LLM — que é a próxima fase de
 verdade —, motores como pacotes baixáveis, integração com o Teams, Linux e Mac.
 
+> **13/08/2026, um dia depois.** A ata por LLM virou carta: [FASE3.md](FASE3.md),
+> junto com as notas de reunião e a transcrição que sobrevive à navegação. Na
+> mesma decisão, o redesign da interface (a antiga Fase 3) foi para o fim da
+> fila, depois do instalador — ver [PLANO.md](PLANO.md), "A reordenação de
+> 13/08/2026".
+
 E três coisas que esta fase deixou explicitamente para trás, repetidas aqui para
 não sumirem no corpo do documento:
 
