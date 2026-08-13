@@ -118,6 +118,73 @@ public sealed class RegistroDeTranscricoesTests
     }
 
     [Fact]
+    public void CancelarSinalizaOTokenQueChegaAosMotores()
+    {
+        // O token é o que o MotorSidecar registra para matar o processo — e
+        // matar é o que devolve a VRAM na hora. Sem isto o "parar" seria um
+        // botão que só muda a tela.
+        var r = new RegistroDeTranscricoes();
+        var t = r.Comecar("a", "A");
+
+        Assert.False(t.Token.IsCancellationRequested);
+        Assert.True(r.Cancelar("a"));
+        Assert.True(t.Token.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void CancelarNaoLiberaORegistroSozinho()
+    {
+        // Quem tira do registro é o Terminar, quando os motores de fato morrem.
+        // Liberar aqui deixaria a próxima transcrição começar com dois modelos
+        // ainda na placa — exatamente o que a trava existe para impedir.
+        var r = new RegistroDeTranscricoes();
+        r.Comecar("a", "A");
+        r.Cancelar("a");
+
+        Assert.True(r.Ocupado);
+        Assert.Throws<InvalidOperationException>(() => r.Comecar("b", "B"));
+
+        r.Terminar("a", cancelada: true);
+        Assert.False(r.Ocupado);
+    }
+
+    [Fact]
+    public void TerminarCanceladaNaoEUmErro()
+    {
+        // A tela trata os dois de maneiras opostas: falha pede alerta vermelho,
+        // parar a pedido é o app obedecendo.
+        var r = new RegistroDeTranscricoes();
+        r.Comecar("a", "A");
+        r.Progredir("a", "asr", 0.4, "metade");
+        r.Terminar("a", cancelada: true);
+
+        Assert.True(r.Ultimo?.Cancelada);
+        Assert.Null(r.Ultimo?.Erro);
+        // A fração não salta para 1: a transcrição não chegou ao fim.
+        Assert.Equal(0.4, r.Ultimo?.Fracao);
+    }
+
+    [Fact]
+    public void CancelarSemNadaRodandoNaoQuebra()
+    {
+        var r = new RegistroDeTranscricoes();
+        Assert.False(r.Cancelar());
+        Assert.False(r.Cancelar("a"));
+    }
+
+    [Fact]
+    public void CancelarOutraGravacaoNaoDerrubaAQueRoda()
+    {
+        // A tela manda o caminho de quem ela está mostrando. Se for outra, o
+        // pedido não pode atingir a transcrição em curso.
+        var r = new RegistroDeTranscricoes();
+        var t = r.Comecar("a", "A");
+
+        Assert.False(r.Cancelar("b"));
+        Assert.False(t.Token.IsCancellationRequested);
+    }
+
+    [Fact]
     public void DuasChamadasConcorrentesSoDeixamUmaPassar()
     {
         // A trava não é decoração: o pedido chega pela thread da UI e o fim do

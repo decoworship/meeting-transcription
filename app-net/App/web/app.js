@@ -5,7 +5,7 @@ import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
-         ultimoResultado, sincronizar } from "/transcricoes.js";
+         ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -67,9 +67,16 @@ function cartao(g) {
   t.textContent = tituloDe(g);
   esquerda.appendChild(t);
 
+  // Cliente e projeto na frente da duração: é por eles que se procura uma
+  // reunião de duas semanas atrás, e é o que prova que a escolha feita na tela
+  // de preparo ficou guardada — antes ela sumia de vista assim que se saía da
+  // tela, e parecia perdida mesmo estando salva.
   const meta = document.createElement("p");
   meta.className = "gravacao__meta";
-  const partes = [duracao(g.duracao_s)];
+  const partes = [];
+  if (g.cliente || g.projeto)
+    partes.push([g.cliente, g.projeto].filter(Boolean).join(" · "));
+  partes.push(duracao(g.duracao_s));
   if (g.titulo) partes.push(quando(g.nome));
   // "convidados" e não "participantes": o número vem da lista da agenda, que
   // diz quem foi chamado e não quem apareceu.
@@ -210,7 +217,12 @@ async function telaDePreparo(g) {
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
 
-  const { clientes } = await pedir("clientes");
+  // O vínculo vem junto: cliente e projeto escolhidos antes sobrevivem a sair
+  // da tela, porque moram em reuniao.json na pasta da gravação e não dentro da
+  // transcrição — que, na tela de preparo, ainda não existe.
+  const [{ clientes }, vinculo] = await Promise.all([
+    pedir("clientes"), pedir("reuniao", { gravacao: g.caminho }),
+  ]);
 
   const forma = document.createElement("div");
   forma.className = "secao";
@@ -220,8 +232,9 @@ async function telaDePreparo(g) {
   const linha1 = document.createElement("div");
   linha1.className = "linha";
   linha1.append(
-    campoComSugestoes("Cliente", "cliente", Object.keys(clientes)),
-    campoComSugestoes("Projeto", "projeto", []),
+    campoComSugestoes("Cliente", "cliente", Object.keys(clientes), vinculo.cliente ?? ""),
+    campoComSugestoes("Projeto", "projeto", clientes[vinculo.cliente] ?? [],
+                      vinculo.projeto ?? ""),
     campo("Data", "input", { id: "data", tipo: "date", valor: dataDe(g.nome) }),
   );
   reuniao.appendChild(linha1);
@@ -236,10 +249,11 @@ async function telaDePreparo(g) {
       opcoes: ["large-v3", "medium", "small", "base", "tiny"],
     }),
     campo("Idioma", "input", { id: "idioma", valor: "pt" }),
-    campo("Separar falantes", "select", {
-      id: "diarizacao",
-      opcoes: ["community-1", "3.1", "não separar"],
-    }),
+    // Sim ou não, e nada de escolher o modelo de diarização: o "3.1" era opção
+    // de tela que o pipeline ignorava — o motor sempre usou o community-1, que
+    // a Fase 0 mediu 6,7 pontos de DER melhor. Oferecer o pior, e não aplicar
+    // nem isso, era duas mentiras na mesma linha (FASE0-RESULTADOS).
+    campo("Separar falantes", "select", { id: "diarizacao", opcoes: ["sim", "não"] }),
   );
   motor.appendChild(linha2);
 
@@ -289,6 +303,13 @@ async function telaDePreparo(g) {
       cliente: campoCliente.value,
       projeto: campoProjeto.value,
     });
+
+    // A tela pode ter sido trocada enquanto a resposta vinha — escolher o
+    // projeto e sair no mesmo segundo é um caminho normal. Sem esta guarda, o
+    // preenchimento cai num getElementById que devolve null e o erro sobe no
+    // console sem ninguém ver.
+    if (!campoCliente.isConnected) return;
+
     if (!prefs) {
       aviso.textContent = "projeto novo — será criado ao transcrever";
       return;
@@ -296,14 +317,40 @@ async function telaDePreparo(g) {
     aviso.textContent = "preferências do projeto carregadas";
     if (prefs.model_size) document.getElementById("modelo").value = prefs.model_size;
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
-    document.getElementById("diarizacao").value =
-      prefs.diarization === false ? "não separar" : (prefs.diar_model ?? "community-1");
+    document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
     document.getElementById("vocabulario").value = prefs.initial_prompt ?? "";
   }
 
-  campoCliente.addEventListener("change", () => { atualizarProjetos(); carregarPreferencias(); });
+  /**
+   * Guarda o vínculo assim que ele muda.
+   *
+   * Na hora da escolha, e não só ao transcrever: quem escolhe o projeto e sai
+   * da tela — para ouvir um trecho, para conferir outra reunião — voltava e
+   * encontrava os campos vazios.
+   */
+  async function guardarVinculo() {
+    try {
+      await pedir("salvar-reuniao", {
+        gravacao: g.caminho,
+        cliente: campoCliente.value.trim(),
+        projeto: campoProjeto.value.trim(),
+      });
+    } catch {
+      // Não vale interromper o preparo por causa disto: o vínculo é gravado de
+      // novo ao transcrever, que é quando ele passa a importar de verdade.
+    }
+  }
+
+  campoCliente.addEventListener("change", () => {
+    atualizarProjetos(); carregarPreferencias(); guardarVinculo();
+  });
   campoCliente.addEventListener("input", atualizarProjetos);
-  campoProjeto.addEventListener("change", carregarPreferencias);
+  campoProjeto.addEventListener("change", () => { carregarPreferencias(); guardarVinculo(); });
+  // O blur é a rede: grava de novo quando o campo perde o foco, inclusive nos
+  // caminhos em que o change não chega a disparar. Gravar duas vezes o mesmo
+  // valor não custa nada — são dois campos num JSON pequeno.
+  campoCliente.addEventListener("blur", guardarVinculo);
+  campoProjeto.addEventListener("blur", guardarVinculo);
 
   botao.addEventListener("click", () => transcrever(g, botao, painel));
 
@@ -348,7 +395,29 @@ function acompanhar(g, botao, painel) {
   const estado = document.createElement("p");
   estado.className = "campo__dica";
   estado.textContent = "preparando…";
-  painel.replaceChildren(barra, estado);
+
+  // Parar mora ao lado da barra, e não entre os botões da tela: é a ação de
+  // quem está olhando a transcrição correr e mudou de ideia. Some junto com ela.
+  const parar = document.createElement("button");
+  parar.className = "aa-btn aa-btn-texto";
+  parar.type = "button";
+  parar.textContent = "Parar transcrição";
+  parar.addEventListener("click", async () => {
+    parar.disabled = true;
+    parar.textContent = "parando…";
+    try {
+      await cancelar(g.caminho);
+    } catch (e) {
+      parar.disabled = false;
+      parar.textContent = "Parar transcrição";
+      painel.appendChild(alerta(e.message, "erro"));
+    }
+  });
+
+  const linha = document.createElement("div");
+  linha.className = "progresso__linha";
+  linha.append(estado, parar);
+  painel.replaceChildren(barra, linha);
 
   function pintar(t) {
     estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
@@ -358,10 +427,10 @@ function acompanhar(g, botao, painel) {
   const atual = emCurso(g.caminho);
   if (atual) pintar(atual);
 
-  const cancelar = assinarTranscricoes(() => {
+  const cancelarAssinatura = assinarTranscricoes(() => {
     // A tela saiu do documento (trocou-se de destino): largar a assinatura e
     // deixar o trabalho seguir. Quem voltar a esta gravação monta outra.
-    if (!painel.isConnected) { cancelar(); return; }
+    if (!painel.isConnected) { cancelarAssinatura(); return; }
 
     const rodando = emCurso(g.caminho);
     if (rodando) { pintar(rodando); return; }
@@ -369,7 +438,18 @@ function acompanhar(g, botao, painel) {
     const fim = ultimoResultado(g.caminho);
     if (!fim) return;              // é outra gravação que mudou de estado
 
-    cancelar();
+    cancelarAssinatura();
+    if (fim.cancelada) {
+      // Parou a pedido: o app obedeceu, então nada de alerta vermelho. O botão
+      // volta a convidar, porque recomeçar é o próximo passo provável.
+      botao.disabled = false;
+      botao.textContent = "Transcrever";
+      const nota = document.createElement("p");
+      nota.className = "campo__dica";
+      nota.textContent = "Transcrição interrompida. A placa foi liberada.";
+      painel.replaceChildren(nota);
+      return;
+    }
     if (fim.erro) {
       botao.disabled = false;
       botao.textContent = "Tentar de novo";
@@ -410,8 +490,10 @@ async function transcrever(g, botao, painel) {
           language: document.getElementById("idioma").value.trim(),
           model_size: document.getElementById("modelo").value,
           engine: "faster-whisper",
-          diarization: diar !== "não separar",
-          diar_model: diar === "não separar" ? "community-1" : diar,
+          diarization: diar === "sim",
+          // Guardado como estava para o projeto não perder o campo, mas quem
+          // decide é o motor: o community-1 é o único que existe no sidecar.
+          diar_model: "community-1",
           condition_on_previous_text: false,
           initial_prompt: vocabulario,
         },
@@ -428,6 +510,9 @@ async function transcrever(g, botao, painel) {
       // nenhum: o motor caía no padrão e detectava o idioma sozinho.
       idioma: document.getElementById("idioma").value.trim(),
       modelo: document.getElementById("modelo").value,
+      // Sem isto a escolha de separar falantes era colhida na tela, salva nas
+      // preferências do projeto e ignorada pelo pipeline.
+      diarizar: diar === "sim",
       // Guardados com a transcrição: sem isto o cabeçalho do arquivo exportado
       // saía sem dizer de que cliente e projeto era a reunião.
       cliente: document.getElementById("cliente").value.trim(),

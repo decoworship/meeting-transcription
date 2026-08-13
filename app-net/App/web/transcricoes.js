@@ -52,6 +52,17 @@ export async function transcrever(campos) {
   aplicar((await pedir("transcrever", campos)).transcricoes);
 }
 
+/**
+ * Pede que a transcrição em curso pare.
+ *
+ * Existe porque a placa é uma só: quando aparece coisa mais importante para
+ * fazer na máquina, esperar meia hora de transcrição não é opção. Matar os
+ * motores é o que devolve a VRAM na hora — ver RegistroDeTranscricoes.Cancelar.
+ */
+export async function cancelar(gravacao) {
+  aplicar((await pedir("cancelar-transcricao", { gravacao })).transcricoes);
+}
+
 /** Esquece o resultado anterior, quando a tela já o mostrou. */
 export async function esquecer() {
   aplicar((await pedir("esquecer-transcricao")).transcricoes);

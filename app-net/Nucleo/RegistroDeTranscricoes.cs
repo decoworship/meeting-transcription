@@ -37,7 +37,32 @@ public sealed class TrabalhoDeTranscricao
     /// <summary>Preenchido só quando terminou mal.</summary>
     public string? Erro { get; internal set; }
 
+    /// <summary>
+    /// Foi interrompida a pedido, e não por falha.
+    /// </summary>
+    /// <remarks>
+    /// Separado do erro porque a tela trata os dois de maneiras opostas: falha
+    /// pede um alerta vermelho e um "tentar de novo"; parar a pedido é o
+    /// comando funcionando, e mostrá-lo como erro faria o app parecer quebrado
+    /// justamente quando obedeceu.
+    /// </remarks>
+    public bool Cancelada { get; internal set; }
+
     public bool Terminou { get; internal set; }
+
+    /// <summary>
+    /// Como se pede ao pipeline que pare.
+    /// </summary>
+    /// <remarks>
+    /// O cancelamento atravessa até os motores: o <c>MotorSidecar</c> registra
+    /// <c>ct.Register(() =&gt; Matar(_processo))</c> e mata a árvore de
+    /// processos, que é o que **libera a VRAM na hora** — pedir educadamente a
+    /// um Python com um modelo carregado devolveria a placa quando ele
+    /// resolvesse cooperar.
+    /// </remarks>
+    internal CancellationTokenSource Fonte { get; } = new();
+
+    public CancellationToken Token => Fonte.Token;
 }
 
 /// <summary>
@@ -110,17 +135,50 @@ public sealed class RegistroDeTranscricoes
     }
 
     /// <summary>Fim de linha, bem ou mal. O trabalho sai de "atual" e vira "último".</summary>
-    public TrabalhoDeTranscricao? Terminar(string gravacao, string? erro = null)
+    public TrabalhoDeTranscricao? Terminar(string gravacao, string? erro = null,
+                                           bool cancelada = false)
     {
         lock (_trava)
         {
             if (_atual is not { } t || t.Gravacao != gravacao) return null;
             t.Terminou = true;
             t.Erro = erro;
-            if (erro is null) t.Fracao = 1;
+            t.Cancelada = cancelada;
+            if (erro is null && !cancelada) t.Fracao = 1;
             _ultimo = t;
             _atual = null;
+            t.Fonte.Dispose();
             return t;
+        }
+    }
+
+    /// <summary>
+    /// Pede que a transcrição em curso pare, liberando a placa.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Existe porque a GPU é uma só e a transcrição não é sempre a coisa mais
+    /// importante em execução na máquina — pedido do dono do produto em
+    /// 13/08/2026, depois de usar a Fase 3 pela primeira vez.
+    /// </para>
+    /// <para>
+    /// Só <b>pede</b>: quem tira o trabalho do registro é o
+    /// <see cref="Terminar"/>, chamado por quem estava rodando o pipeline
+    /// quando ele de fato para. Marcar como terminado aqui abriria uma janela em
+    /// que o registro diz "livre" com dois modelos ainda na VRAM, e a próxima
+    /// transcrição começaria em cima da que está morrendo.
+    /// </para>
+    /// </remarks>
+    /// <returns>Falso quando não havia o que parar.</returns>
+    public bool Cancelar(string? gravacao = null)
+    {
+        lock (_trava)
+        {
+            if (_atual is not { } t) return false;
+            if (gravacao is { Length: > 0 } && t.Gravacao != gravacao) return false;
+            t.Texto = "parando…";
+            t.Fonte.Cancel();
+            return true;
         }
     }
 

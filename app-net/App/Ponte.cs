@@ -26,6 +26,9 @@ internal sealed class Pedido
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("data")] public string? Data { get; init; }
+
+    /// <summary>Separar quem falou. Ausente equivale a sim.</summary>
+    [JsonPropertyName("diarizar")] public bool? Diarizar { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Rótulo do falante e o nome dado a ele, para aprender a voz.</summary>
@@ -94,6 +97,10 @@ internal sealed class Resposta
 
     /// <summary>Cliente → seus projetos. A UI precisa dos dois para o cadastro.</summary>
     [JsonPropertyName("clientes")] public Dictionary<string, List<string>>? Clientes { get; init; }
+
+    /// <summary>O vínculo desta gravação, na resposta a <c>reuniao</c>.</summary>
+    [JsonPropertyName("cliente")] public string? Cliente { get; init; }
+    [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
@@ -202,6 +209,9 @@ internal sealed class TranscricaoResumo
     [JsonPropertyName("comecou_em")] public required string ComecouEm { get; init; }
     [JsonPropertyName("terminou")] public bool Terminou { get; init; }
     [JsonPropertyName("erro")] public string? Erro { get; init; }
+
+    /// <summary>Parou a pedido. A tela trata diferente de falha.</summary>
+    [JsonPropertyName("cancelada")] public bool Cancelada { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -273,6 +283,11 @@ internal sealed class GravacaoResumo
     /// <summary>Quantos a agenda listou — convidados, não presentes.</summary>
     [JsonPropertyName("convidados")] public int Convidados { get; init; }
     [JsonPropertyName("transcrita")] public bool Transcrita { get; init; }
+
+    /// <summary>O vínculo escolhido na tela de preparo, que sobrevive a ela.</summary>
+    [JsonPropertyName("cliente")] public string? Cliente { get; init; }
+    [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
 }
 
@@ -360,6 +375,32 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         Prefs = _projetos.Preferencias(p.Cliente ?? "", p.Projeto ?? ""),
                     });
                     break;
+
+                // O vínculo da reunião com cliente/projeto, guardado na hora em
+                // que se escolhe — e não só quando se transcreve. Ver
+                // DadosDaReuniao: o defeito que originou isto era sair da tela
+                // de preparo e voltar com os campos em branco.
+                case "salvar-reuniao":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    new DadosDaReuniao { Cliente = p.Cliente, Projeto = p.Projeto }
+                        .Salvar(onde);
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+                }
+
+                case "reuniao":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    var d = DadosDaReuniao.Ler(onde);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id, Cliente = d.Cliente, Projeto = d.Projeto,
+                    });
+                    break;
+                }
 
                 case "salvar-projeto":
                     // Cliente e projeto novos nascem aqui: digitar um nome
@@ -472,6 +513,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "transcricoes":
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+                    break;
+
+                // Só pede para parar; quem tira do registro é a tarefa que
+                // estava rodando, quando os motores de fato morrerem.
+                case "cancelar-transcricao":
+                    _transcricoes.Cancelar(p.Gravacao);
                     Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
                     break;
 
@@ -676,6 +724,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         ComecouEm = t.ComecouEm.ToString("o"),
         Terminou = t.Terminou,
         Erro = t.Erro,
+        Cancelada = t.Cancelada,
     };
 
     /// <summary>Empurra o registro à página, sem ela ter pedido.</summary>
@@ -708,6 +757,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             return;
         }
 
+        // O que a tela mandou tem precedência, mas o silêncio dela não apaga o
+        // que já estava: retranscrever com os campos em branco apagava o cliente
+        // e o projeto guardados, e essa era a metade invisível do defeito.
+        var vinculo = DadosDaReuniao.Ler(pasta);
+        string? cliente = p.Cliente is { Length: > 0 } ? p.Cliente : vinculo.Cliente;
+        string? projeto = p.Projeto is { Length: > 0 } ? p.Projeto : vinculo.Projeto;
+        if (cliente != vinculo.Cliente || projeto != vinculo.Projeto)
+            new DadosDaReuniao { Cliente = cliente, Projeto = projeto }.Salvar(pasta);
+
         // Lança quando já há uma em curso, e a mensagem nomeia qual. O catch do
         // AtenderAsync a transforma na resposta de erro que a tela mostra.
         var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta));
@@ -720,14 +778,22 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             {
                 await _transcritor.ExecutarAsync(
                     pasta, p.Vocabulario, p.Idioma,
-                    modelo: p.Modelo, cliente: p.Cliente, projeto: p.Projeto,
+                    modelo: p.Modelo, cliente: cliente, projeto: projeto,
+                    diarizar: p.Diarizar ?? true,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
                         EmpurrarTranscricoes();
-                    });
+                    },
+                    ct: trabalho.Token);
                 _transcricoes.Terminar(pasta);
                 Avisar($"Transcrição pronta: {trabalho.Nome}");
+            }
+            catch (OperationCanceledException)
+            {
+                // Parar a pedido não é falha: a tela não mostra alerta vermelho,
+                // e a bandeja não avisa — quem clicou em parar sabe que parou.
+                _transcricoes.Terminar(pasta, cancelada: true);
             }
             catch (Exception e)
             {
@@ -1161,6 +1227,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 convidados = a.GetArrayLength();
         }
 
+        // O vínculo com cliente/projeto vem junto na lista, e não por pedido
+        // separado: são dois campos por gravação, e um pedido por cartão faria a
+        // lista piscar preenchendo-se aos poucos.
+        var dados = DadosDaReuniao.Ler(pasta);
+
         return new GravacaoResumo
         {
             Nome = Path.GetFileName(pasta),
@@ -1169,6 +1240,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Titulo = titulo,
             Convidados = convidados,
             Transcrita = File.Exists(Path.Combine(pasta, "transcricao.json")),
+            Cliente = dados.Cliente,
+            Projeto = dados.Projeto,
             Avisos = avisos,
         };
     }

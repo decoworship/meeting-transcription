@@ -223,6 +223,18 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
 
+/* O estado da transcrição à esquerda e o "parar" à direita, na mesma linha
+ * abaixo da barra: parar é ação de quem está olhando o progresso correr, e
+ * mandá-la para os botões da tela a afastaria justamente de onde se olha. */
+.progresso__linha {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.progresso__linha .campo__dica { margin: 0; }
+
 /* A barra usa o .aa-progresso do design system; o preenchimento é o filho. */
 .aa-progresso > div {
   height: 100%;

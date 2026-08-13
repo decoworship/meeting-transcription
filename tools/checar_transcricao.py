@@ -48,10 +48,20 @@ window.chrome = { webview: {
     if (p.op === 'gravacoes') r.gravacoes = [
       { nome: '2026-08-12_09-00-00', caminho: 'C:/g/a', duracao_s: 3600,
         titulo: 'Comitê de dados', convidados: 4,
-        transcrita: w._transcritas.has('C:/g/a'), avisos: [] },
+        transcrita: w._transcritas.has('C:/g/a'),
+        cliente: (w._vinculos['C:/g/a'] ?? {}).cliente ?? null,
+        projeto: (w._vinculos['C:/g/a'] ?? {}).projeto ?? null, avisos: [] },
       { nome: '2026-08-11_14-00-00', caminho: 'C:/g/b', duracao_s: 1800,
         titulo: 'Sprint', convidados: 3,
-        transcrita: w._transcritas.has('C:/g/b'), avisos: [] },
+        transcrita: w._transcritas.has('C:/g/b'),
+        cliente: (w._vinculos['C:/g/b'] ?? {}).cliente ?? null,
+        projeto: (w._vinculos['C:/g/b'] ?? {}).projeto ?? null, avisos: [] },
+      // A terceira existe para o teste de parar: no fim do roteiro as duas
+      // primeiras já foram transcritas, e reunião transcrita abre na revisão.
+      { nome: '2026-08-10_09-00-00', caminho: 'C:/g/c', duracao_s: 2400,
+        titulo: 'Kickoff', convidados: 5,
+        transcrita: w._transcritas.has('C:/g/c'),
+        cliente: null, projeto: null, avisos: [] },
     ];
     // O Gravador entra porque é o destino usado para *sair* de Reuniões: o
     // critério A é justamente trocar de destino e voltar.
@@ -68,6 +78,27 @@ window.chrome = { webview: {
       { language: 'pt', duration: 12,
         segments: [{ start: 0, end: 2, text: ' bom dia', speaker: 'You' }] });
     else if (p.op === 'transcricoes') r.transcricoes = w._registro;
+    // O vínculo da reunião, que no app mora em reuniao.json na pasta da
+    // gravação. Aqui um dicionário em memória basta: o que se testa é que a
+    // tela grava ao escolher e lê ao montar.
+    else if (p.op === 'reuniao') {
+      const v = w._vinculos[p.gravacao] ?? {};
+      r.cliente = v.cliente ?? null;
+      r.projeto = v.projeto ?? null;
+    }
+    else if (p.op === 'salvar-reuniao') {
+      w._vinculos[p.gravacao] = { cliente: p.cliente, projeto: p.projeto };
+    }
+    else if (p.op === 'cancelar-transcricao') {
+      const t = w._registro.atual;
+      if (t) {
+        Object.assign(t, { terminou: true, cancelada: true });
+        w._registro = { atual: null, ultimo: t };
+      }
+      r.transcricoes = w._registro;
+      setTimeout(() => w._emitir(
+        { id: 0, tipo: 'transcricoes', transcricoes: w._registro }), 0);
+    }
     else if (p.op === 'esquecer-transcricao') {
       w._registro = { atual: w._registro.atual, ultimo: null };
       r.transcricoes = w._registro;
@@ -80,7 +111,8 @@ window.chrome = { webview: {
                + 'Uma de cada vez: as duas disputariam a mesma placa de vídeo.';
       } else {
         w._registro = { atual: {
-          gravacao: p.gravacao, nome: p.gravacao === 'C:/g/a' ? 'Comitê de dados' : 'Sprint',
+          gravacao: p.gravacao,
+          nome: { 'C:/g/a': 'Comitê de dados', 'C:/g/b': 'Sprint' }[p.gravacao] ?? 'Kickoff',
           etapa: 'mix', fracao: 0.05, texto: 'somando',
           comecou_em: '2026-08-13T10:00:00Z', terminou: false,
         }, ultimo: null };
@@ -96,6 +128,7 @@ window.chrome = { webview: {
 
 window.chrome.webview._registro = { atual: null, ultimo: null };
 window.chrome.webview._transcritas = new Set();
+window.chrome.webview._vinculos = {};
 window.chrome.webview._gravador = {
   gravando: false, mudo: false, mudo_ha_s: 0, cor: 'cinza', status: 'Parado',
   duracao_s: 0, pasta: 'C:/g', notificacoes: true, usar_agenda: false,
@@ -158,9 +191,28 @@ def main() -> int:
 
             conferir("a bolinha começa apagada", estado() == "false")
 
-            # ---- começa a transcrição da primeira reunião
+            # ---- o vínculo com cliente/projeto, que é anterior a transcrever
             pagina.click('[data-gravacao="C:/g/a"]')
             pagina.wait_for_selector("#vocabulario")
+            pagina.fill("#cliente", "Vivo")
+            pagina.dispatch_event("#cliente", "change")
+            pagina.fill("#projeto", "Faturamento B2B")
+            pagina.dispatch_event("#projeto", "change")
+            pagina.wait_for_timeout(80)
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            meta = pagina.inner_text('[data-gravacao="C:/g/a"] .gravacao__meta')
+            conferir("o cartão mostra cliente e projeto", "Vivo · Faturamento B2B" in meta,
+                     meta.replace("\n", " | "))
+
+            pagina.click('[data-gravacao="C:/g/a"]')
+            pagina.wait_for_selector("#vocabulario")
+            voltou = pagina.input_value("#cliente"), pagina.input_value("#projeto")
+            conferir("sair da tela e voltar não apaga cliente/projeto",
+                     voltou == ("Vivo", "Faturamento B2B"), str(voltou))
+
+            # ---- começa a transcrição da primeira reunião
             pagina.click("text=Transcrever")
             pagina.wait_for_selector(".aa-progresso")
 
@@ -168,7 +220,7 @@ def main() -> int:
 
             pagina.evaluate("window.__avancar('asr', 0.42, 'minuto 12 de 60')")
             pagina.wait_for_timeout(50)
-            texto_no_meio = pagina.inner_text(".aa-progresso + .campo__dica")
+            texto_no_meio = pagina.inner_text(".progresso__linha .campo__dica")
             # A largura pelo style inline, e não pelo computado: a barra tem
             # transição, e medir em pixels no meio dela compara animação, não
             # estado.
@@ -189,7 +241,7 @@ def main() -> int:
 
             pagina.click('[data-gravacao="C:/g/a"]')
             pagina.wait_for_selector(".aa-progresso")
-            texto_de_volta = pagina.inner_text(".aa-progresso + .campo__dica")
+            texto_de_volta = pagina.inner_text(".progresso__linha .campo__dica")
             largura_de_volta = pagina.evaluate(
                 "document.querySelector('.aa-progresso div').style.width")
             conferir("critério A: volta na mesma etapa", texto_de_volta == texto_no_meio,
@@ -253,6 +305,26 @@ def main() -> int:
             pagina.wait_for_selector(".revisao", timeout=5000)
             conferir("terminar com a tela aberta abre a revisão",
                      pagina.locator(".revisao .trecho").count() > 0)
+
+            # ---- parar a transcrição: o comando funcionando não é um erro
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/c"]')
+            pagina.wait_for_selector("#vocabulario")
+            pagina.click("text=Transcrever")
+            pagina.wait_for_selector(".aa-progresso")
+            conferir("a transcrição em curso oferece parar",
+                     pagina.locator("text=Parar transcrição").count() == 1)
+
+            pagina.click("text=Parar transcrição")
+            pagina.wait_for_timeout(120)
+            conferir("parar apaga a bolinha", estado() == "false")
+            texto_parado = pagina.inner_text(".aa-pagina")
+            conferir("parar não vira alerta de erro",
+                     "interrompida" in texto_parado
+                     and pagina.locator(".aa-alerta--erro, .alerta--erro").count() == 0)
+            conferir("depois de parar dá para recomeçar",
+                     pagina.locator("text=Transcrever").count() >= 1)
 
             navegador.close()
         srv.shutdown()
