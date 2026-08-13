@@ -175,15 +175,13 @@ tirar o `recorder/` Python de uso**. O soak de 1 h foi refeito e passou.
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-# testes — 72, sempre verdes antes de commitar
+# testes — sempre verdes antes de commitar
 dotnet test app-net/Tests/MeetingApp.Tests.csproj
 
-# publicar o app. As três flags e o token são obrigatórios — ver §7.
-dotnet publish app-net/App/MeetingApp.App.csproj -c Release -r win-x64 \
-  --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true \
-  -p:TokenHuggingFace=/mnt/c/Users/andre/.meeting-recorder/hf_token.txt \
-  -o <saida>
-cp <saida>/MeetingApp.exe /mnt/c/Users/andre/MeetingApp/
+# publicar e instalar. Desde a Fase 2.5 sempre por aqui: o script confere as
+# réguas (tamanho, token, ícones da bandeja) antes de copiar, e o destino
+# padrão é a pasta de teste, não a instalação em uso.
+tools/publicar.sh
 
 # iterar na interface sem recompilar
 MeetingApp.exe --web C:\caminho\para\app-net\App\web
@@ -601,10 +599,23 @@ rola até o fim e confere se as abas continuam abaixo do cabeçalho.
 
 ---
 
-## 16. Aposentar o Docker e o Gradio (autorizado em 12/08)
+## 16. Aposentar o Docker e o Gradio (feito em 13/08)
 
-O dono do produto autorizou a limpeza. **Nada foi removido ainda** — este é o
-inventário para quem fizer, e a parte importante é o que **não** sai.
+> **Executado em 13/08/2026**, junto com o fechamento da Fase 2.5, em commit
+> isolado. Saiu tudo o que este inventário lista, mais o `recorder/` Python e o
+> `config.example.json`. O `src/web/assets/ds/` **não** foi apagado: foi movido
+> para `assets/ds/`, com os `EmbeddedResource` do `.csproj` atualizados.
+>
+> **Duas linhas deste inventário estavam erradas**, e vale registrar por quê.
+> `src/transcription/` e `src/diarization/` estão aqui listados como "o pipeline
+> Python, substituído" — mas **cinco ferramentas de medição os importam**
+> (`benchmark_wer`, `benchmark_der`, `benchmark_vocab`, `sweep_vad`,
+> `comparar_pipeline`). Apagá-los não teria quebrado o app: teria quebrado a
+> forma como o projeto se mede, e em silêncio, porque nenhum teste cobre as
+> ferramentas. Eles ficam, junto com `src/utils/`.
+
+O dono do produto autorizou a limpeza. Este é o inventário, e a parte importante
+é o que **não** sai.
 
 ### O que sai
 
@@ -621,15 +632,18 @@ inventário para quem fizer, e a parte importante é o que **não** sai.
 
 - **`src/web/assets/ds/`** — o design system. O app nativo o consome
   diretamente: o `ds.css` de `app-net/App/web/` faz `@import` de `/ds/`, e o
-  `.csproj` embute esses arquivos por caminho literal
-  (`../../src/web/assets/ds/...`). **Apagar `src/web/` inteiro quebra o build do
-  app.** Se a pasta for movida, os `EmbeddedResource` do `.csproj` vão junto.
+  `.csproj` embute esses arquivos por caminho literal. **Apagar `src/web/`
+  inteiro quebra o build do app.** *(Em 13/08 ele foi movido para `assets/ds/`,
+  com os sete `EmbeddedResource` e o `tools/medir_layout.py` junto.)*
 - **`src/web/projects.py`, `history.py`, `recordings.py`, `voices.py`,
   `exporters.py`** — não estão em uso pelo app nativo, mas são a **referência
   escrita** dos formatos que ele lê e escreve (`projects.json` com as chaves que
   o C# preserva sem modelar, o layout do `history/`). Enquanto houver dado
   antigo para migrar, o valor deles é documental. Sair, se sair, é depois da
-  Fase 2.5.
+  Fase 2.5. *(Em 13/08 ficaram: além do valor documental, o
+  `comparar_pipeline.py` importa o `recordings.py`, e meia dúzia de comentários
+  em C# apontam para eles — `Meta.cs`, `Faixas.cs`, `Projetos.cs`, `MetaTests.cs`.
+  E há dado antigo de verdade: `~/.meeting-transcription/history/` no WSL.)*
 - **`motores/`** — é Python, e é a implementação atual dos três sidecars. Não
   tem relação com o Docker.
 - **`tools/`** — sete ferramentas de medição dependem do `.venv`

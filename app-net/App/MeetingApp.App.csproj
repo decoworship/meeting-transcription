@@ -45,13 +45,43 @@
   <ItemGroup>
     <ProjectReference Include="..\Nucleo\MeetingApp.Nucleo.csproj" />
     <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
+    <!-- O gravador, desde a Fase 2.5. Captura arrasta Gravacao (o antigo Core)
+         por referência de projeto; Agenda entra explícito porque a captura não
+         depende dela — quem depende é o menu, para rotular a reunião. -->
+    <ProjectReference Include="..\Captura\MeetingRecorder.Capture.csproj" />
+    <ProjectReference Include="..\Agenda\MeetingRecorder.Agenda.csproj" />
+  </ItemGroup>
+
+  <!-- Os ícones da bandeja, um por cor de estado, gerados pelo
+       tools/gerar_icone.py. Embutidos pelo mesmo motivo da interface: um arquivo
+       solto ao lado do .exe é mais uma coisa para o instalador acertar, e some
+       se alguém copiar só o binário. O prefixo mudou de MeetingRecorder.Tray
+       para MeetingApp junto com o assembly — ver IconesDaBandeja.
+
+       Barra normal, e não invertida: com "..\..\assets\bandeja-*.ico" o MSBuild
+       no Linux não expande o glob e não embute nada. Compila, publica, passa
+       nos testes, e o app sobe sem ícone na bandeja — sem ícone não há menu, e
+       sem menu não há como sair dele. É o mesmo tipo de defeito silencioso que
+       o token do HuggingFace já tinha dado; a régua do publicar.sh existe
+       porque este aqui foi assim que apareceu. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../assets/bandeja-amarelo.ico"
+                      LogicalName="MeetingApp.bandeja-amarelo.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-cinza.ico"
+                      LogicalName="MeetingApp.bandeja-cinza.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-laranja.ico"
+                      LogicalName="MeetingApp.bandeja-laranja.ico" />
+    <EmbeddedResource Include="../../assets/bandeja-vermelho.ico"
+                      LogicalName="MeetingApp.bandeja-vermelho.ico" />
   </ItemGroup>
 
   <!-- A interface inteira vai embutida: um arquivo solto ao lado do .exe seria
        mais uma coisa para o instalador acertar, e o WebView2 serve tudo de
        memória por SetVirtualHostNameToFolderMapping ou pelo nosso handler.
-       O design system vem de src/web/assets/ds — a mesma cópia que o app
-       Gradio usa, para os dois não divergirem enquanto convivem. -->
+       O design system vem de assets/ds. Morava em src/web/assets/ds enquanto o
+       app Gradio existia e os dois precisavam da mesma cópia para não
+       divergirem; o Gradio saiu em 13/08/2026 e o DS foi para junto dos outros
+       ativos, que é onde ele sempre pertenceu. -->
   <!-- Sem recursão de propósito: com subpastas o %(RecursiveDir) entraria no
        nome do recurso com barras, que não é o separador que o Conteudo usa.
        Enquanto a interface couber em arquivos planos, isto é o mais simples que
@@ -66,19 +96,19 @@
        @font-face dele usam caminhos relativos ('fonts/Fraunces/...'), então o
        nome do recurso tem que bater com a URL que o navegador vai pedir. -->
   <ItemGroup>
-    <EmbeddedResource Include="../../src/web/assets/ds/tokens/tokens.css"
+    <EmbeddedResource Include="../../assets/ds/tokens/tokens.css"
                       LogicalName="MeetingApp.web.ds.tokens.tokens.css" />
-    <EmbeddedResource Include="../../src/web/assets/ds/colors_and_type.css"
+    <EmbeddedResource Include="../../assets/ds/colors_and_type.css"
                       LogicalName="MeetingApp.web.ds.colors_and_type.css" />
-    <EmbeddedResource Include="../../src/web/assets/ds/componentes.css"
+    <EmbeddedResource Include="../../assets/ds/componentes.css"
                       LogicalName="MeetingApp.web.ds.componentes.css" />
-    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Fraunces/Fraunces-VariableFont.ttf"
+    <EmbeddedResource Include="../../assets/ds/fonts/Fraunces/Fraunces-VariableFont.ttf"
                       LogicalName="MeetingApp.web.ds.fonts.Fraunces.Fraunces-VariableFont.ttf" />
-    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Fraunces/Fraunces-Italic-VariableFont.ttf"
+    <EmbeddedResource Include="../../assets/ds/fonts/Fraunces/Fraunces-Italic-VariableFont.ttf"
                       LogicalName="MeetingApp.web.ds.fonts.Fraunces.Fraunces-Italic-VariableFont.ttf" />
-    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf"
+    <EmbeddedResource Include="../../assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-VariableFont_wght.ttf"
                       LogicalName="MeetingApp.web.ds.fonts.Hanken_Grotesk.HankenGrotesk-VariableFont_wght.ttf" />
-    <EmbeddedResource Include="../../src/web/assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf"
+    <EmbeddedResource Include="../../assets/ds/fonts/Hanken_Grotesk/HankenGrotesk-Italic-VariableFont_wght.ttf"
                       LogicalName="MeetingApp.web.ds.fonts.Hanken_Grotesk.HankenGrotesk-Italic-VariableFont_wght.ttf" />
   </ItemGroup>
 

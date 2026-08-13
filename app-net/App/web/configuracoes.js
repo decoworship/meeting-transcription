@@ -117,16 +117,33 @@ function campoDePasta(rotulo, valor, dica, aoMudar) {
 
 // ─────────────────────────────────────────────────────────── aba Geral
 
-function abaGeral(config, gravar) {
+function abaGeral(config, gravador, gravar, estadoDoTexto) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
   const pastas = bloco("Pastas",
-    "Onde o app procura as gravações e para onde ele copia o que você exporta.");
+    "Onde o app grava e procura as gravações, e para onde ele copia o que você exporta.");
 
+  // Uma pasta só, desde a Fase 2.5.
+  //
+  // Havia duas chaves: o `output_dir` do gravador, que é onde o áudio de fato
+  // caía, e este campo, que gravava um `pasta_das_gravacoes` que NADA lia —
+  // mexer nele não tinha efeito nenhum. Fundidos os dois programas, gravar e
+  // ler no mesmo lugar deixa de ser coincidência: este campo agora é o
+  // output_dir, e a migração de quem já tinha escolhido algo aqui acontece na
+  // primeira abertura (ver PastaDasGravacoes.cs).
   const campoPasta = campoDePasta("Pasta das gravações",
-    config.pasta_das_gravacoes ?? "", "vazio = a mesma do gravador",
-    (v) => gravar({ pasta_das_gravacoes: v }));
+    gravador.pasta, "onde as reuniões são gravadas",
+    async (v) => {
+      estadoDoTexto("salvando…");
+      try {
+        const r = await pedir("pasta-das-gravacoes", { pasta: v });
+        gravador.pasta = r.gravador.pasta;
+        estadoDoTexto("salvo");
+      } catch (e) {
+        estadoDoTexto(`não salvou: ${e.message}`);
+      }
+    });
 
   const campoExport = campoDePasta("Pasta de exportação",
     config.pasta_de_exportacao ?? "", "vazio = só ao lado da gravação",
@@ -139,6 +156,90 @@ function abaGeral(config, gravar) {
 
   pastas.append(campoPasta, campoExport, dica);
   painel.append(pastas);
+  return painel;
+}
+
+// ───────────────────────────────────────────────────────── aba Gravador
+
+/**
+ * O que é do gravador e não cabe na tela dele.
+ *
+ * A tela do Gravador é o que se olha durante uma reunião: estado, nível,
+ * dispositivo. O que se configura uma vez e não se olha mais — notificações,
+ * conta do Google — mora aqui, que é onde já se procura configuração.
+ */
+function abaGravador(gravador, aoMexer) {
+  const painel = document.createElement("div");
+  painel.className = "painel";
+
+  const avisos = bloco("Notificações",
+    "Os balões da bandeja: reunião reconhecida, lembrete de microfone mudo.");
+  avisos.classList.add("bloco--chave");
+  avisos.appendChild(chave(gravador.notificacoes,
+    (v) => aoMexer("notificacoes", { ligado: v })));
+
+  // Dito com todas as letras porque é a diferença entre um aviso que incomoda e
+  // um aviso que salva a reunião — e desligar o primeiro não pode desligar o
+  // segundo.
+  const nota = document.createElement("p");
+  nota.className = "bloco__texto";
+  nota.textContent =
+    "Desligar não silencia dispositivo caindo nem disco enchendo: isso você "
+    + "precisa saber de qualquer jeito.";
+  avisos.appendChild(nota);
+
+  const agenda = bloco("Google Calendar",
+    "Identifica a reunião que está sendo gravada e usa os participantes como "
+    + "vocabulário na transcrição.");
+
+  if (!gravador.agenda_configurada) {
+    agenda.appendChild(obra(
+      "Falta o google_client_secret.json",
+      "Ponha o arquivo em %USERPROFILE%\\.meeting-recorder e reabra o app. "
+      + "Só aparece em binário montado sem a credencial embutida."));
+    painel.append(avisos, agenda);
+    return painel;
+  }
+
+  const usar = document.createElement("div");
+  usar.className = "bloco bloco--chave";
+  const usarTitulo = document.createElement("h2");
+  usarTitulo.className = "bloco__titulo";
+  usarTitulo.textContent = "Usar esta agenda";
+  usar.append(usarTitulo, chave(gravador.usar_agenda,
+    (v) => aoMexer("usar-agenda", { ligado: v })));
+
+  const conta = document.createElement("p");
+  conta.className = "bloco__texto";
+  conta.textContent = gravador.conta
+    ? `Conectado: ${gravador.conta}` : "Nenhuma conta conectada.";
+
+  const acoes = document.createElement("div");
+  acoes.className = "acoes";
+
+  const conectar = document.createElement("button");
+  conectar.className = "aa-btn aa-btn-secundario";
+  conectar.type = "button";
+  conectar.textContent = gravador.conta ? "Trocar de conta…" : "Conectar conta…";
+  conectar.addEventListener("click", () => {
+    // O navegador abre e a autorização termina fora do app; o resultado chega
+    // por balão da bandeja. Recarregar aqui mostraria o estado de antes.
+    conta.textContent = "Abrindo o navegador… conclua a autorização por lá.";
+    aoMexer("conectar-agenda");
+  });
+  acoes.appendChild(conectar);
+
+  if (gravador.conta) {
+    const desconectar = document.createElement("button");
+    desconectar.className = "aa-btn aa-btn-texto";
+    desconectar.type = "button";
+    desconectar.textContent = "Desconectar";
+    desconectar.addEventListener("click", () => aoMexer("desconectar-agenda"));
+    acoes.appendChild(desconectar);
+  }
+
+  agenda.append(conta, acoes);
+  painel.append(avisos, usar, agenda);
   return painel;
 }
 
@@ -785,6 +886,7 @@ function abaVozes(vozes, aoMudar) {
 
 const ABAS = [
   ["geral", "Geral"],
+  ["gravador", "Gravador"],
   ["modelos", "Modelos"],
   ["transcricao", "Transcrição"],
   ["clientes", "Clientes"],
@@ -804,12 +906,13 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, vozes;
+  let config, clientes, catalogo, vozes, gravador;
   try {
-    // Tudo de uma vez: são quatro leituras baratas e locais, e pedir sob demanda
+    // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
-    [{ config }, { clientes }, { catalogo }, { vozes }] = await Promise.all([
+    [{ config }, { clientes }, { catalogo }, { vozes }, { gravador }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
+      pedir("gravador"),
     ]);
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
@@ -835,6 +938,19 @@ export async function telaDeAjustes(ctx, aba = "geral") {
     }
   }
 
+  /** As operações do gravador: cada uma devolve o estado inteiro de volta. */
+  async function mexerNoGravador(op, campos = {}) {
+    estado.textContent = "salvando…";
+    try {
+      const r = await pedir(op, campos);
+      gravador = r.gravador;
+      estado.textContent = "salvo";
+      desenharPainel();
+    } catch (e) {
+      estado.textContent = `não salvou: ${e.message}`;
+    }
+  }
+
   async function mexerNaVoz(op, pessoa, indice) {
     const r = await pedir(op, { pessoa, indice });
     vozes = r.vozes;
@@ -855,7 +971,8 @@ export async function telaDeAjustes(ctx, aba = "geral") {
 
   function desenharPainel() {
     const conteudo = {
-      geral: () => abaGeral(config, gravar),
+      geral: () => abaGeral(config, gravador, gravar, (t) => { estado.textContent = t; }),
+      gravador: () => abaGravador(gravador, mexerNoGravador),
       modelos: () => abaModelos(catalogo, config, gravar),
       transcricao: () => abaTranscricao(config, gravar),
       clientes: () => abaClientes(clientes, catalogo),

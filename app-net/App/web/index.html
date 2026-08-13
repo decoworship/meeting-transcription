@@ -51,16 +51,14 @@
 
   <!-- O trilho é o único elemento que nunca sai da tela. É por ele que se troca
        de destino; a barra de cima é do destino em que se está.
-       O gravador já tem lugar reservado: ele hoje vive só na bandeja, e o
-       espelho dele dentro do app é uma decisão tomada e ainda não construída —
-       deixar o buraco à vista é mais honesto que fingir que ele não existe. -->
+       O Gravador deixou de ser um buraco na Fase 2.5: ele continua vivendo na
+       bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
     <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
       <span>Reuniões</span>
     </button>
-    <button class="trilho__item" id="ir-gravador" type="button" disabled
-            title="O gravador ainda vive só na bandeja do Windows">
+    <button class="trilho__item" id="ir-gravador" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
       <span>Gravador</span>
     </button>

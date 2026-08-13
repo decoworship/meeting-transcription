@@ -4,7 +4,8 @@ Documento de passagem de bastão. A carta de execução é a
 [FASE1.md](FASE1.md); aqui está o estado real contra ela, em 08/08/2026.
 
 Branch: `feat/recorder-and-accuracy`. Último commit desta fase: ver
-`git log --oneline recorder-net/`.
+`git log --oneline --follow app-net/Gravacao/ app-net/Captura/` (a árvore
+se chamava `recorder-net/` até a Fase 2.5).
 
 ---
 
@@ -165,7 +166,7 @@ A definição de pronto da carta é **o gravador Python aposentado**. O que falt
 
 Lembrete de leitura para quem for medir de novo: o `desalinhamento entre faixas`
 que o CLI imprime é a **diferença de comprimento** entre elas, não alinhamento
-temporal ([`Cli/Program.cs`](../recorder-net/Cli/Program.cs), busca por
+temporal ([`Cli/Program.cs`](../app-net/CliGravador/Program.cs), busca por
 `desalinhamento`). Em gravação com nada tocando, a faixa `system` sai 100%
 silêncio sintetizado e o número mede o preenchimento, não a captura.
 
@@ -383,17 +384,26 @@ precisão de milissegundos.
 
 ## 7. Como validar um build
 
+> **Fase 2.5 moveu tudo isto.** O `recorder-net/` deixou de existir como árvore
+> separada: o `Core/` virou `app-net/Gravacao/`, o `Capture/` virou
+> `app-net/Captura/`, o `Agenda/` continua `Agenda/` sob o `app-net/`, o CLI
+> virou `app-net/CliGravador/`, e a bandeja virou parte do `app-net/App/`.
+> Não há mais `MeetingRecorder.exe` para publicar — a bandeja é um dos dois
+> papéis do `MeetingApp.exe`. Ver [FASE2.5-HANDOFF.md](FASE2.5-HANDOFF.md).
+> Os comandos abaixo ficam como registro do que a Fase 1 usava.
+
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-# testes
+# testes (hoje: app-net/Tests, as duas suítes juntas)
 dotnet test recorder-net/Tests/MeetingRecorder.Tests.csproj
 
-# CLI
+# CLI (hoje: app-net/CliGravador/MeetingRecorder.Cli.csproj)
 dotnet publish recorder-net/Cli/MeetingRecorder.Cli.csproj -c Release -r win-x64 \
   --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o <saida>
 
 # bandeja — agora com as mesmas flags do CLI, inclusive PublishTrimmed
+# (hoje: tools/publicar.sh, que publica o app inteiro)
 dotnet publish recorder-net/Tray/MeetingRecorder.Tray.csproj -c Release -r win-x64 \
   --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -o <saida>
 ```

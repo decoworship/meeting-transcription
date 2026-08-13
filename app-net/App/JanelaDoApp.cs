@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using MeetingApp.App.Bandeja;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
 using Microsoft.Web.WebView2.Core;
@@ -9,6 +10,13 @@ namespace MeetingApp.App;
 /// <summary>
 /// A janela do aplicativo: um retângulo Win32 hospedando o WebView2.
 /// </summary>
+/// <remarks>
+/// <b>Fechar esconde; sair é pelo menu da bandeja.</b> Esta é a inversão de
+/// ciclo de vida da Fase 2.5, e errá-la perde gravação: até a Fase 2 a janela
+/// <em>era</em> o programa, e o <c>WM_DESTROY</c> dela encerrava o processo. Aqui
+/// ela é um dos dois papéis do mesmo processo, e o outro — gravar — não pode
+/// depender de ela estar aberta. Ver <see cref="Aplicacao"/>.
+/// </remarks>
 internal sealed class JanelaDoApp : IDisposable
 {
     private const string NomeDaClasse = "MeetingApp.Janela";
@@ -19,9 +27,18 @@ internal sealed class JanelaDoApp : IDisposable
     private Ponte? _ponte;
     private readonly string _pastaDasGravacoes;
     private readonly string? _telaInicial;
+    private readonly Gravador _gravador;
 
     private CoreWebView2Controller? _controlador;
     private CoreWebView2? _web;
+
+    /// <summary>A janela foi fechada pelo X — escondida, não destruída.</summary>
+    public Action? AoEsconder { get; set; }
+
+    /// <summary>A página está pronta para receber eventos do gravador.</summary>
+    public bool Pronta => _web is not null;
+
+    public bool Visivel => Win32.IsWindowVisible(Hwnd);
 
     /// <remarks>
     /// Fila e não <see cref="SynchronizationContext"/>: numa janela Win32 crua
@@ -33,12 +50,11 @@ internal sealed class JanelaDoApp : IDisposable
 
     public IntPtr Hwnd { get; }
 
-    public JanelaDoApp(string titulo, string? pastaDasGravacoes = null,
+    public JanelaDoApp(string titulo, Gravador gravador, string pastaDasGravacoes,
                        string? telaInicial = null)
     {
-        Win32.SetProcessDpiAwarenessContext(Win32.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
-        _pastaDasGravacoes = pastaDasGravacoes ?? PastaPadraoDasGravacoes();
+        _gravador = gravador;
+        _pastaDasGravacoes = pastaDasGravacoes;
         _telaInicial = telaInicial;
         _wndProc = Processar;
 
@@ -60,22 +76,21 @@ internal sealed class JanelaDoApp : IDisposable
             throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateWindowEx falhou");
 
         Win32.ShowWindow(Hwnd, Win32.SW_SHOW);
-    }
 
-    /// <summary>Sobe o WebView2 e entra no laço de mensagens.</summary>
-    public void Rodar()
-    {
-        // O WebView2 é assíncrono e precisa de um laço rodando para completar.
-        // Iniciar aqui e bombear as mensagens é o que substitui o
-        // Application.Run de um app WinForms.
+        // O WebView2 é assíncrono e completa pelo laço de mensagens, que quem
+        // roda é a JanelaDeMensagens da bandeja. Aqui só se dispara.
         _ = IniciarWebAsync();
-
-        while (Win32.GetMessageW(out var msg, IntPtr.Zero, 0, 0) > 0)
-        {
-            Win32.TranslateMessage(ref msg);
-            Win32.DispatchMessageW(ref msg);
-        }
     }
+
+    /// <summary>Traz a janela de volta, esteja escondida ou só atrás.</summary>
+    public void Mostrar()
+    {
+        Win32.ShowWindow(Hwnd, Win32.IsIconic(Hwnd) ? Win32.SW_RESTORE : Win32.SW_SHOW);
+        Win32.SetForegroundWindow(Hwnd);
+    }
+
+    /// <summary>Manda um evento à página, sem ela ter pedido.</summary>
+    public void Enviar(string json) => NaUi(json);
 
     private async Task IniciarWebAsync()
     {
@@ -125,7 +140,7 @@ internal sealed class JanelaDoApp : IDisposable
         // A ponte: a página manda JSON, o núcleo responde JSON. O PostWebMessage
         // só pode ser chamado na thread da UI, e o pipeline responde de uma
         // thread de trabalho — daí o salto de volta pelo laço de mensagens.
-        _ponte = new Ponte(_pastaDasGravacoes, NaUi);
+        _ponte = new Ponte(_pastaDasGravacoes, NaUi, _gravador);
         _web.WebMessageReceived += (_, e) =>
         {
             string pedido = e.TryGetWebMessageAsString();
@@ -193,46 +208,24 @@ internal sealed class JanelaDoApp : IDisposable
                 Marshal.StructureToPtr(limites, lParam, fDeleteOld: false);
                 return IntPtr.Zero;
 
+            // O X da janela esconde. Não destrói a janela, não encerra o
+            // processo, e sobretudo não para a gravação: quem fecha a janela no
+            // meio de uma reunião quer a tela fora do caminho, não a reunião
+            // perdida (FASE2.5.md, critério C).
+            //
+            // Esconder e não destruir também é o que faz reabrir ser instantâneo:
+            // o WebView2 já está de pé, com a página no estado em que ficou.
+            case Win32.WM_CLOSE:
+                Win32.ShowWindow(Hwnd, Win32.SW_HIDE);
+                AoEsconder?.Invoke();
+                return IntPtr.Zero;
+
+            // Sem PostQuitMessage, ao contrário da Fase 2: quem encerra o laço é
+            // a janela invisível da bandeja, pelo "Sair" do menu.
             case Win32.WM_DESTROY:
-                Win32.PostQuitMessage(0);
                 return IntPtr.Zero;
         }
         return Win32.DefWindowProcW(hwnd, msg, wParam, lParam);
-    }
-
-    /// <summary>Onde o gravador deixa as gravações.</summary>
-    /// <remarks>
-    /// Lê o mesmo <c>settings.json</c> do gravador em vez de referenciar o
-    /// assembly dele: os dois executáveis são separados por desenho (FASE2.md,
-    /// princípio 1) e se encontram pelos arquivos. Uma chave lida à mão custa
-    /// menos que acoplar os binários.
-    /// </remarks>
-    private static string PastaPadraoDasGravacoes()
-    {
-        string padrao = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "MeetingRecordings");
-
-        string cfg = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".meeting-recorder", "settings.json");
-
-        try
-        {
-            if (!File.Exists(cfg)) return padrao;
-            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(cfg));
-            return doc.RootElement.TryGetProperty("output_dir", out var dir)
-                   && dir.ValueKind == System.Text.Json.JsonValueKind.String
-                   && dir.GetString() is { Length: > 0 } valor
-                ? valor
-                : padrao;
-        }
-        catch (Exception)
-        {
-            // settings.json ilegível não pode impedir o app de abrir — mesma
-            // postura do gravador, que cai nos padrões.
-            return padrao;
-        }
     }
 
     public void Dispose()

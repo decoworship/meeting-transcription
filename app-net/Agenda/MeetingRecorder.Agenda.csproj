@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- net8.0 e não net8.0-windows, e sem nenhum pacote: a agenda é HTTP e JSON,
+       nada de Windows. Fica testável em qualquer máquina, como o Core.
+
+       Sem o SDK Google.Apis de propósito. Medido: um "hello world" publicado
+       com trim custa 11,5 MB sozinho e 19,5 MB com o SDK, além de 11 avisos de
+       trim — o mesmo tipo de reflexão que já derrubou a primeira versão
+       trimada deste projeto. A superfície usada aqui são duas chamadas REST e
+       um POST de refresh; não compensa 8 MB e o risco. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Credenciais.Expiry e Autorizacao.Query sao detalhes internos, mas cada
+         um guarda uma regra que quebra em silencio se mudar: o formato que o
+         google-auth ainda le, e o parsing do redirect do OAuth. -->
+    <InternalsVisibleTo Include="MeetingApp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Gravacao\MeetingRecorder.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Credenciais do Google embutidas no binário publicado, para quem recebe o
+       app não precisar criar um cliente OAuth. O arquivo NÃO vive no
+       repositório: o build pega o do perfil de quem publica, e simplesmente não
+       embute nada se ele não estiver lá. Ver Agenda/FonteDoSegredo.cs.
+
+       Publicando do WSL, o $(USERPROFILE) não existe; passe o caminho:
+         dotnet publish ... -p:SegredoDoGoogle=/mnt/c/Users/<voce>/.meeting-recorder/google_client_secret.json -->
+  <PropertyGroup>
+    <SegredoDoGoogle Condition="'$(SegredoDoGoogle)' == ''">$(USERPROFILE)\.meeting-recorder\google_client_secret.json</SegredoDoGoogle>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(SegredoDoGoogle)')">
+    <EmbeddedResource Include="$(SegredoDoGoogle)"
+                      LogicalName="MeetingRecorder.Agenda.google_client_secret.json" />
+  </ItemGroup>
+
+</Project>

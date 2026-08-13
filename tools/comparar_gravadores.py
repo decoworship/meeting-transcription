@@ -33,7 +33,7 @@ from pathlib import Path
 import numpy as np
 
 RAIZ = Path(__file__).resolve().parent.parent
-EXE = RAIZ / "recorder-net/Cli/bin/Debug/net8.0-windows/win-x64/Capture.exe"
+EXE = RAIZ / "app-net/CliGravador/bin/Debug/net8.0-windows/win-x64/Capture.exe"
 PY_WIN = Path("/mnt/c/Users/andre/.meeting-recorder/.venv/Scripts/python.exe")
 TAXA = 16_000
 

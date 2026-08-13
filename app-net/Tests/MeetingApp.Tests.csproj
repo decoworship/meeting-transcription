@@ -13,9 +13,15 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
+  <!-- As duas suítes juntas desde a Fase 2.5, porque o executável passou a ser
+       um só. Captura e App ficam de fora: são net8.0-windows e exigem hardware
+       de áudio ou sessão interativa — a fronteira que a Fase 1 desenhou ao pôr
+       toda a aritmética no Core portátil continua valendo. -->
   <ItemGroup>
     <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
     <ProjectReference Include="..\Nucleo\MeetingApp.Nucleo.csproj" />
+    <ProjectReference Include="..\Gravacao\MeetingRecorder.Core.csproj" />
+    <ProjectReference Include="..\Agenda\MeetingRecorder.Agenda.csproj" />
   </ItemGroup>
 
   <ItemGroup>

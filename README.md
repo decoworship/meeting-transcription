@@ -1,104 +1,95 @@
 # Meeting Transcription
 
-Web app for transcribing meeting recordings (audio or video) with speaker diarization, voice fingerprinting, and per-project settings.
+Aplicativo Windows nativo que **grava** reuniões em duas faixas e as
+**transcreve** com separação de falantes, tudo local e sem nuvem.
 
-Released under the [MIT License](LICENSE).
+Um executável, um ícone na bandeja, uma janela. Publicado sob a
+[licença MIT](LICENSE).
 
-## Features
+## O que ele faz
 
-- Transcribe audio/video files (mp4, mkv, avi, mov, webm, wav, mp3, m4a, flac, ogg)
-- Speaker diarization (who said what)
-- Voice fingerprinting — auto-recognize people across recordings
-- Per-project settings (vocabulary, language, model)
-- Audio player synced with transcript (click a segment to seek)
-- Inline editing of segments and speakers
-- Export to TXT / SRT / VTT / DOCX
-- History of past transcriptions
-- GPU acceleration with faster-whisper
+**Grava**, pela bandeja ou pela janela:
 
-## HuggingFace setup (required)
+- duas faixas em separado — microfone e áudio do sistema (WASAPI loopback) —,
+  alinhadas por construção e ancoradas no relógio de parede;
+- mute que escreve silêncio em vez de interromper a escrita, para as faixas não
+  se deslocarem uma em relação à outra;
+- WAV que sobrevive a desligamento no meio da reunião;
+- medidores de nível ao vivo e aviso de microfone mudo esquecido;
+- identifica a reunião pelo Google Calendar e usa os participantes como
+  vocabulário na transcrição.
 
-Speaker diarization and voice fingerprinting use gated pyannote models. Before
-the app can run, you need a HuggingFace token AND you must accept the model
-terms in your browser.
+**Transcreve**, na mesma janela:
 
-1. **Create a token** at https://huggingface.co/settings/tokens (Read scope is
-   enough). Copy it — it starts with `hf_`.
-2. **Accept the terms** for both models (you must be logged in; click "Agree
-   and access repository" on each page):
+- faster-whisper com aceleração por GPU, e pyannote para separar quem falou;
+- reconhece pessoas entre reuniões por impressão vocal;
+- vocabulário e preferências por cliente/projeto, com correção fonética a
+  jusante — o termo é recuperado mesmo quando o modelo erra a grafia;
+- áudio sincronizado com o texto, edição de trecho e de falante;
+- exporta em TXT / SRT / VTT / DOCX.
+
+## Como é feito
+
+| pasta | o quê |
+|---|---|
+| `app-net/` | o aplicativo: C# (.NET 8) com a interface em WebView2 |
+| `motores/` | os três sidecars Python (ASR, diarização, modelos), falando JSON por stdin/stdout |
+| `assets/ds/` | o AA Design System, embutido no executável |
+| `tools/` | as ferramentas de medição — é como este projeto se mede |
+| `src/` | o Python que as ferramentas importam: os motores de referência e o formato dos arquivos em disco |
+| `docs/` | o projeto é doc-driven; comece pelo [PLANO.md](docs/PLANO.md) |
+
+Não há mais interface Python: o app Gradio e o gravador Python foram aposentados
+em 13/08/2026, depois que o app nativo os substituiu integralmente. Ver
+[FASE2.5-HANDOFF.md](docs/FASE2.5-HANDOFF.md).
+
+## Compilar e publicar
+
+Requer o SDK do .NET 8. Publica do WSL ou do Windows.
+
+```bash
+export PATH="$HOME/.dotnet:$PATH"
+
+dotnet test app-net/Tests/MeetingApp.Tests.csproj
+
+# publica, confere as réguas e instala
+tools/publicar.sh --destino /mnt/c/Users/andre/MeetingApp
+```
+
+O `tools/publicar.sh` recusa publicar um binário que falhe em qualquer uma das
+três réguas: tamanho mínimo (as flags de publicação pegaram), token do
+HuggingFace embutido, e os ícones da bandeja embutidos. Cada uma existe por um
+defeito que chegou ao usuário.
+
+Os motores (`motores/python`, ~4,3 GB de Python embarcado) são montados à parte
+por `tools/empacotar_motores.sh` e ficam ao lado do executável. **Ainda não há
+instalador** — é a Fase 4.
+
+## HuggingFace
+
+A diarização e a impressão vocal usam modelos pyannote com termos de uso. Quem
+compila o app precisa de um token com os termos aceitos; quem **recebe** o app
+não precisa de nada, porque o token vai embutido no binário.
+
+1. Crie um token em https://huggingface.co/settings/tokens (escopo Read basta).
+2. Aceite os termos, logado, nos dois modelos:
    - https://huggingface.co/pyannote/speaker-diarization-community-1
    - https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM
-3. **Provide the token** to the app via a `.env` file (see below) or by
-   pasting it into the UI on first run.
+3. Salve o token em `%USERPROFILE%\.meeting-recorder\hf_token.txt`. O
+   `publicar.sh` o embute e confere que ele entrou.
 
-Without these steps you will hit a 401/403 from HuggingFace when the app tries
-to load the diarization pipeline. See `Huggingface access guide.md` for
-detailed troubleshooting.
+Diagnóstico de acesso: `tools/diagnosticar_acesso_hf.py`.
 
-## Run with Docker (recommended)
+## Ferramentas de medição
 
-The Docker image bundles Python 3.13 + CUDA 12.8 + all dependencies. Models are downloaded on first use into a mounted volume.
+Precisam do ambiente Python (`uv sync`), que existe só para elas:
 
-### Prerequisites
-
-- Docker 24+ and Docker Compose
-- For GPU: NVIDIA driver + [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) on the host
-- A HuggingFace token with the model terms accepted (see "HuggingFace setup" above)
-
-### Setup
-
-```bash
-# 1. Set your HF token
-echo "HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxx" > .env
-
-# 2. Build and start
-docker compose up -d --build
-
-# 3. Open in browser
-# http://localhost:7860
-```
-
-First transcription downloads the Whisper + pyannote models (~5–10 GB) into `./data/huggingface`. Subsequent runs reuse them.
-
-### Without GPU
-
-Edit `docker-compose.yml` and remove the `deploy.resources.reservations.devices` block. PyTorch will fall back to CPU. `tiny` and `base` Whisper models are usable on CPU; `large-v3` is much slower without a GPU.
-
-### Stopping / updating
-
-```bash
-docker compose down            # stop
-docker compose up -d --build   # rebuild after code changes
-docker compose logs -f         # follow logs
-```
-
-User data persists in `./data/meeting-transcription/` (config, history, projects, voice profiles). This directory is gitignored — your transcripts, voice fingerprints, and project list never leave your machine.
-
-A starter `config.json` is not shipped; the app creates one with sensible defaults the first time you save settings in the UI. See `config.example.json` for the schema and field names.
-
-## Run locally without Docker
-
-### Requirements
-
-- Python 3.13 (via `uv` or system)
-- FFmpeg in PATH
-- Optional: CUDA 12.8 for GPU
-- HuggingFace token (set `HF_TOKEN` env var or paste in the UI)
-
-### Install
-
-```bash
-uv sync
-```
-
-### Usage
-
-```bash
-# Web UI (recommended)
-uv run python web.py
-
-# Desktop UI (legacy CustomTkinter — works under WSL/native Linux)
-uv run python main.py
-```
-
-Web UI opens at http://localhost:7860.
+| ferramenta | o que mede |
+|---|---|
+| `benchmark_wer.py` | erro de palavra do ASR |
+| `benchmark_der.py` | erro de diarização |
+| `benchmark_vocab.py` | ganho do vocabulário por projeto |
+| `comparar_gravadores.py` | as faixas de dois gravadores, amostra a amostra |
+| `comparar_pipeline.py` | o pipeline C# contra o Python, saída a saída |
+| `medir_layout.py` | se a interface cabe na janela, num navegador de verdade |
+| `validar_bandeja.ps1` | executa o binário publicado e exige o `meta.json` como prova |

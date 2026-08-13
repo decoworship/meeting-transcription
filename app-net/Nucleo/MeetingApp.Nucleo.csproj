@@ -10,6 +10,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sidecar\MeetingApp.Sidecar.csproj" />
+    <!-- O núcleo do gravador, desde a Fase 2.5. A dependência existe por um
+         arquivo só, o PastaDasGravacoes: fundidos os dois programas, onde se
+         grava e onde se lê passaram a ser a mesma configuração, e ela é a do
+         gravador. Ler aquele JSON à mão, como a Fase 2 fazia, seria manter duas
+         definições do mesmo formato dentro do mesmo executável. -->
+    <ProjectReference Include="..\Gravacao\MeetingRecorder.Core.csproj" />
   </ItemGroup>
 
 
