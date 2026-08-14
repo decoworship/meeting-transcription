@@ -182,6 +182,16 @@ if [[ ! -e "$DESTINO/motores/python" ]]; then
   fi
 fi
 
+# O motor de ata é conferido, não copiado: são 3,5 GB que não mudam a cada
+# build. Sem ele o app abre e transcreve; só a ata falha, e falha na hora de
+# gerar — que é tarde. Ver tools/empacotar_motor_de_ata.sh.
+if [[ -f "$DESTINO/motores/ata/bin/llama-server.exe" ]]; then
+  echo "==> motor de ata presente"
+else
+  echo "AVISO: sem motor de ata em $DESTINO/motores/ata —" >&2
+  echo "       rode tools/empacotar_motor_de_ata.sh, senão gerar ata vai falhar." >&2
+fi
+
 echo "==> sincronizando os sidecars"
 for m in asr diarizacao modelos; do
   mkdir -p "$DESTINO/motores/$m"

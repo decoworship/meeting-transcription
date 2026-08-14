@@ -86,6 +86,28 @@ window.chrome = { webview: {
       r.cliente = v.cliente ?? null;
       r.projeto = v.projeto ?? null;
     }
+    else if (p.op === 'modelos-de-ata') r.tipos = [
+      { id: 'cliente-update', nome: 'Update com cliente', do_usuario: false },
+      { id: 'sprint', nome: 'Sprint', do_usuario: false },
+    ];
+    else if (p.op === 'ata') {
+      r.ata = w._atas[p.gravacao] ?? null;
+      r.ata_velha = false;
+    }
+    else if (p.op === 'gerar-ata') {
+      if (w._registro.atual) {
+        r.erro = 'já estou escrevendo a ata de "' + w._registro.atual.nome + '".';
+      } else {
+        w._registro = { atual: {
+          gravacao: p.gravacao, nome: 'Comitê de dados', etapa: 'modelo',
+          fracao: 0.05, texto: 'carregando o modelo',
+          comecou_em: '2026-08-14T10:00:00Z', terminou: false,
+        }, ultimo: null };
+        r.transcricoes = w._registro;
+        setTimeout(() => w._emitir(
+          { id: 0, tipo: 'transcricoes', transcricoes: w._registro }), 0);
+      }
+    }
     else if (p.op === 'notas') {
       r.notas = w._notas[p.gravacao] ?? '';
       r.termos = w.__termos(r.notas);
@@ -138,6 +160,19 @@ window.chrome.webview._registro = { atual: null, ultimo: null };
 window.chrome.webview._transcritas = new Set();
 window.chrome.webview._vinculos = {};
 window.chrome.webview._notas = {};
+window.chrome.webview._atas = {};
+
+/** A ata ficando pronta, empurrada pelo teste. */
+window.__ataPronta = (caminho, markdown) => {
+  const w = window.chrome.webview;
+  w._atas[caminho] = markdown;
+  const t = w._registro.atual;
+  if (t) {
+    Object.assign(t, { terminou: true, erro: null, fracao: 1 });
+    w._registro = { atual: null, ultimo: t };
+  }
+  w._emitir({ id: 0, tipo: 'transcricoes', transcricoes: w._registro });
+};
 
 /* O mesmo critério grosseiro do Notas.TermosSugeridos em C#: sigla ou palavra
    capitalizada que não abre a frase. Aqui só precisa ser bom o bastante para a
@@ -443,6 +478,38 @@ def main() -> int:
             conferir("clicar na sugestão a joga no vocabulário",
                      pagina.input_value("#vocabulario").strip() != "",
                      pagina.input_value("#vocabulario"))
+
+            # ---- a tela Atas (item 3 da Fase 3)
+            pagina.evaluate("window.chrome.webview._transcritas.add('C:/g/a')")
+            pagina.click("#ir-atas")
+            pagina.wait_for_selector(".ata")
+            conferir("Atas lista só as reuniões transcritas",
+                     pagina.locator(".ata").count() >= 1)
+            conferir("o cartão oferece o tipo de reunião",
+                     pagina.locator(".ata__tipo select").count() >= 1)
+
+            pagina.click("text=Gerar ata")
+            pagina.wait_for_selector(".ata .aa-progresso")
+            conferir("gerar mostra o progresso e a bolinha acende",
+                     estado() == "true")
+
+            pagina.evaluate("""window.__ataPronta('C:/g/a',
+              '# Ata — Teste\\n\\n## Decisões\\n\\n- **decidido** aqui\\n\\n'
+              + '## Pendências\\n\\n- [ ] Mandar a base — **Dimi** — amanhã\\n')""")
+            pagina.wait_for_selector(".ata__texto", timeout=5000)
+            conferir("a ata pronta aparece no cartão",
+                     "decidido" in pagina.inner_text(".ata__texto"))
+            # O "#" da ata vira h2 e o "##" vira h3 — um nível abaixo do que o
+            # Markdown diz, porque a página já tem o h1 na barra do topo. Título
+            # de documento dentro de documento quebraria a hierarquia para quem
+            # navega por cabeçalho.
+            conferir("o markdown vira HTML de verdade",
+                     pagina.locator(".ata__texto h2").count() == 1
+                     and pagina.locator(".ata__texto h3").count() == 2
+                     and pagina.locator(".ata__texto strong").count() >= 2)
+            conferir("a pendência vira caixa marcável",
+                     pagina.locator(".ata__pendencia input").count() == 1)
+            conferir("a bolinha apaga quando a ata fica pronta", estado() == "false")
 
             navegador.close()
         srv.shutdown()

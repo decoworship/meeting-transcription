@@ -403,3 +403,61 @@ public sealed class AjustesDaPrimeiraGeracaoTests
         return n;
     }
 }
+
+/// <summary>Os dois ajustes que a segunda ata real mostrou.</summary>
+public sealed class AjustesDaSegundaGeracaoTests
+{
+    [Fact]
+    public void PrazoADefinirGanhaOsColchetes()
+    {
+        // Os colchetes marcam a lacuna como lacuna: sem eles, "prazo a definir"
+        // se lê como se fosse um prazo chamado assim.
+        var ata = new AtaGerada
+        {
+            Acoes = [new AcaoDaAta
+            {
+                Acao = "Validar", Responsavel = "Ana", Prazo = "prazo a definir",
+            }],
+        };
+
+        VerificadorDeAta.Conferir(ata, [new SegmentoFinal
+        {
+            Start = 0, End = 1, Text = "a Ana valida isso",
+        }], ["Ana"], []);
+
+        Assert.Equal("[prazo a definir]", ata.Acoes[0].Prazo);
+    }
+
+    [Fact]
+    public void PrazoDeVerdadeNaoGanhaColchete()
+    {
+        var ata = new AtaGerada
+        {
+            Acoes = [new AcaoDaAta { Acao = "X", Responsavel = "Ana", Prazo = "amanhã" }],
+        };
+
+        VerificadorDeAta.Conferir(ata, [new SegmentoFinal
+        {
+            Start = 0, End = 1, Text = "a Ana faz amanhã",
+        }], ["Ana"], []);
+
+        Assert.Equal("amanhã", ata.Acoes[0].Prazo);
+    }
+
+    [Fact]
+    public void CompromissoNaoEntraNaContaDeOmissao()
+    {
+        // A chave de um compromisso é a palavra do prazo. Cobrar que a ata
+        // repita a palavra "hoje" é cobrar coisa nenhuma — e foi o que apareceu
+        // na lista de "números que não entraram" da segunda ata real.
+        var segmentos = new[]
+        {
+            new SegmentoFinal { Start = 0, End = 1, Text = "eu te mando a base hoje" },
+        };
+        var roteiro = RoteiroDeFatos.De(segmentos);
+
+        Assert.Single(roteiro);
+        Assert.Equal("compromisso", roteiro[0].Tipo);
+        Assert.Empty(RoteiroDeFatos.NaoIncorporados(roteiro, "# Ata\n\nnada aqui"));
+    }
+}

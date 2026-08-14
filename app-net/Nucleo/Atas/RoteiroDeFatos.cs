@@ -5,7 +5,12 @@ namespace MeetingApp.Nucleo.Atas;
 /// <summary>Um fato achado na transcrição, com o pedaço de fala em volta.</summary>
 /// <param name="Trecho">O que foi dito, cortado no tamanho que cabe num prompt.</param>
 /// <param name="Quando">Segundos desde o início. Serve para ordenar e para citar.</param>
-public sealed record Fato(string Chave, string Trecho, double Quando);
+/// <param name="Tipo">
+/// "numero" ou "compromisso". A conferência de omissão só vale para números: um
+/// compromisso tem como chave a palavra do prazo ("hoje", "amanhã"), e cobrar
+/// que a ata repita a palavra "hoje" é cobrar coisa nenhuma.
+/// </param>
+public sealed record Fato(string Chave, string Trecho, double Quando, string Tipo = "numero");
 
 /// <summary>
 /// O que a reunião disse de concreto: números, compromissos, nomes, datas.
@@ -103,7 +108,8 @@ public static class RoteiroDeFatos
                 string normalizado = Normalizar(texto);
                 string chave = normalizado[..Math.Min(60, normalizado.Length)];
                 if (vistos.Add($"c:{chave}"))
-                    compromissos.Add(new Fato(prazo.Value, Encurtar(texto), s.Start));
+                        compromissos.Add(new Fato(prazo.Value, Encurtar(texto), s.Start,
+                                              "compromisso"));
             }
         }
 
@@ -147,6 +153,7 @@ public static class RoteiroDeFatos
         var faltando = new List<string>();
         foreach (var f in roteiro)
         {
+            if (f.Tipo != "numero") continue;
             string chave = Normalizar(f.Chave);
             if (chave.Length < 3) continue;
             // Compara sem pontuação: a transcrição diz "27.529" e a ata pode

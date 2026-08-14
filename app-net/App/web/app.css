@@ -772,3 +772,44 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .medidor[data-morto="true"] { background: var(--cor-erro-bg); box-shadow: inset 0 0 0 1px var(--cor-erro); }
 
 .caminho { font-family: var(--fonte-mono); font-size: 11px; word-break: break-all; }
+
+/* ─────────────────────────────────────────────────────────────── atas */
+
+.ata { display: grid; gap: var(--espaco-3); }
+
+/* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
+ * no botão que a usa, e não perdida no meio do cartão. */
+.ata__topo {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: end;
+  gap: var(--espaco-3);
+}
+
+.ata__tipo { min-width: 14rem; margin: 0; }
+
+/* A ata lida: coluna estreita de propósito. Linha de 100 caracteres cansa, e
+ * este é o texto que se lê inteiro, ao contrário da transcrição, que se
+ * percorre. */
+.ata__texto {
+  max-width: 68ch;
+  border-top: 1px solid var(--cor-borda);
+  padding-top: var(--espaco-3);
+}
+
+.ata__texto h2 { font-size: var(--texto-medio); margin: var(--espaco-4) 0 var(--espaco-2); }
+.ata__texto h3 { font-size: var(--texto-base); margin: var(--espaco-3) 0 var(--espaco-1); }
+.ata__texto p { margin: 0 0 var(--espaco-2); line-height: 1.6; }
+.ata__texto ul { margin: 0 0 var(--espaco-3); padding-left: var(--espaco-4); }
+.ata__texto li { margin-bottom: var(--espaco-1); line-height: 1.5; }
+
+/* Pendência com caixa: a lista de ações é o que se lê primeiro numa ata, e a
+ * caixa a separa do resto sem precisar de cor. */
+.ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
+.ata__pendencia input { margin-right: var(--espaco-2); }
+
+.ata__acoes { display: flex; justify-content: flex-end; }
+
+@media (max-width: 900px) {
+  .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
+}

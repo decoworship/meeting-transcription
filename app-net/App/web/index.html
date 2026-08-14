@@ -35,6 +35,11 @@
       <rect x="9" y="3" width="6" height="11" rx="3"/>
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
     </g>
+    <g id="i-atas" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+      <path d="M14 3v5h5M8.5 13l1.5 1.5 3-3M8.5 17.5l1.5 1.5 3-3"/>
+    </g>
     <g id="i-config" fill="none" stroke="currentColor" stroke-width="1.6"
        stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="3"/>
@@ -68,6 +73,12 @@
     <button class="trilho__item" id="ir-gravador" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
       <span>Gravador</span>
+    </button>
+    <!-- Atas fica abaixo do Gravador: é o terceiro destino de todo dia, e o
+         que se visita depois da reunião, não durante. -->
+    <button class="trilho__item" id="ir-atas" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+      <span>Atas</span>
     </button>
     <button class="trilho__item trilho__item--fim" id="ir-config" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-config"/></svg>

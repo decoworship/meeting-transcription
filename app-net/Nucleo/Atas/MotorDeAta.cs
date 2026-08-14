@@ -193,31 +193,29 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         // processo, que é o que devolve a placa.
         using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
-        var corpo = new
+        // O corpo é montado como texto, e não por serialização de objeto
+        // anônimo: JsonSerializer por reflexão é erro de build sob
+        // PublishTrimmed (IL2026) — compila, passa nos testes, e reprova só na
+        // publicação. Mesma armadilha que o reuniao.json já tinha dado.
+        //
+        // Baixa, mas não zero: ata é registro, não criação. Zero deixa o modelo
+        // repetitivo em listas longas.
+        string corpo = $$"""
         {
-            messages = new object[]
-            {
-                new { role = "system", content = PromptDeAta.Sistema },
-                new { role = "user", content = prompt },
-            },
-            // Baixa, mas não zero: ata é registro, não criação. Zero deixa o
-            // modelo repetitivo em listas longas.
-            temperature = 0.3,
-            max_tokens = 4096,
-            response_format = new
-            {
-                type = "json_schema",
-                json_schema = new
-                {
-                    name = "ata",
-                    schema = JsonSerializer.Deserialize<JsonElement>(AtaGerada.Esquema),
-                    strict = true,
-                },
-            },
-        };
+          "messages": [
+            {"role": "system", "content": {{Texto(PromptDeAta.Sistema)}}},
+            {"role": "user", "content": {{Texto(prompt)}}}
+          ],
+          "temperature": 0.3,
+          "max_tokens": 4096,
+          "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "ata", "strict": true, "schema": {{AtaGerada.Esquema}}}
+          }
+        }
+        """;
 
-        var conteudo = new StringContent(
-            JsonSerializer.Serialize(corpo), Encoding.UTF8, "application/json");
+        var conteudo = new StringContent(corpo, Encoding.UTF8, "application/json");
 
         var resposta = await http.PostAsync(
             $"http://127.0.0.1:{porta}/v1/chat/completions", conteudo, ct);
@@ -261,6 +259,19 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         }
         catch (InvalidOperationException) { /* já saiu */ }
     }
+
+    /// <summary>
+    /// Uma string como literal JSON, com as aspas e os escapes.
+    /// </summary>
+    /// <remarks>
+    /// Escrito à mão porque o prompt tem 35 mil caracteres de fala real — com
+    /// aspas, barras e quebras de linha — e montar o corpo por concatenação sem
+    /// escapar produziria JSON inválido no primeiro "não" entre aspas.
+    /// <c>JsonEncodedText</c> faz o escape sem passar por reflexão, que é o que
+    /// o <c>PublishTrimmed</c> recusa.
+    /// </remarks>
+    private static string Texto(string valor) =>
+        $"\"{JsonEncodedText.Encode(valor).ToString()}\"";
 
     private static string Resumir(string texto) =>
         texto.Length <= 300 ? texto : texto[..300] + "…";

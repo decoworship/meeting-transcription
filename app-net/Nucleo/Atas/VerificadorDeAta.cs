@@ -68,7 +68,7 @@ public static class VerificadorDeAta
             // "**Responsável: Fulano**". Medido na primeira geração de ponta a
             // ponta. Limpar aqui é mais barato que pedir ao modelo que não faça.
             acao.Responsavel = SemRotulo(acao.Responsavel, "responsável", "responsavel");
-            acao.Prazo = SemRotulo(acao.Prazo, "prazo");
+            acao.Prazo = ComColchetes(SemRotulo(acao.Prazo, "prazo"));
 
             string dono = acao.Responsavel.Trim();
             if (dono.Length == 0 || dono.StartsWith('['))
@@ -230,6 +230,24 @@ public static class VerificadorDeAta
                   + string.Join(", ", mostrar)
                   + (faltando.Count > mostrar.Count ? $" (e mais {faltando.Count - mostrar.Count})" : "")
                   + ". Confira se algum deveria estar aqui.");
+    }
+
+    /// <summary>
+    /// "prazo a definir" vira "[prazo a definir]".
+    /// </summary>
+    /// <remarks>
+    /// Os colchetes não são enfeite: eles marcam a lacuna como lacuna, e é o que
+    /// diferencia "ninguém deu prazo" de um prazo chamado "a definir". A skill
+    /// pede a forma exata; o modelo escreve sem, às vezes.
+    /// </remarks>
+    private static string ComColchetes(string prazo)
+    {
+        string t = prazo.Trim();
+        if (t.StartsWith('[')) return t;
+        return t.Equals("prazo a definir", StringComparison.OrdinalIgnoreCase)
+               || t.Equals("a definir", StringComparison.OrdinalIgnoreCase)
+               || t.Equals("sem prazo", StringComparison.OrdinalIgnoreCase)
+            ? "[prazo a definir]" : t;
     }
 
     /// <summary>Tira o rótulo que o modelo repetiu dentro do valor.</summary>

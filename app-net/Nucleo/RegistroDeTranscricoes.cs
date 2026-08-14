@@ -25,6 +25,18 @@ public sealed class TrabalhoDeTranscricao
     /// <summary>Como chamar a reunião numa frase — título da agenda, ou a pasta.</summary>
     public required string Nome { get; init; }
 
+    /// <summary>
+    /// "transcricao" ou "ata".
+    /// </summary>
+    /// <remarks>
+    /// Os dois trabalhos moram no mesmo registro porque disputam a mesma coisa:
+    /// a placa de vídeo. Um 4B de ata não convive com o large-v3 do ASR nos 6 GB
+    /// desta máquina, e a trava de um por vez é o que garante que o segundo só
+    /// carregue com a VRAM do primeiro liberada (ATA.md §2). A gravação não
+    /// entra nessa conta — capturar áudio não usa GPU.
+    /// </remarks>
+    public string Tarefa { get; init; } = "transcricao";
+
     public string Etapa { get; internal set; } = "mix";
 
     /// <summary>0 a 1, ou negativo quando a etapa não sabe se medir.</summary>
@@ -105,19 +117,23 @@ public sealed class RegistroDeTranscricoes
     /// Já há uma transcrição em curso. A mensagem nomeia qual, porque "ocupado"
     /// sem dizer com o quê manda o usuário procurar sozinho.
     /// </exception>
-    public TrabalhoDeTranscricao Comecar(string gravacao, string nome)
+    public TrabalhoDeTranscricao Comecar(string gravacao, string nome, string tarefa = "transcricao")
     {
         lock (_trava)
         {
             if (_atual is { } emCurso)
                 throw new InvalidOperationException(
-                    $"já estou transcrevendo \"{emCurso.Nome}\". "
+                    $"já estou {(emCurso.Tarefa == "ata" ? "escrevendo a ata de" : "transcrevendo")} "
+                    + $"\"{emCurso.Nome}\". "
                     + "Uma de cada vez: as duas disputariam a mesma placa de vídeo.");
 
             // O resultado anterior sai de cena aqui: uma tentativa nova apaga o
             // erro da anterior, senão a tela mostraria os dois ao mesmo tempo.
             _ultimo = null;
-            _atual = new TrabalhoDeTranscricao { Gravacao = gravacao, Nome = nome };
+            _atual = new TrabalhoDeTranscricao
+            {
+                Gravacao = gravacao, Nome = nome, Tarefa = tarefa,
+            };
             return _atual;
         }
     }

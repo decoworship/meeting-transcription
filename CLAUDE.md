@@ -28,6 +28,7 @@ export PATH="$HOME/.dotnet:$PATH"
 dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 181 testes
 tools/publicar.sh --so-build                            # publica em dist/publicar
 tools/publicar.sh --destino /mnt/c/Users/andre/MeetingApp
+tools/empacotar_motor_de_ata.sh                         # os 3,5 GB do motor de ata
 
 # a interface do disco, para desenhar sem recompilar
 MeetingApp.exe --web C:\caminho\para\app-net\App\web
@@ -47,6 +48,7 @@ antes de copiar.
 app-net/
   App/          a janela (WebView2), a ponte, e a bandeja em App/Bandeja/
   Nucleo/       o pipeline de transcrição, projetos, vozes, exportação
+  Nucleo/Atas/  as skills, o motor de ata (llama.cpp), o verificador e o redator
   Sidecar/      o protocolo com os motores Python
   Gravacao/     o núcleo do gravador: deriva, WAV, contabilidade de pacotes
   Captura/      WASAPI (Windows-only)

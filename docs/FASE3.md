@@ -260,6 +260,27 @@ se pode confiar.
 
 ---
 
+## 5.1 O que foi entregue (14/08/2026)
+
+Os três itens estão de pé. O que mudou de desenho no caminho, e por quê, está em
+[ATA.md](ATA.md) — este é o resumo:
+
+| item | estado |
+|---|---|
+| 1. transcrição sobrevive à navegação, bolinha no trilho | ✅ + **parar a transcrição**, que não estava previsto e o uso pediu |
+| 2. notas de reunião | ✅ `notas.md`, no Gravador e na reunião, alimentando o vocabulário |
+| 3. ata por LLM local | ✅ motor, verificador, redator e o destino **Atas** no trilho |
+
+Fora do previsto, porque o primeiro uso cobrou: **o vínculo cliente/projeto
+passou a viver na gravação** (`reuniao.json`), e o seletor de diarização, que era
+decorativo, passou a valer.
+
+**O que a Fase 4 herda:** o motor de ata são 3,5 GB (llama.cpp + GGUF) montados
+por `tools/empacotar_motor_de_ata.sh`, e o instalador precisa deles. O build de
+CUDA tem que casar com o driver — o 12.4 funciona onde o 13.3 falha.
+
+---
+
 ## 6. Ordem de trabalho
 
 1. **Item 1**, inteiro: estado no núcleo, evento, bolinha, notificação. É o

@@ -7,6 +7,7 @@ import { abrirGaveta, fecharGavetas, alerta, campo, secao,
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
+import { telaDeAtas } from "/atas.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -634,10 +635,18 @@ export function abrirGravador() {
   return telaDoGravador({ cabecalho, tela });
 }
 
+/** O destino Atas mora em atas.js, pelo mesmo motivo dos outros dois. */
+export function abrirAtas() {
+  fecharGavetas();
+  destino("ir-atas");
+  return telaDeAtas({ cabecalho, tela });
+}
+
 // ─────────────────────────────────────────────────────────── ligação
 
 document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
 document.getElementById("ir-gravador").addEventListener("click", abrirGravador);
+document.getElementById("ir-atas").addEventListener("click", abrirAtas);
 document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
 
@@ -671,6 +680,7 @@ async function inicio() {
   // a tela por nada. "#config=vozes" cai direto na aba.
   if (tela === "config") return abrirAjustes(arg || "geral");
   if (tela === "gravador") return abrirGravador();
+  if (tela === "atas") return abrirAtas();
 
   const { gravacoes } = await pedir("gravacoes");
   const g = gravacoes[Number(arg) || 0];

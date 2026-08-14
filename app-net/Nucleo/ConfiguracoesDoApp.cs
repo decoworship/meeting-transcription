@@ -43,6 +43,18 @@ public sealed class ConfiguracoesDoApp
 
     [JsonPropertyName("diarizacao_padrao")] public string DiarizacaoPadrao { get; set; } = "community-1";
 
+    /// <summary>O GGUF que escreve as atas, dentro de motores/ata/modelos.</summary>
+    /// <remarks>
+    /// Nome de arquivo, e não caminho: o motor sabe onde a pasta fica, e guardar
+    /// caminho absoluto quebraria no dia em que o app mudasse de lugar.
+    /// </remarks>
+    [JsonPropertyName("modelo_de_ata")] public string ModeloDeAta { get; set; }
+        = "qwen3-4b-instruct-q4km.gguf";
+
+    /// <summary>O tipo de ata sugerido quando o projeto não tem preferência.</summary>
+    [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
+        = "cliente-update";
+
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-transcription", "app.json");

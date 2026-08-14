@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
+using MeetingApp.Nucleo.Atas;
 using MeetingApp.Sidecar;
 
 namespace MeetingApp.App;
@@ -107,6 +108,15 @@ internal sealed class Resposta
 
     /// <summary>Nomes e siglas achados nas notas, para sugerir como vocabulário.</summary>
     [JsonPropertyName("termos")] public List<string>? Termos { get; init; }
+
+    /// <summary>Os tipos de ata que a tela pode oferecer.</summary>
+    [JsonPropertyName("tipos")] public List<TipoDeAtaResumo>? Tipos { get; init; }
+
+    /// <summary>A ata em Markdown, ou nulo quando ainda não existe.</summary>
+    [JsonPropertyName("ata")] public string? Ata { get; init; }
+
+    /// <summary>A transcrição mudou depois de a ata ter sido escrita.</summary>
+    [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
@@ -228,6 +238,16 @@ internal sealed class TranscricaoResumo
 
     /// <summary>Parou a pedido. A tela trata diferente de falha.</summary>
     [JsonPropertyName("cancelada")] public bool Cancelada { get; init; }
+}
+
+/// <summary>Um tipo de reunião, como a tela o oferece.</summary>
+internal sealed class TipoDeAtaResumo
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+
+    /// <summary>Veio da pasta do perfil: a tela oferece "voltar ao original".</summary>
+    [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -408,6 +428,63 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id });
                     break;
                 }
+
+                // ─────────────────────────────────────────────── atas
+
+                case "modelos-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        {
+                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
+                        })],
+                    });
+                    break;
+
+                case "ata":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    string caminho = Path.Combine(onde, "ata.md");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Ata = File.Exists(caminho) ? File.ReadAllText(caminho) : null,
+                        // Ata mais velha que a transcrição significa que alguém
+                        // corrigiu o texto depois — e a ata ficou desatualizada
+                        // sem ninguém avisar.
+                        AtaVelha = File.Exists(caminho)
+                                   && File.Exists(Path.Combine(onde, "transcricao.json"))
+                                   && File.GetLastWriteTimeUtc(caminho)
+                                      < File.GetLastWriteTimeUtc(Path.Combine(onde, "transcricao.json")),
+                    });
+                    break;
+                }
+
+                case "gerar-ata":
+                    GerarAta(p);
+                    break;
+
+                case "customizar-tipo-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Arquivo = ModelosDeAta.Customizar(p.Modelo ?? ""),
+                    });
+                    break;
+
+                case "restaurar-tipo-de-ata":
+                    ModelosDeAta.VoltarAoOriginal(p.Modelo ?? "");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        {
+                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
+                        })],
+                    });
+                    break;
 
                 // ─────────────────────────────────── notas da reunião
 
@@ -852,6 +929,89 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // no meio precisa poder descobrir, ao voltar, que falhou.
                 _transcricoes.Terminar(pasta, e.Message);
                 Avisar($"A transcrição de {trabalho.Nome} falhou.");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// Aceita a ata e devolve o controle, como a transcrição faz.
+    /// </summary>
+    /// <remarks>
+    /// Mesmo registro da transcrição, e não um segundo: os dois trabalhos
+    /// disputam a mesma placa, e a trava de um por vez é o que garante que o
+    /// modelo de ata só carregue com a VRAM do ASR liberada. A bolinha do trilho
+    /// acende para os dois pelo mesmo caminho.
+    /// </remarks>
+    private void GerarAta(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = "sem gravação" });
+            return;
+        }
+
+        var tipo = ModelosDeAta.Buscar(p.Modelo)
+            ?? throw new InvalidOperationException($"tipo de ata desconhecido: {p.Modelo}");
+
+        string json = LerTranscricao(pasta)
+            ?? throw new InvalidOperationException("esta reunião ainda não foi transcrita");
+        var dados = ResultadoDaTranscricao.DeJson(json)
+            ?? throw new InvalidOperationException("transcrição ilegível");
+
+        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "ata");
+        Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+        EmpurrarTranscricoes();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var vinculo = DadosDaReuniao.Ler(pasta);
+                var ctx = new ContextoDaReuniao
+                {
+                    Titulo = Listar().FirstOrDefault(g => g.Caminho == pasta)?.Titulo,
+                    Cliente = vinculo.Cliente ?? dados.Client,
+                    Projeto = vinculo.Projeto ?? dados.Project,
+                    Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
+                    DuracaoS = dados.Duration ?? 0,
+                    Falantes = [.. dados.Segments.Select(s => s.Speaker)
+                        .Where(s => s is { Length: > 0 }).Distinct()!],
+                    Notas = Notas.Ler(pasta),
+                    Vocabulario = _projetos.Preferencias(
+                        vinculo.Cliente ?? "", vinculo.Projeto ?? "")?.InitialPrompt ?? "",
+                };
+
+                var roteiro = RoteiroDeFatos.De(dados.Segments);
+                string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
+
+                var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(
+                    ConfiguracoesDoApp.Carregar().ModeloDeAta));
+
+                var ata = await motor.GerarAsync(prompt, ctx.DuracaoS, e =>
+                {
+                    _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
+                    EmpurrarTranscricoes();
+                }, trabalho.Token);
+
+                VerificadorDeAta.Conferir(ata, dados.Segments,
+                    [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro);
+
+                File.WriteAllText(Path.Combine(pasta, "ata.md"),
+                                  RedatorDeAta.Escrever(ata, tipo, ctx));
+                File.WriteAllText(Path.Combine(pasta, "ata.json"), ata.ParaJson());
+
+                _transcricoes.Terminar(pasta);
+                Avisar($"Ata pronta: {trabalho.Nome}");
+            }
+            catch (OperationCanceledException)
+            {
+                _transcricoes.Terminar(pasta, cancelada: true);
+            }
+            catch (Exception e)
+            {
+                _transcricoes.Terminar(pasta, e.Message);
+                Avisar($"A ata de {trabalho.Nome} falhou.");
             }
             EmpurrarTranscricoes();
         });
