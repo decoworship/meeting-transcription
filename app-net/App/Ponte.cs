@@ -1370,11 +1370,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             throw new MotorException(
                 $"o motor de modelos não está em {motores.ScriptModelos}");
 
-        var ambiente = new Dictionary<string, string>();
-        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
-
         using (var motor = await MotorSidecar.IniciarAsync(
-                   motores.Python, [motores.ScriptModelos], CancellationToken.None, ambiente))
+                   motores.Python, [motores.ScriptModelos], CancellationToken.None,
+                   Motores.Ambiente()))
         {
             await motor.BaixarAsync(
                 pacote.Repositorio,

@@ -53,13 +53,13 @@ public sealed class CatalogoTests
         var config = new ConfiguracoesDoApp
         {
             ModeloPadrao = "medium",
-            DiarizacaoPadrao = "3.1",
+            DiarizacaoPadrao = "community-1",
         };
 
         var lista = Catalogo.Listar(config);
 
         Assert.True(lista.Single(i => i.Pacote.Id == "medium").EmUso);
-        Assert.True(lista.Single(i => i.Pacote.Id == "3.1").EmUso);
+        Assert.True(lista.Single(i => i.Pacote.Id == "community-1").EmUso);
         Assert.False(lista.Single(i => i.Pacote.Id == "large-v3").EmUso);
 
         // Um por família, nunca dois: a tela usa isto para acender um cartão só.

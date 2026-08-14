@@ -201,16 +201,21 @@ public static class Catalogo
             TamanhoEsperadoBytes = 32_821_829,
             TamanhoMedido = true,
         },
-        new PacoteDeModelo
-        {
-            Id = "3.1",
-            Nome = "Pyannote 3.1",
-            Familia = "diarizacao",
-            Descricao = "A geração anterior. Fica como saída se o Community 1 regredir.",
-            Repositorio = "pyannote/speaker-diarization-3.1",
-            TamanhoEsperadoBytes = 26_000_000,
-            TamanhoMedido = false,
-        },
+        // O "Pyannote 3.1" saiu da lista na Fase 4, e o motivo não é de
+        // empacotamento: **nada nunca o carregou.** O pipeline pede o
+        // community-1 pelo nome (motores/diarizacao/motor.py), e a escolha de
+        // modelo de diarização — `diarizacao_padrao` no app.json e `diar_model`
+        // nas preferências do projeto — é colhida na tela, salva, e ignorada.
+        // Oferecer o download de 26 MB de um modelo que o app não sabe usar é
+        // gastar a atenção de quem escolhe com uma escolha que não existe.
+        //
+        // Ele também tem portão no HuggingFace, então desde que o token saiu do
+        // binário esse download falharia com 401 — o que tornou visível um
+        // defeito que já estava lá, calado.
+        //
+        // Ligar o seletor de verdade é trabalho de pipeline, e está na Fase 6.
+        // Quando ele existir, esta entrada volta — junto de um caminho local
+        // para os pesos, como o community-1 tem hoje.
     ];
 
     /// <summary>

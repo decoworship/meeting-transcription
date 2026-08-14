@@ -161,11 +161,23 @@ Três ganhos, e o terceiro não é sobre segredo nenhum:
    baixa 32 MB de um repositório com portão no meio do primeiro pipeline; passa a
    estar em disco desde a instalação.
 
-**O risco, e como ele é medido.** `Pipeline.from_pretrained` com caminho local é
-suportado, mas não é o caminho que este projeto exercitou. O critério é objetivo:
-a mesma gravação, diarizada antes e depois, tem que produzir **os mesmos
-falantes nos mesmos instantes**. Se divergir, o item é revertido e o token fica —
-a fase não vai trocar qualidade de diarização por asseio de empacotamento.
+**O risco, e como ele foi medido — ✅ aprovado em 14/08/2026.**
+`Pipeline.from_pretrained` com caminho local é suportado, mas não era o caminho
+que este projeto exercitava. O critério era objetivo: a mesma gravação, diarizada
+pelos dois caminhos, tinha que produzir **os mesmos falantes nos mesmos
+instantes**, sob pena de o item ser revertido e o token ficar.
+
+`tools/conferir_diarizacao_local.py` sobe o motor duas vezes sobre o mesmo
+`system.wav` — uma com a pasta local, outra escondendo-a para forçar o
+HuggingFace — e compara segmento a segmento. Na gravação de 13/08 (29 min):
+
+| | segmentos | tempo |
+|---|---|---|
+| pasta local | 602 | 120 s |
+| HuggingFace | 602 | 184 s |
+
+**Idênticos**: mesmos instantes dentro de 50 ms, mesmos rótulos de falante, na
+mesma ordem. Os 64 segundos a menos são o download que deixou de acontecer.
 
 O `wespeaker` (26 MB, sem portão) entra junto pelo mesmo caminho, porque o ganho
 3 só vale inteiro se nenhum dos dois precisar de rede.

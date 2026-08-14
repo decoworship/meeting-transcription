@@ -165,11 +165,8 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     private async Task<float[]> ExtrairAsync(string audio, List<TrechoLimpo> trechos,
                                              CancellationToken ct)
     {
-        var ambiente = new Dictionary<string, string>();
-        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
-
         using var motor = await MotorSidecar.IniciarAsync(
-            motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
+            motores.Python, [motores.ScriptDiarizacao], ct, Motores.Ambiente());
 
         return await motor.VozAsync(audio,
             [.. trechos.Select(t => (t.Inicio, t.Fim))], ct);

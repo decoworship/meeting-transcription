@@ -395,6 +395,25 @@ não é opção**, porque parece uma rede que não existe.
 `inicio`, `fim` e `texto`. Paga-se o alinhamento por palavra e descarta-se
 exatamente o insumo que resolveria a atribuição de falante.
 
+### 4.6 A escolha do modelo de diarização não chega ao pipeline
+
+**Gatilho:** já disparou — a Fase 4 esbarrou nele ao tirar o token.
+
+`diarizacao_padrao` no `app.json` e `diar_model` nas preferências do projeto são
+colhidos na tela, salvos em disco, e **ignorados**. O motor pede o `community-1`
+pelo nome ([`motores/diarizacao/motor.py`](../motores/diarizacao/motor.py)) e não
+aceita parâmetro de modelo; `Transcritor.ExecutarAsync` não tem por onde passar
+um.
+
+É o mesmo defeito que a Fase 3 corrigiu no seletor de *ligar/desligar* a
+diarização — o de *qual modelo* ficou para trás.
+
+A Fase 4 tirou o "Pyannote 3.1" do catálogo por causa disso: era um download de
+26 MB para um modelo que o app não sabe carregar, e, sem o token embutido, um
+download que ainda por cima falha (ele tem portão). **Quando o seletor passar a
+valer, a entrada volta** — e volta com pesos locais, como o `community-1` tem
+hoje, senão ela reintroduz a dependência de token que a Fase 4 acabou de tirar.
+
 ---
 
 ## 5. A tarefa que **não** espera esta fase: comparar com outras fontes
