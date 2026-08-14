@@ -224,8 +224,19 @@ begin
   Result := True;
   MoverModelos := False;
 
-  if PastaAntiga <> '' then
-    MoverModelos := MsgBox(
+  if PastaAntiga = '' then Exit;
+
+  { Instalação silenciosa não pode parar num diálogo. Um MsgBox aqui trava o
+    /VERYSILENT para sempre, sem nada na tela — e é assim que este instalador é
+    exercitado antes de ir para alguém. Sem ninguém para perguntar, aproveitar os
+    modelos é a resposta certa: ela economiza gigabytes e não apaga nada. }
+  if WizardSilent then
+  begin
+    MoverModelos := True;
+    Exit;
+  end;
+
+  MoverModelos := MsgBox(
       'Encontrei uma instalação anterior em:' + #13#10#13#10 +
       PastaAntiga + #13#10#13#10 +
       'Ela é de antes de existir instalador. Quer que eu aproveite os modelos ' +
@@ -246,6 +257,9 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep <> usPostUninstall then Exit;
+  { Mesmo motivo do InitializeSetup: desinstalação silenciosa não para em
+    diálogo. Quem desinstala em silêncio já sabe o que está fazendo. }
+  if UninstallSilent then Exit;
 
   MsgBox(
     'O MeetingApp foi removido.' + #13#10#13#10 +
