@@ -36,6 +36,19 @@ public sealed record Evento(
         return nomes;
     }
 
+    /// <summary>Os e-mails, na mesma ordem dos nomes. Sem salas.</summary>
+    public List<string> EmailsDosParticipantes()
+    {
+        var emails = new List<string>();
+        foreach (var p in Participantes)
+        {
+            if (p.EhRecurso) continue;
+            string email = (p.Email ?? "").Trim();
+            if (email.Length > 0 && !emails.Contains(email)) emails.Add(email);
+        }
+        return emails;
+    }
+
     /// <summary>
     /// Sem displayName, o começo do e-mail costuma ser o nome:
     /// "dimi.randel@..." vira "Dimi Randel".
@@ -57,6 +70,9 @@ public sealed record Evento(
         Client = null,          // preenchidos depois pelo transcritor
         Project = null,
         Attendees = NomesDosParticipantes(),
+        // Os e-mails vão junto porque o domínio é o que separa a nossa equipe do
+        // cliente na hora de escrever a ata — dedução por contexto erra.
+        AttendeeEmails = EmailsDosParticipantes(),
         CalendarEventId = Id,
         // O gravador Python grava estes três só quando há evento, e o formato é
         // o mesmo ISO 8601 que veio da API — o transcritor compara com o que já

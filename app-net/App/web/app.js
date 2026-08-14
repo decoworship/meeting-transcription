@@ -4,6 +4,11 @@ import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
+import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
+         ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
+import { blocoDeNotas } from "/notas.js";
+import { telaDeAtas } from "/atas.js";
+import { ligarBolinhas } from "/trilho.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -55,6 +60,7 @@ function cartao(g) {
   const botao = document.createElement("button");
   botao.className = "aa-cartao gravacao";
   botao.type = "button";
+  botao.dataset.gravacao = g.caminho;
   botao.addEventListener("click", () => abrirGravacao(g));
 
   const esquerda = document.createElement("div");
@@ -64,13 +70,21 @@ function cartao(g) {
   t.textContent = tituloDe(g);
   esquerda.appendChild(t);
 
+  // Cliente e projeto na frente da duração: é por eles que se procura uma
+  // reunião de duas semanas atrás, e é o que prova que a escolha feita na tela
+  // de preparo ficou guardada — antes ela sumia de vista assim que se saía da
+  // tela, e parecia perdida mesmo estando salva.
   const meta = document.createElement("p");
   meta.className = "gravacao__meta";
-  const partes = [duracao(g.duracao_s)];
+  const partes = [];
+  if (g.cliente || g.projeto)
+    partes.push([g.cliente, g.projeto].filter(Boolean).join(" · "));
+  partes.push(duracao(g.duracao_s));
   if (g.titulo) partes.push(quando(g.nome));
   // "convidados" e não "participantes": o número vem da lista da agenda, que
   // diz quem foi chamado e não quem apareceu.
   if (g.convidados > 0) partes.push(`${g.convidados} convidados`);
+  if (g.com_notas) partes.push("com notas");
   for (const p of partes) {
     const span = document.createElement("span");
     span.textContent = p;
@@ -85,12 +99,32 @@ function cartao(g) {
     esquerda.appendChild(caixa);
   }
 
-  const etiqueta = document.createElement("span");
-  etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
-  etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
-
-  botao.append(esquerda, etiqueta);
+  botao.append(esquerda, etiquetaDe(g));
   return botao;
+}
+
+/**
+ * O estado da gravação em uma palavra.
+ *
+ * "Transcrevendo…" tem precedência sobre "Não transcrita" porque a lista é o
+ * lugar onde se procura a reunião de novo depois de sair da tela dela — e ali
+ * "Não transcrita" ao lado de uma transcrição que está rodando é mentira.
+ */
+function etiquetaDe(g) {
+  const etiqueta = document.createElement("span");
+  const rodando = emCurso(g.caminho);
+  if (rodando) {
+    etiqueta.className = "aa-etiqueta";
+    // A ata usa o mesmo registro da transcrição, e dizer "Transcrevendo…"
+    // enquanto se escreve a ata de uma reunião já transcrita é mentira — foi o
+    // que o dono do produto viu no primeiro uso.
+    etiqueta.textContent = rodando.tarefa === "ata"
+      ? "Escrevendo a ata…" : "Transcrevendo…";
+  } else {
+    etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
+    etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
+  }
+  return etiqueta;
 }
 
 export async function telaDeLista() {
@@ -125,6 +159,19 @@ export async function telaDeLista() {
     cabecalho("Reuniões",
       gravacoes.length === 1 ? "1 gravação" : `${gravacoes.length} gravações`, false);
     for (const g of gravacoes) tela.appendChild(cartao(g));
+
+    // A etiqueta acompanha: quem fica parado na lista enquanto uma transcrição
+    // termina vê "Transcrita" aparecer sozinha, sem precisar recarregar nada.
+    const cancelar = assinarTranscricoes(() => {
+      if (!tela.isConnected || !tela.querySelector(".gravacao")) { cancelar(); return; }
+      for (const g of gravacoes) {
+        const cartaoDela = tela.querySelector(`[data-gravacao="${CSS.escape(g.caminho)}"]`);
+        if (!cartaoDela) continue;
+        const fim = ultimoResultado(g.caminho);
+        if (!emCurso(g.caminho) && fim && !fim.erro) g.transcrita = true;
+        cartaoDela.lastElementChild.replaceWith(etiquetaDe(g));
+      }
+    });
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
     tela.replaceChildren(alerta(e.message, "erro"));
@@ -179,7 +226,12 @@ async function telaDePreparo(g) {
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
 
-  const { clientes } = await pedir("clientes");
+  // O vínculo vem junto: cliente e projeto escolhidos antes sobrevivem a sair
+  // da tela, porque moram em reuniao.json na pasta da gravação e não dentro da
+  // transcrição — que, na tela de preparo, ainda não existe.
+  const [{ clientes }, vinculo] = await Promise.all([
+    pedir("clientes"), pedir("reuniao", { gravacao: g.caminho }),
+  ]);
 
   const forma = document.createElement("div");
   forma.className = "secao";
@@ -189,8 +241,9 @@ async function telaDePreparo(g) {
   const linha1 = document.createElement("div");
   linha1.className = "linha";
   linha1.append(
-    campoComSugestoes("Cliente", "cliente", Object.keys(clientes)),
-    campoComSugestoes("Projeto", "projeto", []),
+    campoComSugestoes("Cliente", "cliente", Object.keys(clientes), vinculo.cliente ?? ""),
+    campoComSugestoes("Projeto", "projeto", clientes[vinculo.cliente] ?? [],
+                      vinculo.projeto ?? ""),
     campo("Data", "input", { id: "data", tipo: "date", valor: dataDe(g.nome) }),
   );
   reuniao.appendChild(linha1);
@@ -205,12 +258,22 @@ async function telaDePreparo(g) {
       opcoes: ["large-v3", "medium", "small", "base", "tiny"],
     }),
     campo("Idioma", "input", { id: "idioma", valor: "pt" }),
-    campo("Separar falantes", "select", {
-      id: "diarizacao",
-      opcoes: ["community-1", "3.1", "não separar"],
-    }),
+    // Sim ou não, e nada de escolher o modelo de diarização: o "3.1" era opção
+    // de tela que o pipeline ignorava — o motor sempre usou o community-1, que
+    // a Fase 0 mediu 6,7 pontos de DER melhor. Oferecer o pior, e não aplicar
+    // nem isso, era duas mentiras na mesma linha (FASE0-RESULTADOS).
+    campo("Separar falantes", "select", { id: "diarizacao", opcoes: ["sim", "não"] }),
   );
   motor.appendChild(linha2);
+
+  // ---- notas escritas durante a reunião
+  //
+  // Antes do vocabulário de propósito: é delas que saem os nomes próprios e as
+  // siglas que o vocabulário quer, e lê-las primeiro é a ordem em que a pessoa
+  // vai querer copiar.
+  const blocoNotas = secao("Notas");
+  const notas = blocoDeNotas(g.caminho, { linhas: 5, aoMudar: (t) => sugerirTermos(t) });
+  blocoNotas.appendChild(notas.raiz);
 
   // ---- vocabulário
   const vocab = secao("Vocabulário");
@@ -223,7 +286,44 @@ async function telaDePreparo(g) {
   dica.textContent =
     "Nomes de pessoas, jargão, nomes de sistemas. Sem limite de tamanho — "
     + "o que o modelo escrever parecido é corrigido depois.";
-  vocab.append(caixa, dica);
+  // Os termos que as notas revelaram, oferecidos um a um.
+  //
+  // Sugestão e não injeção: o nome vai para o vocabulário quando a pessoa
+  // clica, porque quem escreveu a nota sabe o que é nome de sistema e o que é
+  // a primeira palavra de uma frase (FASE3.md §3).
+  const sugestoes = document.createElement("div");
+  sugestoes.className = "sugestoes";
+  vocab.append(caixa, dica, sugestoes);
+
+  function sugerirTermos(termos) {
+    sugestoes.replaceChildren();
+    const caixaVocab = document.getElementById("vocabulario");
+    if (!caixaVocab) return;
+
+    const jaTem = new Set(caixaVocab.value.split(",").map((t) => t.trim()).filter(Boolean));
+    const novos = termos.filter((t) => !jaTem.has(t));
+    if (novos.length === 0) return;
+
+    const rotulo = document.createElement("span");
+    rotulo.className = "campo__dica";
+    rotulo.textContent = "Das suas notas:";
+    sugestoes.appendChild(rotulo);
+
+    for (const termo of novos.slice(0, 12)) {
+      const b = document.createElement("button");
+      b.className = "aa-etiqueta sugestao";
+      b.type = "button";
+      b.textContent = `+ ${termo}`;
+      b.title = "Acrescentar ao vocabulário";
+      b.addEventListener("click", () => {
+        const atual = caixaVocab.value.trim();
+        caixaVocab.value = atual ? `${atual}, ${termo}` : termo;
+        b.remove();
+        if (sugestoes.querySelectorAll(".sugestao").length === 0) sugestoes.replaceChildren();
+      });
+      sugestoes.appendChild(b);
+    }
+  }
 
   const acoes = document.createElement("div");
   acoes.className = "acoes";
@@ -237,7 +337,7 @@ async function telaDePreparo(g) {
   acoes.append(botao, aviso, botaoApagarGravacao(g));
 
   const painel = document.createElement("div");
-  forma.append(reuniao, motor, vocab, acoes, painel);
+  forma.append(reuniao, motor, blocoNotas, vocab, acoes, painel);
   tela.appendChild(forma);
 
   // ---- ligações entre os campos
@@ -258,6 +358,13 @@ async function telaDePreparo(g) {
       cliente: campoCliente.value,
       projeto: campoProjeto.value,
     });
+
+    // A tela pode ter sido trocada enquanto a resposta vinha — escolher o
+    // projeto e sair no mesmo segundo é um caminho normal. Sem esta guarda, o
+    // preenchimento cai num getElementById que devolve null e o erro sobe no
+    // console sem ninguém ver.
+    if (!campoCliente.isConnected) return;
+
     if (!prefs) {
       aviso.textContent = "projeto novo — será criado ao transcrever";
       return;
@@ -265,16 +372,93 @@ async function telaDePreparo(g) {
     aviso.textContent = "preferências do projeto carregadas";
     if (prefs.model_size) document.getElementById("modelo").value = prefs.model_size;
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
-    document.getElementById("diarizacao").value =
-      prefs.diarization === false ? "não separar" : (prefs.diar_model ?? "community-1");
+    document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
     document.getElementById("vocabulario").value = prefs.initial_prompt ?? "";
   }
 
-  campoCliente.addEventListener("change", () => { atualizarProjetos(); carregarPreferencias(); });
+  /**
+   * Guarda o vínculo assim que ele muda.
+   *
+   * Na hora da escolha, e não só ao transcrever: quem escolhe o projeto e sai
+   * da tela — para ouvir um trecho, para conferir outra reunião — voltava e
+   * encontrava os campos vazios.
+   */
+  async function guardarVinculo() {
+    try {
+      await pedir("salvar-reuniao", {
+        gravacao: g.caminho,
+        cliente: campoCliente.value.trim(),
+        projeto: campoProjeto.value.trim(),
+      });
+    } catch {
+      // Não vale interromper o preparo por causa disto: o vínculo é gravado de
+      // novo ao transcrever, que é quando ele passa a importar de verdade.
+    }
+  }
+
+  /**
+   * Guarda o vocabulário no projeto, que é de quem ele é.
+   *
+   * O vocabulário é preferência de cliente/projeto, não desta reunião: os nomes
+   * e siglas de um projeto valem para todas as reuniões dele. Até 14/08 só era
+   * gravado ao clicar em Transcrever — quem digitava um termo e saía da tela
+   * perdia o que escreveu, e a tela seguinte já mostrava o vocabulário velho.
+   */
+  async function guardarVocabulario() {
+    const cliente = campoCliente.value.trim();
+    const projeto = campoProjeto.value.trim();
+    // Sem projeto não há onde guardar: o vocabulário mora no par, e inventar um
+    // projeto "sem nome" só para ter onde salvar criaria lixo no cadastro.
+    if (!cliente || !projeto) return;
+
+    const caixaVocab = document.getElementById("vocabulario");
+    if (!caixaVocab) return;
+
+    try {
+      await pedir("salvar-projeto", {
+        cliente, projeto,
+        prefs: {
+          language: document.getElementById("idioma").value.trim(),
+          model_size: document.getElementById("modelo").value,
+          engine: "faster-whisper",
+          diarization: document.getElementById("diarizacao").value === "sim",
+          diar_model: "community-1",
+          condition_on_previous_text: false,
+          initial_prompt: caixaVocab.value.trim(),
+        },
+      });
+    } catch {
+      // O vocabulário é gravado de novo ao transcrever; falhar aqui não pode
+      // interromper quem está preparando a reunião.
+    }
+  }
+
+  campoCliente.addEventListener("change", () => {
+    atualizarProjetos(); carregarPreferencias(); guardarVinculo();
+  });
   campoCliente.addEventListener("input", atualizarProjetos);
-  campoProjeto.addEventListener("change", carregarPreferencias);
+  campoProjeto.addEventListener("change", () => { carregarPreferencias(); guardarVinculo(); });
+  // O blur é a rede: grava de novo quando o campo perde o foco, inclusive nos
+  // caminhos em que o change não chega a disparar. Gravar duas vezes o mesmo
+  // valor não custa nada — são dois campos num JSON pequeno.
+  campoCliente.addEventListener("blur", guardarVinculo);
+  campoProjeto.addEventListener("blur", guardarVinculo);
+
+  // As preferências do motor e o vocabulário seguem o mesmo caminho do vínculo:
+  // gravam ao sair do campo, e não só ao transcrever.
+  caixa.querySelector("textarea").addEventListener("blur", guardarVocabulario);
+  for (const id of ["modelo", "idioma", "diarizacao"])
+    document.getElementById(id).addEventListener("change", guardarVocabulario);
 
   botao.addEventListener("click", () => transcrever(g, botao, painel));
+
+  // Reencontrar uma transcrição já em curso é o motivo de esta tela existir do
+  // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa
+  // ver é a barra onde ela está — não um botão "Transcrever" que começaria tudo
+  // de novo. O erro da última tentativa aparece pelo mesmo caminho.
+  if (emCurso(g.caminho)) acompanhar(g, botao, painel);
+  else if (ultimoResultado(g.caminho)?.erro)
+    painel.replaceChildren(alerta(ultimoResultado(g.caminho).erro, "erro"));
 }
 
 function dataDe(nome) {
@@ -282,7 +466,22 @@ function dataDe(nome) {
   return m ? m[1] : "";
 }
 
-async function transcrever(g, botao, painel) {
+const ETAPAS = {
+  mix: "Somando as faixas",
+  asr: "Transcrevendo",
+  diarizacao: "Separando os falantes",
+  montagem: "Montando o resultado",
+};
+
+/**
+ * Desenha a transcrição desta gravação enquanto ela roda, esteja ela recém
+ * pedida ou já a meio caminho quando esta tela montou.
+ *
+ * O andamento vem do registro do núcleo, e não de uma promessa: é o que permite
+ * sair da tela e voltar sem perder a barra, e é o que faz o resultado chegar
+ * mesmo que ninguém estivesse olhando quando ele ficou pronto.
+ */
+function acompanhar(g, botao, painel) {
   botao.disabled = true;
   botao.textContent = "Transcrevendo…";
 
@@ -294,14 +493,85 @@ async function transcrever(g, botao, painel) {
   const estado = document.createElement("p");
   estado.className = "campo__dica";
   estado.textContent = "preparando…";
-  painel.replaceChildren(barra, estado);
 
-  const nomes = {
-    mix: "Somando as faixas",
-    asr: "Transcrevendo",
-    diarizacao: "Separando os falantes",
-    montagem: "Montando o resultado",
-  };
+  // Parar mora ao lado da barra, e não entre os botões da tela: é a ação de
+  // quem está olhando a transcrição correr e mudou de ideia. Some junto com ela.
+  const parar = document.createElement("button");
+  parar.className = "aa-btn aa-btn-texto";
+  parar.type = "button";
+  parar.textContent = "Parar transcrição";
+  parar.addEventListener("click", async () => {
+    parar.disabled = true;
+    parar.textContent = "parando…";
+    try {
+      await cancelar(g.caminho);
+    } catch (e) {
+      parar.disabled = false;
+      parar.textContent = "Parar transcrição";
+      painel.appendChild(alerta(e.message, "erro"));
+    }
+  });
+
+  const linha = document.createElement("div");
+  linha.className = "progresso__linha";
+  linha.append(estado, parar);
+  painel.replaceChildren(barra, linha);
+
+  function pintar(t) {
+    estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
+    preenchimento.style.width = `${t.fracao >= 0 ? Math.round(t.fracao * 100) : 0}%`;
+  }
+
+  const atual = emCurso(g.caminho);
+  if (atual) pintar(atual);
+
+  const cancelarAssinatura = assinarTranscricoes(() => {
+    // A tela saiu do documento (trocou-se de destino): largar a assinatura e
+    // deixar o trabalho seguir. Quem voltar a esta gravação monta outra.
+    if (!painel.isConnected) { cancelarAssinatura(); return; }
+
+    const rodando = emCurso(g.caminho);
+    if (rodando) { pintar(rodando); return; }
+
+    const fim = ultimoResultado(g.caminho);
+    if (!fim) return;              // é outra gravação que mudou de estado
+
+    cancelarAssinatura();
+    if (fim.cancelada) {
+      // Parou a pedido: o app obedeceu, então nada de alerta vermelho. O botão
+      // volta a convidar, porque recomeçar é o próximo passo provável.
+      botao.disabled = false;
+      botao.textContent = "Transcrever";
+      const nota = document.createElement("p");
+      nota.className = "campo__dica";
+      nota.textContent = "Transcrição interrompida. A placa foi liberada.";
+      painel.replaceChildren(nota);
+      return;
+    }
+    if (fim.erro) {
+      botao.disabled = false;
+      botao.textContent = "Tentar de novo";
+      painel.replaceChildren(alerta(fim.erro, "erro"));
+      return;
+    }
+    abrirResultado(g);
+  });
+}
+
+/** Abre a revisão do que acabou de ficar pronto, lendo o que foi salvo em disco. */
+async function abrirResultado(g) {
+  try {
+    const r = await pedir("transcricao", { gravacao: g.caminho });
+    if (!r.transcricao) throw new Error("a transcrição não foi encontrada");
+    g.transcrita = true;
+    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+  } catch (e) {
+    tela.replaceChildren(alerta(e.message, "erro"));
+  }
+}
+
+async function transcrever(g, botao, painel) {
+  botao.disabled = true;
 
   try {
     const vocabulario = document.getElementById("vocabulario").value.trim();
@@ -318,31 +588,35 @@ async function transcrever(g, botao, painel) {
           language: document.getElementById("idioma").value.trim(),
           model_size: document.getElementById("modelo").value,
           engine: "faster-whisper",
-          diarization: diar !== "não separar",
-          diar_model: diar === "não separar" ? "community-1" : diar,
+          diarization: diar === "sim",
+          // Guardado como estava para o projeto não perder o campo, mas quem
+          // decide é o motor: o community-1 é o único que existe no sidecar.
+          diar_model: "community-1",
           condition_on_previous_text: false,
           initial_prompt: vocabulario,
         },
       });
     }
 
-    const r = await pedir("transcrever", {
+    // Volta na hora: daqui em diante o trabalho é do núcleo, e a tela passa a
+    // desenhar o que ele empurra. Recusa quando já há outra transcrição em
+    // curso, e a mensagem nomeia qual.
+    await pedirTranscricao({
       gravacao: g.caminho,
       vocabulario,
       // Sem estes dois, escolher modelo e idioma na tela não tinha efeito
       // nenhum: o motor caía no padrão e detectava o idioma sozinho.
       idioma: document.getElementById("idioma").value.trim(),
       modelo: document.getElementById("modelo").value,
+      // Sem isto a escolha de separar falantes era colhida na tela, salva nas
+      // preferências do projeto e ignorada pelo pipeline.
+      diarizar: diar === "sim",
       // Guardados com a transcrição: sem isto o cabeçalho do arquivo exportado
       // saía sem dizer de que cliente e projeto era a reunião.
       cliente: document.getElementById("cliente").value.trim(),
       projeto: document.getElementById("projeto").value.trim(),
-    }, (p) => {
-      estado.textContent = `${nomes[p.etapa] ?? p.etapa}: ${p.texto}`;
-      preenchimento.style.width = `${p.fracao >= 0 ? Math.round(p.fracao * 100) : 0}%`;
     });
-    g.transcrita = true;
-    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+    acompanhar(g, botao, painel);
   } catch (e) {
     botao.disabled = false;
     botao.textContent = "Tentar de novo";
@@ -410,10 +684,18 @@ export function abrirGravador() {
   return telaDoGravador({ cabecalho, tela });
 }
 
+/** O destino Atas mora em atas.js, pelo mesmo motivo dos outros dois. */
+export function abrirAtas() {
+  fecharGavetas();
+  destino("ir-atas");
+  return telaDeAtas({ cabecalho, tela });
+}
+
 // ─────────────────────────────────────────────────────────── ligação
 
 document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
 document.getElementById("ir-gravador").addEventListener("click", abrirGravador);
+document.getElementById("ir-atas").addEventListener("click", abrirAtas);
 document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
 
@@ -429,6 +711,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharGave
  * clique automatizado, quando tentado, acertou a janela errada.
  */
 async function inicio() {
+  // Antes de qualquer tela: se já havia uma transcrição rodando quando esta
+  // página subiu, a bolinha tem que acender agora. Esperar o próximo evento
+  // pode custar minutos — as etapas longas do pipeline não reportam progresso
+  // contínuo.
+  await sincronizar().catch(() => {});
+  ligarBolinhas();
+
   const hash = location.hash.slice(1);
   if (!hash) return telaDeLista();
 
@@ -441,6 +730,7 @@ async function inicio() {
   // a tela por nada. "#config=vozes" cai direto na aba.
   if (tela === "config") return abrirAjustes(arg || "geral");
   if (tela === "gravador") return abrirGravador();
+  if (tela === "atas") return abrirAtas();
 
   const { gravacoes } = await pedir("gravacoes");
   const g = gravacoes[Number(arg) || 0];

@@ -223,10 +223,11 @@ Pessoas
   o sistema apresenta os 3 casos suspeitos da semana com o áudio pronto
   para ouvir.
 
-No Gradio dá para fazer uma versão mínima (tabela + player por linha); a
-versão boa converge com a Fase 3 do porte (UI própria no WebView2), e o
-modelo de dados da seção 1 é o mesmo nos dois — por isso ele é a única
-parte disto que vale fazer *antes* de precisar.
+No Gradio dava para fazer uma versão mínima (tabela + player por linha);
+a versão boa converge com a UI própria em WebView2, que a Fase 2.5
+entregou — o refinamento dela é a Fase 5. O modelo de dados da seção 1 é
+o mesmo nos dois, por isso ele é a única parte disto que vale fazer
+*antes* de precisar.
 
 ---
 

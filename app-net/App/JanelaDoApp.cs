@@ -28,6 +28,7 @@ internal sealed class JanelaDoApp : IDisposable
     private readonly string _pastaDasGravacoes;
     private readonly string? _telaInicial;
     private readonly Gravador _gravador;
+    private readonly Action<string> _avisar;
 
     private CoreWebView2Controller? _controlador;
     private CoreWebView2? _web;
@@ -50,10 +51,17 @@ internal sealed class JanelaDoApp : IDisposable
 
     public IntPtr Hwnd { get; }
 
+    /// <param name="avisar">
+    /// Como a janela pede um balão à bandeja. Chega por parâmetro, e não por
+    /// propriedade preenchida depois, porque a ponte é criada dentro do
+    /// <see cref="IniciarWebAsync"/> — uma propriedade atribuída depois da
+    /// construção poderia chegar tarde.
+    /// </param>
     public JanelaDoApp(string titulo, Gravador gravador, string pastaDasGravacoes,
-                       string? telaInicial = null)
+                       Action<string> avisar, string? telaInicial = null)
     {
         _gravador = gravador;
+        _avisar = avisar;
         _pastaDasGravacoes = pastaDasGravacoes;
         _telaInicial = telaInicial;
         _wndProc = Processar;
@@ -140,7 +148,7 @@ internal sealed class JanelaDoApp : IDisposable
         // A ponte: a página manda JSON, o núcleo responde JSON. O PostWebMessage
         // só pode ser chamado na thread da UI, e o pipeline responde de uma
         // thread de trabalho — daí o salto de volta pelo laço de mensagens.
-        _ponte = new Ponte(_pastaDasGravacoes, NaUi, _gravador);
+        _ponte = new Ponte(_pastaDasGravacoes, NaUi, _gravador, _avisar);
         _web.WebMessageReceived += (_, e) =>
         {
             string pedido = e.TryGetWebMessageAsString();

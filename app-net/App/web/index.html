@@ -35,6 +35,11 @@
       <rect x="9" y="3" width="6" height="11" rx="3"/>
       <path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>
     </g>
+    <g id="i-atas" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/>
+      <path d="M14 3v5h5M8.5 13l1.5 1.5 3-3M8.5 17.5l1.5 1.5 3-3"/>
+    </g>
     <g id="i-config" fill="none" stroke="currentColor" stroke-width="1.6"
        stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="3"/>
@@ -54,13 +59,33 @@
        O Gravador deixou de ser um buraco na Fase 2.5: ele continua vivendo na
        bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
-    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
+    <!-- Uma bolinha por destino, acesa pelo trabalho daquele destino:
+         transcrever em Reuniões, gravar no Gravador, escrever ata em Atas.
+         Quem as acende é o web/trilho.js, do estado do núcleo — nunca por
+         tempo. -->
+    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
+            data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
+        <span class="trilho__ponto" aria-hidden="true"></span>
+      </span>
       <span>Reuniões</span>
     </button>
-    <button class="trilho__item" id="ir-gravador" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
+    <button class="trilho__item" id="ir-gravador" type="button" data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
+        <span class="trilho__ponto trilho__ponto--gravando" aria-hidden="true"></span>
+      </span>
       <span>Gravador</span>
+    </button>
+    <!-- Atas fica abaixo do Gravador: é o terceiro destino de todo dia, e o
+         que se visita depois da reunião, não durante. -->
+    <button class="trilho__item" id="ir-atas" type="button" data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+        <span class="trilho__ponto" aria-hidden="true"></span>
+      </span>
+      <span>Atas</span>
     </button>
     <button class="trilho__item trilho__item--fim" id="ir-config" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-config"/></svg>
@@ -96,6 +121,14 @@
     <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
   </div>
   <div class="gaveta__corpo" id="corpo-falantes"></div>
+</aside>
+
+<aside class="gaveta gaveta--larga" id="gaveta-notas" hidden aria-label="Notas da reunião">
+  <div class="gaveta__topo">
+    <h2>Notas da reunião</h2>
+    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
+  </div>
+  <div class="gaveta__corpo" id="corpo-notas"></div>
 </aside>
 
 <aside class="gaveta" id="gaveta-exportar" hidden aria-label="Exportar">

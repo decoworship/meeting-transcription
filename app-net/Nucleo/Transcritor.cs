@@ -159,10 +159,17 @@ public sealed class Transcritor(Motores motores)
     /// preferências do projeto — modelo menor é a saída para quem precisa de
     /// rapidez mais que de exatidão.
     /// </param>
+    /// <param name="diarizar">
+    /// Separar quem falou. Desligar pula a etapa inteira — o pyannote é o trecho
+    /// mais lento do pipeline depois do ASR, e em reunião onde só importa o que
+    /// foi dito ele é tempo de GPU gasto à toa. Vem das preferências do projeto,
+    /// e até 13/08/2026 a escolha era colhida na tela e ignorada aqui.
+    /// </param>
     public async Task<ResultadoDaTranscricao> ExecutarAsync(
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
         string? modelo = null, string? cliente = null, string? projeto = null,
+        bool diarizar = true, bool corrigirFonetica = true,
         CancellationToken ct = default)
     {
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
@@ -203,12 +210,21 @@ public sealed class Transcritor(Motores motores)
 
         // A diarização roda só no system.wav: o que o microfone captou já se sabe
         // de quem é, e dar o mix ao pyannote o faria tentar separar você de você.
-        IReadOnlyList<SegmentoDeFalante> diarizacao;
-        using (var diar = await MotorSidecar.IniciarAsync(
-                   motores.Python, [motores.ScriptDiarizacao], ct, ambiente))
+        IReadOnlyList<SegmentoDeFalante> diarizacao = [];
+        if (diarizar)
         {
+            using var diar = await MotorSidecar.IniciarAsync(
+                motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
             diarizacao = await diar.DiarizarAsync(sistema,
                 (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)), ct);
+        }
+        else
+        {
+            // Sem falantes, mas ainda com o dono: a faixa do microfone diz o que
+            // é seu com certeza, e isso não custa GPU nenhuma. Desligar a
+            // separação não é motivo para perder a única atribuição que o
+            // desenho de duas faixas dá de graça.
+            progresso?.Invoke(new Progresso("diarizacao", 1, "sem separar falantes"));
         }
 
         progresso?.Invoke(new Progresso("montagem", 0, "juntando texto e falantes"));
@@ -219,7 +235,7 @@ public sealed class Transcritor(Motores motores)
 
         if (filtrarSilencio) FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
 
-        if (vocabulario is { Length: > 0 })
+        if (vocabulario is { Length: > 0 } && corrigirFonetica)
         {
             var termos = vocabulario.Split(',', StringSplitOptions.TrimEntries
                                                 | StringSplitOptions.RemoveEmptyEntries);

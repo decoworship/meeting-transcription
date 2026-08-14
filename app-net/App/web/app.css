@@ -87,6 +87,45 @@ body {
  * quando, e misturá-lo com os de todo dia disputaria atenção com eles. */
 .trilho__item--fim { margin-top: auto; }
 
+/* ─────────────────────────────────────────── a bolinha de transcrevendo */
+
+/* O invólucro existe só para pendurar o ponto no canto do ícone: sem ele, o
+ * position:absolute subiria até o botão e o ponto ficaria no canto do rótulo. */
+.trilho__icone { position: relative; display: grid; }
+
+.trilho__ponto {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  /* Um anel da cor do trilho separa o ponto do desenho do ícone — sem ele, o
+   * ponto encosta na borda do calendário e vira um borrão. */
+  box-shadow: 0 0 0 2px var(--cor-superficie);
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity .15s, transform .15s;
+}
+
+.trilho__item[data-ocupado="true"] .trilho__ponto {
+  opacity: 1;
+  transform: none;
+  animation: pulsar 1.6s ease-in-out infinite;
+}
+
+@keyframes pulsar {
+  50% { opacity: .25; }
+}
+
+/* Este app fica aberto o dia inteiro, e uma transcrição longa passa de meia
+ * hora: um ponto piscando sem parar no canto da tela é exatamente o caso que
+ * esta media query existe para resolver. O ponto continua lá, parado. */
+@media (prefers-reduced-motion: reduce) {
+  .trilho__item[data-ocupado="true"] .trilho__ponto { animation: none; }
+}
+
 /* ───────────────────────────────────────────────────────────── barra */
 
 .barra {
@@ -184,6 +223,18 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
 
+/* O estado da transcrição à esquerda e o "parar" à direita, na mesma linha
+ * abaixo da barra: parar é ação de quem está olhando o progresso correr, e
+ * mandá-la para os botões da tela a afastaria justamente de onde se olha. */
+.progresso__linha {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.progresso__linha .campo__dica { margin: 0; }
+
 /* A barra usa o .aa-progresso do design system; o preenchimento é o filho. */
 .aa-progresso > div {
   height: 100%;
@@ -192,6 +243,51 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   border-radius: inherit;
   transition: width .3s ease;
 }
+
+/* ────────────────────────────────────────────────── notas da reunião */
+
+.notas { display: grid; gap: var(--espaco-2); }
+
+.notas__topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+/* O estado de salvamento não pode empurrar o título quando muda de "salvo"
+ * para uma mensagem de erro comprida: o texto fica à direita e quebra ali. */
+.notas__estado { text-align: right; }
+
+/* Monospace não: nota de reunião é prosa, e a fonte do app já é legível em
+ * bloco. Redimensionar só na vertical — largura é do layout, não do usuário. */
+.notas__texto {
+  width: 100%;
+  resize: vertical;
+  min-height: 6rem;
+  line-height: 1.5;
+}
+
+.notas__acoes { display: flex; gap: var(--espaco-2); }
+
+/* Os termos que as notas sugeriram, como etiquetas clicáveis. */
+.sugestoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.sugestao {
+  border: 1px dashed var(--cor-borda);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--texto-pequeno);
+}
+
+.sugestao:hover { border-style: solid; border-color: var(--cor-acao); color: var(--cor-acao); }
+.sugestao:focus-visible { outline: var(--anel-foco); }
 
 /* ─────────────────────────────────────────────────────── transcrição */
 
@@ -676,3 +772,69 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .medidor[data-morto="true"] { background: var(--cor-erro-bg); box-shadow: inset 0 0 0 1px var(--cor-erro); }
 
 .caminho { font-family: var(--fonte-mono); font-size: 11px; word-break: break-all; }
+
+/* ─────────────────────────────────────────────────────────────── atas */
+
+.ata { display: grid; gap: var(--espaco-3); }
+
+/* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
+ * no botão que a usa, e não perdida no meio do cartão. */
+.ata__topo {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: end;
+  gap: var(--espaco-3);
+}
+
+.ata__tipo { min-width: 14rem; margin: 0; }
+
+/* A ata lida: coluna estreita de propósito. Linha de 100 caracteres cansa, e
+ * este é o texto que se lê inteiro, ao contrário da transcrição, que se
+ * percorre. */
+.ata__texto {
+  max-width: 68ch;
+  border-top: 1px solid var(--cor-borda);
+  padding-top: var(--espaco-3);
+}
+
+.ata__texto h2 { font-size: var(--texto-medio); margin: var(--espaco-4) 0 var(--espaco-2); }
+.ata__texto h3 { font-size: var(--texto-base); margin: var(--espaco-3) 0 var(--espaco-1); }
+.ata__texto p { margin: 0 0 var(--espaco-2); line-height: 1.6; }
+.ata__texto ul { margin: 0 0 var(--espaco-3); padding-left: var(--espaco-4); }
+.ata__texto li { margin-bottom: var(--espaco-1); line-height: 1.5; }
+
+/* Pendência com caixa: a lista de ações é o que se lê primeiro numa ata, e a
+ * caixa a separa do resto sem precisar de cor. */
+.ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
+.ata__pendencia input { margin-right: var(--espaco-2); }
+
+.ata__acoes { display: flex; justify-content: flex-end; }
+
+@media (max-width: 900px) {
+  .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
+}
+
+/* A bolinha do Gravador é vermelha: é a cor que o app inteiro usa para "está
+ * gravando", do ícone da bandeja ao ponto da tela do Gravador. Usar a cor de
+ * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
+.trilho__ponto--gravando { background: var(--cor-erro); }
+
+/* A ata dobrada. Fechada por padrão: com onze reuniões na tela, abrir todas
+ * transformava a página numa rolagem sem fim. */
+.ata__dobra { display: grid; gap: var(--espaco-2); }
+
+.ata__resumo {
+  cursor: pointer;
+  color: var(--cor-acao);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  list-style: none;
+  padding: var(--espaco-2) 0;
+}
+
+/* O triângulo padrão do <details> é do navegador e destoa do resto; a seta
+ * própria gira ao abrir. */
+.ata__resumo::-webkit-details-marker { display: none; }
+.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform .15s; }
+.ata__dobra[open] > .ata__resumo::before { transform: rotate(90deg); }
+.ata__resumo:focus-visible { outline: var(--anel-foco); }

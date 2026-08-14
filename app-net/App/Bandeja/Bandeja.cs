@@ -69,6 +69,17 @@ internal sealed class Bandeja : IDisposable
         _icone.Atualizar(IconesDaBandeja.Obter(_gravador.Estado.Cor), txt);
     }
 
+    /// <summary>
+    /// Um aviso do app, não do gravador — a transcrição que acabou de terminar.
+    /// </summary>
+    /// <remarks>
+    /// Respeita o mesmo interruptor de notificações do menu, e não um segundo
+    /// só seu: quem desligou as notificações desligou os balões deste ícone, e
+    /// inventar uma exceção para a transcrição seria contrariar o que a pessoa
+    /// pediu na única frase que o menu oferece sobre o assunto.
+    /// </remarks>
+    public void AvisarDoApp(string texto) => Avisar(texto, Win32.NIIF_INFO, sempre: false);
+
     private void Avisar(string texto, uint tipo, bool sempre)
     {
         if (!sempre && !_gravador.Estado.NotificacoesLigadas) return;

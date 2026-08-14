@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
+using MeetingApp.Nucleo.Atas;
 using MeetingApp.Sidecar;
 
 namespace MeetingApp.App;
@@ -26,6 +27,9 @@ internal sealed class Pedido
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
     [JsonPropertyName("data")] public string? Data { get; init; }
+
+    /// <summary>Separar quem falou. Ausente equivale a sim.</summary>
+    [JsonPropertyName("diarizar")] public bool? Diarizar { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Rótulo do falante e o nome dado a ele, para aprender a voz.</summary>
@@ -94,6 +98,25 @@ internal sealed class Resposta
 
     /// <summary>Cliente → seus projetos. A UI precisa dos dois para o cadastro.</summary>
     [JsonPropertyName("clientes")] public Dictionary<string, List<string>>? Clientes { get; init; }
+
+    /// <summary>O vínculo desta gravação, na resposta a <c>reuniao</c>.</summary>
+    [JsonPropertyName("cliente")] public string? Cliente { get; init; }
+    [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+
+    /// <summary>O que está escrito em notas.md.</summary>
+    [JsonPropertyName("notas")] public string? Notas { get; init; }
+
+    /// <summary>Nomes e siglas achados nas notas, para sugerir como vocabulário.</summary>
+    [JsonPropertyName("termos")] public List<string>? Termos { get; init; }
+
+    /// <summary>Os tipos de ata que a tela pode oferecer.</summary>
+    [JsonPropertyName("tipos")] public List<TipoDeAtaResumo>? Tipos { get; init; }
+
+    /// <summary>A ata em Markdown, ou nulo quando ainda não existe.</summary>
+    [JsonPropertyName("ata")] public string? Ata { get; init; }
+
+    /// <summary>A transcrição mudou depois de a ata ter sido escrita.</summary>
+    [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
@@ -107,6 +130,9 @@ internal sealed class Resposta
 
     /// <summary>O gravador como a tela precisa vê-lo.</summary>
     [JsonPropertyName("gravador")] public EstadoDoGravador? Gravador { get; init; }
+
+    /// <summary>O que está sendo transcrito, e o que acabou de terminar.</summary>
+    [JsonPropertyName("transcricoes")] public EstadoDasTranscricoes? Transcricoes { get; init; }
 
     /// <summary>Os dispositivos de áudio, para a tela poder escolher.</summary>
     [JsonPropertyName("dispositivos")] public DispositivosDisponiveis? Dispositivos { get; init; }
@@ -144,6 +170,16 @@ internal sealed class EstadoDoGravador
     [JsonPropertyName("duracao_s")] public double DuracaoS { get; init; }
     [JsonPropertyName("pasta")] public required string Pasta { get; init; }
 
+    /// <summary>
+    /// A pasta <b>desta</b> gravação, e não a raiz onde elas moram.
+    /// </summary>
+    /// <remarks>
+    /// É o endereço para onde as notas escritas durante a reunião vão. Sem ele
+    /// a tela do Gravador saberia que está gravando e não saberia onde — a raiz
+    /// não serve, porque nota pertence a uma reunião, não à coleção delas.
+    /// </remarks>
+    [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
+
     /// <summary>A reunião da agenda que está sendo gravada, quando há uma.</summary>
     [JsonPropertyName("titulo")] public string? Titulo { get; init; }
     [JsonPropertyName("participantes")] public List<string>? Participantes { get; init; }
@@ -169,6 +205,61 @@ internal sealed class FaixaAoVivo
     [JsonPropertyName("silencio_s")] public double SilencioS { get; init; }
     [JsonPropertyName("desconectado")] public bool Desconectado { get; init; }
     [JsonPropertyName("falha")] public string? Falha { get; init; }
+}
+
+/// <summary>
+/// As transcrições como a página precisa vê-las.
+/// </summary>
+/// <remarks>
+/// Chega de dois jeitos, como o gravador: como resposta a <c>transcricoes</c> e
+/// empurrado a cada aviso de andamento do pipeline. É o mesmo objeto nos dois
+/// casos, para a tela desenhar do que recebeu sem saber se pediu ou foi avisada.
+/// </remarks>
+internal sealed class EstadoDasTranscricoes
+{
+    /// <summary>A que está rodando agora, ou nulo. É ela que acende a bolinha.</summary>
+    [JsonPropertyName("atual")] public TranscricaoResumo? Atual { get; init; }
+
+    /// <summary>A última que terminou, para a tela poder mostrar como acabou.</summary>
+    [JsonPropertyName("ultimo")] public TranscricaoResumo? Ultimo { get; init; }
+}
+
+internal sealed class TranscricaoResumo
+{
+    /// <summary>A pasta da gravação: é por ela que a tela sabe se é a sua.</summary>
+    [JsonPropertyName("gravacao")] public required string Gravacao { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+
+    /// <summary>
+    /// "transcricao" ou "ata".
+    /// </summary>
+    /// <remarks>
+    /// A tela precisa saber qual dos dois está rodando: os dois usam o mesmo
+    /// registro (disputam a mesma placa), e sem isto a lista dizia
+    /// "Transcrevendo…" numa reunião cuja ata estava sendo escrita, com a
+    /// bolinha acesa no destino errado.
+    /// </remarks>
+    [JsonPropertyName("tarefa")] public required string Tarefa { get; init; }
+
+    [JsonPropertyName("etapa")] public required string Etapa { get; init; }
+    [JsonPropertyName("fracao")] public double Fracao { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+    [JsonPropertyName("comecou_em")] public required string ComecouEm { get; init; }
+    [JsonPropertyName("terminou")] public bool Terminou { get; init; }
+    [JsonPropertyName("erro")] public string? Erro { get; init; }
+
+    /// <summary>Parou a pedido. A tela trata diferente de falha.</summary>
+    [JsonPropertyName("cancelada")] public bool Cancelada { get; init; }
+}
+
+/// <summary>Um tipo de reunião, como a tela o oferece.</summary>
+internal sealed class TipoDeAtaResumo
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+
+    /// <summary>Veio da pasta do perfil: a tela oferece "voltar ao original".</summary>
+    [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -240,6 +331,14 @@ internal sealed class GravacaoResumo
     /// <summary>Quantos a agenda listou — convidados, não presentes.</summary>
     [JsonPropertyName("convidados")] public int Convidados { get; init; }
     [JsonPropertyName("transcrita")] public bool Transcrita { get; init; }
+
+    /// <summary>O vínculo escolhido na tela de preparo, que sobrevive a ela.</summary>
+    [JsonPropertyName("cliente")] public string? Cliente { get; init; }
+    [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+
+    /// <summary>Alguém escreveu notas nesta reunião.</summary>
+    [JsonPropertyName("com_notas")] public bool ComNotas { get; init; }
+
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
 }
 
@@ -248,6 +347,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(Resposta))]
 [JsonSerializable(typeof(PacoteComEstado))]
 [JsonSerializable(typeof(EstadoDoGravador))]
+[JsonSerializable(typeof(EstadoDasTranscricoes))]
 [JsonSerializable(typeof(DispositivosDisponiveis))]
 [JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
@@ -273,11 +373,21 @@ internal static class PonteJson
 /// O gravador do mesmo processo. A ponte não o comanda de longe: chama métodos,
 /// e o efeito aparece na bandeja e na janela pelo mesmo evento.
 /// </param>
+/// <param name="avisar">
+/// Um balão da bandeja. Serve à transcrição que termina com a janela escondida —
+/// que é o caso normal, já que ela passou a rodar sem ninguém olhando.
+/// </param>
 internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
-                            Bandeja.Gravador gravador)
+                            Bandeja.Gravador gravador, Action<string> avisar)
 {
     private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
     private readonly Projetos _projetos = new();
+
+    /// <summary>
+    /// O que está sendo transcrito. Vive na ponte, e não na página, porque a
+    /// página troca de tela e o pipeline não pode saber disso (FASE3.md §2).
+    /// </summary>
+    private readonly RegistroDeTranscricoes _transcricoes = new();
 
     public async Task AtenderAsync(string mensagem)
     {
@@ -316,6 +426,121 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         Prefs = _projetos.Preferencias(p.Cliente ?? "", p.Projeto ?? ""),
                     });
                     break;
+
+                // O vínculo da reunião com cliente/projeto, guardado na hora em
+                // que se escolhe — e não só quando se transcreve. Ver
+                // DadosDaReuniao: o defeito que originou isto era sair da tela
+                // de preparo e voltar com os campos em branco.
+                case "salvar-reuniao":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    new DadosDaReuniao { Cliente = p.Cliente, Projeto = p.Projeto }
+                        .Salvar(onde);
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+                }
+
+                // ─────────────────────────────────────────────── atas
+
+                case "modelos-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        {
+                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
+                        })],
+                    });
+                    break;
+
+                case "ata":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    string caminho = Path.Combine(onde, "ata.md");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Ata = File.Exists(caminho) ? File.ReadAllText(caminho) : null,
+                        // Ata mais velha que a transcrição significa que alguém
+                        // corrigiu o texto depois — e a ata ficou desatualizada
+                        // sem ninguém avisar.
+                        AtaVelha = File.Exists(caminho)
+                                   && File.Exists(Path.Combine(onde, "transcricao.json"))
+                                   && File.GetLastWriteTimeUtc(caminho)
+                                      < File.GetLastWriteTimeUtc(Path.Combine(onde, "transcricao.json")),
+                    });
+                    break;
+                }
+
+                case "gerar-ata":
+                    GerarAta(p);
+                    break;
+
+                case "exportar-ata":
+                    Responder(new Resposta { Id = p.Id, Arquivo = ExportarAta(p) });
+                    break;
+
+                case "customizar-tipo-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Arquivo = ModelosDeAta.Customizar(p.Modelo ?? ""),
+                    });
+                    break;
+
+                case "restaurar-tipo-de-ata":
+                    ModelosDeAta.VoltarAoOriginal(p.Modelo ?? "");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        {
+                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
+                        })],
+                    });
+                    break;
+
+                // ─────────────────────────────────── notas da reunião
+
+                case "notas":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Notas = Notas.Ler(onde),
+                        Termos = Notas.TermosSugeridos(Notas.Ler(onde)),
+                    });
+                    break;
+                }
+
+                case "salvar-notas":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Notas.Salvar(onde, p.Conteudo);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Termos = Notas.TermosSugeridos(p.Conteudo ?? ""),
+                    });
+                    break;
+                }
+
+                case "reuniao":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    var d = DadosDaReuniao.Ler(onde);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id, Cliente = d.Cliente, Projeto = d.Projeto,
+                    });
+                    break;
+                }
 
                 case "salvar-projeto":
                     // Cliente e projeto novos nascem aqui: digitar um nome
@@ -419,8 +644,28 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
                     break;
 
+                // Não espera o pipeline: responde "aceita" na hora, e o
+                // andamento passa a fluir pelo canal de eventos. É o que faz a
+                // transcrição sobreviver a trocar de tela — quem desenha a barra
+                // deixa de ser o dono da promessa (FASE3.md §2).
                 case "transcrever":
-                    await TranscreverAsync(p);
+                    Transcrever(p);
+                    break;
+
+                case "transcricoes":
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+                    break;
+
+                // Só pede para parar; quem tira do registro é a tarefa que
+                // estava rodando, quando os motores de fato morrerem.
+                case "cancelar-transcricao":
+                    _transcricoes.Cancelar(p.Gravacao);
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+                    break;
+
+                case "esquecer-transcricao":
+                    _transcricoes.EsquecerUltimo();
+                    Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
                     break;
 
                 // ─────────────────────────────────── gravador
@@ -546,6 +791,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Status = g.Estado.TextoDeStatus(g.DuracaoAtual, null).Split('\n')[0],
             DuracaoS = g.DuracaoAtual,
             Pasta = g.PastaDeSaida,
+            // Só enquanto grava: o PastaAtual guarda também a da última
+            // gravação, e oferecer o bloco de notas depois de parar faria
+            // escrever numa reunião que já acabou sem a tela dizer qual é.
+            Gravacao = g.Estado.Gravando ? g.PastaAtual : null,
             Titulo = g.Evento?.Titulo,
             Participantes = g.Evento?.NomesDosParticipantes().ToList(),
             Notificacoes = g.Estado.NotificacoesLigadas,
@@ -600,8 +849,52 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         gravador.DefinirPastaDeSaida(pasta);
     }
 
-    /// <summary>Roda o pipeline, reportando andamento pelo mesmo id.</summary>
-    private async Task TranscreverAsync(Pedido p)
+    // ──────────────────────────────────────────────────── transcrições
+
+    /// <summary>O registro como a página o vê.</summary>
+    private EstadoDasTranscricoes Instantaneo() => new()
+    {
+        Atual = Resumir(_transcricoes.Atual),
+        Ultimo = Resumir(_transcricoes.Ultimo),
+    };
+
+    private static TranscricaoResumo? Resumir(TrabalhoDeTranscricao? t) => t is null ? null : new()
+    {
+        Gravacao = t.Gravacao,
+        Nome = t.Nome,
+        Tarefa = t.Tarefa,
+        Etapa = t.Etapa,
+        Fracao = t.Fracao,
+        Texto = t.Texto,
+        ComecouEm = t.ComecouEm.ToString("o"),
+        Terminou = t.Terminou,
+        Erro = t.Erro,
+        Cancelada = t.Cancelada,
+    };
+
+    /// <summary>Empurra o registro à página, sem ela ter pedido.</summary>
+    private void EmpurrarTranscricoes() =>
+        Responder(new Resposta { Id = 0, Tipo = "transcricoes", Transcricoes = Instantaneo() });
+
+    /// <summary>
+    /// Aceita a transcrição e devolve o controle na hora.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O pipeline roda solto: a resposta a este pedido diz apenas que foi
+    /// aceito, e etapa, fração e fim chegam pelo canal de eventos. Foi assim que
+    /// a transcrição deixou de morrer ao trocar de tela — antes, quem desenhava
+    /// a barra era o dono da promessa, e trocar de tela jogava fora o DOM em que
+    /// ela escrevia (FASE3.md §2).
+    /// </para>
+    /// <para>
+    /// <c>Task.Run</c> porque o pipeline bloquearia a thread da UI, que é a
+    /// mesma que desenha a janela <b>e</b> a que atende a bandeja: sem isto, a
+    /// barra congelaria justamente enquanto há progresso a mostrar, e o menu da
+    /// bandeja não abriria durante uma transcrição.
+    /// </para>
+    /// </remarks>
+    private void Transcrever(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)
         {
@@ -609,22 +902,252 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             return;
         }
 
-        // O pipeline é pesado e bloquearia a thread da UI, que é a mesma que
-        // desenha a janela: sem isto a barra de progresso congelaria justamente
-        // enquanto há progresso a mostrar.
-        var resultado = await Task.Run(() => _transcritor.ExecutarAsync(
-            pasta, p.Vocabulario, p.Idioma,
-            modelo: p.Modelo, cliente: p.Cliente, projeto: p.Projeto,
-            progresso: e => Responder(new Resposta
-            {
-                Id = p.Id,
-                Tipo = "progresso",
-                Etapa = e.Etapa,
-                Fracao = e.Fracao,
-                Texto = e.Texto,
-            })));
+        // O que a tela mandou tem precedência, mas o silêncio dela não apaga o
+        // que já estava: retranscrever com os campos em branco apagava o cliente
+        // e o projeto guardados, e essa era a metade invisível do defeito.
+        var vinculo = DadosDaReuniao.Ler(pasta);
+        string? cliente = p.Cliente is { Length: > 0 } ? p.Cliente : vinculo.Cliente;
+        string? projeto = p.Projeto is { Length: > 0 } ? p.Projeto : vinculo.Projeto;
+        if (cliente != vinculo.Cliente || projeto != vinculo.Projeto)
+            new DadosDaReuniao { Cliente = cliente, Projeto = projeto }.Salvar(pasta);
 
-        Responder(new Resposta { Id = p.Id, Transcricao = resultado.ParaJson() });
+        // Lidas uma vez, aqui: dentro da tarefa elas seriam relidas do disco
+        // enquanto o pipeline roda, e mudar a chave no meio de uma transcrição
+        // não pode mudar o que aquela transcrição está fazendo.
+        var cfgDaTranscricao = ConfiguracoesDoApp.Carregar();
+
+        // Lança quando já há uma em curso, e a mensagem nomeia qual. O catch do
+        // AtenderAsync a transforma na resposta de erro que a tela mostra.
+        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta));
+        Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+        EmpurrarTranscricoes();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _transcritor.ExecutarAsync(
+                    pasta, p.Vocabulario, p.Idioma,
+                    // A chave existe em Ajustes › Transcrição desde 14/08; até
+                    // então o filtro só ligava por linha de comando, e a tela
+                    // dizia isso num recado que ninguém podia agir.
+                    filtrarSilencio: cfgDaTranscricao.FiltrarSilencio,
+                    modelo: p.Modelo, cliente: cliente, projeto: projeto,
+                    diarizar: p.Diarizar ?? true,
+                    corrigirFonetica: cfgDaTranscricao.CorrecaoFonetica,
+                    progresso: e =>
+                    {
+                        _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
+                        EmpurrarTranscricoes();
+                    },
+                    ct: trabalho.Token);
+                _transcricoes.Terminar(pasta);
+                Avisar($"Transcrição pronta: {trabalho.Nome}");
+            }
+            catch (OperationCanceledException)
+            {
+                // Parar a pedido não é falha: a tela não mostra alerta vermelho,
+                // e a bandeja não avisa — quem clicou em parar sabe que parou.
+                _transcricoes.Terminar(pasta, cancelada: true);
+            }
+            catch (Exception e)
+            {
+                // O erro vira estado, e não mensagem perdida: quem saiu da tela
+                // no meio precisa poder descobrir, ao voltar, que falhou.
+                _transcricoes.Terminar(pasta, e.Message);
+                Avisar($"A transcrição de {trabalho.Nome} falhou.");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// Copia a ata para a pasta de atas, com um nome que se acha depois.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Pasta própria, separada da de transcrições</b> (pedido do dono do
+    /// produto em 14/08/2026): os dois arquivos têm destino e finalidade
+    /// diferentes. A transcrição é material de trabalho; a ata é o que se manda
+    /// para fora — cliente, time, pasta do projeto.
+    /// </para>
+    /// <para>
+    /// O nome carrega data, cliente e título porque a pasta de destino junta
+    /// atas de reuniões diferentes: "ata.md" ali dentro seria inencontrável na
+    /// segunda exportação, e sobrescreveria a primeira.
+    /// </para>
+    /// </remarks>
+    private static string ExportarAta(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+            throw new InvalidOperationException("sem gravação");
+
+        string origem = Path.Combine(pasta, "ata.md");
+        if (!File.Exists(origem))
+            throw new InvalidOperationException("esta reunião ainda não tem ata");
+
+        var cfg = ConfiguracoesDoApp.Carregar();
+        if (cfg.PastaDeAtas is not { Length: > 0 } destino)
+            throw new InvalidOperationException(
+                "escolha a pasta das atas em Ajustes › Geral antes de exportar");
+
+        Directory.CreateDirectory(destino);
+
+        var dados = DadosDaReuniao.Ler(pasta);
+        string titulo = p.Nome is { Length: > 0 } ? p.Nome : Path.GetFileName(pasta);
+
+        var partes = new[] { dados.Cliente, titulo }.Where(x => x is { Length: > 0 });
+        string arquivo = Exportacao.NomeDeArquivo(
+            string.Join(" - ", partes) + " - ata", "md", Transcritor.DataDaReuniao(pasta));
+
+        string caminho = Path.Combine(destino, arquivo);
+        File.Copy(origem, caminho, overwrite: true);
+        return caminho;
+    }
+
+    /// <summary>
+    /// Aceita a ata e devolve o controle, como a transcrição faz.
+    /// </summary>
+    /// <remarks>
+    /// Mesmo registro da transcrição, e não um segundo: os dois trabalhos
+    /// disputam a mesma placa, e a trava de um por vez é o que garante que o
+    /// modelo de ata só carregue com a VRAM do ASR liberada. A bolinha do trilho
+    /// acende para os dois pelo mesmo caminho.
+    /// </remarks>
+    private void GerarAta(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = "sem gravação" });
+            return;
+        }
+
+        var tipo = ModelosDeAta.Buscar(p.Modelo)
+            ?? throw new InvalidOperationException($"tipo de ata desconhecido: {p.Modelo}");
+
+        string json = LerTranscricao(pasta)
+            ?? throw new InvalidOperationException("esta reunião ainda não foi transcrita");
+        var dados = ResultadoDaTranscricao.DeJson(json)
+            ?? throw new InvalidOperationException("transcrição ilegível");
+
+        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "ata");
+        Responder(new Resposta { Id = p.Id, Transcricoes = Instantaneo() });
+        EmpurrarTranscricoes();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var vinculo = DadosDaReuniao.Ler(pasta);
+                var cfg = ConfiguracoesDoApp.Carregar();
+                var (convidados, emails) = ConvidadosDaAgenda(pasta);
+                // Quem é da casa e quem é do cliente sai do domínio do e-mail, e
+                // não de dedução do modelo: ver Nucleo/Atas/Organizacoes.cs.
+                var pessoas = Organizacoes.Classificar(
+                    emails.Count > 0 ? emails : convidados, cfg.DominiosDaCasa);
+
+                var ctx = new ContextoDaReuniao
+                {
+                    Titulo = Listar().FirstOrDefault(g => g.Caminho == pasta)?.Titulo,
+                    Convidados = convidados,
+                    Pessoas = pessoas,
+                    Cliente = vinculo.Cliente ?? dados.Client,
+                    Projeto = vinculo.Projeto ?? dados.Project,
+                    Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
+                    DuracaoS = dados.Duration ?? 0,
+                    Falantes = [.. dados.Segments.Select(s => s.Speaker)
+                        .Where(s => s is { Length: > 0 }).Distinct()!],
+                    Notas = Notas.Ler(pasta),
+                    Vocabulario = _projetos.Preferencias(
+                        vinculo.Cliente ?? "", vinculo.Projeto ?? "")?.InitialPrompt ?? "",
+                };
+
+                var roteiro = RoteiroDeFatos.De(dados.Segments);
+                string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
+
+                var motor = new MotorDeAta(
+                    CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
+
+                var ata = await motor.GerarAsync(prompt, ctx.DuracaoS, e =>
+                {
+                    _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
+                    EmpurrarTranscricoes();
+                }, trabalho.Token);
+
+                VerificadorDeAta.Conferir(ata, dados.Segments,
+                    [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, pessoas);
+
+                File.WriteAllText(Path.Combine(pasta, "ata.md"),
+                                  RedatorDeAta.Escrever(ata, tipo, ctx));
+                File.WriteAllText(Path.Combine(pasta, "ata.json"), ata.ParaJson());
+
+                _transcricoes.Terminar(pasta);
+                Avisar($"Ata pronta: {trabalho.Nome}");
+            }
+            catch (OperationCanceledException)
+            {
+                _transcricoes.Terminar(pasta, cancelada: true);
+            }
+            catch (Exception e)
+            {
+                _transcricoes.Terminar(pasta, e.Message);
+                Avisar($"A ata de {trabalho.Nome} falhou.");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// Os convidados que a agenda gravou, com os e-mails quando existirem.
+    /// </summary>
+    /// <remarks>
+    /// <c>attendee_emails</c> é chave nova (14/08/2026): as gravações anteriores
+    /// só têm os nomes, e nelas a organização de cada um fica desconhecida — o
+    /// que é melhor que fingir saber.
+    /// </remarks>
+    private static (List<string> Nomes, List<string> Emails) ConvidadosDaAgenda(string pasta)
+    {
+        var nomes = new List<string>();
+        var emails = new List<string>();
+        try
+        {
+            string meta = Path.Combine(pasta, "meta.json");
+            if (!File.Exists(meta)) return (nomes, emails);
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(meta));
+            if (!doc.RootElement.TryGetProperty("meeting", out var reuniao))
+                return (nomes, emails);
+
+            if (reuniao.TryGetProperty("attendees", out var a)
+                && a.ValueKind == JsonValueKind.Array)
+                foreach (var x in a.EnumerateArray())
+                    if (x.GetString() is { Length: > 0 } n) nomes.Add(n);
+
+            if (reuniao.TryGetProperty("attendee_emails", out var e)
+                && e.ValueKind == JsonValueKind.Array)
+                foreach (var x in e.EnumerateArray())
+                    if (x.GetString() is { Length: > 0 } m) emails.Add(m);
+        }
+        catch (Exception)
+        {
+            // meta.json ilegível não pode impedir de escrever a ata.
+        }
+        return (nomes, emails);
+    }
+
+    /// <summary>
+    /// Como chamar a reunião numa frase: o título da agenda, ou a pasta.
+    /// </summary>
+    /// <remarks>
+    /// O mesmo nome que a lista mostra, para o aviso de "já estou transcrevendo
+    /// X" citar o que a pessoa vê na tela, e não um caminho de disco.
+    /// </remarks>
+    private string NomeDaGravacao(string pasta)
+    {
+        string nome = Path.GetFileName(pasta.TrimEnd(Path.DirectorySeparatorChar));
+        foreach (var g in Listar())
+            if (g.Caminho == pasta) return g.Titulo is { Length: > 0 } t ? t : g.Nome;
+        return nome;
     }
 
     private Dictionary<string, List<string>> MapaDeClientes()
@@ -839,7 +1362,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             await motor.BaixarAsync(
                 pacote.Repositorio,
-                Catalogo.PastaDoPacote(pacote),
+                // Na família "ata" o destino é o arquivo, e não a pasta de
+                // cache: quem o abre é o llama.cpp, por caminho.
+                pacote.Familia == "ata"
+                    ? Catalogo.ArquivoDoPacote(pacote) : Catalogo.PastaDoPacote(pacote),
                 pacote.TamanhoEsperadoBytes,
                 (pct, texto) =>
                 Responder(new Resposta
@@ -849,7 +1375,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Etapa = "baixando",
                     Fracao = pct,
                     Texto = texto,
-                }));
+                }),
+                arquivo: pacote.Arquivo);
         }
 
         // O catálogo relê o disco: a tela nunca acredita no que o download
@@ -958,6 +1485,22 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private void Responder(Resposta r) =>
         responder(JsonSerializer.Serialize(r, PonteJson.Default.Resposta));
 
+    /// <summary>
+    /// Um balão da bandeja, e nunca uma exceção que suba.
+    /// </summary>
+    /// <remarks>
+    /// O aviso é conveniência; a transcrição já terminou quando ele sai. Deixar
+    /// uma falha de Shell_NotifyIcon derrubar a tarefa perderia o
+    /// <c>EmpurrarTranscricoes</c> que vem depois — e aí a tela ficaria com a
+    /// barra parada para sempre, que é justamente o defeito que esta fase
+    /// conserta.
+    /// </remarks>
+    private void Avisar(string texto)
+    {
+        try { avisar(texto); }
+        catch { /* a bandeja pode estar indo embora; o estado já foi registrado */ }
+    }
+
     /// <summary>As gravações que o gravador deixou, mais recentes primeiro.</summary>
     private List<GravacaoResumo> Listar()
     {
@@ -1017,6 +1560,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 convidados = a.GetArrayLength();
         }
 
+        // O vínculo com cliente/projeto vem junto na lista, e não por pedido
+        // separado: são dois campos por gravação, e um pedido por cartão faria a
+        // lista piscar preenchendo-se aos poucos.
+        var dados = DadosDaReuniao.Ler(pasta);
+
         return new GravacaoResumo
         {
             Nome = Path.GetFileName(pasta),
@@ -1025,6 +1573,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Titulo = titulo,
             Convidados = convidados,
             Transcrita = File.Exists(Path.Combine(pasta, "transcricao.json")),
+            Cliente = dados.Cliente,
+            Projeto = dados.Projeto,
+            ComNotas = Notas.Existem(pasta),
             Avisos = avisos,
         };
     }

@@ -830,6 +830,15 @@ trechos com fala real.
 
 Repetir numa gravação saudável separaria as duas coisas. Fica como pendência.
 
+> ✅ **Repetido em 14/08/2026**, sobre `2026-08-13_14-30-15` — 29,2 min, **0,3%
+> de silêncio digital e 73,3% de fala**. O efeito colateral **não** era artefato
+> do microfone morto: **207 contra 787 segmentos** (aqui 3,8×; lá 2,7×), 1,8 a
+> 5,7 pontos a menos de cobertura de fala, e **4,6× mais lento** (1514 s contra
+> 331 s). E a consequência que faltava: o colapso de segmentação é o que quebra
+> a **atribuição de falantes**, porque o rótulo é um por segmento do ASR, e é o
+> que **contamina os vetores de voz**, que persistem entre reuniões. Ver
+> [FASE6.md](FASE6.md) §2.3–2.5.
+
 ### O whisper.cpp não tem mecanismo equivalente — e isto bloqueia a migração
 
 Braços do whisper.cpp (GPU no Windows, mesmo áudio, mesmos parâmetros):
@@ -898,6 +907,13 @@ Três consequências:
 - **melhor ainda, o prompt fica dispensável** — e isso é ganho, porque o prompt
   custa 2,5× mais tempo, menos da metade dos segmentos e regurgitação temática
   (resultado 5);
+
+  > ⚠️ **Esta conclusão nunca foi aplicada.** A `CorrecaoFonetica` entrou no
+  > núcleo, mas o `hotwords` continuou ligado — o app paga o preço dos dois
+  > mecanismos e recebe o benefício de um. Em 14/08/2026 mediu-se que o preço é
+  > maior do que este resultado sabia: além do tempo e dos segmentos, ele quebra
+  > a atribuição de falantes e contamina os vetores de voz. Virou a
+  > [Fase 6](FASE6.md), que existe para aplicar esta decisão.
 - **vale igual para os dois motores**, no núcleo, o que casa com o que o
   [PARIDADE.md](PARIDADE.md) defende sobre não deixar filtro de qualidade dentro
   do motor.

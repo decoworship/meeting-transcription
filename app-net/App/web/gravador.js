@@ -14,6 +14,7 @@
 
 import { pedir, assinar } from "/ponte.js";
 import { alerta } from "/pecas.js";
+import { blocoDeNotas } from "/notas.js";
 
 /** "00:12:34" — aqui o tempo é para cronometrar, ao contrário da lista. */
 function relogio(segundos) {
@@ -159,7 +160,18 @@ export async function telaDoGravador(ctx) {
   dicaPasta.textContent = "Trocar em Ajustes › Geral. É a mesma pasta que a lista de reuniões lê.";
   blocoPasta.append(tituloPasta, caminho, dicaPasta);
 
-  raiz.append(cartao, reuniao, blocoDisp, blocoPasta);
+  // ---- notas da reunião
+  //
+  // Logo abaixo dos controles, e acima dos dispositivos: é o que se usa durante
+  // a reunião inteira, enquanto dispositivo e pasta se mexem uma vez por mês.
+  // O tempo vem do estado que já chega cinco vezes por segundo — é ele que o
+  // "marcar momento" carimba.
+  const notas = blocoDeNotas(estado.gravando ? estado.gravacao : null, {
+    tempo: () => estado.duracao_s,
+    linhas: 6,
+  });
+
+  raiz.append(cartao, notas.raiz, reuniao, blocoDisp, blocoPasta);
   tela.replaceChildren(raiz);
 
   // ─────────────────────────────────────────────────────── desenho
@@ -218,6 +230,15 @@ export async function telaDoGravador(ctx) {
     escolhaMic.campo.disabled = g.gravando;
     escolhaLoop.campo.disabled = g.gravando;
     caminho.textContent = g.pasta;
+
+    // As notas seguem a gravação: começar uma aponta o bloco para a pasta dela,
+    // parar guarda o que estiver escrito e devolve o campo ao repouso. O
+    // apontarPara ignora repetição, então chamar isto cinco vezes por segundo
+    // não custa nada.
+    notas.apontarPara(g.gravando ? g.gravacao : null);
+    notas.definirHabilitado(
+      Boolean(g.gravando && g.gravacao),
+      "As notas abrem quando a gravação começa. Depois, edite pela reunião.");
   }
 
   // ───────────────────────────────────────────────────── interação

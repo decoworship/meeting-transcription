@@ -149,12 +149,20 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
     config.pasta_de_exportacao ?? "", "vazio = só ao lado da gravação",
     (v) => gravar({ pasta_de_exportacao: v }));
 
+  // Pasta própria para as atas: a transcrição é material de trabalho, a ata é o
+  // que se manda para fora. Destinos diferentes, finalidades diferentes.
+  const campoAtas = campoDePasta("Pasta das atas",
+    config.pasta_de_atas ?? "", "vazio = só ao lado da gravação",
+    (v) => gravar({ pasta_de_atas: v }));
+
   const dica = document.createElement("p");
   dica.className = "campo__dica";
-  dica.textContent = "A exportação sempre grava ao lado da gravação. "
-    + "A pasta acima é a cópia extra, quando você pedir.";
+  dica.textContent = "As duas exportações sempre gravam ao lado da gravação. "
+    + "As pastas acima são a cópia que se leva para fora — e são separadas "
+    + "porque a transcrição é material de trabalho e a ata é o que se manda "
+    + "para o cliente ou para o time.";
 
-  pastas.append(campoPasta, campoExport, dica);
+  pastas.append(campoPasta, campoExport, campoAtas, dica);
   painel.append(pastas);
   return painel;
 }
@@ -371,6 +379,10 @@ function abaModelos(catalogo, config, gravar) {
      "modelo_padrao", "large-v3"],
     ["diarizacao", "Diarização", "Qual modelo separa quem falou.",
      "diarizacao_padrao", "community-1"],
+    // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
+    // quem abre o .gguf é o llama.cpp, por caminho.
+    ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
+     "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf"],
   ]) {
     const b = bloco(titulo, texto);
     const itens = catalogo.filter((i) => i.pacote.familia === familia);
@@ -380,7 +392,9 @@ function abaModelos(catalogo, config, gravar) {
     const sel = escolha.querySelector("select");
     // O valor visível é o nome bonito; o que vai para a configuração é o id que
     // o motor entende. Sem esta separação a tela dita o vocabulário do motor.
-    itens.forEach((i, n) => { sel.options[n].value = i.pacote.id; });
+    itens.forEach((i, n) => {
+      sel.options[n].value = i.pacote.nome_local ?? i.pacote.id;
+    });
     sel.value = config[chaveConfig] ?? padrao;
     sel.addEventListener("change", async (e) => {
       await gravar({ [chaveConfig]: e.target.value });
@@ -394,9 +408,10 @@ function abaModelos(catalogo, config, gravar) {
 
   const nota = document.createElement("p");
   nota.className = "campo__dica";
-  nota.textContent = "O modelo escolhido também é baixado sozinho na primeira "
-    + "transcrição que precisar dele. Baixar por aqui só evita a espera na hora "
-    + "errada.";
+  nota.textContent = "Os modelos de transcrição e diarização também são baixados "
+    + "sozinhos na primeira vez que fizerem falta; baixar por aqui só evita a "
+    + "espera na hora errada. O de ata não: sem ele baixado, gerar ata falha na "
+    + "hora — são 2,5 GB, e baixá-los no meio de um clique seria pior.";
   painel.appendChild(nota);
 
   return painel;
@@ -424,6 +439,10 @@ function abaTranscricao(config, gravar) {
   const fonetica = bloco("Correção fonética",
     "Os termos do vocabulário do projeto corrigem o texto: 'Dimi' que o modelo "
     + "escreveu 'Jimmy' volta a ser 'Dimi'.");
+  fonetica.classList.add("bloco--chave");
+  fonetica.appendChild(chave(config.correcao_fonetica !== false,
+    (v) => gravar({ correcao_fonetica: v })));
+
   const comoVer = document.createElement("p");
   comoVer.className = "campo__dica";
   comoVer.textContent = "Na transcrição, cada trecho corrigido ganha uma marca "
@@ -433,9 +452,51 @@ function abaTranscricao(config, gravar) {
   fonetica.appendChild(comoVer);
   painel.appendChild(fonetica);
 
-  painel.appendChild(obra(
-    "O filtro de silêncio ainda não tem chave aqui.",
-    "Ele existe no núcleo e só liga por linha de comando."));
+  // ---- os domínios da casa
+  //
+  // Só os nossos, e não os dos clientes: quem não é da casa é cliente, e essa
+  // regra não precisa de manutenção quando aparece um cliente novo.
+  const casa = bloco("Domínios da nossa organização",
+    "Os e-mails da agenda dizem de que lado da mesa cada pessoa está. Sem isto, "
+    + "a ata deduz pelo assunto da conversa — e numa reunião que fala de um "
+    + "cliente o tempo todo, alguém da equipe vira gente do cliente.");
+
+  const entrada = document.createElement("input");
+  entrada.className = "aa-entrada";
+  entrada.id = "dominios-da-casa";
+  entrada.placeholder = "beegol.com, minhaempresa.com.br";
+  entrada.value = (config.dominios_da_casa ?? []).join(", ");
+  entrada.addEventListener("change", () => gravar({
+    dominios_da_casa: entrada.value.split(",")
+      .map((d) => d.trim().replace(/^@/, "").toLowerCase())
+      .filter(Boolean),
+  }));
+
+  const dica = document.createElement("p");
+  dica.className = "campo__dica";
+  dica.textContent = "Separados por vírgula. Quem tiver e-mail de outro domínio "
+    + "entra como cliente; quem não tiver e-mail na agenda fica sem lado, e a "
+    + "ata não inventa um.";
+  casa.append(entrada, dica);
+  painel.appendChild(casa);
+
+  const silencio = bloco("Descartar fala inventada sobre silêncio");
+  silencio.classList.add("bloco--chave");
+  const porQue = document.createElement("p");
+  porQue.className = "bloco__texto";
+  // O número está na tela porque é ele que justifica a chave existir.
+  porQue.textContent = "Cerca de 5% das palavras que o modelo transcreve caem "
+    + "sobre trechos em que não há sinal nenhum — zeros exatos, não fala baixa. "
+    + "Sobre ausência de som, qualquer palavra é invenção. Ligado, esses trechos "
+    + "são descartados antes de a transcrição existir.";
+  const cuidado = document.createElement("p");
+  cuidado.className = "campo__dica";
+  cuidado.textContent = "O critério é severo de propósito (99% de amostras "
+    + "zeradas, e dois terços do trecho): fala removida por engano é conteúdo "
+    + "que não volta, enquanto invenção some no meio da ata sem ninguém notar.";
+  silencio.append(porQue, chave(config.filtrar_silencio,
+    (v) => gravar({ filtrar_silencio: v })), cuidado);
+  painel.appendChild(silencio);
 
   return painel;
 }
@@ -496,10 +557,13 @@ function abaClientes(clientes, catalogo) {
   }
 
   painel.appendChild(b);
-  painel.appendChild(obra(
-    "Renomear e apagar por aqui ainda não existe.",
-    "Cliente e projeto novos continuam nascendo na tela de preparo, digitando "
-    + "um nome que ainda não existe."));
+  const comoNascem = document.createElement("p");
+  comoNascem.className = "campo__dica";
+  comoNascem.textContent = "Cliente e projeto novos nascem na tela de preparo: "
+    + "digite um nome que ainda não existe e ele passa a valer. Aqui se renomeia "
+    + "e se apaga o que já existe — renomear leva junto o vocabulário e as "
+    + "preferências do projeto.";
+  painel.appendChild(comoNascem);
 
   return painel;
 }

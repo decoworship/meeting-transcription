@@ -3,6 +3,18 @@
 Três frentes, em ordem de dependência: validar o áudio gravado, melhorar o
 gravador, redesenhar a interface.
 
+> **Onde o plano está hoje (13/08/2026).** As fases 0, 1, 2 e 2.5 estão
+> concluídas: existe **um** app Windows nativo que grava na bandeja e transcreve
+> na janela, sem Python de interface e sem Docker. A ordem do que falta foi
+> **reordenada** neste dia — features, depois instalador, depois cosmética. A
+> lista de fases atualizada está em §5, "Fases"; a fase corrente tem carta
+> própria em [FASE3.md](FASE3.md).
+>
+> **Acrescentado em 14/08/2026:** uma **Fase 6**, de qualidade da transcrição,
+> depois da 5 ([FASE6.md](FASE6.md)). Ela traz junto uma tarefa que começa
+> agora e não espera a fase: transcrever as reuniões **em paralelo por outras
+> fontes** e guardar as saídas junto da gravação.
+
 ---
 
 ## 0. Bloqueio: o microfone da gravação de 06/08 está mudo
@@ -165,7 +177,12 @@ posterior e opcional — inclusive editável depois no app.
 
 ---
 
-## 3. Redesign da interface com o AA Design System
+## 3. Redesign da interface com o AA Design System — a Fase 5
+
+> **Reordenada em 13/08/2026.** Isto era a Fase 3 e passou a ser a **Fase 5**, a
+> última: depois das features (Fase 3 nova, [FASE3.md](FASE3.md)) e do
+> instalador (Fase 4). O motivo está no fim desta seção, e a decisão inteira em
+> "A reordenação de 13/08/2026", mais abaixo.
 
 ### O que o design system é
 
@@ -174,7 +191,12 @@ auto-hospedadas (Fraunces e Hanken Grotesk), tema escuro por
 `data-tema="escuro"`, tokens em `tokens.json`. Componentes em React ou como
 classes CSS. Português como língua padrão. Sem biblioteca de ícones.
 
-### O conflito estrutural
+### O conflito estrutural — resolvido, e por outro caminho
+
+> **Histórico.** O que vem abaixo descrevia o app Gradio, aposentado em
+> 13/08/2026. **Nada disto vale mais**, e fica registrado porque explica por que
+> o redesign era pré-requisito e deixou de ser. O que sobrou de verdade para a
+> Fase 5 está em "O que a Fase 5 ainda é", no fim da seção.
 
 O app é Gradio, que gera o próprio HTML e traz o próprio CSS. Isso limita o
 alcance do redesign, mas de forma desigual:
@@ -209,18 +231,36 @@ system), sabendo que é reescrever a camada de UI inteira.
 > nos blocos de HTML próprios (fase 2, que sobrevive ao porte) e economizar em
 > tematizar widget do Gradio (fase 1, que será jogado fora).
 
-### Decisões necessárias antes de começar
+### Decisões necessárias antes de começar — todas respondidas pela Fase 2
 
-1. **Idioma.** A interface hoje é inglês; o design system é português-primeiro,
-   inclusive nos nomes de token e no tom de voz. Traduzir a UI para pt-BR faz
-   parte do redesign ou fica para depois?
-2. **Como consumir o design system.** Submódulo git, cópia versionada dentro do
-   repositório, ou pacote publicado? A imagem Docker precisa dos arquivos
-   embutidos de qualquer forma.
-3. **Tema escuro.** O app hoje segue o tema do Gradio. Passar a expor o toggle
-   `data-tema` do design system, ou seguir a preferência do sistema?
-4. **Ordem.** Antes ou depois das integrações do gravador? O redesign é o item
-   mais longo e o que menos muda a qualidade da transcrição.
+1. ~~**Idioma.**~~ ✅ A interface nasceu em pt-BR, do trilho aos rótulos.
+2. ~~**Como consumir o design system.**~~ ✅ Cópia versionada, embutida no
+   executável como `EmbeddedResource` (`App/web/ds.css`). Não há mais imagem
+   Docker.
+3. ~~**Tema escuro.**~~ ✅ `data-tema` no `<html>`, como o design system pede.
+4. ~~**Ordem.**~~ ✅ Respondida em 13/08/2026: **por último**, depois das
+   features e do instalador.
+
+### O que a Fase 5 ainda é
+
+Com a interface própria já escrita em WebView2 — trilho, cartões, revisão,
+gravador, ajustes, tudo em HTML e nas classes do design system —, o que restou
+do redesign é acabamento, e cabe numa lista curta:
+
+- **fidelidade aos tokens**: conferir tela a tela o que ficou de valor solto
+  contra `tokens.json`, agora que existe um catálogo de telas estável;
+- **as fontes** (Fraunces e Hanken Grotesk) auto-hospedadas dentro do
+  executável, com o peso disso medido contra o orçamento de tamanho;
+- **os componentes React do design system**, hoje enfim utilizáveis — mas só
+  onde pagarem por si: trocar HTML que funciona por React para "usar o design
+  system" é custo sem ganho, e a CSP fechada da página é uma régua a respeitar;
+- **o tema escuro de ponta a ponta**, incluindo os estados que ninguém olhou
+  ainda (esqueletos, alertas, medidores de nível);
+- **densidade e tipografia da tela de revisão**, que é onde se passa mais tempo
+  lendo.
+
+Nada disto muda a qualidade da transcrição, e é exatamente por isso que vem
+depois de tudo.
 
 ---
 
@@ -670,35 +710,37 @@ a stack mexe justamente no que se estava tentando melhorar.
    não produz embeddings bit a bit idênticos — os perfis salvos devem ser
    descartados e reinscritos. Barato agora, caro depois de meses de uso.
 5. **A UI é reescrita.** 1.916 linhas de `gradio_app.py` viram HTML/JS servido
-   ao WebView2. É o maior custo isolado do plano — mas converge com a fase 3 da
-   seção 3, que já estava na mesa.
+   ao WebView2. É o maior custo isolado do plano — mas converge com o redesign
+   da seção 3 (hoje Fase 5), que já estava na mesa.
 
 ### Fases
 
 Ordenadas para que cada uma entregue algo sozinha e para que a decisão de
 qualidade venha **antes** do trabalho irreversível.
 
-**Fase 0 — medir antes de migrar.** Sem escrever app nenhum: baixar
+**Fase 0 — medir antes de migrar.** ✅ **Concluída**, resultados em
+[FASE0-RESULTADOS.md](FASE0-RESULTADOS.md). Sem escrever app nenhum: baixar
 `whisper-bin-x64.zip` (8,2 MB) e os modelos ONNX de diarização, rodar
 `whisper-cli.exe` e `sherpa-onnx` sobre gravações já existentes e comparar com a
 saída atual, usando as métricas da seção 1. Decide os itens 1–3 dos riscos.
 *Se a diarização regredir demais, o plano inteiro é reconsiderado aqui, tendo
 gasto dias e não semanas.*
 
-**Fase 1 — o gravador nativo.** Portar `capture.py` + `tray.py` para C#. É a
+**Fase 1 — o gravador nativo.** ✅ **Concluída**, carta em [FASE1.md](FASE1.md)
+e estado final em [FASE1-HANDOFF.md](FASE1-HANDOFF.md). Portar `capture.py` + `tray.py` para C#. É a
 metade menor (~900 linhas), tem critério de aceite objetivo (gravar em paralelo
 com o gravador Python e comparar deriva e faixas amostra a amostra) e entrega
 valor sozinha: 186 MB → ~15 MB, sem `python312.dll`. Serve de aprendizado da
 stack antes do porte grande.
 
-**Fase 2 — o motor de transcrição, como processo separado.** Embutir
+**Fase 2 — o motor de transcrição, como processo separado.** ✅ **Concluída**,
+carta em [FASE2.md](FASE2.md) e estado final em
+[FASE2-HANDOFF.md](FASE2-HANDOFF.md) — mas por **pipe, e com os motores Python**,
+não por HTTP com o `whisper-server.exe` (decisão 5, abaixo). Embutir
 `whisper-server.exe` como sidecar e falar HTTP com ele, em vez de escrever
 binding. Diarização por `sherpa-onnx` ou `pyannote-rs` vendorizado. Atrás da
 mesma interface de hoje (`BaseTranscriber`), produzindo o mesmo
 `TranscriptionResult`. Validável por `curl`, antes de existir UI.
-
-**Fase 3 — a UI em WebView2.** Reescrever a interface com o AA Design System, aí
-sim com os componentes React disponíveis. Maior esforço, menor risco técnico.
 
 **Fase 2.5 — um app só.** ✅ **Concluída em 13/08/2026.** Juntou o gravador e o
 app de transcrição num executável, com bandeja e janela no mesmo processo. **Não
@@ -713,27 +755,99 @@ Carta em [FASE2.5.md](FASE2.5.md), estado final em
 > migração das duas configurações, que era a metade que arriscava o usuário
 > reconfigurar coisas.
 
+**Fase 3 — a reunião depois da reunião.** ✅ **Concluída em 14/08/2026.** Notas escritas durante a gravação,
+transcrição que sobrevive à navegação (com a bolinha no trilho dizendo que ela
+está rodando) e a **ata por LLM**, com modelo local e um tipo de ata por tipo de
+reunião. Carta em [FASE3.md](FASE3.md), estado final em
+[FASE3-HANDOFF.md](FASE3-HANDOFF.md), arquitetura do motor de ata em
+[ATA.md](ATA.md). **Não era esta a Fase 3**: a reordenação está logo abaixo.
+
+> Ela deixa para a Fase 4 os **3,5 GB do motor de ata** (llama.cpp + GGUF) e uma
+> armadilha medida: o build de CUDA tem que casar com o driver — o 13.3 falha na
+> máquina do usuário e o 12.4 funciona.
+
 **Fase 4 — instalador.** Inno Setup, download dos modelos na primeira execução,
 migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
 código se e quando sair da própria máquina.
 
-**O Docker sobrevive até a fase 2 provar seu valor em reunião real.** Ele é hoje
-o caminho de GPU mais confiável que existe no projeto, e aposentá-lo cedo tira
-a rede de segurança.
+**Fase 5 — acabamento visual.** O que era a Fase 3: o redesign da interface com
+o AA Design System (§3), sobre uma interface cujo conjunto de telas já parou de
+crescer.
+
+**Fase 6 — revisões.** Carta em [FASE6.md](FASE6.md). Decisão do dono do produto
+em 14/08/2026: **lançar primeiro, melhorar depois.** Tudo o que as fases
+anteriores marcaram como "revisitar" foi para lá, e cada item tem um **gatilho**
+— o que precisa acontecer para valer a pena fazê-lo. Uma fase de revisões sem
+gatilhos vira lista de desejos, e lista de desejos se executa pela ordem de quem
+gosta mais, não pela ordem do que dói.
+
+**Fase 6 — a qualidade do que sai.** Acrescentada em 14/08/2026, depois de
+comparar a transcrição do app com a do Notion na mesma reunião. Carta em
+[FASE6.md](FASE6.md). O vocabulário do projeto, passado como `hotwords`, colapsa
+a segmentação do ASR em 3,8× — e é isso que quebra a atribuição de falantes e
+contamina os vetores de voz, além de custar fala e 4,6× no tempo de
+decodificação. A fase resolve o trade-off com medição, fecha o gate do VAD 0,15
+que está aberto desde a Fase 1, e conserta o aprendizado de voz.
+
+> Vem **depois da Fase 5** por decisão do dono do produto: nada nela bloqueia a
+> ata, o instalador ou o acabamento, e tudo nela melhora o que o app já entrega.
+> Mas ela nasce de **uma** reunião, e por isso a §10 da carta abre uma tarefa
+> que **começa agora e roda em paralelo às fases 3 a 5**: transcrever as
+> reuniões em paralelo por outras fontes — Notion, Teams/Meet, o próprio app sem
+> `hotwords` — e guardar as saídas junto da gravação. Sem esse corpus a fase
+> calibra um default com *n* = 1, que é o erro do resultado 3-C repetido.
+
+### A reordenação de 13/08/2026
+
+Decisão do dono do produto, no dia seguinte ao fechamento da Fase 2.5:
+**features → instalador → cosmética**, em vez de features → cosmética →
+instalador.
+
+O que mudou de lugar foi o **redesign**, que era a Fase 3 e virou a 5. Ele era
+pré-requisito enquanto o Gradio existia — a nota da §3 dizia isso com todas as
+letras: "empacotar como app nativo tira o Gradio de cena de qualquer forma, a
+fase 3 deixa de ser opcional e vira pré-requisito". A Fase 2.5 aposentou o
+Gradio e escreveu a interface própria em WebView2, e com isso o redesign **já
+foi pago naquilo que era estrutural**. O que sobrou dele é aparência, e
+aparência se ajusta por último, quando não há mais tela nova para desenhar — a
+Fase 3 nova acrescenta o destino "Atas" e mexe no Gravador e na revisão.
+
+O instalador vem antes da cosmética porque é o que separa "o app que roda na
+minha máquina" de "o app que se instala", e porque a Fase 3 nova traz um modelo
+GGUF novo para baixar — o instalador quer conhecer esse caso.
+
+**Manter o que funciona.** A régua da reordenação, dita pelo dono do produto: as
+fases 3 e 4 não reabrem o que a 2.5 entregou funcionando. O que está na lista de
+"não se reabre" do CLAUDE.md continua fora de discussão, e agora acompanhado da
+interface que a 2.5 escreveu — ela muda por *necessidade* das telas novas, não
+por gosto, até a Fase 5.
+
+**O Docker sobrevive até a fase 2 provar seu valor em reunião real.** ✅
+Resolvido: a fase 2 provou, e o Docker saiu em 13/08/2026 junto com o Gradio.
 
 ### Decisões pendentes
 
-1. **Turbo ou large-v3?** O turbo é 4–8× mais rápido e cabe folgado em 6 GB, mas
-   é mais fraco em multilíngue. Só a fase 0 responde, em português e com áudio
-   real de reunião.
-2. **Vulkan entra?** +37 MB no instalador para funcionar em máquina sem NVIDIA.
-   Se o alvo é só a sua máquina, não paga; se o app for distribuído, paga.
-3. **ffmpeg embutido ou opcional?** Só serve para importar vídeo. Um segundo
-   instalador "com suporte a vídeo" evita 80 MB no caso comum.
-4. **O histórico migra?** `history/`, `projects.json` e `voices.json` são JSON e
-   portáveis — exceto os embeddings (risco 4). Migrar tudo menos as vozes, ou
-   começar limpo?
-5. **Sidecar ou biblioteca?** O `whisper-server.exe` custa um processo filho e
-   um contrato HTTP; a biblioteca embutida custa binding e acopla o motor ao
-   ciclo de vida do app. A fase 0 já usa os binários — se o desempenho e a
-   ergonomia agradarem ali, a resposta se dá sozinha.
+1. ~~**Turbo ou large-v3?**~~ ✅ **large-v3.** A Fase 0 mediu: o turbo é
+   genuinamente pior em português — 4,3 pontos de WER, intervalo de confiança
+   inteiramente do lado ruim ([FASE0-RESULTADOS.md](FASE0-RESULTADOS.md) §"Em
+   áudio bem formado, o large-v3 empata — e o turbo não"). Fica como opção
+   explícita de "rápido e um pouco pior".
+2. **Vulkan entra?** Pendente, e agora vale para dois motores: +37 MB para o ASR
+   rodar em máquina sem NVIDIA, e a mesma pergunta de novo para o motor de ata
+   da Fase 3. Se o alvo é só a sua máquina, não paga; se o app for distribuído,
+   paga. **A Fase 4 é onde isto se decide.**
+3. **ffmpeg embutido ou opcional?** Pendente, e é decisão da Fase 4. Só serve
+   para importar vídeo; um segundo instalador "com suporte a vídeo" evita 80 MB
+   no caso comum.
+4. ~~**O histórico migra?**~~ ✅ Migrou o que era portável. A Fase 2.5 migrou as
+   duas configurações (`settings.json` do gravador e `app.json` do app) sem o
+   usuário reconfigurar nada; as vozes seguem a regra do risco 4 — perfil de voz
+   se reinscreve, não se converte.
+5. ~~**Sidecar ou biblioteca?**~~ ✅ **Sidecar, e por pipe, não por HTTP.** Os
+   motores são processos Python que falam JSON por stdin/stdout
+   ([SIDECAR.md](SIDECAR.md)). Sem porta, sem diálogo do Firewall, morte do
+   processo detectável na hora. O motor de ata da Fase 3 nasce com o mesmo
+   contrato.
+6. ~~**A ata roda local ou remota?**~~ ✅ **Local**, decidido em 13/08/2026:
+   GGUF por sidecar, nada de transcrição de cliente saindo da máquina. O custo
+   aceito é ata pior que a de um modelo de fronteira ([FASE3.md](FASE3.md) §4).

@@ -65,6 +65,14 @@ Os motores (`motores/python`, ~4,3 GB de Python embarcado) são montados à part
 por `tools/empacotar_motores.sh` e ficam ao lado do executável. **Ainda não há
 instalador** — é a Fase 4.
 
+## O que vem a seguir
+
+| fase | o quê |
+|---|---|
+| **3** (corrente) | notas de reunião, transcrição que sobrevive à navegação, e a **ata por LLM** local — [docs/FASE3.md](docs/FASE3.md) |
+| **4** | o instalador (Inno Setup), com os modelos baixados na primeira execução |
+| **5** | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
+
 ## HuggingFace
 
 A diarização e a impressão vocal usam modelos pyannote com termos de uso. Quem

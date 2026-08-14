@@ -140,6 +140,26 @@ public sealed class MetaMeeting
     [JsonPropertyName("client")] public string? Client { get; init; }
     [JsonPropertyName("project")] public string? Project { get; init; }
     [JsonPropertyName("attendees")] public List<string> Attendees { get; init; } = [];
+
+    /// <summary>
+    /// Os e-mails dos convidados, na mesma ordem de <see cref="Attendees"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Chave nova (14/08/2026), acrescentada pela mesma regra do
+    /// <c>dropped_samples</c>: quem lê ignora o que não conhece, então
+    /// acrescentar é seguro — o que não se pode é remover ou renomear.
+    /// </para>
+    /// <para>
+    /// Existe por causa da ata: o domínio do e-mail é o que diz quem é da casa e
+    /// quem é do cliente, e sem ele o modelo deduz pelo assunto da conversa e
+    /// erra — atribuiu uma ação a "Andre Monlevade (Vivo)", que é da equipe. Ver
+    /// <c>Nucleo/Atas/Organizacoes.cs</c>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("attendee_emails")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? AttendeeEmails { get; init; }
     [JsonPropertyName("calendar_event_id")] public string? CalendarEventId { get; init; }
 
     /// <summary>

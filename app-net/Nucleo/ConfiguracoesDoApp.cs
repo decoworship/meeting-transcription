@@ -27,6 +27,18 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("pasta_de_exportacao")] public string? PastaDeExportacao { get; set; }
 
     /// <summary>
+    /// Onde as atas exportadas vão parar.
+    /// </summary>
+    /// <remarks>
+    /// Separada da pasta de transcrições porque os dois arquivos têm destino e
+    /// finalidade diferentes: a transcrição é material de trabalho, que se
+    /// consulta e se corrige; a ata é o que se manda para fora — para o cliente,
+    /// para o time, para a pasta do projeto. Misturá-las obrigaria a escolher a
+    /// pasta na hora de exportar, toda vez.
+    /// </remarks>
+    [JsonPropertyName("pasta_de_atas")] public string? PastaDeAtas { get; set; }
+
+    /// <summary>
     /// Mostrar o botão de transcrever de novo numa reunião já transcrita.
     /// </summary>
     /// <remarks>
@@ -42,6 +54,52 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("modelo_padrao")] public string ModeloPadrao { get; set; } = "large-v3";
 
     [JsonPropertyName("diarizacao_padrao")] public string DiarizacaoPadrao { get; set; } = "community-1";
+
+    /// <summary>
+    /// Corrigir a grafia dos termos do projeto no texto transcrito.
+    /// </summary>
+    /// <remarks>
+    /// Ligada por padrão, ao contrário do filtro de silêncio: ela <b>troca</b>
+    /// palavra por palavra do vocabulário que o usuário mesmo escreveu, e cada
+    /// troca fica marcada na revisão e é reversível num clique. O erro que ela
+    /// corrige — "Dimi" virando "Jimmy" — aparece em toda reunião; o erro que
+    /// ela pode cometer aparece marcado.
+    /// </remarks>
+    [JsonPropertyName("correcao_fonetica")] public bool CorrecaoFonetica { get; set; } = true;
+
+    /// <summary>
+    /// Descartar os trechos que o ASR inventou sobre silêncio digital.
+    /// </summary>
+    /// <remarks>
+    /// Desligado por padrão: o filtro remove texto, e remover texto por engano
+    /// é o erro caro dos dois. Quem liga está trocando ~5% de invenção
+    /// (FASE0 6-A) pelo risco de perder uma fala baixa mal gravada. Ver
+    /// <see cref="FiltroDeSilencio"/>.
+    /// </remarks>
+    [JsonPropertyName("filtrar_silencio")] public bool FiltrarSilencio { get; set; }
+
+    /// <summary>O GGUF que escreve as atas, dentro de motores/ata/modelos.</summary>
+    /// <remarks>
+    /// Nome de arquivo, e não caminho: o motor sabe onde a pasta fica, e guardar
+    /// caminho absoluto quebraria no dia em que o app mudasse de lugar.
+    /// </remarks>
+    [JsonPropertyName("modelo_de_ata")] public string ModeloDeAta { get; set; }
+        = "qwen3-4b-instruct-q4km.gguf";
+
+    /// <summary>
+    /// Os domínios de e-mail da nossa organização.
+    /// </summary>
+    /// <remarks>
+    /// Só os nossos: quem não é da casa é cliente, e essa regra não precisa de
+    /// manutenção quando aparece um cliente novo. É o que permite a ata separar
+    /// as pendências por lado sem o modelo deduzir organização pelo assunto da
+    /// conversa — dedução que já pôs alguém da equipe como sendo do cliente.
+    /// </remarks>
+    [JsonPropertyName("dominios_da_casa")] public List<string> DominiosDaCasa { get; set; } = [];
+
+    /// <summary>O tipo de ata sugerido quando o projeto não tem preferência.</summary>
+    [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
+        = "cliente-update";
 
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

@@ -24,6 +24,30 @@ string script = arg.GetValueOrDefault("script") ?? "motores/diarizacao/motor.py"
 string? audio = arg.GetValueOrDefault("audio");
 double? cancelarEm = double.TryParse(arg.GetValueOrDefault("cancelar-em"), out double s) ? s : null;
 
+// A ata é o terceiro modo, e existe pelo mesmo motivo dos outros dois: provar o
+// caminho antes de existir tela. Ver Cli/GeradorDeAta.cs.
+if (arg.GetValueOrDefault("ata") is { Length: > 0 } pastaDaAta)
+{
+    using var ataCts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; ataCts.Cancel(); };
+    try
+    {
+        return await GeradorDeAta.ExecutarAsync(
+            pastaDaAta, arg.GetValueOrDefault("tipo") ?? "cliente-update",
+            arg.GetValueOrDefault("modelo"), ataCts.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        Console.Error.WriteLine("cancelado; o motor foi morto e a placa liberada.");
+        return 4;
+    }
+    catch (Exception e)
+    {
+        Console.Error.WriteLine($"a ata falhou: {e.Message}");
+        return 5;
+    }
+}
+
 // O pipeline inteiro é outro modo desta mesma ferramenta: as duas coisas que
 // ela faz são "exercitar um motor" e "provar o caminho completo".
 if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)

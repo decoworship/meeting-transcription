@@ -47,6 +47,26 @@ public sealed class PacoteDeModelo
 
     /// <summary>O que sabemos de custo, medido aqui. Vazio quando não medimos.</summary>
     [JsonPropertyName("nota")] public string? Nota { get; init; }
+
+    /// <summary>
+    /// O arquivo único a baixar, nos pacotes que não são repositório inteiro.
+    /// </summary>
+    /// <remarks>
+    /// Os GGUF de ata moram em repositórios com uma dezena de quantizações, e
+    /// baixar tudo traria 20 GB para usar 2,5. Preenchido só na família "ata";
+    /// nulo nos outros, que continuam vindo por <c>snapshot_download</c>.
+    /// </remarks>
+    [JsonPropertyName("arquivo")] public string? Arquivo { get; init; }
+
+    /// <summary>
+    /// Onde o arquivo fica, quando não é no cache do HuggingFace.
+    /// </summary>
+    /// <remarks>
+    /// O llama.cpp abre o <c>.gguf</c> por caminho, e não pela biblioteca do
+    /// HF — então o modelo de ata mora ao lado do <c>llama-server</c>, em
+    /// <c>motores/ata/modelos</c>, e não no cache.
+    /// </remarks>
+    [JsonPropertyName("nome_local")] public string? NomeLocal { get; init; }
 }
 
 /// <summary>Um pacote com o estado dele nesta máquina.</summary>
@@ -147,6 +167,32 @@ public static class Catalogo
         },
         new PacoteDeModelo
         {
+            Id = "qwen3-4b-instruct",
+            Nome = "Qwen3 4B Instruct",
+            Familia = "ata",
+            Descricao = "Escreve as atas. É o que o app usa por padrão.",
+            Repositorio = "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+            Arquivo = "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+            NomeLocal = "qwen3-4b-instruct-q4km.gguf",
+            TamanhoEsperadoBytes = 2_497_281_120,
+            TamanhoMedido = true,
+            Nota = "Ata de reunião de 30 min em ~1 min; de 2 h em ~4 min, na RTX 2060.",
+        },
+        new PacoteDeModelo
+        {
+            Id = "qwen3-1.7b-instruct",
+            Nome = "Qwen3 1.7B Instruct",
+            Familia = "ata",
+            Descricao = "Menor e mais rápido, para placa apertada. Ata mais pobre.",
+            Repositorio = "unsloth/Qwen3-1.7B-GGUF",
+            Arquivo = "Qwen3-1.7B-Q4_K_M.gguf",
+            NomeLocal = "qwen3-1.7b-q4km.gguf",
+            TamanhoEsperadoBytes = 1_100_000_000,
+            TamanhoMedido = false,
+            Nota = "Ainda não medido aqui — o 4B é o que passou no critério de qualidade.",
+        },
+        new PacoteDeModelo
+        {
             Id = "community-1",
             Nome = "Community 1",
             Familia = "diarizacao",
@@ -195,7 +241,19 @@ public static class Catalogo
     /// com um hífen em cada junta.
     /// </remarks>
     public static string PastaDoPacote(PacoteDeModelo pacote) =>
-        Path.Combine(PastaDoCache(), "models--" + pacote.Repositorio.Replace("/", "--"));
+        pacote.Familia == "ata"
+            ? PastaDosModelosDeAta()
+            : Path.Combine(PastaDoCache(), "models--" + pacote.Repositorio.Replace("/", "--"));
+
+    /// <summary>Ao lado do llama-server, que é quem abre o arquivo.</summary>
+    public static string PastaDosModelosDeAta() =>
+        Environment.GetEnvironmentVariable("MEETINGAPP_MOTOR_ATA") is { Length: > 0 } fora
+            ? Path.Combine(fora, "modelos")
+            : Path.Combine(AppContext.BaseDirectory, "motores", "ata", "modelos");
+
+    /// <summary>O caminho final do arquivo de um pacote de ata.</summary>
+    public static string ArquivoDoPacote(PacoteDeModelo pacote) =>
+        Path.Combine(PastaDosModelosDeAta(), pacote.NomeLocal ?? pacote.Arquivo ?? pacote.Id);
 
     /// <summary>Os pacotes com o estado de cada um nesta máquina.</summary>
     /// <param name="config">Para marcar quais estão em uso hoje.</param>
@@ -204,7 +262,12 @@ public static class Catalogo
         var lista = new List<PacoteComEstado>();
         foreach (var pacote in Pacotes)
         {
-            long bytes = TamanhoEmDisco(PastaDoPacote(pacote));
+            // Na família "ata" o pacote é um arquivo, e não uma pasta de cache:
+            // medir a pasta contaria os outros modelos de ata junto.
+            long bytes = pacote.Familia == "ata"
+                ? (File.Exists(ArquivoDoPacote(pacote))
+                    ? new FileInfo(ArquivoDoPacote(pacote)).Length : 0)
+                : TamanhoEmDisco(PastaDoPacote(pacote));
 
             // A margem de 5% existe porque o tamanho publicado não é o tamanho
             // em disco: o cache guarda blobs mais links, e o sistema de arquivos
@@ -218,9 +281,12 @@ public static class Catalogo
                 Pacote = pacote,
                 Estado = estado,
                 BytesEmDisco = bytes,
-                EmUso = pacote.Familia == "asr"
-                    ? pacote.Id == config.ModeloPadrao
-                    : pacote.Id == config.DiarizacaoPadrao,
+                EmUso = pacote.Familia switch
+                {
+                    "asr" => pacote.Id == config.ModeloPadrao,
+                    "ata" => pacote.NomeLocal == config.ModeloDeAta,
+                    _ => pacote.Id == config.DiarizacaoPadrao,
+                },
             });
         }
         return lista;

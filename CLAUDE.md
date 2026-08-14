@@ -10,9 +10,21 @@ janela ao mesmo tempo: C#/.NET 8 com a interface em WebView2, e os modelos
 rodando em sidecars Python.
 
 O projeto é **doc-driven**. Antes de mexer em qualquer coisa não trivial, leia
-`docs/` — as cartas de fase (`FASE1.md`, `FASE2.md`, `FASE2.5.md`) dizem o que
-se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e por quê. Muito
-comentário no código aponta para eles.
+`docs/` — as cartas de fase (`FASE1.md`, `FASE2.md`, `FASE2.5.md`, `FASE3.md`)
+dizem o que se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e
+por quê. Muito comentário no código aponta para eles.
+
+**A fase corrente é a 3** ([docs/FASE3.md](docs/FASE3.md)): notas de reunião,
+transcrição que sobrevive à navegação, e a ata por LLM local — cuja arquitetura
+está em [docs/ATA.md](docs/ATA.md). Depois vêm o
+instalador (Fase 4), o acabamento visual (Fase 5, que era a antiga
+Fase 3 — ver a reordenação em `docs/PLANO.md`) e a qualidade da transcrição
+(Fase 6, [docs/FASE6.md](docs/FASE6.md)).
+
+**Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
+outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas
+junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia em
+**uma** reunião; sem corpus ela calibraria um default com *n* = 1.
 
 ## Comandos
 
@@ -22,6 +34,7 @@ export PATH="$HOME/.dotnet:$PATH"
 dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 181 testes
 tools/publicar.sh --so-build                            # publica em dist/publicar
 tools/publicar.sh --destino /mnt/c/Users/andre/MeetingApp
+tools/empacotar_motor_de_ata.sh                         # os 3,5 GB do motor de ata
 
 # a interface do disco, para desenhar sem recompilar
 MeetingApp.exe --web C:\caminho\para\app-net\App\web
@@ -41,6 +54,7 @@ antes de copiar.
 app-net/
   App/          a janela (WebView2), a ponte, e a bandeja em App/Bandeja/
   Nucleo/       o pipeline de transcrição, projetos, vozes, exportação
+  Nucleo/Atas/  as skills, o motor de ata (llama.cpp), o verificador e o redator
   Sidecar/      o protocolo com os motores Python
   Gravacao/     o núcleo do gravador: deriva, WAV, contabilidade de pacotes
   Captura/      WASAPI (Windows-only)
