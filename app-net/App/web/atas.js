@@ -128,24 +128,45 @@ function cartaoDeAta(g, tipos, ctx) {
   return raiz;
 }
 
-async function mostrarAtaExistente(g, corpo, botao) {
+async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
   try {
     const r = await pedir("ata", { gravacao: g.caminho });
     if (!r.ata) return;
     botao.textContent = "Refazer ata";
     botao.className = "aa-btn aa-btn-secundario";
-    desenharAta(corpo, r.ata, r.ata_velha, g);
+    desenharAta(corpo, r.ata, r.ata_velha, abrir);
   } catch {
     // Sem ata é o estado normal de quem nunca gerou.
   }
 }
 
-/** A ata em si, com o aviso de desatualizada e o botão de copiar. */
-function desenharAta(corpo, markdown, velha, g) {
+/**
+ * A ata em si, dobrada.
+ *
+ * <b>Fechada por padrão.</b> A primeira versão abria todas, com o argumento de
+ * que quem entra aqui quer ler — e com onze reuniões transcritas a tela virou
+ * uma rolagem sem fim, em que chegar à ata seguinte custava minutos de scroll.
+ * Ler uma ata é ler <em>uma</em>; a lista serve para achá-la.
+ */
+function desenharAta(corpo, markdown, velha, abrir = false) {
   corpo.replaceChildren();
 
+  const dobra = document.createElement("details");
+  dobra.className = "ata__dobra";
+  dobra.open = abrir;
+
+  const resumo = document.createElement("summary");
+  resumo.className = "ata__resumo";
+  // Duas informações que ajudam a decidir se vale abrir, sem abrir.
+  const linhas = markdown.split("\n").filter((l) => l.trim().length > 0).length;
+  const pendencias = (markdown.match(/^- \[ \]/gm) ?? []).length;
+  resumo.textContent = pendencias > 0
+    ? `Ver a ata — ${pendencias} pendência${pendencias > 1 ? "s" : ""}, ${linhas} linhas`
+    : `Ver a ata — ${linhas} linhas`;
+  dobra.appendChild(resumo);
+
   if (velha) {
-    corpo.appendChild(alerta(
+    dobra.appendChild(alerta(
       "A transcrição foi corrigida depois que esta ata foi escrita. "
       + "Vale refazer.", "aviso"));
   }
@@ -170,7 +191,8 @@ function desenharAta(corpo, markdown, velha, g) {
   texto.className = "ata__texto";
   texto.append(...renderizar(markdown));
 
-  corpo.append(acoes, texto);
+  dobra.append(acoes, texto);
+  corpo.appendChild(dobra);
 }
 
 /**
@@ -303,6 +325,6 @@ function acompanhar(g, botao, painel, corpo) {
     }
     if (fim.erro) { painel.replaceChildren(alerta(fim.erro, "erro")); return; }
 
-    mostrarAtaExistente(g, corpo, botao);
+    mostrarAtaExistente(g, corpo, botao, true);
   });
 }

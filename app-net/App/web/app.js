@@ -396,6 +396,43 @@ async function telaDePreparo(g) {
     }
   }
 
+  /**
+   * Guarda o vocabulário no projeto, que é de quem ele é.
+   *
+   * O vocabulário é preferência de cliente/projeto, não desta reunião: os nomes
+   * e siglas de um projeto valem para todas as reuniões dele. Até 14/08 só era
+   * gravado ao clicar em Transcrever — quem digitava um termo e saía da tela
+   * perdia o que escreveu, e a tela seguinte já mostrava o vocabulário velho.
+   */
+  async function guardarVocabulario() {
+    const cliente = campoCliente.value.trim();
+    const projeto = campoProjeto.value.trim();
+    // Sem projeto não há onde guardar: o vocabulário mora no par, e inventar um
+    // projeto "sem nome" só para ter onde salvar criaria lixo no cadastro.
+    if (!cliente || !projeto) return;
+
+    const caixaVocab = document.getElementById("vocabulario");
+    if (!caixaVocab) return;
+
+    try {
+      await pedir("salvar-projeto", {
+        cliente, projeto,
+        prefs: {
+          language: document.getElementById("idioma").value.trim(),
+          model_size: document.getElementById("modelo").value,
+          engine: "faster-whisper",
+          diarization: document.getElementById("diarizacao").value === "sim",
+          diar_model: "community-1",
+          condition_on_previous_text: false,
+          initial_prompt: caixaVocab.value.trim(),
+        },
+      });
+    } catch {
+      // O vocabulário é gravado de novo ao transcrever; falhar aqui não pode
+      // interromper quem está preparando a reunião.
+    }
+  }
+
   campoCliente.addEventListener("change", () => {
     atualizarProjetos(); carregarPreferencias(); guardarVinculo();
   });
@@ -406,6 +443,12 @@ async function telaDePreparo(g) {
   // valor não custa nada — são dois campos num JSON pequeno.
   campoCliente.addEventListener("blur", guardarVinculo);
   campoProjeto.addEventListener("blur", guardarVinculo);
+
+  // As preferências do motor e o vocabulário seguem o mesmo caminho do vínculo:
+  // gravam ao sair do campo, e não só ao transcrever.
+  caixa.querySelector("textarea").addEventListener("blur", guardarVocabulario);
+  for (const id of ["modelo", "idioma", "diarizacao"])
+    document.getElementById(id).addEventListener("change", guardarVocabulario);
 
   botao.addEventListener("click", () => transcrever(g, botao, painel));
 

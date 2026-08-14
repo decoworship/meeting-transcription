@@ -73,6 +73,41 @@ def _bytes_em(pasta: str) -> int:
     return total
 
 
+def _baixar_arquivo(repositorio: str, arquivo: str, destino: str, id_req: int,
+                    tamanho_esperado: int | None) -> None:
+    """Um arquivo só, e não o repositório inteiro.
+
+    Os GGUF de ata moram em repositórios com uma dezena de quantizações; baixar
+    o repositório inteiro traria 20 GB para usar 2,5. E eles não vão para o
+    cache do HuggingFace: o motor de ata lê de ``motores/ata/modelos``, ao lado
+    do llama-server, porque quem abre o arquivo é o llama.cpp e não a
+    biblioteca do HF.
+    """
+    import os
+    from huggingface_hub import hf_hub_download
+
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    _enviar(id=id_req, tipo="progresso", pct=0.0,
+            texto=f"baixando {arquivo}")
+
+    baixado = hf_hub_download(
+        repo_id=repositorio, filename=arquivo,
+        local_dir=os.path.dirname(destino), token=os.environ.get("HF_TOKEN"),
+    )
+
+    # O nome no repositório e o nome que o app espera são diferentes: o app usa
+    # um nome curto e estável, para a configuração não carregar a quantização.
+    if os.path.abspath(baixado) != os.path.abspath(destino):
+        os.replace(baixado, destino)
+
+    tamanho = os.path.getsize(destino)
+    if tamanho_esperado and tamanho < tamanho_esperado * 0.95:
+        raise ValueError(
+            f"o arquivo veio com {tamanho // 1_000_000} MB e devia ter "
+            f"~{tamanho_esperado // 1_000_000} MB — download interrompido")
+    _log(f"baixado {destino} ({tamanho} bytes)")
+
+
 def _baixar(repositorio: str, id_req: int, pasta: str | None,
             esperado: int | None) -> dict:
     """Baixa um repositório inteiro para o cache, relatando andamento.
@@ -148,8 +183,12 @@ def main() -> None:
                 repositorio = req.get("repositorio")
                 if not repositorio:
                     raise ValueError("faltou o repositorio")
-                _baixar(repositorio, id_req, req.get("pasta"),
-                        req.get("tamanho_esperado"))
+                if req.get("arquivo"):
+                    _baixar_arquivo(repositorio, req["arquivo"], req["pasta"],
+                                    id_req, req.get("tamanho_esperado"))
+                else:
+                    _baixar(repositorio, id_req, req.get("pasta"),
+                            req.get("tamanho_esperado"))
                 _enviar(id=id_req, tipo="resultado")
             else:
                 _enviar(id=id_req, tipo="erro", mensagem=f"operacao desconhecida: {op}")

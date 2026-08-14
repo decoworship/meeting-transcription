@@ -371,6 +371,10 @@ function abaModelos(catalogo, config, gravar) {
      "modelo_padrao", "large-v3"],
     ["diarizacao", "Diarização", "Qual modelo separa quem falou.",
      "diarizacao_padrao", "community-1"],
+    // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
+    // quem abre o .gguf é o llama.cpp, por caminho.
+    ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
+     "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf"],
   ]) {
     const b = bloco(titulo, texto);
     const itens = catalogo.filter((i) => i.pacote.familia === familia);
@@ -380,7 +384,9 @@ function abaModelos(catalogo, config, gravar) {
     const sel = escolha.querySelector("select");
     // O valor visível é o nome bonito; o que vai para a configuração é o id que
     // o motor entende. Sem esta separação a tela dita o vocabulário do motor.
-    itens.forEach((i, n) => { sel.options[n].value = i.pacote.id; });
+    itens.forEach((i, n) => {
+      sel.options[n].value = i.pacote.nome_local ?? i.pacote.id;
+    });
     sel.value = config[chaveConfig] ?? padrao;
     sel.addEventListener("change", async (e) => {
       await gravar({ [chaveConfig]: e.target.value });
@@ -394,9 +400,10 @@ function abaModelos(catalogo, config, gravar) {
 
   const nota = document.createElement("p");
   nota.className = "campo__dica";
-  nota.textContent = "O modelo escolhido também é baixado sozinho na primeira "
-    + "transcrição que precisar dele. Baixar por aqui só evita a espera na hora "
-    + "errada.";
+  nota.textContent = "Os modelos de transcrição e diarização também são baixados "
+    + "sozinhos na primeira vez que fizerem falta; baixar por aqui só evita a "
+    + "espera na hora errada. O de ata não: sem ele baixado, gerar ata falha na "
+    + "hora — são 2,5 GB, e baixá-los no meio de um clique seria pior.";
   painel.appendChild(nota);
 
   return painel;
@@ -461,9 +468,23 @@ function abaTranscricao(config, gravar) {
   casa.append(entrada, dica);
   painel.appendChild(casa);
 
-  painel.appendChild(obra(
-    "O filtro de silêncio ainda não tem chave aqui.",
-    "Ele existe no núcleo e só liga por linha de comando."));
+  const silencio = bloco("Descartar fala inventada sobre silêncio");
+  silencio.classList.add("bloco--chave");
+  const porQue = document.createElement("p");
+  porQue.className = "bloco__texto";
+  // O número está na tela porque é ele que justifica a chave existir.
+  porQue.textContent = "Cerca de 5% das palavras que o modelo transcreve caem "
+    + "sobre trechos em que não há sinal nenhum — zeros exatos, não fala baixa. "
+    + "Sobre ausência de som, qualquer palavra é invenção. Ligado, esses trechos "
+    + "são descartados antes de a transcrição existir.";
+  const cuidado = document.createElement("p");
+  cuidado.className = "campo__dica";
+  cuidado.textContent = "O critério é severo de propósito (99% de amostras "
+    + "zeradas, e dois terços do trecho): fala removida por engano é conteúdo "
+    + "que não volta, enquanto invenção some no meio da ata sem ninguém notar.";
+  silencio.append(porQue, chave(config.filtrar_silencio,
+    (v) => gravar({ filtrar_silencio: v })), cuidado);
+  painel.appendChild(silencio);
 
   return painel;
 }
@@ -524,10 +545,13 @@ function abaClientes(clientes, catalogo) {
   }
 
   painel.appendChild(b);
-  painel.appendChild(obra(
-    "Renomear e apagar por aqui ainda não existe.",
-    "Cliente e projeto novos continuam nascendo na tela de preparo, digitando "
-    + "um nome que ainda não existe."));
+  const comoNascem = document.createElement("p");
+  comoNascem.className = "campo__dica";
+  comoNascem.textContent = "Cliente e projeto novos nascem na tela de preparo: "
+    + "digite um nome que ainda não existe e ele passa a valer. Aqui se renomeia "
+    + "e se apaga o que já existe — renomear leva junto o vocabulário e as "
+    + "preferências do projeto.";
+  painel.appendChild(comoNascem);
 
   return painel;
 }

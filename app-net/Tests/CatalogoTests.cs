@@ -130,7 +130,37 @@ public sealed class CatalogoTests
         Assert.Equal(Catalogo.Pacotes.Count,
                      Catalogo.Pacotes.Select(p => p.Id).Distinct().Count());
 
+        // "ata" entrou na Fase 3. A lista é fechada de propósito: a tela agrupa
+        // por família, e uma família nova sem bloco na tela some sem avisar.
         Assert.All(Catalogo.Pacotes, p =>
-            Assert.Contains(p.Familia, new[] { "asr", "diarizacao" }));
+            Assert.Contains(p.Familia, new[] { "asr", "diarizacao", "ata" }));
+    }
+
+    [Fact]
+    public void PacoteDeAtaSabeQualArquivoBaixarEComoChamarEmDisco()
+    {
+        // Sem `arquivo`, o download traria o repositório inteiro — uma dezena de
+        // quantizações, 20 GB para usar 2,5. Sem `nome_local`, a configuração
+        // carregaria a quantização no nome e mudar de quantização quebraria o
+        // que já estava escolhido.
+        var atas = Catalogo.Pacotes.Where(p => p.Familia == "ata").ToList();
+
+        Assert.NotEmpty(atas);
+        Assert.All(atas, p =>
+        {
+            Assert.EndsWith(".gguf", p.Arquivo);
+            Assert.EndsWith(".gguf", p.NomeLocal);
+        });
+    }
+
+    [Fact]
+    public void OModeloDeAtaNaoMoraNoCacheDoHuggingFace()
+    {
+        // Quem abre o .gguf é o llama.cpp, por caminho, e não a biblioteca do
+        // HF: ele fica ao lado do llama-server.
+        var ata = Catalogo.Pacotes.First(p => p.Familia == "ata");
+
+        Assert.Contains("ata", Catalogo.ArquivoDoPacote(ata));
+        Assert.EndsWith(ata.NomeLocal!, Catalogo.ArquivoDoPacote(ata));
     }
 }

@@ -43,6 +43,17 @@ public sealed class ConfiguracoesDoApp
 
     [JsonPropertyName("diarizacao_padrao")] public string DiarizacaoPadrao { get; set; } = "community-1";
 
+    /// <summary>
+    /// Descartar os trechos que o ASR inventou sobre silêncio digital.
+    /// </summary>
+    /// <remarks>
+    /// Desligado por padrão: o filtro remove texto, e remover texto por engano
+    /// é o erro caro dos dois. Quem liga está trocando ~5% de invenção
+    /// (FASE0 6-A) pelo risco de perder uma fala baixa mal gravada. Ver
+    /// <see cref="FiltroDeSilencio"/>.
+    /// </remarks>
+    [JsonPropertyName("filtrar_silencio")] public bool FiltrarSilencio { get; set; }
+
     /// <summary>O GGUF que escreve as atas, dentro de motores/ata/modelos.</summary>
     /// <remarks>
     /// Nome de arquivo, e não caminho: o motor sabe onde a pasta fica, e guardar

@@ -919,6 +919,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             {
                 await _transcritor.ExecutarAsync(
                     pasta, p.Vocabulario, p.Idioma,
+                    // A chave existe em Ajustes › Transcrição desde 14/08; até
+                    // então o filtro só ligava por linha de comando, e a tela
+                    // dizia isso num recado que ninguém podia agir.
+                    filtrarSilencio: ConfiguracoesDoApp.Carregar().FiltrarSilencio,
                     modelo: p.Modelo, cliente: cliente, projeto: projeto,
                     diarizar: p.Diarizar ?? true,
                     progresso: e =>
@@ -1304,7 +1308,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             await motor.BaixarAsync(
                 pacote.Repositorio,
-                Catalogo.PastaDoPacote(pacote),
+                // Na família "ata" o destino é o arquivo, e não a pasta de
+                // cache: quem o abre é o llama.cpp, por caminho.
+                pacote.Familia == "ata"
+                    ? Catalogo.ArquivoDoPacote(pacote) : Catalogo.PastaDoPacote(pacote),
                 pacote.TamanhoEsperadoBytes,
                 (pct, texto) =>
                 Responder(new Resposta
@@ -1314,7 +1321,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Etapa = "baixando",
                     Fracao = pct,
                     Texto = texto,
-                }));
+                }),
+                arquivo: pacote.Arquivo);
         }
 
         // O catálogo relê o disco: a tela nunca acredita no que o download

@@ -182,9 +182,15 @@ public sealed class MotorSidecar : IDisposable
     /// "está aí?" é o <c>Catalogo</c>, lendo o cache. Ter o motor devolver o
     /// caminho criaria uma segunda fonte da mesma verdade.
     /// </remarks>
+    /// <param name="arquivo">
+    /// Um arquivo só do repositório, em vez do repositório inteiro. Os GGUF de
+    /// ata moram em repositórios com uma dezena de quantizações, e baixar tudo
+    /// traria 20 GB para usar 2,5.
+    /// </param>
     public async Task BaixarAsync(
         string repositorio, string pasta, long tamanhoEsperado,
-        Action<double, string>? progresso, CancellationToken ct = default)
+        Action<double, string>? progresso, CancellationToken ct = default,
+        string? arquivo = null)
     {
         await ExecutarAsync(
             new Requisicao
@@ -194,6 +200,7 @@ public sealed class MotorSidecar : IDisposable
                 Repositorio = repositorio,
                 Pasta = pasta,
                 TamanhoEsperado = tamanhoEsperado,
+                Arquivo = arquivo,
             },
             progresso, ct);
     }

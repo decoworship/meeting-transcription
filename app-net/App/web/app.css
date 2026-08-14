@@ -818,3 +818,23 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * gravando", do ícone da bandeja ao ponto da tela do Gravador. Usar a cor de
  * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
 .trilho__ponto--gravando { background: var(--cor-erro); }
+
+/* A ata dobrada. Fechada por padrão: com onze reuniões na tela, abrir todas
+ * transformava a página numa rolagem sem fim. */
+.ata__dobra { display: grid; gap: var(--espaco-2); }
+
+.ata__resumo {
+  cursor: pointer;
+  color: var(--cor-acao);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  list-style: none;
+  padding: var(--espaco-2) 0;
+}
+
+/* O triângulo padrão do <details> é do navegador e destoa do resto; a seta
+ * própria gira ao abrir. */
+.ata__resumo::-webkit-details-marker { display: none; }
+.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform .15s; }
+.ata__dobra[open] > .ata__resumo::before { transform: rotate(90deg); }
+.ata__resumo:focus-visible { outline: var(--anel-foco); }

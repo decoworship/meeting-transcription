@@ -500,8 +500,23 @@ def main() -> int:
               '# Ata — Teste\\n\\n## Decisões\\n\\n- **decidido** aqui\\n\\n'
               + '## Pendências\\n\\n- [ ] Mandar a base — **Dimi** — amanhã\\n')""")
             pagina.wait_for_selector(".ata__texto", timeout=5000)
+            # A ata recém-gerada abre sozinha: quem acabou de mandar escrever
+            # quer ver. As outras ficam dobradas — com onze reuniões na tela,
+            # abrir todas era uma rolagem sem fim.
+            conferir("a ata recém-gerada abre sozinha",
+                     pagina.locator(".ata__dobra[open]").count() == 1)
             conferir("a ata pronta aparece no cartão",
                      "decidido" in pagina.inner_text(".ata__texto"))
+            conferir("o resumo da dobra conta as pendências",
+                     "pendência" in pagina.inner_text(".ata__resumo"),
+                     pagina.inner_text(".ata__resumo"))
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click("#ir-atas")
+            pagina.wait_for_selector(".ata__dobra")
+            conferir("ao voltar, a ata vem fechada",
+                     pagina.locator(".ata__dobra[open]").count() == 0)
             # O "#" da ata vira h2 e o "##" vira h3 — um nível abaixo do que o
             # Markdown diz, porque a página já tem o h1 na barra do topo. Título
             # de documento dentro de documento quebraria a hierarquia para quem

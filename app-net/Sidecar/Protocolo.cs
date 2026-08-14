@@ -95,6 +95,11 @@ internal sealed class Requisicao
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
     [JsonPropertyName("tamanho_esperado")] public long? TamanhoEsperado { get; init; }
 
+    /// <summary>Um arquivo só do repositório, quando não se quer o todo.</summary>
+    [JsonPropertyName("arquivo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Arquivo { get; init; }
+
     /// <summary>
     /// Vocabulário do projeto, repassado ao ASR como <c>hotwords</c>.
     /// </summary>
