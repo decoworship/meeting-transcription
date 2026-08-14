@@ -341,6 +341,20 @@ As réguas, que param antes de gerar:
 | **zero ocorrências de `hf_token`** | o inverso da régua de hoje: agora a presença é o defeito |
 | nenhum `.gguf` no payload | 2,5 GB entrando por engano no instalador |
 
+**O primeiro artefato, medido em 14/08/2026:**
+
+| | |
+|---|---|
+| payload bruto | 5,4 GB |
+| instalador | **2,03 GB** |
+| tempo de compressão | 24,5 min (lzma2/max, sólido) |
+
+A razão de 2,7× vem de o payload ser dominado por DLLs de CUDA, que comprimem
+bem. Os 24 minutos são o preço de `lzma2/max`, e ele se paga: o instalador é
+entregue por link, e cada 100 MB pesam mais na paciência de quem baixa do que um
+build mais longo na de quem compila. É também por isso que o `--pular-build`
+existe — ajustar o `.iss` não deve custar uma republicação.
+
 O que sai junto do instalador, e é metade da entrega:
 
 - **`docs/INSTALAR.md`** — para quem vai receber, não para quem compila: o que a
