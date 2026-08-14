@@ -125,6 +125,22 @@ desde que o Meetily foi estudado. O desenho de referência já está registrado 
 [PLANO.md](PLANO.md) §5 ("O motor de resumo do Meetily é o modelo a seguir") e
 não se reabre aqui.
 
+> **A arquitetura do motor foi escrita em 14/08/2026: [ATA.md](ATA.md).** Ela
+> mediu o que esta carta só estimava, e duas coisas mudaram de figura:
+>
+> - **as skills não são grandes** — 2.400 tokens com a referência junto, 7% de um
+>   contexto de 32k. O que aperta é a transcrição, e só passando de ~1h45. O
+>   problema real do modelo pequeno não é caber, é **obedecer**;
+> - **sem keep-alive na v1**, ao contrário do que esta carta antecipou do
+>   Meetily: gera-se uma ata por reunião, com o usuário esperando, e manter
+>   2,6 GB de VRAM presos enquanto ele grava a próxima custa mais do que
+>   carregar o modelo de novo.
+>
+> A ATA.md também decide o que esta carta deixava em aberto: o app classifica o
+> tipo e o modelo só redige, a saída é constrangida por gramática, e um
+> verificador determinístico procura dono inventado e decisão inventada antes de
+> a ata virar arquivo.
+
 ### Decisão fechada: modelo local
 
 O motor roda **na máquina**, como sidecar, com modelo GGUF baixado pelo
