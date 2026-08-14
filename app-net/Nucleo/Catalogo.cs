@@ -24,7 +24,11 @@ public sealed class PacoteDeModelo
 
     [JsonPropertyName("nome")] public required string Nome { get; init; }
 
-    /// <summary>"asr" ou "diarizacao" — a aba agrupa por isto.</summary>
+    /// <summary>"asr" ou "ata" — a aba agrupa por isto.</summary>
+    /// <remarks>
+    /// Havia uma terceira, <c>"diarizacao"</c>, e ela saiu na Fase 4 junto com o
+    /// último pacote dela: a diarização deixou de ser um download.
+    /// </remarks>
     [JsonPropertyName("familia")] public required string Familia { get; init; }
 
     /// <summary>Uma linha, dita em português comum.</summary>
@@ -191,16 +195,18 @@ public static class Catalogo
             TamanhoMedido = false,
             Nota = "Ainda não medido aqui — o 4B é o que passou no critério de qualidade.",
         },
-        new PacoteDeModelo
-        {
-            Id = "community-1",
-            Nome = "Community 1",
-            Familia = "diarizacao",
-            Descricao = "Separa quem falou. É o que o app usa por padrão.",
-            Repositorio = "pyannote/speaker-diarization-community-1",
-            TamanhoEsperadoBytes = 32_821_829,
-            TamanhoMedido = true,
-        },
+        // ── A família "diarizacao" saiu do catálogo na Fase 4 ───────────────
+        //
+        // Não porque a diarização tenha mudado, mas porque ela **deixou de ser
+        // um download**: os 57 MB de pesos viajam dentro do instalador e o motor
+        // os carrega da pasta ao lado (docs/FASE4.md §4). O catálogo mede o
+        // cache do HuggingFace, que o pipeline não lê mais — um cartão aqui
+        // diria "ausente" sobre uma diarização que funciona, ou ofereceria
+        // "Remover" sobre arquivos do instalador.
+        //
+        // A tela de Modelos continua dizendo qual modelo separa os falantes; o
+        // que ela não faz mais é fingir que há o que escolher ou baixar.
+
         // O "Pyannote 3.1" saiu da lista na Fase 4, e o motivo não é de
         // empacotamento: **nada nunca o carregou.** O pipeline pede o
         // community-1 pelo nome (motores/diarizacao/motor.py), e a escolha de
@@ -288,13 +294,77 @@ public static class Catalogo
                 BytesEmDisco = bytes,
                 EmUso = pacote.Familia switch
                 {
-                    "asr" => pacote.Id == config.ModeloPadrao,
                     "ata" => pacote.NomeLocal == config.ModeloDeAta,
-                    _ => pacote.Id == config.DiarizacaoPadrao,
+                    // "asr" e o que vier depois: o id é o que o motor recebe.
+                    _ => pacote.Id == config.ModeloPadrao,
                 },
             });
         }
         return lista;
+    }
+
+    /// <summary>
+    /// O que impede este modelo de ser usado agora, ou <c>null</c> se nada impede.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Nasceu na Fase 4, com o instalador: até então o modelo estava sempre lá,
+    /// porque a máquina era a de quem o baixou à mão. Numa instalação nova ele
+    /// não está, e sem esta checagem a primeira transcrição morre lá dentro —
+    /// o <c>faster_whisper</c> tenta baixar 3 GB sem barra de progresso, ou
+    /// falha com uma mensagem de biblioteca que não diz o que fazer.
+    /// </para>
+    /// <para>
+    /// <b>Só reprova o que sabe estar ausente.</b> Um id fora do catálogo passa:
+    /// quem digitou um modelo que não conhecemos pode ter um cache montado à mão,
+    /// e barrar por desconhecimento seria transformar ignorância em veto.
+    /// </para>
+    /// </remarks>
+    public static string? OQueImpede(string? id)
+    {
+        if (id is not { Length: > 0 }) return null;
+
+        var pacote = Pacotes.FirstOrDefault(p => p.Id == id);
+        if (pacote is null) return null;
+
+        long bytes = TamanhoEmDisco(PastaDoPacote(pacote));
+        if (bytes == 0)
+            return $"o modelo {pacote.Nome} ainda não foi baixado. "
+                 + "Abra Ajustes → Modelos e baixe-o antes de transcrever.";
+
+        if (bytes < pacote.TamanhoEsperadoBytes * 0.95)
+            return $"o download do modelo {pacote.Nome} está pela metade "
+                 + $"({bytes / 1_000_000} MB de {pacote.TamanhoEsperadoBytes / 1_000_000} MB). "
+                 + "Abra Ajustes → Modelos e baixe-o de novo.";
+
+        return null;
+    }
+
+    /// <summary>
+    /// Espaço livre no disco de destino, em bytes. -1 quando não deu para ler.
+    /// </summary>
+    /// <remarks>
+    /// Perguntar antes de baixar 3 GB é o que evita o pior desfecho do
+    /// download: acabar o disco no meio, deixar um pacote parcial, e a próxima
+    /// transcrição falhar por um motivo que não tem nada a ver com o que se
+    /// estava fazendo.
+    /// </remarks>
+    public static long LivreNoDestino(PacoteDeModelo pacote)
+    {
+        try
+        {
+            string destino = pacote.Familia == "ata" ? PastaDosModelosDeAta() : PastaDoCache();
+            // A pasta pode ainda não existir numa instalação nova; o que importa
+            // é o volume, e ele existe.
+            string? raiz = Path.GetPathRoot(Path.GetFullPath(destino));
+            if (raiz is null or "") return -1;
+            return new DriveInfo(raiz).AvailableFreeSpace;
+        }
+        catch (Exception e) when (e is IOException or ArgumentException
+                                       or UnauthorizedAccessException)
+        {
+            return -1;
+        }
     }
 
     private static long TamanhoEmDisco(string pasta)

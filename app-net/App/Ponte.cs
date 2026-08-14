@@ -1370,6 +1370,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             throw new MotorException(
                 $"o motor de modelos não está em {motores.ScriptModelos}");
 
+        // Cabe no disco? A margem de 10% cobre o que o cache do HuggingFace
+        // gasta além do peso do modelo — blobs mais links, mais o arredondamento
+        // do sistema de arquivos. Sem esta pergunta, o pior desfecho é acabar o
+        // espaço no meio de 3 GB: fica um pacote parcial, e a falha aparece na
+        // próxima transcrição, longe de onde foi causada.
+        long livre = Catalogo.LivreNoDestino(pacote);
+        long preciso = (long)(pacote.TamanhoEsperadoBytes * 1.1);
+        if (livre >= 0 && livre < preciso)
+            throw new InvalidOperationException(
+                $"não cabe: {pacote.Nome} precisa de {preciso / 1_000_000_000.0:0.#} GB "
+                + $"e há {livre / 1_000_000_000.0:0.#} GB livres no disco de destino.");
+
         using (var motor = await MotorSidecar.IniciarAsync(
                    motores.Python, [motores.ScriptModelos], CancellationToken.None,
                    Motores.Ambiente()))

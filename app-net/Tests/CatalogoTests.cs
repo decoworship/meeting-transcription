@@ -53,18 +53,17 @@ public sealed class CatalogoTests
         var config = new ConfiguracoesDoApp
         {
             ModeloPadrao = "medium",
-            DiarizacaoPadrao = "community-1",
+            ModeloDeAta = "qwen3-4b-instruct-q4km.gguf",
         };
 
         var lista = Catalogo.Listar(config);
 
         Assert.True(lista.Single(i => i.Pacote.Id == "medium").EmUso);
-        Assert.True(lista.Single(i => i.Pacote.Id == "community-1").EmUso);
         Assert.False(lista.Single(i => i.Pacote.Id == "large-v3").EmUso);
 
         // Um por família, nunca dois: a tela usa isto para acender um cartão só.
         Assert.Single(lista, i => i.Pacote.Familia == "asr" && i.EmUso);
-        Assert.Single(lista, i => i.Pacote.Familia == "diarizacao" && i.EmUso);
+        Assert.Single(lista, i => i.Pacote.Familia == "ata" && i.EmUso);
     }
 
     [Fact]
@@ -130,10 +129,67 @@ public sealed class CatalogoTests
         Assert.Equal(Catalogo.Pacotes.Count,
                      Catalogo.Pacotes.Select(p => p.Id).Distinct().Count());
 
-        // "ata" entrou na Fase 3. A lista é fechada de propósito: a tela agrupa
-        // por família, e uma família nova sem bloco na tela some sem avisar.
+        // "ata" entrou na Fase 3, e "diarizacao" saiu na Fase 4 — os pesos
+        // passaram a viajar dentro do instalador, e o catálogo é sobre o que se
+        // baixa. A lista é fechada de propósito: a tela agrupa por família, e
+        // uma família nova sem bloco na tela some sem avisar.
         Assert.All(Catalogo.Pacotes, p =>
-            Assert.Contains(p.Familia, new[] { "asr", "diarizacao", "ata" }));
+            Assert.Contains(p.Familia, new[] { "asr", "ata" }));
+    }
+
+    [Fact]
+    public void ADiarizacaoNaoEstaMaisNoCatalogo()
+    {
+        // Ela viaja dentro do instalador desde a Fase 4. Um pacote de
+        // diarização aqui voltaria a medir o cache do HuggingFace, que o motor
+        // não lê mais: diria "ausente" sobre uma diarização que funciona, e
+        // ofereceria "Remover" sobre arquivos do instalador.
+        Assert.DoesNotContain(Catalogo.Pacotes, p => p.Familia == "diarizacao");
+    }
+
+    [Fact]
+    public void ModeloAusenteImpedeATranscricaoComUmaFraseQueDizOQueFazer()
+    {
+        string vazio = Directory.CreateTempSubdirectory("catalogo-impede").FullName;
+        string antes = Environment.GetEnvironmentVariable("HF_HUB_CACHE") ?? "";
+        try
+        {
+            Environment.SetEnvironmentVariable("HF_HUB_CACHE", vazio);
+
+            string? impede = Catalogo.OQueImpede("large-v3");
+
+            // A frase importa mais que o booleano: ela é o que a pessoa lê no
+            // lugar de "o motor morreu". Tem que dizer onde ir.
+            Assert.NotNull(impede);
+            Assert.Contains("Modelos", impede);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("HF_HUB_CACHE",
+                antes.Length == 0 ? null : antes);
+            Directory.Delete(vazio, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ModeloDesconhecidoNaoEBarrado()
+    {
+        // Ignorância não é veto: quem aponta para um modelo que não está no
+        // catálogo pode ter montado o cache à mão, e barrar por não conhecer
+        // quebraria um arranjo que funciona.
+        Assert.Null(Catalogo.OQueImpede("um-modelo-que-nao-conhecemos"));
+        Assert.Null(Catalogo.OQueImpede(null));
+        Assert.Null(Catalogo.OQueImpede(""));
+    }
+
+    [Fact]
+    public void ODiscoDeDestinoERespondidoAntesDeBaixar()
+    {
+        // Não se afirma quanto é livre — isso é da máquina. O que se protege é
+        // que a pergunta tenha resposta: -1 em toda máquina faria a checagem de
+        // espaço nunca reprovar nada, silenciosamente.
+        var pacote = Catalogo.Pacotes.First(p => p.Familia == "asr");
+        Assert.True(Catalogo.LivreNoDestino(pacote) > 0);
     }
 
     [Fact]
