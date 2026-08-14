@@ -259,6 +259,22 @@ O que ele tem que acertar, e cada linha aqui é um jeito conhecido de errar:
   presente. Windows 11 já tem; Windows 10 quase sempre tem, pelo Edge — mas
   "quase sempre" na máquina de outra pessoa é uma tela em branco sem explicação.
 
+### Três armadilhas medidas ao escrever o `.iss`
+
+Nenhuma delas aparece na documentação do Inno com o sintoma que ela produz:
+
+- **`const` dentro de função não existe** no Pascal Script. O erro é
+  `'BEGIN' expected` na linha do `const`, que manda procurar no lugar errado;
+- **`#` na primeira coluna vira diretiva de pré-processador**, mesmo dentro de
+  uma string do `[Code]`. Uma linha continuada que começa com `#13#10` aborta a
+  compilação com *Unknown preprocessor directive*. O `#13#10` fica grudado no fim
+  da linha anterior;
+- **o interop do WSL escapa as aspas** ao montar a linha de comando de um
+  processo Windows. Como o `ISCC.exe` mora em `Inno Setup 6` — com espaço —, ele
+  precisa de aspas, e o `cmd.exe` recebe `\"C:\...\ISCC.exe\"` e responde que não
+  reconhece o comando. A saída é escrever um `.cmd` do lado de cá e executar o
+  arquivo: as aspas nascem do lado Windows e ninguém as toca no caminho.
+
 E o que fica **de fora, de propósito**: assinatura de código. Sem certificado, o
 SmartScreen mostra o aviso de editor desconhecido. Com a audiência sendo amigos a
 quem se entrega o arquivo pessoalmente, o custo certo é uma linha no recado

@@ -43,6 +43,12 @@ Não há mais interface Python: o app Gradio e o gravador Python foram aposentad
 em 13/08/2026, depois que o app nativo os substituiu integralmente. Ver
 [FASE2.5-HANDOFF.md](docs/FASE2.5-HANDOFF.md).
 
+## Instalar
+
+Se você só quer **usar** o app, é [docs/INSTALAR.md](docs/INSTALAR.md): rode o
+instalador, aceite o aviso do SmartScreen, baixe o modelo de transcrição na
+primeira execução. Não é preciso Python, CUDA nem .NET na máquina.
+
 ## Compilar e publicar
 
 Requer o SDK do .NET 8. Publica do WSL ou do Windows.
@@ -57,34 +63,50 @@ tools/publicar.sh --destino /mnt/c/Users/andre/MeetingApp
 ```
 
 O `tools/publicar.sh` recusa publicar um binário que falhe em qualquer uma das
-três réguas: tamanho mínimo (as flags de publicação pegaram), token do
-HuggingFace embutido, e os ícones da bandeja embutidos. Cada uma existe por um
-defeito que chegou ao usuário.
+réguas: tamanho mínimo (as flags de publicação pegaram), **ausência** de token do
+HuggingFace, e os ícones da bandeja embutidos. Cada uma existe por um defeito que
+chegou ao usuário.
 
 Os motores (`motores/python`, ~4,3 GB de Python embarcado) são montados à parte
-por `tools/empacotar_motores.sh` e ficam ao lado do executável. **Ainda não há
-instalador** — é a Fase 4.
+por `tools/empacotar_motores.sh` e ficam ao lado do executável.
+
+Para produzir o **instalador**:
+
+```bash
+winget install --id JRSoftware.InnoSetup   # uma vez
+
+tools/empacotar_motores.sh                   # o Python embarcado
+tools/empacotar_motor_de_ata.sh              # llama.cpp + o GGUF
+tools/empacotar_modelos_de_diarizacao.sh     # os 57 MB de pesos do pyannote
+tools/montar_instalador.sh                   # o .exe que se entrega
+```
 
 ## O que vem a seguir
 
 | fase | o quê |
 |---|---|
-| **3** (corrente) | notas de reunião, transcrição que sobrevive à navegação, e a **ata por LLM** local — [docs/FASE3.md](docs/FASE3.md) |
-| **4** | o instalador (Inno Setup), com os modelos baixados na primeira execução |
+| **4** (corrente) | o instalador (Inno Setup), com os modelos baixados na primeira execução — [docs/FASE4.md](docs/FASE4.md) |
 | **5** | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
+| **6** | qualidade da transcrição e as revisões acumuladas — [docs/FASE6.md](docs/FASE6.md) |
 
 ## HuggingFace
 
-A diarização e a impressão vocal usam modelos pyannote com termos de uso. Quem
-compila o app precisa de um token com os termos aceitos; quem **recebe** o app
-não precisa de nada, porque o token vai embutido no binário.
+**Quem recebe o app não precisa de token, e desde a Fase 4 o binário também não
+carrega nenhum.** Os pesos de diarização (`speaker-diarization-community-1` e
+`wespeaker-voxceleb-resnet34-LM`, 57 MB, CC-BY-4.0) viajam dentro do instalador,
+com atribuição, e o motor os carrega por caminho local — ver
+[docs/FASE4.md](docs/FASE4.md) §4.
+
+Quem **empacota** ainda precisa de token uma vez, para montar essa pasta numa
+máquina que nunca rodou uma diarização:
 
 1. Crie um token em https://huggingface.co/settings/tokens (escopo Read basta).
-2. Aceite os termos, logado, nos dois modelos:
-   - https://huggingface.co/pyannote/speaker-diarization-community-1
-   - https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM
-3. Salve o token em `%USERPROFILE%\.meeting-recorder\hf_token.txt`. O
-   `publicar.sh` o embute e confere que ele entrou.
+2. Aceite os termos, logado, em
+   https://huggingface.co/pyannote/speaker-diarization-community-1 — é o único
+   dos quatro modelos do app que tem portão.
+3. Salve o token em `%USERPROFILE%\.meeting-recorder\hf_token.txt` e rode
+   `tools/empacotar_modelos_de_diarizacao.sh`. Numa máquina que já transcreveu
+   alguma vez, ele copia do cache e nem chega a usar o token.
 
 Diagnóstico de acesso: `tools/diagnosticar_acesso_hf.py`.
 
