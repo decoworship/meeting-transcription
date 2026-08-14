@@ -246,7 +246,7 @@ esquema garante a forma do que é verificável.
 resumo            texto
 secoes[]          { titulo, situacao?, texto }   ← a parte específica do tipo
 decisoes[]        texto
-acoes[]           { acao, responsavel, prazo }   ← o que o verificador confere
+acoes[]           { acao, responsavel, prazo, lado }  ← "nosso" ou "cliente"
 pontos_em_aberto[] texto
 riscos[]          texto
 observacoes[]     texto                          ← o que o verificador escreveu
@@ -295,6 +295,7 @@ aceitável. Roda sobre o JSON, antes de virar Markdown, e é **determinístico**
 | **código de issue** — `ABC-1234` que não aparece na transcrição | marca com `[sic?]`, como a skill pede |
 | **decisão sem âncora** — item de "Decisões" sem sobreposição léxica com nenhum trecho | move para "Pontos em aberto" |
 | **prazo relativo** — "sexta", "semana que vem" | resolve contra a data da reunião, ou deixa como veio |
+| **número não incorporado** — citado na transcrição e ausente da ata | lista em "Observações"; é a rede contra **omissão**, que é o modo de falha real do modelo pequeno (§8) |
 
 A quarta é a mais valiosa e a mais grosseira: promover hipótese a decisão é o
 erro que estraga ata, e um 4B tende **mais** a isso que um modelo de fronteira.
@@ -440,6 +441,50 @@ sidecar precisa saber disto antes de perder uma tarde.
   falham; caminhos relativos com o diretório certo funcionam. O caminho do
   próprio `.exe` pode ser do WSL, porque quem o resolve é o interop.
 
+### O critério E, lado a lado
+
+A mesma reunião de 29 min, escrita pelo Qwen3-4B e por um modelo de fronteira
+seguindo a mesma skill. Comparadas fato a fato contra a transcrição:
+
+| | 4B local | fronteira |
+|---|---|---|
+| seções da estrutura | 7 de 8 | 8 de 8 |
+| separou pendências por lado | sim | sim |
+| fatos inventados | **nenhum** | nenhum |
+| donos inventados | **nenhum** | nenhum |
+| itens de ação | **4** | 8 |
+| números-chave recuperados | 7 de 14 | 14 de 14 |
+
+**O 4B não erra: ele omite.** Não inventou nada — e deixou de fora metade da
+substância, incluindo **o impacto financeiro** (R$ 180 mil/mês, mais de R$ 2
+milhões no ano), que é provavelmente a linha mais importante de um update com
+cliente. Também perdeu o terceiro citado para quem a apresentação é feita, a
+reunião do dia seguinte, o recorte por tipo de produto e o risco de dependência
+do TI do cliente.
+
+**Isso muda o desenho, e é o motivo de a comparação vir antes de construir.** O
+verificador do §4 foi desenhado contra invenção, e invenção não é o modo de
+falha deste modelo. Contra omissão ele não faz nada. Entram duas peças:
+
+1. **Roteiro de fatos, extraído deterministicamente** e injetado no prompt: os
+   números citados com o trecho em volta, os compromissos verbais ("te mando
+   amanhã", "vou dar uma olhada"), os nomes de terceiros citados e as datas.
+   Não é o modelo que procura — é o C#, com expressão regular, e o modelo recebe
+   a lista pronta para usar o que for relevante;
+2. **Conferência de cobertura**, depois: número citado na transcrição que não
+   apareceu na ata entra em "Observações" como *não incorporado*. Não é o modelo
+   que julga o que faltou; é uma lista que o humano bate o olho.
+
+Nenhuma das duas exige modelo maior, e as duas são do tipo de coisa que este
+projeto já faz bem: regra determinística embaixo, modelo por cima.
+
+### Uma variação que a estrutura resolve
+
+Duas rodadas iguais, mesma reunião e mesma temperatura: numa saiu a seção
+"Observações sobre a transcrição", na outra não. Com o Markdown livre, a
+presença de uma seção é sorte; com o esquema, o renderizador emite o que existe
+e omite o que está vazio — e "vazio" passa a ser um fato, não um esquecimento.
+
 ### O que ainda não foi medido
 
 | # | pergunta | por que ainda não |
@@ -447,13 +492,35 @@ sidecar precisa saber disto antes de perder uma tarde.
 | 1 | Gemma 3 4B contra o Qwen3 4B | o Qwen passou; comparar só paga se ele começar a falhar |
 | 2 | `llama-cpp-python` no Python embarcado × binário ao lado | o binário resolveu; a decisão de empacotamento é da Fase 4 |
 | 3 | Reunião de 2 h **com esquema JSON** | o caminho de 49k foi medido em Markdown livre |
-| 4 | Qualidade contra ata de modelo de fronteira | é o critério E, e pede leitura humana das duas |
+| 4 | ~~Qualidade contra ata de fronteira~~ | **feito** — ver acima |
+| 5 | **CUDA 12.4 × 13.x depois de atualizar o driver** | pedido do dono do produto: medir se a versão nova rende mais, ou se compensa ficar na 12.4 por compatibilidade. É rodar `medir_motor_de_ata.py` na mesma gravação, trocando só a pasta `bin/` |
 
-A 4 é a que decide se a fase entrega ou se a escolha de provedor reabre.
+A 4 respondeu: **entrega, com as duas peças contra omissão acima**. Uma ata que
+recupera 7 de 14 números não serve sozinha — com o roteiro de fatos, a aposta é
+que sirva. Se não servir, o resultado honesto continua sendo reabrir a escolha
+de provedor.
 
 ---
 
-## 9. O risco, dito em voz alta
+## 9. O que já existe
+
+Construído em 14/08/2026, no núcleo (`Nucleo/Atas/`), portátil e com testes:
+
+- **`ModelosDeAta`** — os seis tipos embutidos como recurso, a pasta do usuário
+  sobrepondo por nome, o recorte das regras comuns do `SKILL.md` e a lista de
+  seções extraída do esqueleto de cada referência. O teste do recorte é a rede
+  contra alguém reescrever o `SKILL.md` e o app passar a mandar um prompt sem as
+  regras que impedem ata errada;
+- **`RoteiroDeFatos`** — a rede contra omissão (§8): números com o trecho em
+  volta, compromissos verbais com prazo, e a conferência do que a ata não
+  incorporou.
+
+Falta: o motor (processo do llama.cpp), o esquema, o verificador, o redator e a
+tela.
+
+---
+
+## 10. O risco, dito em voz alta
 
 **Um 4B não segue 1.700 tokens de instrução como um modelo de fronteira segue.**
 Toda a arquitetura acima é uma sequência de compensações para isso: o app

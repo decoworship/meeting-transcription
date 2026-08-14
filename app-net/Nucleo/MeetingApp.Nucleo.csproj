@@ -30,6 +30,26 @@
        ATENÇÃO: este token dá acesso à conta HuggingFace de quem publica —
        diferente do segredo OAuth do Google, que não é secreto para apps
        instalados. Use um token só de leitura, criado para isto e revogável. -->
+  <!-- As skills de ata, embutidas: são a instrução que o motor de ata manda ao
+       modelo, e ficam dentro do binário pelo mesmo motivo da interface — um
+       arquivo solto ao lado do .exe é mais uma coisa para o instalador acertar,
+       e some se alguém copiar só o binário.
+
+       Fonte única: estes arquivos são cópia de trabalho de "transcrição para
+       atas/", e um teste compara os dois. Barra normal no Include, e um item
+       por arquivo: com "../../assets/atas/*.md" o MSBuild rodando em Linux não
+       expande o glob e o app publica sem as skills, em silêncio — foi assim que
+       os ícones da bandeja sumiram uma vez. -->
+  <ItemGroup>
+    <EmbeddedResource Include="../../assets/atas/SKILL.md" LogicalName="MeetingApp.atas.SKILL.md" />
+    <EmbeddedResource Include="../../assets/atas/cliente-update.md" LogicalName="MeetingApp.atas.cliente-update.md" />
+    <EmbeddedResource Include="../../assets/atas/sprint.md" LogicalName="MeetingApp.atas.sprint.md" />
+    <EmbeddedResource Include="../../assets/atas/trabalho.md" LogicalName="MeetingApp.atas.trabalho.md" />
+    <EmbeddedResource Include="../../assets/atas/kickoff.md" LogicalName="MeetingApp.atas.kickoff.md" />
+    <EmbeddedResource Include="../../assets/atas/resultados.md" LogicalName="MeetingApp.atas.resultados.md" />
+    <EmbeddedResource Include="../../assets/atas/daily.md" LogicalName="MeetingApp.atas.daily.md" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TokenHuggingFace Condition="'$(TokenHuggingFace)' == ''">$(USERPROFILE)\.meeting-recorder\hf_token.txt</TokenHuggingFace>
   </PropertyGroup>

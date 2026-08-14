@@ -135,7 +135,10 @@ def medir(args) -> int:
         return 2
 
     prompt, info = prompt_da_reuniao(pasta, args.tipo)
-    destino = BASE / f"ata-{args.gravacao}-{args.tipo}-c{args.ctx}"
+    # O modo entra no nome: sem isto, a rodada com esquema sobrescreve a de
+    # Markdown livre da mesma reunião, e a comparação entre as duas some.
+    modo = "json" if args.esquema else "md"
+    destino = BASE / f"ata-{args.gravacao}-{args.tipo}-c{args.ctx}-{modo}"
     if args.esquema:
         sistema = (
             "Você redige atas de reunião em português do Brasil a partir de "
