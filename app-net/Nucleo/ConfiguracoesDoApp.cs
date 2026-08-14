@@ -27,6 +27,18 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("pasta_de_exportacao")] public string? PastaDeExportacao { get; set; }
 
     /// <summary>
+    /// Onde as atas exportadas vão parar.
+    /// </summary>
+    /// <remarks>
+    /// Separada da pasta de transcrições porque os dois arquivos têm destino e
+    /// finalidade diferentes: a transcrição é material de trabalho, que se
+    /// consulta e se corrige; a ata é o que se manda para fora — para o cliente,
+    /// para o time, para a pasta do projeto. Misturá-las obrigaria a escolher a
+    /// pasta na hora de exportar, toda vez.
+    /// </remarks>
+    [JsonPropertyName("pasta_de_atas")] public string? PastaDeAtas { get; set; }
+
+    /// <summary>
     /// Mostrar o botão de transcrever de novo numa reunião já transcrita.
     /// </summary>
     /// <remarks>
@@ -42,6 +54,18 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("modelo_padrao")] public string ModeloPadrao { get; set; } = "large-v3";
 
     [JsonPropertyName("diarizacao_padrao")] public string DiarizacaoPadrao { get; set; } = "community-1";
+
+    /// <summary>
+    /// Corrigir a grafia dos termos do projeto no texto transcrito.
+    /// </summary>
+    /// <remarks>
+    /// Ligada por padrão, ao contrário do filtro de silêncio: ela <b>troca</b>
+    /// palavra por palavra do vocabulário que o usuário mesmo escreveu, e cada
+    /// troca fica marcada na revisão e é reversível num clique. O erro que ela
+    /// corrige — "Dimi" virando "Jimmy" — aparece em toda reunião; o erro que
+    /// ela pode cometer aparece marcado.
+    /// </remarks>
+    [JsonPropertyName("correcao_fonetica")] public bool CorrecaoFonetica { get; set; } = true;
 
     /// <summary>
     /// Descartar os trechos que o ASR inventou sobre silêncio digital.

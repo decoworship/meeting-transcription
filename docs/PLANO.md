@@ -9,6 +9,11 @@ gravador, redesenhar a interface.
 > **reordenada** neste dia — features, depois instalador, depois cosmética. A
 > lista de fases atualizada está em §5, "Fases"; a fase corrente tem carta
 > própria em [FASE3.md](FASE3.md).
+>
+> **Acrescentado em 14/08/2026:** uma **Fase 6**, de qualidade da transcrição,
+> depois da 5 ([FASE6.md](FASE6.md)). Ela traz junto uma tarefa que começa
+> agora e não espera a fase: transcrever as reuniões **em paralelo por outras
+> fontes** e guardar as saídas junto da gravação.
 
 ---
 
@@ -750,11 +755,16 @@ Carta em [FASE2.5.md](FASE2.5.md), estado final em
 > migração das duas configurações, que era a metade que arriscava o usuário
 > reconfigurar coisas.
 
-**Fase 3 — a reunião depois da reunião.** Notas escritas durante a gravação,
+**Fase 3 — a reunião depois da reunião.** ✅ **Concluída em 14/08/2026.** Notas escritas durante a gravação,
 transcrição que sobrevive à navegação (com a bolinha no trilho dizendo que ela
 está rodando) e a **ata por LLM**, com modelo local e um tipo de ata por tipo de
-reunião. Carta em [FASE3.md](FASE3.md). **Não era esta a Fase 3**: a reordenação
-está logo abaixo.
+reunião. Carta em [FASE3.md](FASE3.md), estado final em
+[FASE3-HANDOFF.md](FASE3-HANDOFF.md), arquitetura do motor de ata em
+[ATA.md](ATA.md). **Não era esta a Fase 3**: a reordenação está logo abaixo.
+
+> Ela deixa para a Fase 4 os **3,5 GB do motor de ata** (llama.cpp + GGUF) e uma
+> armadilha medida: o build de CUDA tem que casar com o driver — o 13.3 falha na
+> máquina do usuário e o 12.4 funciona.
 
 **Fase 4 — instalador.** Inno Setup, download dos modelos na primeira execução,
 migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
@@ -763,6 +773,22 @@ código se e quando sair da própria máquina.
 **Fase 5 — acabamento visual.** O que era a Fase 3: o redesign da interface com
 o AA Design System (§3). Por último, sobre uma interface cujo conjunto de telas
 já parou de crescer.
+
+**Fase 6 — a qualidade do que sai.** Acrescentada em 14/08/2026, depois de
+comparar a transcrição do app com a do Notion na mesma reunião. Carta em
+[FASE6.md](FASE6.md). O vocabulário do projeto, passado como `hotwords`, colapsa
+a segmentação do ASR em 3,8× — e é isso que quebra a atribuição de falantes e
+contamina os vetores de voz, além de custar fala e 4,6× no tempo de
+decodificação. A fase resolve o trade-off com medição, fecha o gate do VAD 0,15
+que está aberto desde a Fase 1, e conserta o aprendizado de voz.
+
+> Vem **depois da Fase 5** por decisão do dono do produto: nada nela bloqueia a
+> ata, o instalador ou o acabamento, e tudo nela melhora o que o app já entrega.
+> Mas ela nasce de **uma** reunião, e por isso a §10 da carta abre uma tarefa
+> que **começa agora e roda em paralelo às fases 3 a 5**: transcrever as
+> reuniões em paralelo por outras fontes — Notion, Teams/Meet, o próprio app sem
+> `hotwords` — e guardar as saídas junto da gravação. Sem esse corpus a fase
+> calibra um default com *n* = 1, que é o erro do resultado 3-C repetido.
 
 ### A reordenação de 13/08/2026
 

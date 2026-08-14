@@ -169,7 +169,8 @@ public sealed class Transcritor(Motores motores)
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
         string? modelo = null, string? cliente = null, string? projeto = null,
-        bool diarizar = true, CancellationToken ct = default)
+        bool diarizar = true, bool corrigirFonetica = true,
+        CancellationToken ct = default)
     {
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
 
@@ -234,7 +235,7 @@ public sealed class Transcritor(Motores motores)
 
         if (filtrarSilencio) FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
 
-        if (vocabulario is { Length: > 0 })
+        if (vocabulario is { Length: > 0 } && corrigirFonetica)
         {
             var termos = vocabulario.Split(',', StringSplitOptions.TrimEntries
                                                 | StringSplitOptions.RemoveEmptyEntries);

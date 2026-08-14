@@ -134,7 +134,7 @@ async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
     if (!r.ata) return;
     botao.textContent = "Refazer ata";
     botao.className = "aa-btn aa-btn-secundario";
-    desenharAta(corpo, r.ata, r.ata_velha, abrir);
+    desenharAta(corpo, r.ata, r.ata_velha, abrir, g);
   } catch {
     // Sem ata é o estado normal de quem nunca gerou.
   }
@@ -148,7 +148,7 @@ async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
  * uma rolagem sem fim, em que chegar à ata seguinte custava minutos de scroll.
  * Ler uma ata é ler <em>uma</em>; a lista serve para achá-la.
  */
-function desenharAta(corpo, markdown, velha, abrir = false) {
+function desenharAta(corpo, markdown, velha, abrir, gravacao) {
   corpo.replaceChildren();
 
   const dobra = document.createElement("details");
@@ -186,6 +186,32 @@ function desenharAta(corpo, markdown, velha, abrir = false) {
     setTimeout(() => { copiar.textContent = "Copiar"; }, 1500);
   });
   acoes.appendChild(copiar);
+
+  // Exportar leva a ata para a pasta das atas, que é configurada à parte da de
+  // transcrições — a ata é o que sai para o cliente.
+  const exportar = document.createElement("button");
+  exportar.className = "aa-btn aa-btn-texto";
+  exportar.type = "button";
+  exportar.textContent = "Exportar";
+  exportar.addEventListener("click", async () => {
+    exportar.disabled = true;
+    try {
+      const r = await pedir("exportar-ata", { gravacao: gravacao.caminho,
+                                              nome: tituloDe(gravacao) });
+      exportar.textContent = "Exportada";
+      // O caminho fica na tela: exportar sem dizer onde obriga a procurar.
+      const onde = document.createElement("p");
+      onde.className = "campo__dica";
+      onde.textContent = r.arquivo;
+      acoes.after(onde);
+    } catch (e) {
+      acoes.after(alerta(e.message, "erro"));
+    } finally {
+      exportar.disabled = false;
+      setTimeout(() => { exportar.textContent = "Exportar"; }, 2000);
+    }
+  });
+  acoes.appendChild(exportar);
 
   const texto = document.createElement("div");
   texto.className = "ata__texto";

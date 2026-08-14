@@ -176,7 +176,21 @@ Fase 0, nesta ordem de valor:
    `-dtw` vs VAD) — é o único gate restante da migração do ASR;
 2. **Confirmar VAD 0,15 em mais 1–2 gravações reais** + filtro de segmentos
    sobre silêncio digital no núcleo → mudar o default do app atual;
-3. **Repetir resultado 5/5-A em gravação saudável** — fecha a pendência do
-   "prompt dispensável";
+
+   > ⚠️ **Continua aberto, e em 14/08/2026 descobriu-se por quê.** A varredura
+   > sobre `2026-08-13_14-30-15` não separou os limiares (4036–4055 palavras nas
+   > quatro configurações) porque foi feita no `mix.wav`, que tem **0,3% de
+   > silêncio digital** — somar mic e sistema quase nunca dá zero exato, e isso
+   > apaga o critério. O áudio certo é o `system.wav` de reuniões em que o dono
+   > fala pouco. O filtro de segmentos **foi escrito** (`FiltroDeSilencio.cs`) e
+   > **não está ligado**: a `Ponte.cs` não passa o parâmetro. Os dois itens
+   > passam a ser critérios D e E da [Fase 6](FASE6.md).
+3. ~~**Repetir resultado 5/5-A em gravação saudável**~~ — ✅ **o lado do
+   resultado 5 fechou em 14/08/2026** sobre `2026-08-13_14-30-15` (0,3% de
+   silêncio digital, 73,3% de fala): o `hotwords` colapsa a segmentação em 3,8×
+   (207 contra 787 segmentos), custa 1,8–5,7 pontos de cobertura de fala e 4,6×
+   no tempo. Não era artefato do microfone morto. O lado do 5-A — confirmar que
+   a correção fonética sozinha mantém os nomes — continua aberto e é o critério
+   A da [Fase 6](FASE6.md);
 4. Correções dos bugs 1.1–1.4 da [AUDITORIA.md](AUDITORIA.md) no app atual,
    que continua sendo a ferramenta de produção durante as fases 1–3.

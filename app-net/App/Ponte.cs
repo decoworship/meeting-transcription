@@ -478,6 +478,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     GerarAta(p);
                     break;
 
+                case "exportar-ata":
+                    Responder(new Resposta { Id = p.Id, Arquivo = ExportarAta(p) });
+                    break;
+
                 case "customizar-tipo-de-ata":
                     Responder(new Resposta
                     {
@@ -907,6 +911,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         if (cliente != vinculo.Cliente || projeto != vinculo.Projeto)
             new DadosDaReuniao { Cliente = cliente, Projeto = projeto }.Salvar(pasta);
 
+        // Lidas uma vez, aqui: dentro da tarefa elas seriam relidas do disco
+        // enquanto o pipeline roda, e mudar a chave no meio de uma transcrição
+        // não pode mudar o que aquela transcrição está fazendo.
+        var cfgDaTranscricao = ConfiguracoesDoApp.Carregar();
+
         // Lança quando já há uma em curso, e a mensagem nomeia qual. O catch do
         // AtenderAsync a transforma na resposta de erro que a tela mostra.
         var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta));
@@ -922,9 +931,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     // A chave existe em Ajustes › Transcrição desde 14/08; até
                     // então o filtro só ligava por linha de comando, e a tela
                     // dizia isso num recado que ninguém podia agir.
-                    filtrarSilencio: ConfiguracoesDoApp.Carregar().FiltrarSilencio,
+                    filtrarSilencio: cfgDaTranscricao.FiltrarSilencio,
                     modelo: p.Modelo, cliente: cliente, projeto: projeto,
                     diarizar: p.Diarizar ?? true,
+                    corrigirFonetica: cfgDaTranscricao.CorrecaoFonetica,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
@@ -949,6 +959,50 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             EmpurrarTranscricoes();
         });
+    }
+
+    /// <summary>
+    /// Copia a ata para a pasta de atas, com um nome que se acha depois.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Pasta própria, separada da de transcrições</b> (pedido do dono do
+    /// produto em 14/08/2026): os dois arquivos têm destino e finalidade
+    /// diferentes. A transcrição é material de trabalho; a ata é o que se manda
+    /// para fora — cliente, time, pasta do projeto.
+    /// </para>
+    /// <para>
+    /// O nome carrega data, cliente e título porque a pasta de destino junta
+    /// atas de reuniões diferentes: "ata.md" ali dentro seria inencontrável na
+    /// segunda exportação, e sobrescreveria a primeira.
+    /// </para>
+    /// </remarks>
+    private static string ExportarAta(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } pasta)
+            throw new InvalidOperationException("sem gravação");
+
+        string origem = Path.Combine(pasta, "ata.md");
+        if (!File.Exists(origem))
+            throw new InvalidOperationException("esta reunião ainda não tem ata");
+
+        var cfg = ConfiguracoesDoApp.Carregar();
+        if (cfg.PastaDeAtas is not { Length: > 0 } destino)
+            throw new InvalidOperationException(
+                "escolha a pasta das atas em Ajustes › Geral antes de exportar");
+
+        Directory.CreateDirectory(destino);
+
+        var dados = DadosDaReuniao.Ler(pasta);
+        string titulo = p.Nome is { Length: > 0 } ? p.Nome : Path.GetFileName(pasta);
+
+        var partes = new[] { dados.Cliente, titulo }.Where(x => x is { Length: > 0 });
+        string arquivo = Exportacao.NomeDeArquivo(
+            string.Join(" - ", partes) + " - ata", "md", Transcritor.DataDaReuniao(pasta));
+
+        string caminho = Path.Combine(destino, arquivo);
+        File.Copy(origem, caminho, overwrite: true);
+        return caminho;
     }
 
     /// <summary>

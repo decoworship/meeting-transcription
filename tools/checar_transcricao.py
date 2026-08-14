@@ -94,6 +94,9 @@ window.chrome = { webview: {
       r.ata = w._atas[p.gravacao] ?? null;
       r.ata_velha = false;
     }
+    else if (p.op === 'exportar-ata') {
+      r.arquivo = 'C:/atas/2026-08-12 Comitê de dados - ata.md';
+    }
     else if (p.op === 'gerar-ata') {
       if (w._registro.atual) {
         r.erro = 'já estou escrevendo a ata de "' + w._registro.atual.nome + '".';
@@ -517,6 +520,16 @@ def main() -> int:
             pagina.wait_for_selector(".ata__dobra")
             conferir("ao voltar, a ata vem fechada",
                      pagina.locator(".ata__dobra[open]").count() == 0)
+
+            # Exportar leva a ata para a pasta das atas — separada da de
+            # transcrições, porque os destinos são diferentes.
+            pagina.click(".ata__resumo")
+            pagina.wait_for_selector(".ata__texto")
+            pagina.click("text=Exportar")
+            pagina.wait_for_timeout(150)
+            conferir("exportar diz onde a ata foi parar",
+                     "atas" in pagina.inner_text(".ata"),
+                     [l for l in pagina.inner_text(".ata").splitlines() if "atas" in l][:1])
             # O "#" da ata vira h2 e o "##" vira h3 — um nível abaixo do que o
             # Markdown diz, porque a página já tem o h1 na barra do topo. Título
             # de documento dentro de documento quebraria a hierarquia para quem

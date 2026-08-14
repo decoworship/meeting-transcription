@@ -149,12 +149,20 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
     config.pasta_de_exportacao ?? "", "vazio = só ao lado da gravação",
     (v) => gravar({ pasta_de_exportacao: v }));
 
+  // Pasta própria para as atas: a transcrição é material de trabalho, a ata é o
+  // que se manda para fora. Destinos diferentes, finalidades diferentes.
+  const campoAtas = campoDePasta("Pasta das atas",
+    config.pasta_de_atas ?? "", "vazio = só ao lado da gravação",
+    (v) => gravar({ pasta_de_atas: v }));
+
   const dica = document.createElement("p");
   dica.className = "campo__dica";
-  dica.textContent = "A exportação sempre grava ao lado da gravação. "
-    + "A pasta acima é a cópia extra, quando você pedir.";
+  dica.textContent = "As duas exportações sempre gravam ao lado da gravação. "
+    + "As pastas acima são a cópia que se leva para fora — e são separadas "
+    + "porque a transcrição é material de trabalho e a ata é o que se manda "
+    + "para o cliente ou para o time.";
 
-  pastas.append(campoPasta, campoExport, dica);
+  pastas.append(campoPasta, campoExport, campoAtas, dica);
   painel.append(pastas);
   return painel;
 }
@@ -431,6 +439,10 @@ function abaTranscricao(config, gravar) {
   const fonetica = bloco("Correção fonética",
     "Os termos do vocabulário do projeto corrigem o texto: 'Dimi' que o modelo "
     + "escreveu 'Jimmy' volta a ser 'Dimi'.");
+  fonetica.classList.add("bloco--chave");
+  fonetica.appendChild(chave(config.correcao_fonetica !== false,
+    (v) => gravar({ correcao_fonetica: v })));
+
   const comoVer = document.createElement("p");
   comoVer.className = "campo__dica";
   comoVer.textContent = "Na transcrição, cada trecho corrigido ganha uma marca "

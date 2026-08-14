@@ -262,6 +262,9 @@ se pode confiar.
 
 ## 5.1 O que foi entregue (14/08/2026)
 
+> **Estado final em [FASE3-HANDOFF.md](FASE3-HANDOFF.md)** — o que foi medido, as
+> decisões que valem revisitar, e o que a Fase 4 herda.
+
 Os três itens estão de pé. O que mudou de desenho no caminho, e por quê, está em
 [ATA.md](ATA.md) — este é o resumo:
 

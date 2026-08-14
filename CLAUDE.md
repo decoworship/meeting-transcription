@@ -17,8 +17,14 @@ por quê. Muito comentário no código aponta para eles.
 **A fase corrente é a 3** ([docs/FASE3.md](docs/FASE3.md)): notas de reunião,
 transcrição que sobrevive à navegação, e a ata por LLM local — cuja arquitetura
 está em [docs/ATA.md](docs/ATA.md). Depois vêm o
-instalador (Fase 4) e só então o acabamento visual (Fase 5, que era a antiga
-Fase 3 — ver a reordenação em `docs/PLANO.md`).
+instalador (Fase 4), o acabamento visual (Fase 5, que era a antiga
+Fase 3 — ver a reordenação em `docs/PLANO.md`) e a qualidade da transcrição
+(Fase 6, [docs/FASE6.md](docs/FASE6.md)).
+
+**Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
+outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas
+junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia em
+**uma** reunião; sem corpus ela calibraria um default com *n* = 1.
 
 ## Comandos
 
