@@ -771,8 +771,15 @@ migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
 código se e quando sair da própria máquina.
 
 **Fase 5 — acabamento visual.** O que era a Fase 3: o redesign da interface com
-o AA Design System (§3). Por último, sobre uma interface cujo conjunto de telas
-já parou de crescer.
+o AA Design System (§3), sobre uma interface cujo conjunto de telas já parou de
+crescer.
+
+**Fase 6 — revisões.** Carta em [FASE6.md](FASE6.md). Decisão do dono do produto
+em 14/08/2026: **lançar primeiro, melhorar depois.** Tudo o que as fases
+anteriores marcaram como "revisitar" foi para lá, e cada item tem um **gatilho**
+— o que precisa acontecer para valer a pena fazê-lo. Uma fase de revisões sem
+gatilhos vira lista de desejos, e lista de desejos se executa pela ordem de quem
+gosta mais, não pela ordem do que dói.
 
 **Fase 6 — a qualidade do que sai.** Acrescentada em 14/08/2026, depois de
 comparar a transcrição do app com a do Notion na mesma reunião. Carta em

@@ -88,13 +88,17 @@ escrever JSON Schema. O custo: as seções muito estruturadas de alguns tipos (o
    máquina com *"the provided PTX was compiled with an unsupported toolchain"*
    (driver 595.97, que anuncia 13.2); o **12.4 funciona** e é compatível para
    trás. Publicar o 12.4, ou detectar;
-3. **medir 12.4 × 13.x depois de atualizar o driver** — pendência aberta pelo
-   dono do produto. É trocar a pasta `bin/` e rodar o `medir_motor_de_ata.py` na
-   mesma gravação.
+3. ~~medir 12.4 × 13.x~~ — **decidido em 14/08/2026: fica na 12.4**, por
+   compatibilidade. Ela roda em driver novo e velho; a 13.3 exige um mais novo
+   que o de hoje.
 
 ---
 
 ## 5. O que ficou de fora, com o custo registrado
+
+> Tudo o que segue, e mais o que a Fase 3 deixou incompleto de propósito, está
+> organizado com gatilhos em [FASE6.md](FASE6.md) — a fase de revisões, criada
+> por decisão do dono do produto para não atrasar a primeira versão.
 
 - **map-reduce para reunião acima de ~2h15.** A medição mostrou que 2 h cabem
   numa passada, e um caminho de blocos existindo é um caminho de blocos sendo

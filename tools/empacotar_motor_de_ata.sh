@@ -10,10 +10,12 @@
 #   tools/empacotar_motor_de_ata.sh
 #   tools/empacotar_motor_de_ata.sh --destino /mnt/c/Users/andre/MeetingApp
 #
-# **O build de CUDA tem que casar com o driver.** O 13.3 falha na máquina do
-# usuário com "the provided PTX was compiled with an unsupported toolchain"
-# (driver 595.97, que anuncia CUDA 13.2); o 12.4 funciona e é compatível para
-# trás. Medido em 14/08/2026 — ver docs/ATA.md §8.
+# **O build de CUDA tem que casar com o driver, e a 12.4 é a escolha.** O 13.3
+# falha na máquina do usuário com "the provided PTX was compiled with an
+# unsupported toolchain" (driver 595.97, que anuncia CUDA 13.2); a 12.4 funciona
+# e roda também em driver novo. Decisão do dono do produto em 14/08/2026:
+# compatibilidade ganha de um desempenho que ninguém mediu fazer falta.
+# Não troque para 13.x sem medir — ver docs/ATA.md §8 e docs/FASE6.md §1.5.
 
 set -euo pipefail
 

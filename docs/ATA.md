@@ -524,7 +524,7 @@ e omite o que está vazio — e "vazio" passa a ser um fato, não um esqueciment
 | 2 | `llama-cpp-python` no Python embarcado × binário ao lado | o binário resolveu; a decisão de empacotamento é da Fase 4 |
 | 3 | Reunião de 2 h **com esquema JSON** | o caminho de 49k foi medido em Markdown livre |
 | 4 | ~~Qualidade contra ata de fronteira~~ | **feito** — ver acima |
-| 5 | **CUDA 12.4 × 13.x depois de atualizar o driver** | pedido do dono do produto: medir se a versão nova rende mais, ou se compensa ficar na 12.4 por compatibilidade. É rodar `medir_motor_de_ata.py` na mesma gravação, trocando só a pasta `bin/` |
+| 5 | ~~CUDA 12.4 × 13.x~~ | **decidido em 14/08/2026: fica na 12.4.** Ela funciona em driver novo e velho; a 13.3 falha no driver de hoje. Compatibilidade ganha de um desempenho que ninguém mediu fazer falta — remedir só se houver motivo ([FASE6.md](FASE6.md) §1.5) |
 
 A 4 respondeu: **entrega, com as duas peças contra omissão acima**. Uma ata que
 recupera 7 de 14 números não serve sozinha — com o roteiro de fatos, a aposta é
@@ -546,8 +546,8 @@ Construído em 14/08/2026, no núcleo (`Nucleo/Atas/`), portátil e com testes:
   volta, compromissos verbais com prazo, e a conferência do que a ata não
   incorporou.
 
-Falta: o motor (processo do llama.cpp), o esquema, o verificador, o redator e a
-tela.
+Tudo isso foi construído e está em uso. O que ficou para depois, com o gatilho de
+cada coisa, está em [FASE6.md](FASE6.md).
 
 ---
 
