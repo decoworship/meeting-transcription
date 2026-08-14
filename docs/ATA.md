@@ -4,13 +4,26 @@ Desenho do item 3 da Fase 3 — a ata gerada por LLM local. Escrito em 14/08/202
 antes de escrever código, porque três perguntas do dono do produto mudavam o
 desenho inteiro e duas delas se respondem medindo.
 
+> **Medido na máquina do usuário em 14/08/2026** (RTX 2060 de 6 GB, Qwen3-4B
+> Instruct Q4_K_M, llama.cpp b10427), com as gravações reais dela. Os números
+> estão no §8, e três coisas que este documento supunha mudaram:
+>
+> - **a reunião de 2 h cabe numa passada só** — 42.822 tokens em contexto de
+>   49k, com o KV em q4_0. O caminho de blocos do §7 **sai da v1**;
+> - **o conteúdo saiu bom e o formato saiu torto**: nenhum número inventado,
+>   nenhum dono fora da lista de participantes, e mesmo assim o Markdown livre
+>   derrapou do formato pedido. É a medição que justifica a saída constrangida
+>   do §3 — que, testada, saiu **JSON válido de primeira**;
+> - **o modelo carrega em 5 s e a VRAM pode ficar ocupada** (decisão do dono do
+>   produto: gravar não disputa GPU). O keep-alive volta à mesa — ver §2.
+
 A carta da fase está em [FASE3.md](FASE3.md) §4; o que **este** documento decide
 é como o motor é feito por dentro. As skills que ele executa estão em
 `transcrição para atas/` na raiz do repositório.
 
 ---
 
-## 1. As três perguntas, respondidas com número
+## 1. As perguntas do dono do produto, respondidas com número
 
 ### "As skills são grandes demais para um modelo pequeno?"
 
@@ -38,9 +51,13 @@ transcrição, medida nas suas gravações reais:
 | 2026-08-12 (Algar) | 21,3 min | 6.203 | 291 |
 
 **Uma reunião de 1 h cabe folgada**: 14–17,5k tokens de transcrição + 2,4k de
-instrução + a ata gerada (1–2k) = ~20k dos 32k. O aperto começa perto de **1h45**
-e vira problema real em 2h30. Ou seja: a divisão em blocos existe, mas **não é o
-caminho comum** e não deve ser construída antes de medir.
+instrução + a ata gerada (1–2k) = ~20k dos 32k.
+
+> **A medição depois corrigiu esta estimativa para pior e o limite para melhor.**
+> Com o tokenizador do próprio Qwen, uma reunião de 122 minutos deu **42.822
+> tokens** — mais denso que a régua acima. Em compensação, ela **coube numa
+> passada só** em contexto de 49k com o KV em q4_0, que é o que a placa de 6 GB
+> aguenta (§8). Blocos ficam para reunião de 3 h.
 
 ### "Como vamos usar as skills?"
 
@@ -79,6 +96,57 @@ O que **não** vai para o modelo, e por quê:
 | Regras comuns (decidido × discutido, dono, fidelidade, idioma) | **vai inteiro** — é o que impede ata errada |
 | Esqueleto de seções do tipo | vai, e também vira contrato de validação (§4) |
 | Notas específicas do tipo | vai |
+
+### "Vamos precisar ajustar as skills para o modelo menor?"
+
+**Cirurgia, não reescrita** — e agora isso é medido, não opinião. O Qwen3-4B leu
+as regras comuns inteiras e as obedeceu no conteúdo: não inventou número, não
+inventou dono, separou decidido de discutido, excluiu small talk e registrou o
+que não deu para inferir (§8). O que ele **não** fez foi obedecer ao *formato*:
+escreveu `**Responsável: Dimi Randel**` onde a skill pede
+`Ação — **Responsável** — prazo`.
+
+Isso desenha exatamente onde mexer:
+
+| na skill | ajuste | por quê |
+|---|---|---|
+| Passo 1 (classificar) | **remover do prompt** | quem classifica é o usuário na tela |
+| "pergunte ao usuário" | **remover do prompt** | não há conversa, há um botão |
+| Regras comuns | **nada** | foram obedecidas como estão |
+| Notas específicas do tipo | **nada** | idem |
+| Esqueleto de seções (o bloco ```markdown) | **vira esquema JSON** | é a parte que o modelo erra, e a única que dá para impor por decodificação |
+
+O esqueleto deixar de ser texto e virar esquema **não é adaptar a skill para o
+modelo pequeno** — é tirar do modelo uma responsabilidade que ele não precisa
+ter. Um modelo de fronteira também erraria menos com o formato imposto; a
+diferença é que nele o erro é raro e aqui é a regra.
+
+### "As skills são fixas ou dá para customizar?"
+
+**As duas coisas, com precedência.** As seis que existem vão embutidas no
+executável e são a base; quem quiser mexer, mexe numa pasta do perfil:
+
+```
+%USERPROFILE%\.meeting-transcription\atas\
+    sprint.md            ← substitui a embutida, se existir
+    comite-de-dados.md   ← um tipo novo, que passa a aparecer na tela
+```
+
+Regras:
+
+- **arquivo do usuário ganha** do embutido de mesmo nome;
+- **um arquivo novo = um tipo novo** na lista da tela, sem recompilar nada;
+- **o esquema não é do usuário.** Ele é universal (§3): resumo, seções, decisões,
+  ações, pontos em aberto, riscos, observações. O que o arquivo do usuário
+  descreve é *quais seções produzir e o que pôr nelas* — não a forma da saída.
+  É isso que permite customizar escrevendo Markdown, sem escrever JSON Schema;
+- **as embutidas não são editadas no lugar.** Customizar copia para a pasta do
+  perfil e edita a cópia, e um botão "voltar ao original" apaga a cópia. Editar o
+  embutido faria a atualização do app apagar o trabalho do usuário sem avisar.
+
+O ganho não é estética: **ata por cliente**. "As reuniões da Vivo têm uma seção
+de SLA no fim" é exatamente o tipo de coisa que o usuário sabe e o app não, e
+casa com o vocabulário por projeto que já existe.
 
 ### "Dá para adicionar tools para a LLM?"
 
@@ -126,13 +194,22 @@ do [SIDECAR.md](SIDECAR.md), reaproveitando o `MotorSidecar` que já existe — 
 o cancelamento que a Fase 3 acabou de ligar (matar o processo é o que devolve a
 VRAM na hora, e vale igual para a ata).
 
-**Um processo por geração, sem keep-alive.** Isto **revisa** o que a FASE3.md §4
-antecipou do Meetily. Eles mantêm o processo quente porque servem requisições de
-resumo o tempo todo; aqui se gera **uma ata por reunião**, com o usuário
-esperando na frente da tela. Carregar 2,6 GB uma vez por ata é aceitável; manter
-2,6 GB de VRAM ocupados enquanto o usuário grava a próxima reunião não é. Se a
-medição mostrar carga acima de ~20 s, a decisão se reabre — e o keep-alive entra
-como opção, não como padrão.
+**Um processo por geração, sem keep-alive — e agora por outro motivo.** A
+primeira versão deste documento justificava isso com a VRAM: manter 2,6 GB
+presos atrapalharia a gravação. **O dono do produto corrigiu**: a transcrição já
+ocupa a placa inteira e a gravação continua funcionando, porque capturar áudio
+não usa GPU. A justificativa caiu.
+
+O que sobrou de justificativa é mais fraca, e por isso a decisão vira ajuste em
+vez de dogma: **o modelo carrega em 5 segundos** (medido, modelo em SSD), então
+um processo por ata custa 5 s por ata. Manter o motor quente economiza esses 5 s
+e custa um processo vivo e 2,5 GB de VRAM que a próxima transcrição vai querer —
+e a transcrição, essa sim, aperta os 6 GB.
+
+**A regra que fica:** um processo por geração na v1, e um `--manter-vivo N` no
+sidecar para quando gerar várias atas em sequência virar rotina. A trava de "um
+motor pesado por vez" continua valendo entre **ata e transcrição**, que disputam
+a mesma placa — e não entre ata e gravação, que não disputam nada.
 
 **O modelo entra pelo catálogo que já existe.** `PacoteDeModelo` ganha a família
 `"ata"`, e o GGUF baixa pela mesma tela dos modelos de ASR e diarização, com
@@ -161,8 +238,28 @@ renderiza o Markdown. Três razões, em ordem de peso:
 3. **A ata vira dado.** Exportar em DOCX, colar no e-mail, listar "todas as ações
    em aberto do cliente X" — tudo isso é trivial com campos e caro com prosa.
 
-**Um esquema por tipo, derivado do esqueleto da referência.** Cada referência já
-traz o esqueleto num bloco ```` ```markdown ````, e ele mapeia quase um a um:
+**Um esquema universal, e não um por tipo.** É o que permite customizar
+escrevendo Markdown (§1): o arquivo do tipo diz *quais seções produzir*, e o
+esquema garante a forma do que é verificável.
+
+```
+resumo            texto
+secoes[]          { titulo, situacao?, texto }   ← a parte específica do tipo
+decisoes[]        texto
+acoes[]           { acao, responsavel, prazo }   ← o que o verificador confere
+pontos_em_aberto[] texto
+riscos[]          texto
+observacoes[]     texto                          ← o que o verificador escreveu
+```
+
+O esqueleto de cada referência vira a **lista de seções esperadas** — usada para
+pedir ao modelo e para conferir o que voltou, não para gerar um esquema por
+tipo. O que se perde: as seções muito estruturadas de alguns tipos (o "Por
+pessoa" da sprint e da daily) caem em `secoes[].texto` como prosa, em vez de
+virar lista de pessoas. É perda aceitável na v1, e o dia em que incomodar,
+`secoes[]` ganha um campo opcional de itens.
+
+O mapeamento, para um update com cliente:
 
 | seção do esqueleto | tipo de campo | como é renderizada |
 |---|---|---|
@@ -172,9 +269,13 @@ traz o esqueleto num bloco ```` ```markdown ````, e ele mapeia quase um a um:
 | `## Ações` | lista de `{acao, responsavel, prazo}` | `- [ ] … — **X** — prazo` |
 | `## Pontos em aberto` | lista de texto | lista |
 
-O renderizador é **um só e genérico**: lê a declaração de seções do tipo e
-monta. Acrescentar um sétimo tipo de reunião passa a ser escrever uma referência
-e uma declaração de dez linhas — não escrever código.
+O renderizador é **um só e genérico**: recebe o JSON e monta o Markdown na
+ordem canônica. Acrescentar um sétimo tipo de reunião passa a ser **escrever um
+arquivo Markdown** — nem código, nem esquema (§1).
+
+**Medido:** com JSON Schema pelo `llama-server`, o Qwen3-4B devolveu JSON válido
+de primeira, com responsáveis reais e `[prazo a definir]` onde faltava prazo
+(§8). Sem o esquema, o mesmo modelo escreveu o responsável fora do formato.
 
 **Seções vazias somem**, como o `daily.md` manda. É regra da skill que o
 renderizador aplica, em vez de esperar que o modelo lembre.
@@ -189,6 +290,7 @@ aceitável. Roda sobre o JSON, antes de virar Markdown, e é **determinístico**
 | verificação | o que faz quando falha |
 |---|---|
 | **dono inventado** — responsável que não é participante da agenda, nem falante da transcrição, nem nome conhecido | troca por `[responsável a definir]` e registra o que veio |
+| **falante genérico na lista de participantes** — `Speaker 1`, `Speaker 8` | tira da lista: medido na ata da reunião de 2 h, onde os não nomeados entraram como se fossem gente |
 | **número inventado** — algarismo na ata que não aparece na transcrição | marca com `[conferir]` |
 | **código de issue** — `ABC-1234` que não aparece na transcrição | marca com `[sic?]`, como a skill pede |
 | **decisão sem âncora** — item de "Decisões" sem sobreposição léxica com nenhum trecho | move para "Pontos em aberto" |
@@ -220,7 +322,9 @@ Em ordem de construção. As cinco primeiras são a v1.
    transcrição;
 7. **Exportar** nos formatos que a exportação já tem (a ata entra como mais um
    conteúdo, não como um segundo mecanismo);
-8. **Reuniões longas por blocos** (§7), *se* a medição mostrar que faz falta;
+8. ~~**Reuniões longas por blocos**~~ — **sai da v1**: a medição mostrou que uma
+   reunião de 2 h cabe numa passada só, com contexto de 49k e KV em q4_0 (§8). O
+   §7 fica registrado para o dia em que aparecer uma reunião de 3 h;
 9. **Ata anterior como contexto** — "o que ficou pendente na última reunião deste
    projeto" é a pergunta que mais se faz numa série de reuniões, e o app é o
    único que sabe respondê-la;
@@ -245,7 +349,11 @@ fase: as notas não existem só para o humano reler.
 
 ## 7. Reuniões longas, quando chegarem
 
-Acima de ~1h45 a transcrição não cabe. O caminho é map-reduce, e ele **degrada a
+> **Medido: o limite não é 1h45, é ~2h15** — e nesta placa, com KV em q4_0. A
+> reunião de 122 minutos do usuário coube numa passada só. Esta seção deixa de
+> ser plano e vira registro para quando aparecer uma reunião de 3 h.
+
+Acima disso a transcrição não cabe. O caminho é map-reduce, e ele **degrada a
 ata** — perde-se a visão do todo que faz "Situação da sprint" ter sentido:
 
 1. dividir por janelas de tempo com sobreposição (a sobreposição existe para uma
@@ -260,19 +368,88 @@ por engano.
 
 ---
 
-## 8. O que a medição precisa responder, antes de escrever o motor
+## 8. A medição, feita em 14/08/2026
 
-No espírito da Fase 0, e com as gravações reais que já existem no disco:
+Máquina do usuário: RTX 2060 de 6 GB (≈950 MiB já ocupados pelo desktop),
+driver 595.97. Modelo **Qwen3-4B-Instruct-2507 Q4_K_M** (2,5 GB), llama.cpp
+b10427, build CUDA 12.4. Ferramenta: `tools/medir_motor_de_ata.py`, que monta o
+mesmo prompt que o app vai montar.
 
-| # | pergunta | como |
+### Cabe, e quanto demora
+
+| reunião | tokens do prompt | contexto / KV | tempo | pico de VRAM |
+|---|---:|---|---:|---:|
+| 29 min, 205 trechos | 10.258 | 16k / q8_0 | **55 s** | 4.732 MiB |
+| 42 min, 964 trechos | ~19.900 | 24k / q8_0 | **98 s** | 5.386 MiB |
+| 122 min, 2.058 trechos | **42.822** | 32k / q8_0 | — | 5.727 MiB, **não coube** |
+| 122 min, 2.058 trechos | 42.822 | 49k / **q4_0** | **236 s** | 5.343 MiB |
+
+Velocidade: **1.500–1.600 t/s** processando o prompt e **44 t/s** gerando em
+contexto curto; **866 t/s / 17 t/s** no contexto de 49k. Carga do modelo: **5 s**.
+
+**A régua do KV.** Medindo o pico entre 16k e 32k: **62 KiB por token** de
+contexto com KV em q8_0 — cerca de 124 KiB em f16 e 31 KiB em q4_0. É o que
+manda na conta, não o modelo: o Qwen3-4B ocupa 2,5 GB e o KV de 49k ocupa 1,6 GB
+em q4_0 e ocuparia 6 GB em f16.
+
+**Regra prática que sai daí, para os 6 GB desta placa:**
+
+| duração da reunião | contexto | KV |
 |---|---|---|
-| 1 | `llama-cpp-python` no Python embarcado ou binário do llama.cpp ao lado? | instalar os dois, medir tamanho em disco, tempo de carga e tokens/s |
-| 2 | O 4B cabe na 2060 com o ASR descarregado, e em quanto tempo gera? | gerar a ata de uma reunião de 29 min, cronometrando |
-| 3 | Qwen 3 4B ou Gemma 3 4B? | a mesma transcrição nos dois, comparando com a ata da skill num modelo de fronteira |
-| 4 | A gramática GBNF segura o formato sem estragar o conteúdo? | gerar com e sem, comparar |
-| 5 | Quanto o modelo local inventa? | contar donos e decisões inventadas — é o critério E |
+| até ~45 min | 16k–24k | q8_0 |
+| até ~1h30 | 32k | q8_0 |
+| até ~2h15 | 49k | q4_0 |
+| acima disso | blocos (§7), ainda não construído |
 
-A 5 é a que decide se a fase entrega ou se a decisão de provedor reabre.
+### O conteúdo saiu bom; o formato, torto
+
+Ata da reunião de 29 min (update com cliente, Vivo/Faturamento B2B), conferida
+contra a transcrição:
+
+- **números inventados: nenhum.** Os 15 números da ata aparecem na transcrição;
+- **donos inventados: nenhum.** Os quatro responsáveis são falantes reconhecidos
+  da reunião, e o prazo ausente virou `[prazo a definir]`, como a skill manda;
+- **decisões**: quatro, todas rastreáveis a trechos com conclusão explícita;
+- **small talk** sobre a vida pessoal de uma participante foi excluído, e a
+  exclusão foi registrada nas observações — que é literalmente o que a regra pede;
+- **formato**: derrapou. `**Responsável: Fulano**` no lugar de
+  `Ação — **Responsável** — prazo`.
+
+### A saída constrangida resolve o formato
+
+Mesma reunião, mesmo modelo, com JSON Schema pelo `llama-server`:
+
+- **JSON válido de primeira**, com as sete chaves do esquema;
+- 1.337 tokens gerados em **37 s** (44 t/s);
+- responsáveis todos reais, prazos ausentes já como `[prazo a definir]`;
+- pico de 4.512 MiB.
+
+**Atenção ao caminho.** A gramática **não funciona pelo `llama-cli` em modo
+conversa**: ela é aplicada desde o primeiro token e colide com o
+`<|im_start|>` do template de chat (`Unexpected empty grammar stack`). Pelo
+`llama-server`, aplicada só à resposta do assistente, funciona. Quem escrever o
+sidecar precisa saber disto antes de perder uma tarde.
+
+### Duas armadilhas medidas, que não são do modelo
+
+- **o build de CUDA tem que casar com o driver.** O `llama-b10427-bin-win-cuda-13.3`
+  falha nesta máquina com *"the provided PTX was compiled with an unsupported
+  toolchain"* — driver 595.97 anuncia CUDA 13.2. O build **12.4 funciona**. Vale
+  para o instalador da Fase 4: publicar o 12.4, ou detectar;
+- **`llama-cli.exe` não abre caminho do WSL.** Argumentos como `/mnt/c/...`
+  falham; caminhos relativos com o diretório certo funcionam. O caminho do
+  próprio `.exe` pode ser do WSL, porque quem o resolve é o interop.
+
+### O que ainda não foi medido
+
+| # | pergunta | por que ainda não |
+|---|---|---|
+| 1 | Gemma 3 4B contra o Qwen3 4B | o Qwen passou; comparar só paga se ele começar a falhar |
+| 2 | `llama-cpp-python` no Python embarcado × binário ao lado | o binário resolveu; a decisão de empacotamento é da Fase 4 |
+| 3 | Reunião de 2 h **com esquema JSON** | o caminho de 49k foi medido em Markdown livre |
+| 4 | Qualidade contra ata de modelo de fronteira | é o critério E, e pede leitura humana das duas |
+
+A 4 é a que decide se a fase entrega ou se a escolha de provedor reabre.
 
 ---
 
