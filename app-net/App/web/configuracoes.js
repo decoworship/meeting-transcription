@@ -163,8 +163,67 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
     + "para o cliente ou para o time.";
 
   pastas.append(campoPasta, campoExport, campoAtas, dica);
-  painel.append(pastas);
+  painel.append(pastas, blocoSobre());
   return painel;
+}
+
+/**
+ * Versão e diagnóstico.
+ *
+ * Nasceu na Fase 4, quando o app passou a ser instalado em máquina que não é a
+ * de quem o compila. A partir daí "está dando erro" só vira relato utilizável
+ * com um número de versão junto — e as três perguntas seguintes ("achou a
+ * placa?", "o modelo chegou a baixar?", "para onde estão indo as gravações?")
+ * são as mesmas toda vez. O botão responde as quatro de uma vez.
+ *
+ * O bloco vem do núcleo pronto (Nucleo/Diagnostico.cs) e não é remontado aqui:
+ * o texto que a pessoa cola e o texto que ela vê na tela têm que ser o mesmo.
+ */
+function blocoSobre() {
+  const b = bloco("Sobre",
+    "A versão instalada, e o bloco que ajuda a resolver um problema à distância.");
+
+  const linha = document.createElement("p");
+  linha.className = "campo__dica";
+  linha.textContent = "carregando…";
+
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-secundario";
+  botao.type = "button";
+  botao.textContent = "Copiar diagnóstico";
+  botao.disabled = true;
+
+  let texto = "";
+  pedir("diagnostico").then((r) => {
+    const d = r.diagnostico;
+    texto = d.texto;
+    // A versão e a placa na linha visível: são as duas que a pessoa quer saber
+    // sem clicar em nada. O resto está no bloco copiado.
+    linha.textContent = `MeetingApp ${d.versao} — `
+      + (d.placa ?? "sem placa NVIDIA; a transcrição vai rodar em CPU");
+    botao.disabled = false;
+  }).catch((e) => {
+    linha.textContent = `não deu para ler o diagnóstico: ${e.message}`;
+  });
+
+  botao.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      botao.textContent = "Copiado";
+      setTimeout(() => { botao.textContent = "Copiar diagnóstico"; }, 2000);
+    } catch {
+      // Sem área de transferência, mostrar o texto ainda resolve: dá para
+      // selecionar e copiar à mão. Falhar em silêncio, não.
+      linha.textContent = texto;
+    }
+  });
+
+  const acoes = document.createElement("div");
+  acoes.className = "acoes";
+  acoes.append(botao);
+
+  b.append(linha, acoes);
+  return b;
 }
 
 // ───────────────────────────────────────────────────────── aba Gravador

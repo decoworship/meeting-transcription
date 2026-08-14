@@ -10,10 +10,11 @@ gravador, redesenhar a interface.
 > lista de fases atualizada está em §5, "Fases"; a fase corrente tem carta
 > própria em [FASE3.md](FASE3.md).
 >
-> **Acrescentado em 14/08/2026:** uma **Fase 6**, de qualidade da transcrição,
-> depois da 5 ([FASE6.md](FASE6.md)). Ela traz junto uma tarefa que começa
-> agora e não espera a fase: transcrever as reuniões **em paralelo por outras
-> fontes** e guardar as saídas junto da gravação.
+> **Acrescentado em 14/08/2026:** uma **Fase 6**, de revisões, depois da 5
+> ([FASE6.md](FASE6.md)) — cada item com o gatilho que justifica fazê-lo. Ela
+> traz junto uma tarefa que **começa agora e não espera a fase**: transcrever e
+> resumir as reuniões **em paralelo por outras fontes** e guardar as saídas
+> junto da gravação.
 
 ---
 
@@ -781,21 +782,17 @@ anteriores marcaram como "revisitar" foi para lá, e cada item tem um **gatilho*
 gatilhos vira lista de desejos, e lista de desejos se executa pela ordem de quem
 gosta mais, não pela ordem do que dói.
 
-**Fase 6 — a qualidade do que sai.** Acrescentada em 14/08/2026, depois de
-comparar a transcrição do app com a do Notion na mesma reunião. Carta em
-[FASE6.md](FASE6.md). O vocabulário do projeto, passado como `hotwords`, colapsa
-a segmentação do ASR em 3,8× — e é isso que quebra a atribuição de falantes e
-contamina os vetores de voz, além de custar fala e 4,6× no tempo de
-decodificação. A fase resolve o trade-off com medição, fecha o gate do VAD 0,15
-que está aberto desde a Fase 1, e conserta o aprendizado de voz.
-
-> Vem **depois da Fase 5** por decisão do dono do produto: nada nela bloqueia a
-> ata, o instalador ou o acabamento, e tudo nela melhora o que o app já entrega.
-> Mas ela nasce de **uma** reunião, e por isso a §10 da carta abre uma tarefa
-> que **começa agora e roda em paralelo às fases 3 a 5**: transcrever as
-> reuniões em paralelo por outras fontes — Notion, Teams/Meet, o próprio app sem
-> `hotwords` — e guardar as saídas junto da gravação. Sem esse corpus a fase
-> calibra um default com *n* = 1, que é o erro do resultado 3-C repetido.
+> **Dois blocos da carta já têm o gatilho disparado**, e por isso não são
+> hipótese: a §1.6 (a ata comparada com o resumo do Notion da mesma reunião) e a
+> §4 inteira (a transcrição — o `hotwords` colapsando a segmentação em 3,8×, o
+> que quebra a atribuição de falantes e contamina os vetores de voz). Os dois
+> saíram de saídas reais conferidas contra o áudio em 14/08/2026.
+>
+> E a **§5 não espera a fase**: transcrever e resumir as reuniões **em paralelo
+> por outras fontes** — Notion, Teams/Meet, o próprio app sem `hotwords` — e
+> guardar as saídas junto da gravação. Tudo o que a carta sabe hoje veio de
+> **uma** reunião; sem esse corpus a Fase 6 calibraria defaults com *n* = 1, que
+> é o erro do resultado 3-C repetido.
 
 ### A reordenação de 13/08/2026
 

@@ -837,7 +837,7 @@ Repetir numa gravação saudável separaria as duas coisas. Fica como pendência
 > 331 s). E a consequência que faltava: o colapso de segmentação é o que quebra
 > a **atribuição de falantes**, porque o rótulo é um por segmento do ASR, e é o
 > que **contamina os vetores de voz**, que persistem entre reuniões. Ver
-> [FASE6.md](FASE6.md) §2.3–2.5.
+> [FASE6.md](FASE6.md) §4.1–4.2.
 
 ### O whisper.cpp não tem mecanismo equivalente — e isto bloqueia a migração
 

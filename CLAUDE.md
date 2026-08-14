@@ -19,7 +19,7 @@ transcrição que sobrevive à navegação, e a ata por LLM local — cuja arqui
 está em [docs/ATA.md](docs/ATA.md). Depois vêm o
 instalador (Fase 4), o acabamento visual (Fase 5, que era a antiga
 Fase 3 — ver a reordenação em `docs/PLANO.md`) e a qualidade da transcrição
-(Fase 6, [docs/FASE6.md](docs/FASE6.md)).
+(Fase 6 — revisões, [docs/FASE6.md](docs/FASE6.md)).
 
 **Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
 outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas

@@ -136,6 +136,9 @@ internal sealed class Resposta
 
     /// <summary>Os dispositivos de áudio, para a tela poder escolher.</summary>
     [JsonPropertyName("dispositivos")] public DispositivosDisponiveis? Dispositivos { get; init; }
+
+    /// <summary>O estado desta instalação, para quem vai relatar um problema.</summary>
+    [JsonPropertyName("diagnostico")] public Diagnostico? Diagnostico { get; init; }
 }
 
 /// <summary>
@@ -352,6 +355,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
+[JsonSerializable(typeof(Diagnostico))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -553,6 +557,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "config":
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
+                    break;
+
+                case "diagnostico":
+                    // Fora da thread da UI: o nvidia-smi é um processo filho, e
+                    // esperar por ele aqui congelaria a janela por até 5 s na
+                    // máquina em que ele estiver lento.
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Diagnostico = await Task.Run(() =>
+                            Diagnostico.Coletar(ConfiguracoesDoApp.Carregar(), pastaDasGravacoes)),
+                    });
                     break;
 
                 case "escolher-pasta":
