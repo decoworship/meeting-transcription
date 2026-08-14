@@ -271,9 +271,12 @@ Os três itens estão de pé. O que mudou de desenho no caminho, e por quê, est
 | 2. notas de reunião | ✅ `notas.md`, no Gravador e na reunião, alimentando o vocabulário |
 | 3. ata por LLM local | ✅ motor, verificador, redator e o destino **Atas** no trilho |
 
-Fora do previsto, porque o primeiro uso cobrou: **o vínculo cliente/projeto
-passou a viver na gravação** (`reuniao.json`), e o seletor de diarização, que era
-decorativo, passou a valer.
+Fora do previsto, porque o uso cobrou: **o vínculo cliente/projeto passou a
+viver na gravação** (`reuniao.json`), o seletor de diarização — que era
+decorativo — passou a valer, **cada destino do trilho ganhou a sua bolinha**
+(gravar convive com transcrever ou com escrever ata; transcrever e escrever ata
+nunca convivem), e **a organização de cada participante passa a sair do domínio
+do e-mail da agenda**, não de dedução do modelo ([ATA.md](ATA.md) §5.1).
 
 **O que a Fase 4 herda:** o motor de ata são 3,5 GB (llama.cpp + GGUF) montados
 por `tools/empacotar_motor_de_ata.sh`, e o instalador precisa deles. O build de

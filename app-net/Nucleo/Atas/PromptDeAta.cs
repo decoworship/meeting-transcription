@@ -14,6 +14,15 @@ public sealed record ContextoDaReuniao
     /// <summary>Quem a agenda listou. São os nomes que um dono de ação pode ter.</summary>
     public IReadOnlyList<string> Convidados { get; init; } = [];
 
+    /// <summary>
+    /// Os convidados com o lado da mesa, quando o e-mail permitiu saber.
+    /// </summary>
+    /// <remarks>
+    /// Vem do domínio do e-mail da agenda contra os domínios da casa, e não de
+    /// dedução do modelo — ver <see cref="Organizacoes"/>.
+    /// </remarks>
+    public IReadOnlyList<Pessoa> Pessoas { get; init; } = [];
+
     /// <summary>Quem a diarização separou, já nomeado quando reconhecido.</summary>
     public IReadOnlyList<string> Falantes { get; init; } = [];
 
@@ -62,8 +71,14 @@ public static class PromptDeAta
         if (ctx.Projeto is { Length: > 0 }) sb.AppendLine($"- Projeto: {ctx.Projeto}");
         if (ctx.Data is { Length: > 0 }) sb.AppendLine($"- Data: {Cabecalho.DataLegivel(ctx.Data)}");
         if (ctx.DuracaoS > 0) sb.AppendLine($"- Duração: {Cabecalho.Duracao(ctx.DuracaoS)}");
-        if (ctx.Convidados.Count > 0)
+        // Agrupado por organização quando dá para saber: é o que a skill pede no
+        // cabeçalho ("participantes agrupados por organização") e é o que impede
+        // o modelo de deduzir de que lado alguém está pelo assunto da conversa.
+        if (Organizacoes.ParaPrompt(ctx.Pessoas, ctx.Cliente) is { Length: > 0 } grupos)
+            sb.AppendLine(grupos);
+        else if (ctx.Convidados.Count > 0)
             sb.AppendLine($"- Convidados pela agenda: {string.Join(", ", ctx.Convidados)}");
+
         if (ctx.Falantes.Count > 0)
             sb.AppendLine($"- Quem falou: {string.Join(", ", ctx.Falantes)}");
 

@@ -82,27 +82,9 @@ export async function sincronizar() {
 
 function aplicar(novo) {
   estado = novo ?? VAZIO;
-  acenderBolinha();
   // Cópia da lista: um ouvinte que se cancela ao ser chamado — e o da tela de
   // preparo faz exatamente isso ao terminar — mutaria o Set em iteração.
   for (const fn of [...ouvintes]) fn(estado);
-}
-
-/**
- * A bolinha no trilho.
- *
- * Sai do estado, e não de um temporizador: apaga quando o núcleo diz que
- * acabou, inclusive quando acabou em erro. O rótulo acompanha, porque um ponto
- * colorido não diz nada a quem usa leitor de tela.
- */
-function acenderBolinha() {
-  const botao = document.getElementById("ir-reunioes");
-  if (!botao) return;
-
-  const rodando = Boolean(estado.atual);
-  botao.dataset.ocupado = String(rodando);
-  if (rodando) botao.setAttribute("aria-label", `Reuniões — transcrevendo ${estado.atual.nome}`);
-  else botao.removeAttribute("aria-label");
 }
 
 assinar("transcricoes", (evento) => aplicar(evento.transcricoes));

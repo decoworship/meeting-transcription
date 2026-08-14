@@ -42,11 +42,7 @@ public static class RedatorDeAta
 
         // Só gente: "Speaker 3" na lista de participantes faz a ata parecer
         // escrita por quem não estava lá — e foi o que aconteceu na medição.
-        var pessoas = ctx.Convidados.Concat(ctx.Falantes)
-            .Where(n => n is { Length: > 0 } && !PromptDeAta.EhRotuloGenerico(n))
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (pessoas.Count > 0)
-            sb.AppendLine($"**Participantes:** {string.Join(", ", pessoas)}");
+        sb.AppendLine(Participantes(ctx));
 
         sb.AppendLine();
 
@@ -97,6 +93,33 @@ public static class RedatorDeAta
         Canonica(sb, "Observações sobre a transcrição", ata, escritas);
 
         return sb.ToString().TrimEnd() + "\n";
+    }
+
+    /// <summary>
+    /// Os participantes, agrupados por organização quando dá para saber.
+    /// </summary>
+    /// <remarks>
+    /// "Participantes: [agrupados por organização]" é o que o esqueleto da ata
+    /// de cliente pede, e agora dá para cumprir: o domínio do e-mail da agenda
+    /// diz de que lado cada um está.
+    /// </remarks>
+    private static string Participantes(ContextoDaReuniao ctx)
+    {
+        var casa = ctx.Pessoas.Where(p => p.DaCasa == true).Select(p => p.Nome).ToList();
+        var cliente = ctx.Pessoas.Where(p => p.DaCasa == false).Select(p => p.Nome).ToList();
+
+        if (casa.Count > 0 && cliente.Count > 0)
+        {
+            string nomeDoCliente = ctx.Cliente is { Length: > 0 } c ? c : "cliente";
+            return $"**Participantes:** {string.Join(", ", casa)} · "
+                   + $"**{nomeDoCliente}:** {string.Join(", ", cliente)}";
+        }
+
+        var todos = ctx.Pessoas.Select(p => p.Nome)
+            .Concat(ctx.Convidados).Concat(ctx.Falantes)
+            .Where(n => n is { Length: > 0 } && !PromptDeAta.EhRotuloGenerico(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return todos.Count > 0 ? $"**Participantes:** {string.Join(", ", todos)}" : "";
     }
 
     private static void Secao(StringBuilder sb, SecaoDaAta secao)

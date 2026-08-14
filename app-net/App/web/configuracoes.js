@@ -433,6 +433,34 @@ function abaTranscricao(config, gravar) {
   fonetica.appendChild(comoVer);
   painel.appendChild(fonetica);
 
+  // ---- os domínios da casa
+  //
+  // Só os nossos, e não os dos clientes: quem não é da casa é cliente, e essa
+  // regra não precisa de manutenção quando aparece um cliente novo.
+  const casa = bloco("Domínios da nossa organização",
+    "Os e-mails da agenda dizem de que lado da mesa cada pessoa está. Sem isto, "
+    + "a ata deduz pelo assunto da conversa — e numa reunião que fala de um "
+    + "cliente o tempo todo, alguém da equipe vira gente do cliente.");
+
+  const entrada = document.createElement("input");
+  entrada.className = "aa-entrada";
+  entrada.id = "dominios-da-casa";
+  entrada.placeholder = "beegol.com, minhaempresa.com.br";
+  entrada.value = (config.dominios_da_casa ?? []).join(", ");
+  entrada.addEventListener("change", () => gravar({
+    dominios_da_casa: entrada.value.split(",")
+      .map((d) => d.trim().replace(/^@/, "").toLowerCase())
+      .filter(Boolean),
+  }));
+
+  const dica = document.createElement("p");
+  dica.className = "campo__dica";
+  dica.textContent = "Separados por vírgula. Quem tiver e-mail de outro domínio "
+    + "entra como cliente; quem não tiver e-mail na agenda fica sem lado, e a "
+    + "ata não inventa um.";
+  casa.append(entrada, dica);
+  painel.appendChild(casa);
+
   painel.appendChild(obra(
     "O filtro de silêncio ainda não tem chave aqui.",
     "Ele existe no núcleo e só liga por linha de comando."));

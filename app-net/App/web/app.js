@@ -8,6 +8,7 @@ import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
 import { telaDeAtas } from "/atas.js";
+import { ligarBolinhas } from "/trilho.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -111,9 +112,14 @@ function cartao(g) {
  */
 function etiquetaDe(g) {
   const etiqueta = document.createElement("span");
-  if (emCurso(g.caminho)) {
+  const rodando = emCurso(g.caminho);
+  if (rodando) {
     etiqueta.className = "aa-etiqueta";
-    etiqueta.textContent = "Transcrevendo…";
+    // A ata usa o mesmo registro da transcrição, e dizer "Transcrevendo…"
+    // enquanto se escreve a ata de uma reunião já transcrita é mentira — foi o
+    // que o dono do produto viu no primeiro uso.
+    etiqueta.textContent = rodando.tarefa === "ata"
+      ? "Escrevendo a ata…" : "Transcrevendo…";
   } else {
     etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
     etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
@@ -667,6 +673,7 @@ async function inicio() {
   // pode custar minutos — as etapas longas do pipeline não reportam progresso
   // contínuo.
   await sincronizar().catch(() => {});
+  ligarBolinhas();
 
   const hash = location.hash.slice(1);
   if (!hash) return telaDeLista();

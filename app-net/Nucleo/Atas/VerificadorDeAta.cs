@@ -26,12 +26,13 @@ public static class VerificadorDeAta
     /// </param>
     public static AtaGerada Conferir(AtaGerada ata, IReadOnlyList<SegmentoFinal> segmentos,
                                      IReadOnlyList<string> conhecidos,
-                                     IReadOnlyList<Fato> roteiro)
+                                     IReadOnlyList<Fato> roteiro,
+                                     IReadOnlyList<Pessoa>? pessoas = null)
     {
         var notas = new List<string>();
-        string transcricao = string.Join(" ", segmentos.Select(s => s.Text));
 
         ConferirDonos(ata, conhecidos, notas);
+        ConferirLados(ata, pessoas ?? [], notas);
         ConferirDecisoes(ata, segmentos, notas);
         ConferirRiscos(ata, segmentos, notas);
         ConferirOmissoes(ata, roteiro, notas);
@@ -105,6 +106,50 @@ public static class VerificadorDeAta
             }
         }
     }
+
+    /// <summary>
+    /// De que lado a pendência está, pelo domínio do e-mail e não por dedução.
+    /// </summary>
+    /// <remarks>
+    /// O modelo põe do lado do cliente quem ele acha que é do cliente, e o que
+    /// ele acha vem do assunto da conversa: numa reunião que fala de Vivo o
+    /// tempo todo, alguém da equipe vira "Andre Monlevade (Vivo)". Quando a
+    /// agenda deu o e-mail, quem decide é o domínio.
+    /// </remarks>
+    private static void ConferirLados(AtaGerada ata, IReadOnlyList<Pessoa> pessoas,
+                                      List<string> notas)
+    {
+        var sabidos = pessoas.Where(p => p.DaCasa is not null).ToList();
+        if (sabidos.Count == 0) return;      // sem e-mail não se afirma nada
+
+        int trocados = 0;
+        foreach (var acao in ata.Acoes)
+        {
+            string dono = acao.Responsavel.Trim();
+            if (dono.StartsWith('[')) continue;
+
+            var quem = sabidos.FirstOrDefault(
+                p => p.Nome.Contains(dono, StringComparison.OrdinalIgnoreCase)
+                     || dono.Contains(p.Nome, StringComparison.OrdinalIgnoreCase)
+                     || PrimeiroNome(p.Nome).Equals(PrimeiroNome(dono),
+                                                    StringComparison.OrdinalIgnoreCase));
+            if (quem is null) continue;
+
+            if (!string.Equals(acao.Lado, quem.Lado, StringComparison.OrdinalIgnoreCase))
+            {
+                acao.Lado = quem.Lado;
+                trocados++;
+            }
+        }
+
+        if (trocados > 0)
+            notas.Add($"{trocados} pendência(s) mudaram de lado: quem é da casa e quem é do "
+                      + "cliente foi decidido pelo domínio do e-mail da agenda, e não pelo "
+                      + "assunto da conversa.");
+    }
+
+    private static string PrimeiroNome(string n) =>
+        n.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? n;
 
     /// <summary>
     /// Decisão sem eco na transcrição desce para "Pontos em aberto".

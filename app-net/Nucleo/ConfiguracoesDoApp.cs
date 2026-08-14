@@ -51,6 +51,17 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("modelo_de_ata")] public string ModeloDeAta { get; set; }
         = "qwen3-4b-instruct-q4km.gguf";
 
+    /// <summary>
+    /// Os domínios de e-mail da nossa organização.
+    /// </summary>
+    /// <remarks>
+    /// Só os nossos: quem não é da casa é cliente, e essa regra não precisa de
+    /// manutenção quando aparece um cliente novo. É o que permite a ata separar
+    /// as pendências por lado sem o modelo deduzir organização pelo assunto da
+    /// conversa — dedução que já pôs alguém da equipe como sendo do cliente.
+    /// </remarks>
+    [JsonPropertyName("dominios_da_casa")] public List<string> DominiosDaCasa { get; set; } = [];
+
     /// <summary>O tipo de ata sugerido quando o projeto não tem preferência.</summary>
     [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
         = "cliente-update";

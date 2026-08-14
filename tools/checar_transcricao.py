@@ -99,7 +99,7 @@ window.chrome = { webview: {
         r.erro = 'já estou escrevendo a ata de "' + w._registro.atual.nome + '".';
       } else {
         w._registro = { atual: {
-          gravacao: p.gravacao, nome: 'Comitê de dados', etapa: 'modelo',
+          gravacao: p.gravacao, tarefa: 'ata', nome: 'Comitê de dados', etapa: 'modelo',
           fracao: 0.05, texto: 'carregando o modelo',
           comecou_em: '2026-08-14T10:00:00Z', terminou: false,
         }, ultimo: null };
@@ -141,7 +141,7 @@ window.chrome = { webview: {
                + 'Uma de cada vez: as duas disputariam a mesma placa de vídeo.';
       } else {
         w._registro = { atual: {
-          gravacao: p.gravacao,
+          gravacao: p.gravacao, tarefa: 'transcricao',
           nome: { 'C:/g/a': 'Comitê de dados', 'C:/g/b': 'Sprint' }[p.gravacao] ?? 'Kickoff',
           etapa: 'mix', fracao: 0.05, texto: 'somando',
           comecou_em: '2026-08-13T10:00:00Z', terminou: false,
@@ -490,8 +490,11 @@ def main() -> int:
 
             pagina.click("text=Gerar ata")
             pagina.wait_for_selector(".ata .aa-progresso")
-            conferir("gerar mostra o progresso e a bolinha acende",
-                     estado() == "true")
+            # A bolinha da ata é a de Atas, não a de Reuniões: as duas tarefas
+            # dividem o registro, e até 14/08 a tela acendia a errada.
+            conferir("gerar mostra o progresso e a bolinha de Atas acende",
+                     pagina.get_attribute("#ir-atas", "data-ocupado") == "true"
+                     and estado() == "false")
 
             pagina.evaluate("""window.__ataPronta('C:/g/a',
               '# Ata — Teste\\n\\n## Decisões\\n\\n- **decidido** aqui\\n\\n'
@@ -509,7 +512,38 @@ def main() -> int:
                      and pagina.locator(".ata__texto strong").count() >= 2)
             conferir("a pendência vira caixa marcável",
                      pagina.locator(".ata__pendencia input").count() == 1)
-            conferir("a bolinha apaga quando a ata fica pronta", estado() == "false")
+            conferir("a bolinha de Atas apaga quando a ata fica pronta",
+                     pagina.get_attribute("#ir-atas", "data-ocupado") == "false")
+
+            # ---- as três bolinhas, cada uma no seu destino
+            ocupado = lambda id_: pagina.get_attribute(f"#{id_}", "data-ocupado")  # noqa: E731
+
+            pagina.evaluate("window.__gravar(true)")
+            pagina.wait_for_timeout(120)
+            conferir("gravando acende a bolinha do Gravador",
+                     ocupado("ir-gravador") == "true")
+            conferir("e não acende a de Reuniões", ocupado("ir-reunioes") == "false")
+
+            pagina.click("#ir-atas")
+            pagina.wait_for_selector(".ata")
+            pagina.click("text=Refazer ata")
+            pagina.wait_for_selector(".ata .aa-progresso")
+            conferir("escrever ata acende a bolinha de Atas",
+                     ocupado("ir-atas") == "true")
+            conferir("e a de Reuniões continua apagada — era o defeito relatado",
+                     ocupado("ir-reunioes") == "false")
+            conferir("gravação e ata convivem", ocupado("ir-gravador") == "true")
+
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            etiqueta = pagina.inner_text('[data-gravacao="C:/g/a"] .aa-etiqueta')
+            conferir("a lista diz que está escrevendo a ata, não transcrevendo",
+                     etiqueta == "Escrevendo a ata…", etiqueta)
+
+            pagina.evaluate("window.__gravar(false)")
+            pagina.wait_for_timeout(120)
+            conferir("parar de gravar apaga a bolinha do Gravador",
+                     ocupado("ir-gravador") == "false")
 
             navegador.close()
         srv.shutdown()

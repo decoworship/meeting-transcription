@@ -334,6 +334,37 @@ Em ordem de construção. As cinco primeiras são a v1.
 
 ---
 
+## 5.1 Quem é da casa e quem é do cliente
+
+**O domínio do e-mail decide, e não o assunto da conversa.** Pedido do dono do
+produto em 14/08/2026, a partir de um erro concreto: a ata atribuiu uma ação a
+"Andre Monlevade (Vivo)" — Andre é da equipe, e o modelo deduziu a organização
+porque a reunião falava de Vivo o tempo todo.
+
+Como funciona:
+
+1. **a agenda passa a guardar os e-mails.** O `meta.json` ganhou
+   `attendee_emails`, chave nova pela mesma regra do `dropped_samples`: quem lê
+   ignora o que não conhece, então acrescentar é seguro. O e-mail sempre esteve
+   disponível no evento do Google — só era descartado na hora de gravar;
+2. **configura-se só a nossa lista de domínios**, em Ajustes › Transcrição.
+   `beegol.com` na lista significa que todo o resto é cliente. Não se cadastra o
+   domínio de cada cliente: essa regra não precisaria de manutenção hoje e
+   precisaria no dia em que aparecesse um cliente novo;
+3. **o prompt recebe os dois grupos** ("Da nossa equipe: …", "Do cliente (Vivo):
+   …") e a instrução explícita de não deduzir organização pelo assunto;
+4. **o verificador corrige o lado** de cada pendência pelo domínio, e registra
+   quantas mudaram — é fato contra chute, e o chute era do modelo;
+5. **o redator agrupa os participantes** no cabeçalho, que é o que o esqueleto
+   da ata de cliente sempre pediu e não dava para cumprir.
+
+**Sem e-mail, não se afirma nada.** As gravações anteriores a esta versão só
+guardam o nome; nelas a organização fica desconhecida e o verificador não mexe
+no lado que o modelo escolheu. Preferir "não sei" a chutar é a diferença entre
+uma ata que se pode conferir e uma que inventa com confiança.
+
+---
+
 ## 6. As notas do humano têm precedência
 
 Ordem de confiança no prompt, dita explicitamente ao modelo:

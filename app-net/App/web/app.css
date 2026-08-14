@@ -813,3 +813,8 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
 }
+
+/* A bolinha do Gravador é vermelha: é a cor que o app inteiro usa para "está
+ * gravando", do ícone da bandeja ao ponto da tela do Gravador. Usar a cor de
+ * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
+.trilho__ponto--gravando { background: var(--cor-erro); }

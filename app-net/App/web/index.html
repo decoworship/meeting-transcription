@@ -59,9 +59,10 @@
        O Gravador deixou de ser um buraco na Fase 2.5: ele continua vivendo na
        bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
-    <!-- A bolinha marca transcrição em curso. Fica no destino Reuniões porque é
-         de lá que se transcreve e é para lá que se volta ver o resultado; o
-         ponto some quando o núcleo diz que acabou, e não por tempo. -->
+    <!-- Uma bolinha por destino, acesa pelo trabalho daquele destino:
+         transcrever em Reuniões, gravar no Gravador, escrever ata em Atas.
+         Quem as acende é o web/trilho.js, do estado do núcleo — nunca por
+         tempo. -->
     <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
             data-ocupado="false">
       <span class="trilho__icone">
@@ -70,14 +71,20 @@
       </span>
       <span>Reuniões</span>
     </button>
-    <button class="trilho__item" id="ir-gravador" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
+    <button class="trilho__item" id="ir-gravador" type="button" data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
+        <span class="trilho__ponto trilho__ponto--gravando" aria-hidden="true"></span>
+      </span>
       <span>Gravador</span>
     </button>
     <!-- Atas fica abaixo do Gravador: é o terceiro destino de todo dia, e o
          que se visita depois da reunião, não durante. -->
-    <button class="trilho__item" id="ir-atas" type="button">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+    <button class="trilho__item" id="ir-atas" type="button" data-ocupado="false">
+      <span class="trilho__icone">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+        <span class="trilho__ponto" aria-hidden="true"></span>
+      </span>
       <span>Atas</span>
     </button>
     <button class="trilho__item trilho__item--fim" id="ir-config" type="button">

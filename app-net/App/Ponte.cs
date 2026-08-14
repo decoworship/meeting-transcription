@@ -229,6 +229,18 @@ internal sealed class TranscricaoResumo
     /// <summary>A pasta da gravação: é por ela que a tela sabe se é a sua.</summary>
     [JsonPropertyName("gravacao")] public required string Gravacao { get; init; }
     [JsonPropertyName("nome")] public required string Nome { get; init; }
+
+    /// <summary>
+    /// "transcricao" ou "ata".
+    /// </summary>
+    /// <remarks>
+    /// A tela precisa saber qual dos dois está rodando: os dois usam o mesmo
+    /// registro (disputam a mesma placa), e sem isto a lista dizia
+    /// "Transcrevendo…" numa reunião cuja ata estava sendo escrita, com a
+    /// bolinha acesa no destino errado.
+    /// </remarks>
+    [JsonPropertyName("tarefa")] public required string Tarefa { get; init; }
+
     [JsonPropertyName("etapa")] public required string Etapa { get; init; }
     [JsonPropertyName("fracao")] public double Fracao { get; init; }
     [JsonPropertyName("texto")] public required string Texto { get; init; }
@@ -846,6 +858,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     {
         Gravacao = t.Gravacao,
         Nome = t.Nome,
+        Tarefa = t.Tarefa,
         Etapa = t.Etapa,
         Fracao = t.Fracao,
         Texto = t.Texto,
@@ -968,9 +981,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             try
             {
                 var vinculo = DadosDaReuniao.Ler(pasta);
+                var cfg = ConfiguracoesDoApp.Carregar();
+                var (convidados, emails) = ConvidadosDaAgenda(pasta);
+                // Quem é da casa e quem é do cliente sai do domínio do e-mail, e
+                // não de dedução do modelo: ver Nucleo/Atas/Organizacoes.cs.
+                var pessoas = Organizacoes.Classificar(
+                    emails.Count > 0 ? emails : convidados, cfg.DominiosDaCasa);
+
                 var ctx = new ContextoDaReuniao
                 {
                     Titulo = Listar().FirstOrDefault(g => g.Caminho == pasta)?.Titulo,
+                    Convidados = convidados,
+                    Pessoas = pessoas,
                     Cliente = vinculo.Cliente ?? dados.Client,
                     Projeto = vinculo.Projeto ?? dados.Project,
                     Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
@@ -985,8 +1007,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 var roteiro = RoteiroDeFatos.De(dados.Segments);
                 string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
 
-                var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(
-                    ConfiguracoesDoApp.Carregar().ModeloDeAta));
+                var motor = new MotorDeAta(
+                    CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
 
                 var ata = await motor.GerarAsync(prompt, ctx.DuracaoS, e =>
                 {
@@ -995,7 +1017,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 }, trabalho.Token);
 
                 VerificadorDeAta.Conferir(ata, dados.Segments,
-                    [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro);
+                    [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, pessoas);
 
                 File.WriteAllText(Path.Combine(pasta, "ata.md"),
                                   RedatorDeAta.Escrever(ata, tipo, ctx));
@@ -1015,6 +1037,44 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             EmpurrarTranscricoes();
         });
+    }
+
+    /// <summary>
+    /// Os convidados que a agenda gravou, com os e-mails quando existirem.
+    /// </summary>
+    /// <remarks>
+    /// <c>attendee_emails</c> é chave nova (14/08/2026): as gravações anteriores
+    /// só têm os nomes, e nelas a organização de cada um fica desconhecida — o
+    /// que é melhor que fingir saber.
+    /// </remarks>
+    private static (List<string> Nomes, List<string> Emails) ConvidadosDaAgenda(string pasta)
+    {
+        var nomes = new List<string>();
+        var emails = new List<string>();
+        try
+        {
+            string meta = Path.Combine(pasta, "meta.json");
+            if (!File.Exists(meta)) return (nomes, emails);
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(meta));
+            if (!doc.RootElement.TryGetProperty("meeting", out var reuniao))
+                return (nomes, emails);
+
+            if (reuniao.TryGetProperty("attendees", out var a)
+                && a.ValueKind == JsonValueKind.Array)
+                foreach (var x in a.EnumerateArray())
+                    if (x.GetString() is { Length: > 0 } n) nomes.Add(n);
+
+            if (reuniao.TryGetProperty("attendee_emails", out var e)
+                && e.ValueKind == JsonValueKind.Array)
+                foreach (var x in e.EnumerateArray())
+                    if (x.GetString() is { Length: > 0 } m) emails.Add(m);
+        }
+        catch (Exception)
+        {
+            // meta.json ilegível não pode impedir de escrever a ata.
+        }
+        return (nomes, emails);
     }
 
     /// <summary>
