@@ -56,8 +56,8 @@ public sealed class DadosDaReuniao
             string caminho = Path.Combine(pastaDaGravacao, NomeDoArquivo);
             if (File.Exists(caminho))
             {
-                var lido = JsonSerializer.Deserialize<DadosDaReuniao>(
-                    File.ReadAllText(caminho), Opcoes);
+                var lido = JsonSerializer.Deserialize(
+                    File.ReadAllText(caminho), ReuniaoJson.Default.DadosDaReuniao);
                 if (lido is not null && !lido.Vazio) return lido;
             }
         }
@@ -108,14 +108,34 @@ public sealed class DadosDaReuniao
         }
 
         AtualizadoEm = DateTimeOffset.Now.ToString("o");
-        File.WriteAllText(caminho, JsonSerializer.Serialize(this, Opcoes));
+        File.WriteAllText(caminho,
+            JsonSerializer.Serialize(this, ReuniaoJson.Default.DadosDaReuniao));
     }
+}
 
+/// <summary>
+/// O serializador gerado em tempo de compilação para o <c>reuniao.json</c>.
+/// </summary>
+/// <remarks>
+/// <b>Não trocar por <c>JsonSerializer.Serialize&lt;T&gt;</c> com opções.</b> O
+/// app é publicado com <c>PublishTrimmed</c>, e a versão por reflexão é erro de
+/// build ali (IL2026) — compila e testa bem no loop de desenvolvimento, e
+/// reprova só na publicação. Mesmo caminho do <c>MetaJson</c> do gravador.
+/// </remarks>
+[JsonSourceGenerationOptions(
+    WriteIndented = true,
     // Acento literal, como todo JSON deste projeto: nome de cliente tem acento.
-    private static readonly JsonSerializerOptions Opcoes = new()
+    UseStringEnumConverter = false,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(DadosDaReuniao))]
+internal sealed partial class ReuniaoJsonBase : JsonSerializerContext;
+
+internal static class ReuniaoJson
+{
+    public static readonly ReuniaoJsonBase Default = new(new JsonSerializerOptions
     {
         WriteIndented = true,
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
+    });
 }

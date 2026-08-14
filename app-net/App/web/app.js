@@ -6,6 +6,7 @@ import { abrirGaveta, fecharGavetas, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
+import { blocoDeNotas } from "/notas.js";
 
 const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
@@ -81,6 +82,7 @@ function cartao(g) {
   // "convidados" e não "participantes": o número vem da lista da agenda, que
   // diz quem foi chamado e não quem apareceu.
   if (g.convidados > 0) partes.push(`${g.convidados} convidados`);
+  if (g.com_notas) partes.push("com notas");
   for (const p of partes) {
     const span = document.createElement("span");
     span.textContent = p;
@@ -257,6 +259,15 @@ async function telaDePreparo(g) {
   );
   motor.appendChild(linha2);
 
+  // ---- notas escritas durante a reunião
+  //
+  // Antes do vocabulário de propósito: é delas que saem os nomes próprios e as
+  // siglas que o vocabulário quer, e lê-las primeiro é a ordem em que a pessoa
+  // vai querer copiar.
+  const blocoNotas = secao("Notas");
+  const notas = blocoDeNotas(g.caminho, { linhas: 5, aoMudar: (t) => sugerirTermos(t) });
+  blocoNotas.appendChild(notas.raiz);
+
   // ---- vocabulário
   const vocab = secao("Vocabulário");
   const caixa = campo("Termos do projeto", "textarea", { id: "vocabulario", linhas: 4 });
@@ -268,7 +279,44 @@ async function telaDePreparo(g) {
   dica.textContent =
     "Nomes de pessoas, jargão, nomes de sistemas. Sem limite de tamanho — "
     + "o que o modelo escrever parecido é corrigido depois.";
-  vocab.append(caixa, dica);
+  // Os termos que as notas revelaram, oferecidos um a um.
+  //
+  // Sugestão e não injeção: o nome vai para o vocabulário quando a pessoa
+  // clica, porque quem escreveu a nota sabe o que é nome de sistema e o que é
+  // a primeira palavra de uma frase (FASE3.md §3).
+  const sugestoes = document.createElement("div");
+  sugestoes.className = "sugestoes";
+  vocab.append(caixa, dica, sugestoes);
+
+  function sugerirTermos(termos) {
+    sugestoes.replaceChildren();
+    const caixaVocab = document.getElementById("vocabulario");
+    if (!caixaVocab) return;
+
+    const jaTem = new Set(caixaVocab.value.split(",").map((t) => t.trim()).filter(Boolean));
+    const novos = termos.filter((t) => !jaTem.has(t));
+    if (novos.length === 0) return;
+
+    const rotulo = document.createElement("span");
+    rotulo.className = "campo__dica";
+    rotulo.textContent = "Das suas notas:";
+    sugestoes.appendChild(rotulo);
+
+    for (const termo of novos.slice(0, 12)) {
+      const b = document.createElement("button");
+      b.className = "aa-etiqueta sugestao";
+      b.type = "button";
+      b.textContent = `+ ${termo}`;
+      b.title = "Acrescentar ao vocabulário";
+      b.addEventListener("click", () => {
+        const atual = caixaVocab.value.trim();
+        caixaVocab.value = atual ? `${atual}, ${termo}` : termo;
+        b.remove();
+        if (sugestoes.querySelectorAll(".sugestao").length === 0) sugestoes.replaceChildren();
+      });
+      sugestoes.appendChild(b);
+    }
+  }
 
   const acoes = document.createElement("div");
   acoes.className = "acoes";
@@ -282,7 +330,7 @@ async function telaDePreparo(g) {
   acoes.append(botao, aviso, botaoApagarGravacao(g));
 
   const painel = document.createElement("div");
-  forma.append(reuniao, motor, vocab, acoes, painel);
+  forma.append(reuniao, motor, blocoNotas, vocab, acoes, painel);
   tela.appendChild(forma);
 
   // ---- ligações entre os campos

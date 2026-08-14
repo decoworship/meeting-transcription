@@ -86,6 +86,14 @@ window.chrome = { webview: {
       r.cliente = v.cliente ?? null;
       r.projeto = v.projeto ?? null;
     }
+    else if (p.op === 'notas') {
+      r.notas = w._notas[p.gravacao] ?? '';
+      r.termos = w.__termos(r.notas);
+    }
+    else if (p.op === 'salvar-notas') {
+      w._notas[p.gravacao] = p.conteudo;
+      r.termos = w.__termos(p.conteudo ?? '');
+    }
     else if (p.op === 'salvar-reuniao') {
       w._vinculos[p.gravacao] = { cliente: p.cliente, projeto: p.projeto };
     }
@@ -129,10 +137,70 @@ window.chrome = { webview: {
 window.chrome.webview._registro = { atual: null, ultimo: null };
 window.chrome.webview._transcritas = new Set();
 window.chrome.webview._vinculos = {};
+window.chrome.webview._notas = {};
+
+/* O mesmo critério grosseiro do Notas.TermosSugeridos em C#: sigla ou palavra
+   capitalizada que não abre a frase. Aqui só precisa ser bom o bastante para a
+   tela ter o que mostrar — quem tem a regra de verdade é o núcleo, e ela tem
+   os testes dela.
+
+   Sem expressão regular de propósito: esta string atravessa o Python antes de
+   virar JS, e uma barra invertida aqui vira sequência de escape lá. A primeira
+   versão usava /[s,;()]/ e o navegador recusou o script inteiro — a página
+   subiu sem ponte e o teste morreu esperando um seletor. */
+window.chrome.webview.__termos = (texto) => {
+  const QUEBRA = String.fromCharCode(10);
+  const SEPARADORES = ' ,;()[]"';
+  const MARCAS = '-*# ';
+  const FINAIS = '.:!?…';
+  const achados = [];
+
+  for (const linha of (texto || '').split(QUEBRA)) {
+    let limpa = linha;
+    while (limpa.length > 0 && MARCAS.includes(limpa[0])) limpa = limpa.slice(1);
+
+    const palavras = [...limpa]
+      .map((c) => (SEPARADORES.includes(c) ? ' ' : c))
+      .join('')
+      .split(' ')
+      .filter(Boolean);
+
+    palavras.forEach((cru, i) => {
+      let p = cru;
+      while (p.length > 0 && FINAIS.includes(p[p.length - 1])) p = p.slice(0, -1);
+      if (p.length < 3) return;
+      if (p[0].toLowerCase() === p[0].toUpperCase()) return;   // não começa com letra
+
+      const sigla = p === p.toUpperCase();
+      const nomeNoMeio = i > 0 && p[0] === p[0].toUpperCase();
+      if ((sigla || nomeNoMeio) && !achados.includes(p)) achados.push(p);
+    });
+  }
+  return achados;
+};
+
 window.chrome.webview._gravador = {
   gravando: false, mudo: false, mudo_ha_s: 0, cor: 'cinza', status: 'Parado',
-  duracao_s: 0, pasta: 'C:/g', notificacoes: true, usar_agenda: false,
-  agenda_configurada: false, faixas: [],
+  duracao_s: 0, pasta: 'C:/g', gravacao: null, notificacoes: true,
+  usar_agenda: false, agenda_configurada: false, faixas: [],
+};
+
+/** Começa ou para a gravação, do lado do dublê. */
+window.__gravar = (ligado) => {
+  const w = window.chrome.webview;
+  Object.assign(w._gravador, {
+    gravando: ligado, duracao_s: ligado ? 754 : 0,
+    gravacao: ligado ? 'C:/g/agora' : null,
+    status: ligado ? 'Gravando 00:12:34' : 'Parado',
+    cor: ligado ? 'vermelho' : 'cinza',
+    faixas: ligado ? [
+      { nome: 'mic', dispositivo: 'Headset', nivel: 0.05, ja_ouviu: true,
+        mudo: false, silencio_s: 0, desconectado: false, falha: null },
+      { nome: 'system', dispositivo: 'Alto-falantes', nivel: 0.2, ja_ouviu: true,
+        mudo: false, silencio_s: 0, desconectado: false, falha: null },
+    ] : [],
+  });
+  w._emitir({ id: 0, tipo: 'gravador', gravador: w._gravador });
 };
 
 /** O pipeline andando um passo, empurrado pelo teste. */
@@ -325,6 +393,56 @@ def main() -> int:
                      and pagina.locator(".aa-alerta--erro, .alerta--erro").count() == 0)
             conferir("depois de parar dá para recomeçar",
                      pagina.locator("text=Transcrever").count() >= 1)
+
+            # ---- notas da reunião (item 2 da Fase 3)
+            #
+            # O que dói perder é o texto, então o que se confere é ele: escrito
+            # numa tela, encontrado na outra, e sobrevivendo a parar a gravação.
+            pagina.click("#ir-gravador")
+            pagina.wait_for_selector(".gravador")
+            conferir("sem gravação o bloco de notas fica fechado",
+                     pagina.is_disabled(".notas__texto"))
+
+            pagina.evaluate("window.__gravar(true)")
+            pagina.wait_for_timeout(120)
+            conferir("gravando, o bloco abre", not pagina.is_disabled(".notas__texto"))
+
+            pagina.fill(".notas__texto", "decidimos adiar o piloto com a Vivo")
+            pagina.click("text=Marcar momento")
+            pagina.wait_for_timeout(150)
+            marcado = pagina.input_value(".notas__texto")
+            conferir("marcar momento carimba o tempo decorrido", "[00:12:34]" in marcado,
+                     marcado.replace("\n", " ⏎ "))
+
+            # Parar a gravação não pode levar a última frase junto.
+            pagina.evaluate("window.__gravar(false)")
+            pagina.wait_for_timeout(250)
+            guardado = pagina.evaluate("window.chrome.webview._notas['C:/g/agora'] ?? ''")
+            conferir("parar a gravação guarda o que estava escrito",
+                     "adiar o piloto" in guardado and "[00:12:34]" in guardado)
+            conferir("parada, a tela volta a fechar o bloco",
+                     pagina.is_disabled(".notas__texto"))
+
+            # E as notas de uma reunião aparecem na tela dela, com os termos
+            # oferecidos ao vocabulário.
+            pagina.evaluate(
+                "window.chrome.webview._notas['C:/g/c'] = 'combinado com a Vanessa: subir o CSV'")
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".gravacao")
+            pagina.click('[data-gravacao="C:/g/c"]')
+            pagina.wait_for_selector(".notas__texto")
+            pagina.wait_for_timeout(150)
+            conferir("a reunião mostra as notas escritas na gravação",
+                     "Vanessa" in pagina.input_value(".notas__texto"))
+            conferir("os termos das notas viram sugestão de vocabulário",
+                     pagina.locator(".sugestao").count() >= 2,
+                     pagina.inner_text(".sugestoes").replace("\n", " "))
+
+            pagina.click(".sugestao >> nth=0")
+            pagina.wait_for_timeout(80)
+            conferir("clicar na sugestão a joga no vocabulário",
+                     pagina.input_value("#vocabulario").strip() != "",
+                     pagina.input_value("#vocabulario"))
 
             navegador.close()
         srv.shutdown()

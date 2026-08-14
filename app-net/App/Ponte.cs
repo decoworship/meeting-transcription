@@ -101,6 +101,12 @@ internal sealed class Resposta
     /// <summary>O vínculo desta gravação, na resposta a <c>reuniao</c>.</summary>
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
+
+    /// <summary>O que está escrito em notas.md.</summary>
+    [JsonPropertyName("notas")] public string? Notas { get; init; }
+
+    /// <summary>Nomes e siglas achados nas notas, para sugerir como vocabulário.</summary>
+    [JsonPropertyName("termos")] public List<string>? Termos { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
@@ -153,6 +159,16 @@ internal sealed class EstadoDoGravador
 
     [JsonPropertyName("duracao_s")] public double DuracaoS { get; init; }
     [JsonPropertyName("pasta")] public required string Pasta { get; init; }
+
+    /// <summary>
+    /// A pasta <b>desta</b> gravação, e não a raiz onde elas moram.
+    /// </summary>
+    /// <remarks>
+    /// É o endereço para onde as notas escritas durante a reunião vão. Sem ele
+    /// a tela do Gravador saberia que está gravando e não saberia onde — a raiz
+    /// não serve, porque nota pertence a uma reunião, não à coleção delas.
+    /// </remarks>
+    [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
 
     /// <summary>A reunião da agenda que está sendo gravada, quando há uma.</summary>
     [JsonPropertyName("titulo")] public string? Titulo { get; init; }
@@ -288,6 +304,9 @@ internal sealed class GravacaoResumo
     [JsonPropertyName("cliente")] public string? Cliente { get; init; }
     [JsonPropertyName("projeto")] public string? Projeto { get; init; }
 
+    /// <summary>Alguém escreveu notas nesta reunião.</summary>
+    [JsonPropertyName("com_notas")] public bool ComNotas { get; init; }
+
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
 }
 
@@ -387,6 +406,34 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     new DadosDaReuniao { Cliente = p.Cliente, Projeto = p.Projeto }
                         .Salvar(onde);
                     Responder(new Resposta { Id = p.Id });
+                    break;
+                }
+
+                // ─────────────────────────────────── notas da reunião
+
+                case "notas":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Notas = Notas.Ler(onde),
+                        Termos = Notas.TermosSugeridos(Notas.Ler(onde)),
+                    });
+                    break;
+                }
+
+                case "salvar-notas":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Notas.Salvar(onde, p.Conteudo);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Termos = Notas.TermosSugeridos(p.Conteudo ?? ""),
+                    });
                     break;
                 }
 
@@ -651,6 +698,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Status = g.Estado.TextoDeStatus(g.DuracaoAtual, null).Split('\n')[0],
             DuracaoS = g.DuracaoAtual,
             Pasta = g.PastaDeSaida,
+            // Só enquanto grava: o PastaAtual guarda também a da última
+            // gravação, e oferecer o bloco de notas depois de parar faria
+            // escrever numa reunião que já acabou sem a tela dizer qual é.
+            Gravacao = g.Estado.Gravando ? g.PastaAtual : null,
             Titulo = g.Evento?.Titulo,
             Participantes = g.Evento?.NomesDosParticipantes().ToList(),
             Notificacoes = g.Estado.NotificacoesLigadas,
@@ -1242,6 +1293,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Transcrita = File.Exists(Path.Combine(pasta, "transcricao.json")),
             Cliente = dados.Cliente,
             Projeto = dados.Projeto,
+            ComNotas = Notas.Existem(pasta),
             Avisos = avisos,
         };
     }

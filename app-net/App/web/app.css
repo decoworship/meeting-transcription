@@ -244,6 +244,51 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   transition: width .3s ease;
 }
 
+/* ────────────────────────────────────────────────── notas da reunião */
+
+.notas { display: grid; gap: var(--espaco-2); }
+
+.notas__topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+/* O estado de salvamento não pode empurrar o título quando muda de "salvo"
+ * para uma mensagem de erro comprida: o texto fica à direita e quebra ali. */
+.notas__estado { text-align: right; }
+
+/* Monospace não: nota de reunião é prosa, e a fonte do app já é legível em
+ * bloco. Redimensionar só na vertical — largura é do layout, não do usuário. */
+.notas__texto {
+  width: 100%;
+  resize: vertical;
+  min-height: 6rem;
+  line-height: 1.5;
+}
+
+.notas__acoes { display: flex; gap: var(--espaco-2); }
+
+/* Os termos que as notas sugeriram, como etiquetas clicáveis. */
+.sugestoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.sugestao {
+  border: 1px dashed var(--cor-borda);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--texto-pequeno);
+}
+
+.sugestao:hover { border-style: solid; border-color: var(--cor-acao); color: var(--cor-acao); }
+.sugestao:focus-visible { outline: var(--anel-foco); }
+
 /* ─────────────────────────────────────────────────────── transcrição */
 
 .revisao { display: grid; gap: var(--espaco-4); }
