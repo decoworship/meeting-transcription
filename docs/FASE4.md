@@ -194,40 +194,83 @@ semana.
 
 ## 5. Item 3 — emagrecer o payload
 
-5,4 GB brutos comprimem para algo entre 2 e 3 GB. Cabe num link, mas cada 500 MB
-economizados são um download a menos na paciência de quem testa. Três cortes
-candidatos, **todos com a mesma régua: cortar, rodar uma reunião real de ponta a
-ponta (gravar → transcrever → diarizar → ata), e só então manter o corte.**
+> **Executado em 14/08/2026**, a pedido do dono do produto, depois que o
+> primeiro instalador saiu com 2,03 GB. O que segue é o que foi medido, e não o
+> que se supunha.
 
-**5.1 O cuBLAS duplicado — ~570 MB.** A instalação tem duas cópias de cuBLAS: uma
-do torch (`cublasLt64_12.dll` 451 MB + `cublas64_12.dll` 96 MB) e uma do
-llama.cpp (473 MB + 100 MB). Conferido: **não são o mesmo arquivo** — o llama.cpp
-traz o cudart 12.4 de março de 2024, o torch traz o do índice `cu124`. São
-builds diferentes da mesma versão maior de CUDA, o que torna a substituição
-plausível e não garantida. O experimento é apontar o `llama-server` para o cuBLAS
-do torch e conferir que a ata sai igual **e na GPU** — a régua do
-`empacotar_motor_de_ata.sh` já sabe que sem CUDA a ata roda em CPU e ninguém
-avisa.
+A régua de cada corte: `tools/conferir_motores_curto.py`, que recorta 60 s de uma
+gravação real, esconde as DLLs candidatas, sobe os dois motores e exige que os
+dois **subam, achem a GPU e produzam saída**. Um minuto por experimento, contra
+quinze de uma reunião inteira — e o que um trecho curto não pega (degradação de
+qualidade ao longo do tempo) não é o modo de falha em questão: uma DLL ausente
+não piora a transcrição, ela impede o processo de subir.
 
-**5.2 As DLLs de CUDA que o pipeline não usa — até ~700 MB.** `cufft` (279 MB),
-`cusparse` (263 MB), `cusolver` + `cusolverMg` (185 MB) e `curand` (61 MB) vêm
-com o torch por completude, não por necessidade. Nem todas são dispensáveis — o
-`cufft` é suspeito, porque espectrograma na GPU passa por FFT. Uma de cada vez,
-com a régua acima.
+O "achou a GPU" é metade da régua. Sem ela um corte errado não quebra nada: o
+torch cai para CPU em silêncio, tudo "funciona", e o app fica vinte vezes mais
+lento na máquina de quem instalou.
 
-**5.3 Os pacotes que ninguém importa — ~150 MB.** `matplotlib`, `pandas`,
-`sympy`, `fontTools`, `grpc`, `sqlalchemy` chegam como dependência transitiva do
-`pyannote.audio`. O `scipy` e o `sklearn` **ficam**: a clusterização usa os dois.
+### O que saiu
 
-E dois cortes que não são experimento nenhum, só arrumação:
+| corte | bruto | como se soube |
+|---|---|---|
+| **`motores/ata/bin` inteiro** | **1,1 GB** | decisão de desenho, §5.1 |
+| `curand64_10.dll` | 63 MB | nada em `site-packages` a referencia; medido |
+| `cusolverMg64_11.dll` | 78 MB | idem |
+| `tests/`, `test/` | 63 MB | fixtures de pacote, não rodam na máquina de ninguém |
+| `*.pyi` | 7 MB | stubs de tipo, só úteis a quem edita código |
+| os dois `.gguf` | 3,6 GB | já eram excluídos: modelos baixam sob demanda |
 
-- o **GGUF de 1,7B** (1,1 GB) não entra: não é o padrão, e a tela de Modelos o
-  baixa para quem quiser;
-- o `.cache` dentro de `motores/ata/modelos`.
+### O que **não** sai, e por quê
 
-**O que não se corta:** as DLLs `ggml-cpu-*` do llama.cpp, uma por arquitetura de
-CPU. São 15 MB no total e são exatamente o que faz o binário rodar na máquina do
-amigo cujo processador não é este.
+- **`cudnn_engines_precompiled64_9.dll` — 589 MB.** Era o maior candidato
+  isolado, e reprovou: sem ele a diarização morre com *"Could not locate
+  cudnn_engines_precompiled64_9.dll"*. O `cudnn_engines_runtime_compiled` (8 MB)
+  está ao lado, mas o cuDNN **não cai para ele** — falha e pronto;
+- **`cufft` (279 MB), `cusparse` (263 MB), `cusolver` (110 MB), `cublas`
+  (547 MB).** Não precisou de experimento: os quatro estão na **tabela de
+  importações do `torch_cuda.dll`**, que é carregada quando o torch carrega. Sem
+  qualquer um deles, `import torch` falha;
+- **`sympy`, `pandas`, `matplotlib`.** Pareciam órfãos e não são: 86, 7 e 14
+  arquivos do torch e do pyannote os importam. `scipy` e `sklearn` idem — a
+  clusterização usa os dois;
+- as DLLs **`ggml-cpu-*`** do llama.cpp, uma por arquitetura de CPU: 15 MB que
+  são exatamente o que faz o motor rodar na máquina do amigo cujo processador
+  não é este.
+
+### 5.1 O motor de ata deixa de viajar
+
+É o maior corte isolado, e o único que é decisão de desenho e não medição.
+
+`motores/ata/bin` são **1,1 GB** — `ggml-cuda.dll` (513 MB) mais o cuBLAS que o
+llama.cpp traz (547 MB) — para uma funcionalidade que nem toda instalação vai
+usar. Ele passa a ser baixado sob demanda, pela mesma tela e pelo mesmo gesto que
+os modelos já usavam: **641 MB** de duas releases oficiais do llama.cpp no
+GitHub, uma vez só, quando a pessoa quiser a primeira ata.
+
+Três coisas que isso resolve de uma vez:
+
+- **–400 MB no instalador**, que é o arquivo que se manda por link;
+- **nada é hospedado por nós.** A origem é a release oficial, conferível por
+  quem quiser — o mesmo lugar de onde o `empacotar_motor_de_ata.sh` já baixava;
+- **o cuBLAS duplicado deixou de ser um problema.** Havia um experimento previsto
+  — apontar o `llama-server` para o cuBLAS do torch e poupar 547 MB — e ele saiu
+  de cena: o que não viaja não precisa ser deduplicado. Fica anotado para o dia
+  em que o tamanho do *download* incomodar.
+
+O que ele custa, e está registrado: quem gerar a primeira ata espera 641 MB. A
+tela diz isso antes, e `CaminhosDoMotorDeAta.OQueFalta()` passou de constatação
+("o motor não está em `C:\...`") para instrução ("abra Ajustes › Modelos e
+baixe-o — são 641 MB").
+
+### O corte que não é desta fase
+
+O `torch` inteiro — 3,6 GB, dois terços do que sobrou — existe **só para a
+diarização**. Trocá-lo por ONNX (`sherpa-onnx`, 33 MB), que é o que o
+[PLANO.md](PLANO.md) §5 sempre previu e a [FASE6.md](FASE6.md) §3.1 mantém em
+aberto, levaria o instalador para perto de **300 MB**.
+
+Não é uma poda, é a troca de stack que a Fase 0 mediu antes de fazer — e mexe
+justamente na qualidade que o critério E acabou de proteger. Fica onde está.
 
 ---
 

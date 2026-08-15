@@ -98,13 +98,31 @@ Source: "{#Payload}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; Os motores — Python embarcado, os três sidecars, o llama.cpp e os 57 MB de
 ; pesos de diarização. São dezenas de milhares de arquivos.
 ;
-; O que NÃO viaja, e cada exclusão é uma decisão:
-;   *.gguf      os modelos de ata, 2,5 GB cada. Decisão (2) da fase: modelos
-;               baixam na primeira execução, pela tela que já sabe baixá-los;
-;   .cache      o que o huggingface_hub deixa para trás ao baixar;
-;   __pycache__ bytecode desta máquina, que o Python regenera sozinho.
+; O que NÃO viaja, e cada exclusão é uma decisão medida:
+;
+;   *.gguf                  os modelos de ata, 2,5 GB cada. Decisão (2) da fase:
+;                           modelos baixam na primeira execução;
+;   ata\bin                 **1,1 GB** — o llama.cpp inteiro. Ele passou a ser
+;                           baixado sob demanda (Nucleo/Atas/PacoteDoMotorDeAta.cs),
+;                           porque é o segundo maior item do payload e serve a uma
+;                           funcionalidade que nem toda instalação usa;
+;   curand64_10.dll         **63 MB** — nada em site-packages a referencia, e o
+;   cusolverMg64_11.dll     **78 MB**   pipeline roda igual sem as duas. Medido
+;                           com tools/conferir_motores_curto.py: mesmos 19
+;                           segmentos, mesmos 18 turnos, mesma GPU;
+;   tests, test             fixtures dos pacotes Python, 63 MB que nunca rodam
+;                           na máquina de quem usa;
+;   *.pyi                   stubs de tipo, 7 MB só úteis a quem edita código;
+;   .cache                  o que o huggingface_hub deixa para trás ao baixar;
+;   __pycache__             bytecode desta máquina, que o Python regenera.
+;
+; O que **não** dá para cortar, e foi tentado: cudnn_engines_precompiled64_9.dll
+; (589 MB) é obrigatório — sem ele a diarização morre com "Could not locate
+; cudnn_engines_precompiled64_9.dll", sem cair para o compilado em runtime. E
+; cufft, cusparse, cusolver e cublas estão na tabela de importações do
+; torch_cuda.dll: sem qualquer um deles o torch não carrega.
 Source: "{#Motores}\*"; DestDir: "{app}\motores"; \
-  Excludes: "*.gguf,.cache,__pycache__"; \
+  Excludes: "*.gguf,ata\bin,curand64_10.dll,cusolverMg64_11.dll,tests,test,*.pyi,.cache,__pycache__"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\INSTALAR.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "{#Payload}\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion

@@ -37,18 +37,23 @@ Não é preciso instalar Python, CUDA, .NET nem nada. Está tudo dentro.
 
 ---
 
-## A primeira execução: os dois downloads
+## A primeira execução: o que ainda falta baixar
 
-O instalador não traz os modelos dentro — eles somam quase 6 GB, e você
-provavelmente não quer todos.
+O instalador não traz os modelos dentro — eles somam mais de 6 GB, e você
+provavelmente não quer todos. Tudo se baixa em **Ajustes → Modelos**, com barra
+de progresso e o tamanho à vista.
 
-| modelo | tamanho | para quê | quando baixar |
+| o quê | tamanho | para quê | quando baixar |
 |---|---|---|---|
 | **Large v3** | 3,1 GB | transcrever | antes da primeira reunião |
-| **Qwen3 4B** | 2,5 GB | escrever a ata | quando for gerar a primeira ata |
+| **Motor de ata** | 641 MB | rodar o modelo de ata na sua placa | antes da primeira ata |
+| **Qwen3 4B** | 2,5 GB | escrever a ata | antes da primeira ata |
 
 Baixe o **Large v3** antes de precisar dele: numa conexão comum são 10 a 20
 minutos, e você não quer descobrir isso logo depois de uma reunião de uma hora.
+
+Se você não for usar atas, os dois últimos nunca precisam ser baixados — são
+3,1 GB que ficam fora da sua máquina.
 
 O modelo que **separa quem falou** já vem dentro do app. Você não precisa baixar
 nada para isso, e ele funciona sem internet.

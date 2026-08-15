@@ -41,7 +41,13 @@ public sealed record CaminhosDoMotorDeAta(string Servidor, string Modelo)
 
     public string? OQueFalta()
     {
-        if (!File.Exists(Servidor)) return $"o motor de ata não está em {Servidor}";
+        // Desde a Fase 4 o motor não vem no instalador — são 1,1 GB para uma
+        // funcionalidade que nem toda instalação usa. Então "não está lá" é o
+        // estado normal de quem acabou de instalar, e a frase tem que dizer o
+        // que fazer em vez de só constatar um caminho vazio.
+        if (!File.Exists(Servidor))
+            return "o motor de ata ainda não foi baixado — "
+                 + "abra Ajustes › Modelos e baixe-o (são 641 MB)";
         if (!File.Exists(Modelo))
             return $"o modelo de ata não está em {Modelo} — baixe-o em Ajustes › Modelos";
         return null;

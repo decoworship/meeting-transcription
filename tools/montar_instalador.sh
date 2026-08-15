@@ -112,10 +112,12 @@ versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
 for m in asr diarizacao modelos; do
   [[ -f "$MOTORES/$m/motor.py" ]] || reprovar "falta motores/$m/motor.py"
 done
-[[ -f "$MOTORES/ata/bin/llama-server.exe" ]] || reprovar "falta o llama-server — gerar ata vai falhar."
-# Sem esta DLL o llama.cpp cai para CPU e ninguém avisa: a ata sai em 20 minutos
-# em vez de 1, e parece que o app é lento.
-[[ -f "$MOTORES/ata/bin/ggml-cuda.dll" ]] || reprovar "falta ggml-cuda.dll — a ata rodaria em CPU, calada."
+# O motor de ata NÃO viaja mais (1,1 GB, docs/FASE4.md §5): o app o baixa da
+# release oficial do llama.cpp quando fizer falta. Aqui a régua se inverte —
+# conferir que ele está EXCLUÍDO, porque um Excludes com erro de digitação o
+# traria de volta em silêncio, e só o tamanho do arquivo final denunciaria.
+grep -q 'ata\\bin' "$RAIZ/instalador/MeetingApp.iss" \
+  || reprovar "o .iss não exclui mais ata\\bin — o instalador vai engordar 1,1 GB."
 # Os pesos de diarização, que desde a Fase 4 são o que substitui o token.
 [[ -f "$MOTORES/diarizacao/modelos/community-1/config.yaml" ]] \
   || reprovar "faltam os pesos de diarização — rode tools/empacotar_modelos_de_diarizacao.sh."
@@ -123,10 +125,15 @@ done
 [[ -f "$MOTORES/diarizacao/modelos/ATRIBUICAO.md" ]] \
   || reprovar "falta a ATRIBUICAO.md dos pesos de diarização."
 
-# Os .gguf são excluídos pelo .iss. Conferir aqui é conferir a exclusão: um erro
-# de digitação em Excludes acrescentaria 3,6 GB ao instalador em silêncio, e só
-# se descobriria pelo tamanho do arquivo final.
-echo "    (os .gguf presentes em motores/ ficam de fora por Excludes)"
+echo "    (gguf, ata\\bin, curand, cusolverMg, tests e .pyi ficam de fora por Excludes)"
+
+# ── privacidade ──────────────────────────────────────────────────────────────
+# Nada de cliente, projeto, voz ou reunião pode entrar no instalador. A régua
+# roda com os dados reais desta máquina como termo de busca; ver o cabeçalho de
+# tools/conferir_privacidade.py.
+echo "==> conferindo privacidade (leva alguns minutos)"
+python3 "$RAIZ/tools/conferir_privacidade.py" --payload "$PAYLOAD" --motores "$MOTORES" \
+  || reprovar "a régua de privacidade reprovou — veja acima o que vazou."
 
 echo "==> compilando o instalador"
 [[ -f "$ISCC" ]] || reprovar "não achei o ISCC.exe em $ISCC — winget install --id JRSoftware.InnoSetup"

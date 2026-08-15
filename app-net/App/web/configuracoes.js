@@ -443,6 +443,83 @@ function cartaoDeModelo(item) {
   return cartao;
 }
 
+/**
+ * O motor de ata: o programa, e não o modelo.
+ *
+ * Ele deixou de viajar no instalador na Fase 4 — são 1,1 GB descompactados para
+ * uma funcionalidade que nem toda instalação usa, e tirá-lo tirou 400 MB do
+ * arquivo que se manda por link. O bloco existe para que "baixar depois" seja
+ * uma escolha visível e não uma surpresa na hora de gerar a primeira ata.
+ *
+ * São dois downloads da release oficial do llama.cpp no GitHub. Não hospedamos
+ * nada, e a origem é conferível por quem quiser.
+ */
+function blocoDoMotorDeAta() {
+  const b = bloco("Motor de ata",
+    "O programa que roda o modelo de ata na sua placa. Vem separado do app.");
+
+  const dizer = document.createElement("p");
+  dizer.className = "campo__dica";
+  dizer.textContent = "verificando…";
+
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-secundario";
+  botao.type = "button";
+  botao.textContent = "Baixar";
+  botao.hidden = true;
+
+  const barra = document.createElement("div");
+  barra.className = "aa-progresso";
+  barra.hidden = true;
+  barra.appendChild(document.createElement("div"));
+
+  const andamento = document.createElement("span");
+  andamento.className = "campo__dica";
+
+  function desenhar(m) {
+    if (m.instalado) {
+      dizer.textContent = `Instalado — ${tamanho(m.bytes_em_disco)} em disco.`;
+      botao.hidden = true;
+      return;
+    }
+    dizer.textContent = "Ainda não baixado. Sem ele, gerar ata falha na hora — "
+      + `são ${tamanho(m.bytes_do_download)} de download, uma vez só.`;
+    botao.hidden = false;
+  }
+
+  pedir("motor-de-ata")
+    .then((r) => desenhar(r.motor_de_ata))
+    .catch((e) => { dizer.textContent = `não deu para verificar: ${e.message}`; });
+
+  botao.addEventListener("click", async () => {
+    botao.disabled = true;
+    barra.hidden = false;
+    andamento.textContent = "começando…";
+    try {
+      const r = await pedir("baixar-motor-de-ata", {}, (p) => {
+        barra.firstChild.style.width = `${Math.round((p.fracao ?? 0) * 100)}%`;
+        andamento.textContent = p.texto ?? "";
+      });
+      barra.hidden = true;
+      andamento.textContent = "";
+      desenhar(r.motor_de_ata);
+    } catch (e) {
+      // O caminho continua utilizável depois de uma falha — rede cai, e tentar
+      // de novo é só clicar. Daí o botão voltar, em vez de a tela travar.
+      andamento.textContent = `não baixou: ${e.message}`;
+      botao.disabled = false;
+      barra.hidden = true;
+    }
+  });
+
+  const acoes = document.createElement("div");
+  acoes.className = "acoes";
+  acoes.append(botao);
+
+  b.append(dizer, acoes, barra, andamento);
+  return b;
+}
+
 function abaModelos(catalogo, config, gravar) {
   const painel = document.createElement("div");
   painel.className = "painel";
@@ -499,6 +576,8 @@ function abaModelos(catalogo, config, gravar) {
     for (const i of itens) b.appendChild(cartaoDeModelo(i));
     painel.appendChild(b);
   }
+
+  painel.appendChild(blocoDoMotorDeAta());
 
   // Diarização: um bloco que informa, e não oferece.
   //

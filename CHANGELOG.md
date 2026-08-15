@@ -26,7 +26,13 @@ Novo nesta versão, e é o que a torna entregável:
 
 - **versão à vista e bloco de diagnóstico** nos Ajustes, em Geral. O botão copia
   versão, placa, modelos instalados e pasta das gravações — é o que resolve um
-  problema à distância sem vinte perguntas.
+  problema à distância sem vinte perguntas;
+- **o que é grande e opcional se baixa quando faz falta.** O modelo de
+  transcrição, o motor de ata e o modelo de ata ficam fora do instalador, em
+  Ajustes → Modelos, com barra e tamanho à vista. Quem não usa ata nunca baixa os
+  3,1 GB dela;
+- **separar quem falou funciona sem internet**, desde a primeira reunião: os
+  modelos de diarização vêm dentro do app.
 
 O que ainda **não** existe, dito com todas as letras:
 

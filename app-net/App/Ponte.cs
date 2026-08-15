@@ -139,6 +139,9 @@ internal sealed class Resposta
 
     /// <summary>O estado desta instalação, para quem vai relatar um problema.</summary>
     [JsonPropertyName("diagnostico")] public Diagnostico? Diagnostico { get; init; }
+
+    /// <summary>O motor de ata, que desde a Fase 4 se baixa em vez de vir junto.</summary>
+    [JsonPropertyName("motor_de_ata")] public EstadoDoMotorDeAta? MotorDeAta { get; init; }
 }
 
 /// <summary>
@@ -356,6 +359,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
 [JsonSerializable(typeof(Diagnostico))]
+[JsonSerializable(typeof(EstadoDoMotorDeAta))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -610,6 +614,34 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "baixar-pacote":
                     await BaixarPacoteAsync(p);
+                    break;
+
+                case "motor-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        MotorDeAta = PacoteDoMotorDeAta.Estado(),
+                    });
+                    break;
+
+                case "baixar-motor-de-ata":
+                    // 641 MB de duas releases do GitHub, extraídos em
+                    // motores/ata/bin. Ver PacoteDoMotorDeAta.
+                    await PacoteDoMotorDeAta.BaixarAsync(
+                        (fracao, texto) => Responder(new Resposta
+                        {
+                            Id = p.Id,
+                            Tipo = "progresso",
+                            Etapa = "baixando",
+                            Fracao = fracao,
+                            Texto = texto,
+                        }),
+                        CancellationToken.None);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        MotorDeAta = PacoteDoMotorDeAta.Estado(),
+                    });
                     break;
 
                 case "remover-pacote":
