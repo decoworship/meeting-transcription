@@ -384,13 +384,19 @@ As réguas, que param antes de gerar:
 | **zero ocorrências de `hf_token`** | o inverso da régua de hoje: agora a presença é o defeito |
 | nenhum `.gguf` no payload | 2,5 GB entrando por engano no instalador |
 
-**O primeiro artefato, medido em 14/08/2026:**
+**Os artefatos, medidos:**
 
-| | |
-|---|---|
-| payload bruto | 5,4 GB |
-| instalador | **2,03 GB** |
-| tempo de compressão | 24,5 min (lzma2/max, sólido) |
+| | primeiro (14/08) | depois dos cortes (15/08) |
+|---|---|---|
+| payload bruto | 5,4 GB | 4,1 GB |
+| **instalador** | **2,03 GB** | **1,59 GB** |
+| compressão | 24,5 min | 6,8 min |
+
+O corte de 1,3 GB brutos rendeu **440 MB** no instalador — menos do que a razão
+de 2,7× sugeria, e a diferença tem explicação: o que saiu (o `ggml-cuda.dll` e o
+cuBLAS do llama.cpp) já era conteúdo que comprime pior que a média do payload.
+Registrado porque a conta de guardanapo errou para o lado otimista, e a próxima
+estimativa deve descontar isso.
 
 A razão de 2,7× vem de o payload ser dominado por DLLs de CUDA, que comprimem
 bem. Os 24 minutos são o preço de `lzma2/max`, e ele se paga: o instalador é
