@@ -59,14 +59,23 @@ public static class GeradorDeAta
         var roteiro = RoteiroDeFatos.De(dados.Segments);
         string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
 
-        var (contexto, kv) = MotorDeAta.Dimensionar(ctx.DuracaoS);
+        var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(modelo);
         Console.WriteLine($"reunião  {Path.GetFileName(pasta)} · {ctx.DuracaoS / 60:F0} min · "
                           + $"{dados.Segments.Count} trechos");
         Console.WriteLine($"tipo     {tipo.Nome}{(tipo.DoUsuario ? " (do usuário)" : "")}");
         Console.WriteLine($"prompt   {prompt.Length:N0} chars · roteiro com {roteiro.Count} fatos");
-        Console.WriteLine($"motor    contexto {contexto}, KV {kv}");
 
-        var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(modelo));
+        // O dimensionamento agora depende do modelo e da placa, e não só do
+        // relógio — então imprimir aqui exige ler o GGUF, o que só vale se ele
+        // estiver mesmo no lugar. Sem ele, o GerarAsync abaixo já diz o que falta.
+        if (File.Exists(caminhos.Modelo))
+        {
+            var meta = MetadadosDoGguf.Ler(caminhos.Modelo);
+            Console.WriteLine($"modelo   {meta.Nome} · {meta.Camadas} camadas · "
+                              + $"contexto máximo {meta.ContextoMaximo:N0}");
+        }
+
+        var motor = new MotorDeAta(caminhos);
         var relogio = Stopwatch.StartNew();
 
         var ata = await motor.GerarAsync(prompt, ctx.DuracaoS,

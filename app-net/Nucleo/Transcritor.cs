@@ -206,19 +206,22 @@ public sealed class Transcritor(Motores motores)
     {
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
 
-        // O modelo, antes de somar as faixas. Numa instalação nova ele não está
-        // baixado, e descobrir isso depois do mix é fazer o usuário esperar por
-        // um trabalho que vai ser jogado fora. Ver Catalogo.OQueImpede.
-        string escolhido = modelo is { Length: > 0 } ? modelo
-                                                     : ConfiguracoesDoApp.Carregar().ModeloPadrao;
-        if (Catalogo.OQueImpede(escolhido) is { } semModelo)
-            throw new MotorException(semModelo);
-
         string mic = Path.Combine(pastaDaGravacao, "mic.wav");
         string sistema = Path.Combine(pastaDaGravacao, "system.wav");
         foreach (string f in new[] { mic, sistema })
             if (!File.Exists(f))
                 throw new MotorException($"a gravação não tem {Path.GetFileName(f)}");
+
+        // O modelo, depois das faixas e antes do mix. Depois das faixas porque
+        // gravação faltando é problema maior e mais específico; antes do mix
+        // porque somar as duas faixas é trabalho de verdade, e numa instalação
+        // nova o modelo não está lá — fazer o usuário esperar por um trabalho
+        // que vai ser jogado fora é o que esta ordem evita. Ver
+        // Catalogo.OQueImpede.
+        string escolhido = modelo is { Length: > 0 } ? modelo
+                                                     : ConfiguracoesDoApp.Carregar().ModeloPadrao;
+        if (Catalogo.OQueImpede(escolhido) is { } semModelo)
+            throw new MotorException(semModelo);
 
         progresso?.Invoke(new Progresso("mix", 0, "somando as duas faixas"));
         var faixas = Faixas.Ler(mic, sistema);

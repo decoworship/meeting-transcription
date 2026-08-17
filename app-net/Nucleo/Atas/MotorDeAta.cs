@@ -87,20 +87,138 @@ public sealed record ProgressoDaAta(string Etapa, double Fracao, string Texto);
 public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
 {
     /// <summary>
-    /// Quanto contexto pedir, pela duração da reunião.
+    /// Caracteres do prompt por token, medido em português com carimbo de tempo.
     /// </summary>
     /// <remarks>
-    /// Medido na RTX 2060 de 6 GB: o KV custa ~62 KiB por token em q8_0, e é ele
-    /// que decide se cabe — não o modelo. Daí a escada, e daí o q4_0 no degrau
-    /// mais alto: uma reunião de 2 h só cabe com o KV mais apertado (ATA.md §8).
+    /// <para>
+    /// Medido em 15/08/2026 sobre a reunião que falhou: 48.071 caracteres de
+    /// transcrição no formato do prompt viraram ~17.500 tokens, ou
+    /// <b>2,74 caracteres por token</b>. É bem menos que os 3,5 a 4 de prosa
+    /// corrida, e a razão está no formato: <c>[MM:SS] Fulano:</c> em cada linha
+    /// é pontuação e dígito, que tokenizam mal.
+    /// </para>
+    /// <para>
+    /// O valor usado é <b>2,5</b>, e a folga é deliberada: superestimar o
+    /// contexto custa VRAM, subestimar custa a ata inteira depois de o usuário
+    /// já ter esperado.
+    /// </para>
     /// </remarks>
-    public static (int Contexto, string Kv) Dimensionar(double duracaoS)
+    public const double CaracteresPorToken = 2.5;
+
+    /// <summary>
+    /// Tokens reservados para a ata que o modelo vai escrever.
+    /// </summary>
+    /// <remarks>
+    /// O mesmo número vai para o <c>max_tokens</c> da requisição e para a
+    /// reserva no dimensionamento do contexto — eram dois números diferentes
+    /// (3.072 e 4.096) e a divergência é justamente o que produz o pior
+    /// desfecho: o contexto reservado é menor do que o modelo tem permissão para
+    /// escrever, e a ata sai pela metade.
+    /// </remarks>
+    public const int TokensDeSaida = 8192;
+
+    /// <summary>Sobra para os buffers de computação do llama.cpp.</summary>
+    private const long FolgaDeVram = 600L * 1024 * 1024;
+
+    /// <summary>O contexto é arredondado para cima neste múltiplo.</summary>
+    /// <remarks>
+    /// <para>
+    /// Havia uma escada de degraus (8k, 16k, 24k, 32k, 48k, 64k…) e ela se
+    /// mostrou grosseira demais na primeira medição: uma reunião que precisava
+    /// de 51k tokens caía no degrau de 64k, e 64k **não cabem** com a chave em
+    /// q8_0 — então o cache inteiro desabava para q4_0 por causa de 13k tokens
+    /// que ninguém ia usar.
+    /// </para>
+    /// <para>
+    /// Arredondar de 4k em 4k pede o que se precisa, e deixa a chave em q8_0 nos
+    /// casos em que a escada a derrubava sem necessidade.
+    /// </para>
+    /// </remarks>
+    private const int Granularidade = 4096;
+
+    /// <summary>Teto prático: acima disto o cache não cabe em placa alguma.</summary>
+    private const int ContextoMaximoPratico = 131072;
+
+    /// <summary>
+    /// Quanto contexto pedir, a partir do prompt e da placa.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A versão anterior estimava pela duração da reunião, e isso quebrou em
+    /// campo.</b> A escada dava 16k para qualquer reunião de até 45 min; uma
+    /// sessão de trabalho de 39 min produziu <b>19.935 tokens</b> — 508 por
+    /// minuto, contra os ~360 que a escada pressupunha — e o
+    /// <c>llama-server</c> recusou com <c>exceed_context_size_error</c> depois
+    /// de o modelo já ter carregado.
+    /// </para>
+    /// <para>
+    /// O erro não era o número: era medir a coisa errada. <b>Tokens não saem do
+    /// relógio, saem da fala</b> — duas pessoas discutindo sem pausa produzem o
+    /// dobro de uma apresentação com silêncio. E o prompt já existe, inteiro, na
+    /// memória, antes de o motor subir: dá para contar em vez de adivinhar.
+    /// </para>
+    /// <para>
+    /// A quantização do cache segue o que couber, nesta ordem: <c>q8_0</c> nos
+    /// dois (praticamente sem perda), depois <c>q8_0</c> na chave e <c>q4_0</c>
+    /// no valor, e por fim <c>q4_0</c> nos dois. A chave é a última a ceder
+    /// porque é ela que decide onde o modelo presta atenção.
+    /// </para>
+    /// </remarks>
+    /// <param name="caracteresDoPrompt">O prompt montado, em caracteres.</param>
+    /// <param name="modelo">Lido do próprio <c>.gguf</c>.</param>
+    /// <param name="vramBytes">Total da placa. Zero quando não se sabe.</param>
+    public static (int Contexto, string Ctk, string Ctv) Dimensionar(
+        int caracteresDoPrompt, MetadadosDoGguf modelo, long vramBytes)
     {
-        double minutos = duracaoS / 60;
-        if (minutos <= 45) return (16384, "q8_0");
-        if (minutos <= 75) return (24576, "q8_0");
-        if (minutos <= 100) return (32768, "q8_0");
-        return (49152, "q4_0");
+        int precisa = (int)(caracteresDoPrompt / CaracteresPorToken) + TokensDeSaida;
+
+        int teto = modelo.ContextoMaximo > 0
+            ? Math.Min(modelo.ContextoMaximo, ContextoMaximoPratico)
+            : ContextoMaximoPratico;
+
+        // Arredondado para cima, e nunca menor que um contexto de trabalho
+        // mínimo: pedir 5k porque a reunião foi curta economiza VRAM que
+        // ninguém estava disputando.
+        int pedido = Math.Max(
+            Granularidade * 2,
+            (precisa + Granularidade - 1) / Granularidade * Granularidade);
+
+        // Sem saber a VRAM não se inventa limite: pede o que precisa e deixa o
+        // llama.cpp reclamar, que é melhor que recusar por uma conta chutada.
+        long paraCache = vramBytes > 0
+            ? vramBytes - modelo.BytesDoArquivo - FolgaDeVram
+            : long.MaxValue;
+
+        foreach (var (ctk, ctv) in new[] { ("q8_0", "q8_0"), ("q8_0", "q4_0"), ("q4_0", "q4_0") })
+        {
+            long porToken = modelo.BytesDeCachePorToken(ctk, ctv);
+            long cabeNaPlaca = porToken > 0 && paraCache != long.MaxValue
+                ? paraCache / porToken
+                : teto;
+
+            if (pedido <= teto && pedido <= cabeNaPlaca) return (pedido, ctk, ctv);
+        }
+
+        // Chegar aqui é não caber. As duas causas são diferentes e pedem coisas
+        // diferentes de quem lê, então a mensagem separa as duas — dizer "não
+        // cabe na placa" quando o limite é do modelo manda a pessoa comprar
+        // memória que não vai resolver.
+        //
+        // E dizer isso **agora** é o ponto: antes vinha um JSON de erro do
+        // servidor depois de o modelo já ter carregado e o usuário já ter
+        // esperado.
+        if (precisa > teto)
+            throw new InvalidOperationException(
+                $"esta reunião precisa de ~{precisa:N0} tokens de contexto, e o modelo "
+                + $"{modelo.Nome} vai até {teto:N0}. Gere a ata de um trecho menor, ou "
+                + $"escolha um modelo de contexto maior em Ajustes › Modelos.");
+
+        long comQ4 = modelo.BytesDeCachePorToken("q4_0", "q4_0");
+        throw new InvalidOperationException(
+            $"esta reunião precisa de ~{precisa:N0} tokens de contexto e não cabe nesta placa. "
+            + $"Cabem ~{paraCache / comQ4:N0} tokens com o cache mais apertado. "
+            + $"Gere a ata de um trecho menor, ou use um modelo de ata mais leve em "
+            + $"Ajustes › Modelos.");
     }
 
     public async Task<AtaGerada> GerarAsync(
@@ -109,12 +227,18 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     {
         if (caminhos.OQueFalta() is { } falta) throw new InvalidOperationException(falta);
 
-        var (contexto, kv) = Dimensionar(duracaoS);
+        // O modelo diz de quantas camadas e cabeças ele é feito, e a placa diz
+        // quanta memória tem. Com os dois, o contexto é conta e não chute — e a
+        // recusa, quando vier, vem antes de carregar 2,5 GB.
+        var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
+        var (contexto, ctk, ctv) = Dimensionar(prompt.Length, modelo, VramDaPlaca());
         int porta = PortaLivre();
 
-        progresso?.Invoke(new ProgressoDaAta("modelo", 0.05, "carregando o modelo"));
+        progresso?.Invoke(new ProgressoDaAta(
+            "modelo", 0.05,
+            $"carregando o modelo ({contexto / 1024}k de contexto)"));
 
-        using var processo = Subir(porta, contexto, kv);
+        using var processo = Subir(porta, contexto, ctk, ctv);
         try
         {
             using var registroDeMorte = ct.Register(() => Matar(processo));
@@ -133,7 +257,46 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         }
     }
 
-    private Process Subir(int porta, int contexto, string kv)
+    /// <summary>
+    /// A memória total da placa, em bytes. Zero quando não há placa ou não deu.
+    /// </summary>
+    /// <remarks>
+    /// Perguntado ao <c>nvidia-smi</c>, como o bloco de diagnóstico já faz. Zero
+    /// não é erro: significa "não sei", e o dimensionamento trata "não sei" como
+    /// "não imponha limite" — deixar o llama.cpp reclamar é melhor que recusar
+    /// uma reunião por causa de uma conta chutada.
+    /// </remarks>
+    private static long VramDaPlaca()
+    {
+        try
+        {
+            var p = Process.Start(new ProcessStartInfo
+            {
+                FileName = "nvidia-smi",
+                Arguments = "--query-gpu=memory.total --format=csv,noheader,nounits",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            });
+            if (p is null) return 0;
+
+            string saida = p.StandardOutput.ReadToEnd();
+            if (!p.WaitForExit(5_000)) { try { p.Kill(true); } catch { } return 0; }
+            if (p.ExitCode != 0) return 0;
+
+            string primeira = saida.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                                   .FirstOrDefault()?.Trim() ?? "";
+            return long.TryParse(primeira, out long mib) ? mib * 1024 * 1024 : 0;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException
+                                       or InvalidOperationException)
+        {
+            return 0;
+        }
+    }
+
+    private Process Subir(int porta, int contexto, string ctk, string ctv)
     {
         var inicio = new ProcessStartInfo(caminhos.Servidor)
         {
@@ -149,7 +312,11 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         foreach (string a in new[]
         {
             "-m", caminhos.Modelo, "-ngl", "99",
-            "-c", contexto.ToString(), "-ctk", kv, "-ctv", kv,
+            "-c", contexto.ToString(), "-ctk", ctk, "-ctv", ctv,
+            // Flash attention explícita: o cache de V quantizado depende dela, e
+            // o padrão "auto" pode decidir não usá-la e derrubar a alocação de
+            // um contexto que a conta dizia caber.
+            "-fa", "on",
             "--host", "127.0.0.1", "--port", porta.ToString(),
             "--jinja", "--no-warmup",
             // Um slot só: duas gerações em paralelo dividiriam o contexto ao
@@ -213,7 +380,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
             {"role": "user", "content": {{Texto(prompt)}}}
           ],
           "temperature": 0.3,
-          "max_tokens": 4096,
+          "max_tokens": {{TokensDeSaida}},
           "response_format": {
             "type": "json_schema",
             "json_schema": {"name": "ata", "strict": true, "schema": {{AtaGerada.Esquema}}}
@@ -234,8 +401,23 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         if (doc.RootElement.TryGetProperty("error", out var erro))
             throw new InvalidOperationException($"o motor de ata falhou: {Resumir(erro.ToString())}");
 
-        return doc.RootElement.GetProperty("choices")[0]
-            .GetProperty("message").GetProperty("content").GetString()
+        var escolha = doc.RootElement.GetProperty("choices")[0];
+
+        // Truncar é o modo de falha mais confuso deste motor, e ele já aconteceu
+        // em campo: o modelo escreveu uma seção de 14 mil caracteres, bateu no
+        // teto de tokens, e o JSON chegou pela metade. O sintoma era um erro de
+        // desserialização apontando para uma posição de byte — que não diz nada
+        // a quem só queria uma ata.
+        //
+        // O servidor avisa, e basta perguntar.
+        if (escolha.TryGetProperty("finish_reason", out var razao)
+            && razao.GetString() == "length")
+            throw new InvalidOperationException(
+                $"o modelo escreveu mais do que o limite de {TokensDeSaida:N0} tokens e a ata "
+                + "saiu pela metade. Isso costuma ser o modelo se alongando numa seção só; "
+                + "tente outro tipo de ata, ou um modelo melhor em Ajustes › Modelos.");
+
+        return escolha.GetProperty("message").GetProperty("content").GetString()
             ?? throw new InvalidOperationException("o motor de ata devolveu resposta vazia");
     }
 

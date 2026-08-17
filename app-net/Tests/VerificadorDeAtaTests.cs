@@ -248,20 +248,141 @@ public sealed class RedatorDeAtaTests
 /// <summary>O dimensionamento de contexto, que é o que faz caber na placa.</summary>
 public sealed class MotorDeAtaTests
 {
-    [Theory]
-    [InlineData(20, 16384, "q8_0")]
-    [InlineData(45, 16384, "q8_0")]
-    [InlineData(60, 24576, "q8_0")]
-    [InlineData(90, 32768, "q8_0")]
-    [InlineData(122, 49152, "q4_0")]
-    public void ADuracaoEscolheOContextoEOKv(double minutos, int contexto, string kv)
+    /// <summary>O Qwen3-4B como ele é no disco, lido do GGUF em 15/08/2026.</summary>
+    private static MetadadosDoGguf Qwen3_4B => new()
     {
-        // A escada saiu da medição na RTX 2060: o KV custa ~62 KiB por token em
-        // q8_0, e é ele que decide se cabe — não o tamanho do modelo.
-        var (c, k) = MotorDeAta.Dimensionar(minutos * 60);
+        Arquitetura = "qwen3",
+        Nome = "Qwen3-4B-Instruct-2507",
+        ContextoMaximo = 262144,
+        Camadas = 36,
+        CabecasDeKv = 8,
+        DimensaoDaChave = 128,
+        DimensaoDoValor = 128,
+        BytesDoArquivo = 2_497_281_120,
+    };
 
-        Assert.Equal(contexto, c);
-        Assert.Equal(kv, k);
+    private const long Rtx2060 = 6L * 1024 * 1024 * 1024;
+
+    [Fact]
+    public void AReuniaoQueFalhouEmCampoAgoraCabe()
+    {
+        // 14/08/2026: sessão de trabalho de 39 min, 19.935 tokens de prompt. A
+        // escada antiga dava 16k para qualquer coisa até 45 min, e o
+        // llama-server recusou com exceed_context_size_error depois de o modelo
+        // já ter carregado. Este é o caso, com os números reais.
+        int caracteres = 56_000;   // o prompt inteiro daquela reunião
+
+        var (contexto, ctk, ctv) = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, Rtx2060);
+
+        Assert.True(contexto >= 19_935 + 3072,
+                    $"contexto {contexto} não cobre os 19.935 tokens medidos mais a saída");
+        Assert.Equal("q8_0", ctk);
+    }
+
+    [Fact]
+    public void UmaHoraDeConversaDensaCabeNaPlacaDe6Gb()
+    {
+        // 508 tokens por minuto foi a densidade medida naquela reunião. Uma hora
+        // nesse ritmo são ~30.500 tokens, e é o caso que o dono do produto pediu
+        // para garantir.
+        int tokens = 508 * 60;
+        int caracteres = (int)(tokens * MotorDeAta.CaracteresPorToken);
+
+        var (contexto, ctk, ctv) = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, Rtx2060);
+
+        Assert.True(contexto >= tokens + 3072, $"contexto {contexto} é pequeno demais");
+        // Cabe, mas cedendo no cache: em q8_0 nos dois o KV de 32k já passa dos
+        // 2,4 GB que sobram depois do modelo.
+        Assert.Contains("q", ctk);
+        Assert.Contains("q", ctv);
+    }
+
+    [Fact]
+    public void OCacheCedePrimeiroNoValorEDepoisNaChave()
+    {
+        // A chave é a última a ceder porque é ela que decide onde o modelo
+        // presta atenção. A ordem importa e é fácil de inverter sem querer.
+        //
+        // Numa RTX 2060, 32k em q8_0/q8_0 já não cabem: sobram ~2,9 GB depois do
+        // modelo e da folga, e 32.768 x 76,5 KiB são 2,5 GB — passa quando se
+        // soma o degrau seguinte. Daí os dois pontos escolhidos.
+        var curto = MotorDeAta.Dimensionar(20_000, Qwen3_4B, Rtx2060);
+        var longo = MotorDeAta.Dimensionar(100_000, Qwen3_4B, Rtx2060);
+
+        Assert.Equal(("q8_0", "q8_0"), (curto.Ctk, curto.Ctv));
+        Assert.True(longo.Contexto > curto.Contexto);
+        Assert.Equal("q4_0", longo.Ctv);
+        // A chave resistiu: só o valor cedeu.
+        Assert.Equal("q8_0", longo.Ctk);
+    }
+
+    [Fact]
+    public void OQueNaoCabeERecusadoAntesDeCarregarOModelo()
+    {
+        // 200 mil caracteres são ~83 mil tokens: cabem no modelo, não cabem numa
+        // placa de 6 GB. O que se protege aqui é o MOMENTO da recusa: agora, com
+        // números, e não depois de subir 2,5 GB e receber um JSON do servidor.
+        var erro = Assert.Throws<InvalidOperationException>(
+            () => MotorDeAta.Dimensionar(200_000, Qwen3_4B, Rtx2060));
+
+        Assert.Contains("não cabe nesta placa", erro.Message);
+        Assert.Contains("tokens", erro.Message);
+        // Uma saída, e não só um lamento.
+        Assert.Contains("Modelos", erro.Message);
+    }
+
+    [Fact]
+    public void SemSaberAVramNaoSeInventaLimite()
+    {
+        // Numa máquina onde o nvidia-smi não responde, recusar por uma conta
+        // chutada seria pior que deixar o llama.cpp reclamar. O mesmo prompt que
+        // uma RTX 2060 recusa passa aqui, porque não há placa conhecida para
+        // dizer que não.
+        int caracteres = 200_000;
+
+        Assert.Throws<InvalidOperationException>(
+            () => MotorDeAta.Dimensionar(caracteres, Qwen3_4B, Rtx2060));
+
+        var (contexto, _, _) = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, vramBytes: 0);
+        Assert.True(contexto >= 83_072, $"contexto {contexto} foi limitado sem saber a placa");
+    }
+
+    [Fact]
+    public void OContextoNuncaPassaDoQueOModeloSuporta()
+    {
+        // Pedir mais que o treinado não dá erro: dá saída ruim, em silêncio.
+        //
+        // 16k é o menor teto que ainda deixa o motor funcionar, e a conta diz por
+        // quê: a reserva de saída sozinha são 8.192 tokens, então um modelo de
+        // contexto 8k não escreveria ata nenhuma nem com transcrição vazia.
+        var modelinho = Qwen3_4B with { ContextoMaximo = 16384 };
+
+        var (contexto, _, _) = MotorDeAta.Dimensionar(10_000, modelinho, Rtx2060);
+        Assert.True(contexto <= 16384, $"contexto {contexto} passa do máximo do modelo");
+
+        // E quando nem assim cabe, a recusa culpa o modelo — e não a placa, que
+        // mandaria a pessoa comprar memória que não resolveria.
+        var erro = Assert.Throws<InvalidOperationException>(
+            () => MotorDeAta.Dimensionar(40_000, modelinho, Rtx2060));
+
+        Assert.Contains("o modelo", erro.Message);
+        Assert.Contains("16.384", erro.Message.Replace(",", "."));
+    }
+
+    [Fact]
+    public void OCacheDeQ8CustaMaisQueODeQ4()
+    {
+        // A conta que decide tudo: 36 camadas x 8 cabeças x 128, para K e para V.
+        long q8 = Qwen3_4B.BytesDeCachePorToken("q8_0", "q8_0");
+        long q4 = Qwen3_4B.BytesDeCachePorToken("q4_0", "q4_0");
+
+        Assert.InRange(q8 / 1024.0, 74, 80);   // ~76,5 KiB por token
+        Assert.InRange(q4 / 1024.0, 38, 43);   // ~40,5 KiB por token
+
+        // A escala do bloco quantizado conta: q8_0 são 34 bytes por 32 valores,
+        // e ignorá-la subestimaria o cache em 6% — o bastante para a placa
+        // encher no fim de uma reunião longa.
+        Assert.True(q8 > Qwen3_4B.Camadas * Qwen3_4B.CabecasDeKv * 128L * 2);
     }
 
     [Fact]
