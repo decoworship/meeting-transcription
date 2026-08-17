@@ -25,12 +25,39 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
-VERSAO = "2"
+VERSAO = "3"
 
 # O mesmo modelo que o app Python usa. Trocar mudaria o espaço vetorial e
 # invalidaria toda voz já aprendida — os vetores de modelos diferentes não são
 # comparáveis, e a comparação não falha: ela só passa a errar.
 MODELO_DE_VOZ = "pyannote/wespeaker-voxceleb-resnet34-LM"
+PIPELINE_DE_DIARIZACAO = "pyannote/speaker-diarization-community-1"
+
+# Os pesos ao lado deste arquivo, montados por
+# tools/empacotar_modelos_de_diarizacao.sh. Ver docs/FASE4.md §4.
+#
+# São 57 MB, CC-BY-4.0, redistribuídos com atribuição (ATRIBUICAO.md fica junto
+# deles). Estarem aqui é o que permite o binário do app não carregar um token do
+# HuggingFace — e, de quebra, é o que faz a primeira diarização de uma instalação
+# nova não depender de rede nem de portão.
+#
+# Os nomes das pastas casam com os do empacotador. Mudar um sem o outro faz o
+# motor cair silenciosamente no caminho do HuggingFace, que é justamente o que
+# não se quer: ele funcionaria nesta máquina (que tem token e cache) e falharia
+# na de quem instalou.
+_LOCAIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelos")
+
+
+def _pipeline_local() -> str | None:
+    """A pasta do pipeline embarcado, ou ``None`` quando ele não veio junto."""
+    pasta = os.path.join(_LOCAIS, "community-1")
+    return pasta if os.path.isfile(os.path.join(pasta, "config.yaml")) else None
+
+
+def _voz_local() -> str | None:
+    """A pasta do modelo de voz embarcado, ou ``None``."""
+    pasta = os.path.join(_LOCAIS, "wespeaker-voxceleb-resnet34-LM")
+    return pasta if os.path.isfile(os.path.join(pasta, "pytorch_model.bin")) else None
 
 
 def _enviar(**campos) -> None:
@@ -58,17 +85,27 @@ class Pipeline:
         from pyannote.audio import Pipeline as PyannotePipeline
         import torch
 
-        token = os.environ.get("HF_TOKEN")
-        if not token:
-            raise RuntimeError(
-                "HF_TOKEN não está no ambiente; o pyannote precisa dele para "
-                "baixar o modelo na primeira execução."
-            )
-
         # community-1: 6,7 pontos de DER melhor que o 3.1 na medição da Fase 0.
-        self._pipeline = PyannotePipeline.from_pretrained(
-            "pyannote/speaker-diarization-community-1", token=token
-        )
+        #
+        # De onde ele vem, nesta ordem: a pasta ao lado (o app instalado), e só
+        # então o HuggingFace (a máquina de quem desenvolve, que pode não ter
+        # rodado o empacotador). Os pesos são os mesmos nos dois casos — o que
+        # muda é precisar ou não de token e de rede.
+        local = _pipeline_local()
+        if local:
+            _log(f"pipeline local: {local}")
+            self._pipeline = PyannotePipeline.from_pretrained(local)
+        else:
+            token = os.environ.get("HF_TOKEN")
+            if not token:
+                raise RuntimeError(
+                    f"o pipeline de diarização não está em {_LOCAIS} e não há "
+                    "HF_TOKEN no ambiente para baixá-lo. Rode "
+                    "tools/empacotar_modelos_de_diarizacao.sh."
+                )
+            self._pipeline = PyannotePipeline.from_pretrained(
+                PIPELINE_DE_DIARIZACAO, token=token
+            )
         self.dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
         self._pipeline.to(torch.device(self.dispositivo))
         _log(f"pipeline carregado em {self.dispositivo}")
@@ -90,8 +127,14 @@ class Pipeline:
             import torch as _t
             if self.dispositivo == "?":
                 self.dispositivo = "cuda" if _t.cuda.is_available() else "cpu"
-            token = os.environ.get("HF_TOKEN")
-            modelo = Model.from_pretrained(MODELO_DE_VOZ, token=token)
+            # Mesma ordem do pipeline: a pasta ao lado primeiro. O modelo de voz
+            # não tem portão no HuggingFace, mas ele viaja junto pelo ganho que
+            # não é de segredo — a primeira reunião de uma instalação nova não
+            # depende de rede.
+            local = _voz_local()
+            modelo = (Model.from_pretrained(local) if local
+                      else Model.from_pretrained(MODELO_DE_VOZ,
+                                                 token=os.environ.get("HF_TOKEN")))
             if torch.cuda.is_available():
                 modelo = modelo.to(torch.device("cuda"))
             self._voz = Inference(modelo, window="whole")

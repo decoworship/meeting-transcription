@@ -1,0 +1,26 @@
+<Project>
+
+  <!--
+    A versão do app, num lugar só.
+
+    Ela nasce na Fase 4 e existe por um motivo prático: a partir dela o app é
+    entregue a outras pessoas, e "está dando erro" só vira relato utilizável se
+    vier com um número. Ver docs/FASE4.md §3.
+
+    **Zero-major de propósito.** O formato em disco (transcricao.json, reuniao.json,
+    voices.json) ainda pode mudar entre versões; 1.0 seria uma promessa de
+    estabilidade que esta fase não tem como cumprir.
+
+    Três consumidores leem daqui, e é por isso que o valor não fica no .csproj do
+    app:
+
+      - o binário, via AssemblyInformationalVersion (Nucleo/Diagnostico.cs);
+      - o instalador, que mostra o número em "Aplicativos Instalados"
+        (tools/montar_instalador.sh lê esta linha);
+      - o CHANGELOG.md, escrito à mão, que tem que casar com ela.
+  -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

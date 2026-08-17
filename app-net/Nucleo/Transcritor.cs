@@ -28,31 +28,31 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
     }
 
     /// <summary>
-    /// O token do HuggingFace, que o pyannote exige para baixar o modelo.
+    /// O token do HuggingFace, quando esta máquina tem um. Normalmente não tem.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Três fontes, nesta ordem: a variável de ambiente, o arquivo
-    /// <c>%USERPROFILE%\.meeting-recorder\.env</c>, e o <b>token embutido no
-    /// executável</b>. As duas primeiras existem para quem desenvolve poder
-    /// sobrepor; a terceira é a que faz o app funcionar na máquina de quem só
-    /// quer transcrever uma reunião.
+    /// Duas fontes, nesta ordem: a variável de ambiente e o arquivo
+    /// <c>%USERPROFILE%\.meeting-recorder\.env</c>. Havia uma terceira — o token
+    /// embutido no executável —, e ela <b>saiu na Fase 4</b>.
     /// </para>
     /// <para>
-    /// <b>Por que embutir.</b> Criar conta no HuggingFace, aceitar os termos do
-    /// modelo e gerar um token é trabalho de desenvolvedor, e o app não pode
-    /// exigir isso de quem grava reunião — foi a decisão do dono do produto,
-    /// pelo mesmo caminho que as credenciais do Google já tinham seguido. O
-    /// token fica no binário publicado, e nunca no repositório: o
-    /// <c>.csproj</c> só o embute se o arquivo existir na máquina de quem
-    /// publica.
+    /// <b>Por que ela existia, e por que deixou de precisar existir.</b> Criar
+    /// conta no HuggingFace, aceitar os termos do modelo e gerar um token é
+    /// trabalho de desenvolvedor, e o app não pode exigir isso de quem grava
+    /// reunião — decisão do dono do produto, e ela continua valendo. O que mudou
+    /// foi o custo de cumpri-la: dos quatro modelos que o app baixa, só o
+    /// <c>speaker-diarization-community-1</c> tinha portão, ele pesa 32 MB e é
+    /// CC-BY-4.0. Redistribuí-lo dentro do instalador cumpre a mesma decisão sem
+    /// carregar um segredo, e ainda tira a rede do caminho da primeira
+    /// diarização. Ver <c>docs/FASE4.md</c> §4.
     /// </para>
     /// <para>
-    /// Diferente do segredo OAuth do Google, <b>este token é secreto de
-    /// verdade</b> — ele dá acesso à conta HuggingFace de quem publica. Deve
-    /// ser um token de leitura, criado só para isto, e revogável sem afetar
-    /// mais nada. Só é usado na primeira execução de cada máquina, para baixar
-    /// o modelo; depois ele fica no cache local.
+    /// O que sobrou aqui serve a duas situações, as duas de quem desenvolve:
+    /// baixar um modelo de ASR sob demanda, e rodar numa árvore onde
+    /// <c>tools/empacotar_modelos_de_diarizacao.sh</c> ainda não passou. Na
+    /// máquina de quem só usa o app, este método devolve <c>null</c> e nada
+    /// depende disso.
     /// </para>
     /// </remarks>
     public static string? TokenDoHuggingFace()
@@ -75,21 +75,53 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
         }
         catch (IOException)
         {
-            // Arquivo ilegível não pode derrubar a transcrição: cai no embutido.
+            // Arquivo ilegível não pode derrubar a transcrição: segue sem token,
+            // que desde a Fase 4 é o caso normal.
         }
-        return Embutido();
+        return null;
     }
 
-    internal const string RecursoDoToken = "MeetingApp.hf_token.txt";
-
-    private static string? Embutido()
+    /// <summary>
+    /// O ambiente com que todo sidecar Python é iniciado.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Existe porque eram três lugares montando o mesmo dicionário à mão — o
+    /// pipeline, o aprendizado de vozes e o download de modelos. Três cópias de
+    /// uma decisão é a forma mais confiável de garantir que um dia elas
+    /// discordem, e a discordância aqui seria invisível: um motor com telemetria
+    /// ligada e outro não.
+    /// </para>
+    /// <para>
+    /// <b>A telemetria do pyannote fica desligada.</b> A partir da 4.x ele
+    /// exporta um span para <c>otel.pyannote.ai</c> a cada carga de pipeline e a
+    /// cada aplicação, com origem, versão e um id de sessão. Não vai áudio nem
+    /// texto junto — mas a promessa deste app é que a reunião não sai da
+    /// máquina, e um app instalado na máquina de outra pessoa não pede a ela uma
+    /// conexão que ela não sabe que existe. <c>PYANNOTE_METRICS_ENABLED</c> é a
+    /// chave que a própria biblioteca lê (<c>telemetry/metrics.py</c>), e ela
+    /// <b>não tem valor padrão no código</b>: sem a variável, o
+    /// <c>is_metrics_enabled</c> levanta exceção. Defini-la aqui é obrigatório,
+    /// não opcional.
+    /// </para>
+    /// <para>
+    /// <b>O token do HuggingFace é opcional desde a Fase 4.</b> Os pesos de
+    /// diarização viajam dentro do app (docs/FASE4.md §4), então o caso normal é
+    /// não haver token nenhum. Ele continua sendo passado quando existe, para a
+    /// máquina de quem desenvolve — que pode não ter rodado o empacotador — e
+    /// para o download de modelos de ASR sob demanda.
+    /// </para>
+    /// </remarks>
+    public static Dictionary<string, string> Ambiente()
     {
-        using var fluxo = typeof(Motores).Assembly.GetManifestResourceStream(RecursoDoToken);
-        if (fluxo is null) return null;
+        var ambiente = new Dictionary<string, string>
+        {
+            ["PYANNOTE_METRICS_ENABLED"] = "false",
+        };
 
-        using var leitor = new StreamReader(fluxo);
-        string token = leitor.ReadToEnd().Trim();
-        return token.Length > 0 ? token : null;
+        if (TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
+
+        return ambiente;
     }
 
     /// <summary>Diz o que falta, ou <c>null</c> se está tudo no lugar.</summary>
@@ -180,6 +212,17 @@ public sealed class Transcritor(Motores motores)
             if (!File.Exists(f))
                 throw new MotorException($"a gravação não tem {Path.GetFileName(f)}");
 
+        // O modelo, depois das faixas e antes do mix. Depois das faixas porque
+        // gravação faltando é problema maior e mais específico; antes do mix
+        // porque somar as duas faixas é trabalho de verdade, e numa instalação
+        // nova o modelo não está lá — fazer o usuário esperar por um trabalho
+        // que vai ser jogado fora é o que esta ordem evita. Ver
+        // Catalogo.OQueImpede.
+        string escolhido = modelo is { Length: > 0 } ? modelo
+                                                     : ConfiguracoesDoApp.Carregar().ModeloPadrao;
+        if (Catalogo.OQueImpede(escolhido) is { } semModelo)
+            throw new MotorException(semModelo);
+
         progresso?.Invoke(new Progresso("mix", 0, "somando as duas faixas"));
         var faixas = Faixas.Ler(mic, sistema);
 
@@ -191,10 +234,9 @@ public sealed class Transcritor(Motores motores)
         // ASR primeiro, diarização depois, cada um no seu processo: numa placa
         // de 6 GB os dois modelos não cabem juntos, e processos separados fazem
         // a VRAM do primeiro voltar antes de o segundo subir.
-        // O token vai para os dois motores: hoje só a diarização o usa, mas o
-        // faster-whisper também baixa do HuggingFace e um dia pode precisar.
-        var ambiente = new Dictionary<string, string>();
-        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
+        // O mesmo ambiente para os dois motores, montado num lugar só — inclusive
+        // o desligamento da telemetria do pyannote. Ver Motores.Ambiente().
+        var ambiente = Motores.Ambiente();
 
         Transcricao transcricao;
         string[] argsAsr = modelo is { Length: > 0 }

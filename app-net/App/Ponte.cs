@@ -136,6 +136,12 @@ internal sealed class Resposta
 
     /// <summary>Os dispositivos de áudio, para a tela poder escolher.</summary>
     [JsonPropertyName("dispositivos")] public DispositivosDisponiveis? Dispositivos { get; init; }
+
+    /// <summary>O estado desta instalação, para quem vai relatar um problema.</summary>
+    [JsonPropertyName("diagnostico")] public Diagnostico? Diagnostico { get; init; }
+
+    /// <summary>O motor de ata, que desde a Fase 4 se baixa em vez de vir junto.</summary>
+    [JsonPropertyName("motor_de_ata")] public EstadoDoMotorDeAta? MotorDeAta { get; init; }
 }
 
 /// <summary>
@@ -352,6 +358,8 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(PessoaResumo))]
 [JsonSerializable(typeof(PreferenciasDoProjeto))]
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
+[JsonSerializable(typeof(Diagnostico))]
+[JsonSerializable(typeof(EstadoDoMotorDeAta))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -555,6 +563,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
                     break;
 
+                case "diagnostico":
+                    // Fora da thread da UI: o nvidia-smi é um processo filho, e
+                    // esperar por ele aqui congelaria a janela por até 5 s na
+                    // máquina em que ele estiver lento.
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Diagnostico = await Task.Run(() =>
+                            Diagnostico.Coletar(ConfiguracoesDoApp.Carregar(), pastaDasGravacoes)),
+                    });
+                    break;
+
                 case "escolher-pasta":
                     Responder(new Resposta { Id = p.Id, Pasta = EscolherPasta(p.Pasta) });
                     break;
@@ -594,6 +614,34 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "baixar-pacote":
                     await BaixarPacoteAsync(p);
+                    break;
+
+                case "motor-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        MotorDeAta = PacoteDoMotorDeAta.Estado(),
+                    });
+                    break;
+
+                case "baixar-motor-de-ata":
+                    // 641 MB de duas releases do GitHub, extraídos em
+                    // motores/ata/bin. Ver PacoteDoMotorDeAta.
+                    await PacoteDoMotorDeAta.BaixarAsync(
+                        (fracao, texto) => Responder(new Resposta
+                        {
+                            Id = p.Id,
+                            Tipo = "progresso",
+                            Etapa = "baixando",
+                            Fracao = fracao,
+                            Texto = texto,
+                        }),
+                        CancellationToken.None);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        MotorDeAta = PacoteDoMotorDeAta.Estado(),
+                    });
                     break;
 
                 case "remover-pacote":
@@ -1354,11 +1402,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             throw new MotorException(
                 $"o motor de modelos não está em {motores.ScriptModelos}");
 
-        var ambiente = new Dictionary<string, string>();
-        if (Motores.TokenDoHuggingFace() is { Length: > 0 } token) ambiente["HF_TOKEN"] = token;
+        // Cabe no disco? A margem de 10% cobre o que o cache do HuggingFace
+        // gasta além do peso do modelo — blobs mais links, mais o arredondamento
+        // do sistema de arquivos. Sem esta pergunta, o pior desfecho é acabar o
+        // espaço no meio de 3 GB: fica um pacote parcial, e a falha aparece na
+        // próxima transcrição, longe de onde foi causada.
+        long livre = Catalogo.LivreNoDestino(pacote);
+        long preciso = (long)(pacote.TamanhoEsperadoBytes * 1.1);
+        if (livre >= 0 && livre < preciso)
+            throw new InvalidOperationException(
+                $"não cabe: {pacote.Nome} precisa de {preciso / 1_000_000_000.0:0.#} GB "
+                + $"e há {livre / 1_000_000_000.0:0.#} GB livres no disco de destino.");
 
         using (var motor = await MotorSidecar.IniciarAsync(
-                   motores.Python, [motores.ScriptModelos], CancellationToken.None, ambiente))
+                   motores.Python, [motores.ScriptModelos], CancellationToken.None,
+                   Motores.Ambiente()))
         {
             await motor.BaixarAsync(
                 pacote.Repositorio,

@@ -710,6 +710,32 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") fecharGave
  * Existe para desenhar e fotografar cada estado sem depender de clique — e
  * clique automatizado, quando tentado, acertou a janela errada.
  */
+/**
+ * A máquina ainda não tem o modelo de transcrição?
+ *
+ * É a pergunta da primeira execução, e ela nasceu com o instalador da Fase 4:
+ * até então o modelo estava sempre lá, porque a máquina era a de quem o baixou.
+ * Numa instalação nova, cair na lista de gravações vazia não diz o que fazer —
+ * e o que há para fazer é um download de 3 GB que precisa começar antes da
+ * primeira reunião, não durante.
+ *
+ * Só o de transcrição decide isto. O de ata é grande também, mas quem abre o app
+ * pela primeira vez quer gravar e transcrever; mandá-lo para a tela de Modelos
+ * por causa da ata seria responder uma pergunta que ele ainda não fez.
+ *
+ * Falhar aqui não pode custar a tela: sem resposta, segue para a lista, que é o
+ * comportamento de sempre.
+ */
+async function faltaModelo() {
+  try {
+    const { catalogo } = await pedir("catalogo");
+    const asr = catalogo.find((i) => i.pacote.familia === "asr" && i.em_uso);
+    return asr ? asr.estado !== "instalado" : false;
+  } catch {
+    return false;
+  }
+}
+
 async function inicio() {
   // Antes de qualquer tela: se já havia uma transcrição rodando quando esta
   // página subiu, a bolinha tem que acender agora. Esperar o próximo evento
@@ -719,7 +745,7 @@ async function inicio() {
   ligarBolinhas();
 
   const hash = location.hash.slice(1);
-  if (!hash) return telaDeLista();
+  if (!hash) return (await faltaModelo()) ? abrirAjustes("modelos") : telaDeLista();
 
   // "revisao=1&falantes" — a parte depois do & abre um painel por cima, que é
   // o que não dá para alcançar sem clique.

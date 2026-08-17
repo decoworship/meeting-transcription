@@ -77,4 +77,33 @@ public sealed class TranscritorTests : IDisposable
 
         Assert.Contains("mic.wav", e.Message);
     }
+
+    [Fact]
+    public void ATelemetriaDoPyannoteSaiDesligadaEmTodoSidecar()
+    {
+        // A chave NÃO tem valor padrão do lado do pyannote: sem ela o
+        // is_metrics_enabled levanta ValueError e o motor morre ao carregar o
+        // pipeline. Então esta não é uma preferência — é obrigação, e é por isso
+        // que ela mora no Ambiente() e não em cada chamador.
+        //
+        // O valor é "false" porque a promessa do app é que a reunião não sai da
+        // máquina, e o pyannote 4.x exporta um span para otel.pyannote.ai a cada
+        // carga de pipeline. Ver Motores.Ambiente().
+        Assert.Equal("false",
+            MeetingApp.Nucleo.Motores.Ambiente()["PYANNOTE_METRICS_ENABLED"]);
+    }
+
+    [Fact]
+    public void NenhumSegredoDoHuggingFaceVaiEmbutidoNoBinario()
+    {
+        // A régua da Fase 4, em código e não só no publicar.sh: o .exe é
+        // entregue a outras pessoas, e um token embutido vai junto para a
+        // máquina delas. O recurso se chamava "MeetingApp.hf_token.txt" e
+        // reintroduzi-lo é uma linha de .csproj — barato de fazer sem querer,
+        // e invisível até alguém rodar strings.
+        var recursos = typeof(MeetingApp.Nucleo.Motores).Assembly
+            .GetManifestResourceNames();
+
+        Assert.DoesNotContain(recursos, r => r.Contains("hf_token"));
+    }
 }

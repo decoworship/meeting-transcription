@@ -30,6 +30,21 @@ function dia(iso) {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("pt-BR");
 }
 
+/**
+ * O diagnóstico, pedido uma vez por sessão.
+ *
+ * Duas telas o querem — o bloco "Sobre" e o aviso de placa em Modelos — e ele
+ * custa um `nvidia-smi`, que é processo filho. Nem a versão nem a placa mudam
+ * enquanto o app está aberto, então a promessa é guardada e reaproveitada. O que
+ * muda (quais modelos estão em disco) não sai daqui: quem responde isso é o
+ * catálogo, relido a cada recarga da tela.
+ */
+let _diagnostico = null;
+function diagnostico() {
+  _diagnostico ??= pedir("diagnostico").then((r) => r.diagnostico);
+  return _diagnostico;
+}
+
 function bloco(titulo, texto) {
   const b = document.createElement("section");
   b.className = "bloco";
@@ -163,8 +178,66 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
     + "para o cliente ou para o time.";
 
   pastas.append(campoPasta, campoExport, campoAtas, dica);
-  painel.append(pastas);
+  painel.append(pastas, blocoSobre());
   return painel;
+}
+
+/**
+ * Versão e diagnóstico.
+ *
+ * Nasceu na Fase 4, quando o app passou a ser instalado em máquina que não é a
+ * de quem o compila. A partir daí "está dando erro" só vira relato utilizável
+ * com um número de versão junto — e as três perguntas seguintes ("achou a
+ * placa?", "o modelo chegou a baixar?", "para onde estão indo as gravações?")
+ * são as mesmas toda vez. O botão responde as quatro de uma vez.
+ *
+ * O bloco vem do núcleo pronto (Nucleo/Diagnostico.cs) e não é remontado aqui:
+ * o texto que a pessoa cola e o texto que ela vê na tela têm que ser o mesmo.
+ */
+function blocoSobre() {
+  const b = bloco("Sobre",
+    "A versão instalada, e o bloco que ajuda a resolver um problema à distância.");
+
+  const linha = document.createElement("p");
+  linha.className = "campo__dica";
+  linha.textContent = "carregando…";
+
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-secundario";
+  botao.type = "button";
+  botao.textContent = "Copiar diagnóstico";
+  botao.disabled = true;
+
+  let texto = "";
+  diagnostico().then((d) => {
+    texto = d.texto;
+    // A versão e a placa na linha visível: são as duas que a pessoa quer saber
+    // sem clicar em nada. O resto está no bloco copiado.
+    linha.textContent = `MeetingApp ${d.versao} — `
+      + (d.placa ?? "sem placa NVIDIA; a transcrição vai rodar em CPU");
+    botao.disabled = false;
+  }).catch((e) => {
+    linha.textContent = `não deu para ler o diagnóstico: ${e.message}`;
+  });
+
+  botao.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      botao.textContent = "Copiado";
+      setTimeout(() => { botao.textContent = "Copiar diagnóstico"; }, 2000);
+    } catch {
+      // Sem área de transferência, mostrar o texto ainda resolve: dá para
+      // selecionar e copiar à mão. Falhar em silêncio, não.
+      linha.textContent = texto;
+    }
+  });
+
+  const acoes = document.createElement("div");
+  acoes.className = "acoes";
+  acoes.append(botao);
+
+  b.append(linha, acoes);
+  return b;
 }
 
 // ───────────────────────────────────────────────────────── aba Gravador
@@ -370,15 +443,113 @@ function cartaoDeModelo(item) {
   return cartao;
 }
 
+/**
+ * O motor de ata: o programa, e não o modelo.
+ *
+ * Ele deixou de viajar no instalador na Fase 4 — são 1,1 GB descompactados para
+ * uma funcionalidade que nem toda instalação usa, e tirá-lo tirou 400 MB do
+ * arquivo que se manda por link. O bloco existe para que "baixar depois" seja
+ * uma escolha visível e não uma surpresa na hora de gerar a primeira ata.
+ *
+ * São dois downloads da release oficial do llama.cpp no GitHub. Não hospedamos
+ * nada, e a origem é conferível por quem quiser.
+ */
+function blocoDoMotorDeAta() {
+  const b = bloco("Motor de ata",
+    "O programa que roda o modelo de ata na sua placa. Vem separado do app.");
+
+  const dizer = document.createElement("p");
+  dizer.className = "campo__dica";
+  dizer.textContent = "verificando…";
+
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-secundario";
+  botao.type = "button";
+  botao.textContent = "Baixar";
+  botao.hidden = true;
+
+  const barra = document.createElement("div");
+  barra.className = "aa-progresso";
+  barra.hidden = true;
+  barra.appendChild(document.createElement("div"));
+
+  const andamento = document.createElement("span");
+  andamento.className = "campo__dica";
+
+  function desenhar(m) {
+    if (m.instalado) {
+      dizer.textContent = `Instalado — ${tamanho(m.bytes_em_disco)} em disco.`;
+      botao.hidden = true;
+      return;
+    }
+    dizer.textContent = "Ainda não baixado. Sem ele, gerar ata falha na hora — "
+      + `são ${tamanho(m.bytes_do_download)} de download, uma vez só.`;
+    botao.hidden = false;
+  }
+
+  pedir("motor-de-ata")
+    .then((r) => desenhar(r.motor_de_ata))
+    .catch((e) => { dizer.textContent = `não deu para verificar: ${e.message}`; });
+
+  botao.addEventListener("click", async () => {
+    botao.disabled = true;
+    barra.hidden = false;
+    andamento.textContent = "começando…";
+    try {
+      const r = await pedir("baixar-motor-de-ata", {}, (p) => {
+        barra.firstChild.style.width = `${Math.round((p.fracao ?? 0) * 100)}%`;
+        andamento.textContent = p.texto ?? "";
+      });
+      barra.hidden = true;
+      andamento.textContent = "";
+      desenhar(r.motor_de_ata);
+    } catch (e) {
+      // O caminho continua utilizável depois de uma falha — rede cai, e tentar
+      // de novo é só clicar. Daí o botão voltar, em vez de a tela travar.
+      andamento.textContent = `não baixou: ${e.message}`;
+      botao.disabled = false;
+      barra.hidden = true;
+    }
+  });
+
+  const acoes = document.createElement("div");
+  acoes.className = "acoes";
+  acoes.append(botao);
+
+  b.append(dizer, acoes, barra, andamento);
+  return b;
+}
+
 function abaModelos(catalogo, config, gravar) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
+  // O aviso de placa, quando não há placa.
+  //
+  // A primeira versão instalável só traz o caminho CUDA (docs/FASE4.md §2,
+  // decisão 4). Sem NVIDIA o app funciona — o faster-whisper e o llama.cpp caem
+  // para CPU sozinhos —, mas uma reunião de uma hora passa a levar horas. Dizer
+  // isso aqui é a diferença entre um app lento e um app que parece travado.
+  //
+  // Entra por cima, e não some depois: quem instalou numa máquina sem placa
+  // precisa dessa informação toda vez que escolher um modelo, não só na
+  // primeira.
+  const avisoDePlaca = document.createElement("div");
+  painel.appendChild(avisoDePlaca);
+  diagnostico().then((d) => {
+    if (d.placa) return;
+    avisoDePlaca.appendChild(alerta(
+      "Não encontrei placa NVIDIA nesta máquina. O app funciona, mas transcreve "
+      + "pela CPU — uma reunião de uma hora pode levar algumas horas. Modelos "
+      + "menores (Medium, Small) ajudam bastante nesse caso.", "atencao"));
+  }).catch(() => {
+    // Sem diagnóstico não se afirma nada: um aviso errado sobre a placa é pior
+    // que aviso nenhum.
+  });
+
   for (const [familia, titulo, texto, chaveConfig, padrao] of [
     ["asr", "Transcrição", "Qual modelo transforma áudio em texto.",
      "modelo_padrao", "large-v3"],
-    ["diarizacao", "Diarização", "Qual modelo separa quem falou.",
-     "diarizacao_padrao", "community-1"],
     // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
     // quem abre o .gguf é o llama.cpp, por caminho.
     ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
@@ -406,12 +577,41 @@ function abaModelos(catalogo, config, gravar) {
     painel.appendChild(b);
   }
 
+  painel.appendChild(blocoDoMotorDeAta());
+
+  // Diarização: um bloco que informa, e não oferece.
+  //
+  // Ela tinha cartão e seletor até a Fase 4, e os dois mentiam de formas
+  // diferentes. O cartão media o cache do HuggingFace, que o motor deixou de
+  // ler quando os pesos passaram a viajar dentro do instalador — numa
+  // instalação nova ele diria "ausente" sobre uma diarização que funciona. E o
+  // seletor nunca chegou ao pipeline: era colhido, salvo e ignorado
+  // (docs/FASE6.md §4.6).
+  //
+  // O que sobrou é o que a pessoa de fato quer saber olhando aqui: qual modelo
+  // separa os falantes, e por que ele não aparece para baixar.
+  const diar = bloco("Diarização", "Qual modelo separa quem falou.");
+  const dizerDiar = document.createElement("p");
+  dizerDiar.className = "campo__dica";
+  dizerDiar.textContent = "Pyannote Community 1, e ele já vem dentro do app — "
+    + "são 57 MB instalados junto, não há o que baixar nem o que escolher. "
+    + "Separar falantes funciona sem internet desde a primeira reunião.";
+  diar.appendChild(dizerDiar);
+  painel.appendChild(diar);
+
   const nota = document.createElement("p");
   nota.className = "campo__dica";
-  nota.textContent = "Os modelos de transcrição e diarização também são baixados "
-    + "sozinhos na primeira vez que fizerem falta; baixar por aqui só evita a "
-    + "espera na hora errada. O de ata não: sem ele baixado, gerar ata falha na "
-    + "hora — são 2,5 GB, e baixá-los no meio de um clique seria pior.";
+  // O texto mudou na Fase 4, e o motivo é que o comportamento mudou.
+  //
+  // Antes o faster-whisper baixava 3 GB sozinho na primeira transcrição — sem
+  // barra, sem anunciar o tamanho, no meio de um clique. Agora o app confere
+  // antes e manda para cá, onde existe barra de progresso e o tamanho está
+  // escrito. E a diarização não baixa mais nada: os pesos dela vêm dentro do
+  // instalador.
+  nota.textContent = "A transcrição e a ata precisam do modelo baixado antes: "
+    + "o app não começa um download de gigabytes no meio de um clique. É aqui "
+    + "que se baixa, com barra e tamanho à vista. A diarização não aparece para "
+    + "baixar porque ela já vem dentro do app.";
   painel.appendChild(nota);
 
   return painel;

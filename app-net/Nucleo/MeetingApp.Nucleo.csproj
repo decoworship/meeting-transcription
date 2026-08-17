@@ -19,17 +19,30 @@
   </ItemGroup>
 
 
-  <!-- Token do HuggingFace embutido no binário publicado, para quem recebe o
-       app não precisar criar conta, aceitar termos de modelo e gerar token.
-       O arquivo NÃO vive no repositório: o build pega o do perfil de quem
-       publica, e simplesmente não embute nada se ele não estiver lá.
+  <!-- ── O token do HuggingFace saiu daqui na Fase 4 ────────────────────────
 
-       Publicando do WSL, onde não há USERPROFILE, passe o caminho:
-         dotnet publish ... -p:TokenHuggingFace=/mnt/c/Users/<voce>/.meeting-recorder/hf_token.txt
+       Até a Fase 3, um token de leitura ia embutido no binário publicado, para
+       quem recebesse o app não precisar criar conta, aceitar termos e gerar
+       token. Funcionava numa máquina só. Deixou de funcionar quando o app
+       passou a ser instalado na máquina de outra pessoa: o token vai junto, e
+       `strings` o encontra.
 
-       ATENÇÃO: este token dá acesso à conta HuggingFace de quem publica —
-       diferente do segredo OAuth do Google, que não é secreto para apps
-       instalados. Use um token só de leitura, criado para isto e revogável. -->
+       O que o substituiu: os 57 MB de pesos de diarização viajam DENTRO do
+       instalador, sob CC-BY-4.0 e com atribuição, e o motor os carrega por
+       caminho local (motores/diarizacao/motor.py, e
+       tools/empacotar_modelos_de_diarizacao.sh). Só o community-1 tinha portão;
+       o whisper e o GGUF de ata são abertos e continuam sendo baixados sob
+       demanda, sem token nenhum.
+
+       Verificado antes de trocar, e é o critério E da fase: a mesma gravação,
+       diarizada pelos dois caminhos, deu 602 segmentos idênticos — mesmos
+       falantes, mesmos instantes (tools/conferir_diarizacao_local.py).
+
+       O token continua sendo LIDO do ambiente e de %USERPROFILE%\.meeting-recorder\.env
+       (ver Motores.TokenDoHuggingFace), para a máquina de quem desenvolve e
+       ainda não rodou o empacotador. O que não existe mais é a terceira fonte,
+       a embutida. Ver docs/FASE4.md §4. -->
+
   <!-- As skills de ata, embutidas: são a instrução que o motor de ata manda ao
        modelo, e ficam dentro do binário pelo mesmo motivo da interface — um
        arquivo solto ao lado do .exe é mais uma coisa para o instalador acertar,
@@ -48,14 +61,6 @@
     <EmbeddedResource Include="../../assets/atas/kickoff.md" LogicalName="MeetingApp.atas.kickoff.md" />
     <EmbeddedResource Include="../../assets/atas/resultados.md" LogicalName="MeetingApp.atas.resultados.md" />
     <EmbeddedResource Include="../../assets/atas/daily.md" LogicalName="MeetingApp.atas.daily.md" />
-  </ItemGroup>
-
-  <PropertyGroup>
-    <TokenHuggingFace Condition="'$(TokenHuggingFace)' == ''">$(USERPROFILE)\.meeting-recorder\hf_token.txt</TokenHuggingFace>
-  </PropertyGroup>
-
-  <ItemGroup Condition="Exists('$(TokenHuggingFace)')">
-    <EmbeddedResource Include="$(TokenHuggingFace)" LogicalName="MeetingApp.hf_token.txt" />
   </ItemGroup>
 
 </Project>

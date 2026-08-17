@@ -3,17 +3,22 @@
 Três frentes, em ordem de dependência: validar o áudio gravado, melhorar o
 gravador, redesenhar a interface.
 
-> **Onde o plano está hoje (13/08/2026).** As fases 0, 1, 2 e 2.5 estão
-> concluídas: existe **um** app Windows nativo que grava na bandeja e transcreve
-> na janela, sem Python de interface e sem Docker. A ordem do que falta foi
-> **reordenada** neste dia — features, depois instalador, depois cosmética. A
-> lista de fases atualizada está em §5, "Fases"; a fase corrente tem carta
-> própria em [FASE3.md](FASE3.md).
+> **Onde o plano está hoje (15/08/2026).** As fases 0 a 4 estão concluídas:
+> existe **um app que se instala**, grava na bandeja, transcreve, separa
+> falantes e escreve a ata — e ele já rodou numa máquina que não é a de quem o
+> compilou. O que falta é acabamento visual (Fase 5) e qualidade da transcrição
+> (Fase 6). A lista completa está em §5, "Fases".
 >
-> **Acrescentado em 14/08/2026:** uma **Fase 6**, de qualidade da transcrição,
-> depois da 5 ([FASE6.md](FASE6.md)). Ela traz junto uma tarefa que começa
-> agora e não espera a fase: transcrever as reuniões **em paralelo por outras
-> fontes** e guardar as saídas junto da gravação.
+> **A dívida que a Fase 4 deixou aberta e não estava prevista:** não há rota de
+> atualização. Ver [FASE4-HANDOFF.md](FASE4-HANDOFF.md) §6.1 — ela precisa ser
+> decidida antes ou junto da Fase 5, porque toda correção das duas fases
+> seguintes depende de um caminho até quem já instalou.
+>
+> **Acrescentado em 14/08/2026:** uma **Fase 6**, de revisões, depois da 5
+> ([FASE6.md](FASE6.md)) — cada item com o gatilho que justifica fazê-lo. Ela
+> traz junto uma tarefa que **começa agora e não espera a fase**: transcrever e
+> resumir as reuniões **em paralelo por outras fontes** e guardar as saídas
+> junto da gravação.
 
 ---
 
@@ -766,9 +771,20 @@ reunião. Carta em [FASE3.md](FASE3.md), estado final em
 > armadilha medida: o build de CUDA tem que casar com o driver — o 13.3 falha na
 > máquina do usuário e o 12.4 funciona.
 
-**Fase 4 — instalador.** Inno Setup, download dos modelos na primeira execução,
-migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
-código se e quando sair da própria máquina.
+**Fase 4 — instalador.** ✅ **Concluída em 15/08/2026.** Inno Setup por usuário,
+modelos e motor de ata baixados sob demanda, e o token do HuggingFace fora do
+binário — os pesos de diarização passaram a viajar dentro do app. Carta em
+[FASE4.md](FASE4.md), estado final em [FASE4-HANDOFF.md](FASE4-HANDOFF.md),
+texto para quem recebe em [INSTALAR.md](INSTALAR.md).
+
+> **1,59 GB**, e fechou pelo critério que importa: o instalador foi para a
+> máquina de um amigo e funcionou. Assinatura de código continua de fora.
+>
+> Ela deixa para as fases seguintes uma dívida que a própria carta subestimou:
+> **não há rota de atualização**. Existe um amigo com 0.1.0 instalado e nenhum
+> jeito de ele saber que saiu uma versão nova. O handoff §6.1 desenha os três
+> degraus, e traz o número que decide o desenho: o `.exe` tem 18,5 MB e os
+> motores têm 4,1 GB, então **quase toda versão nova é um arquivo de 18,5 MB**.
 
 **Fase 5 — acabamento visual.** O que era a Fase 3: o redesign da interface com
 o AA Design System (§3), sobre uma interface cujo conjunto de telas já parou de
@@ -781,21 +797,17 @@ anteriores marcaram como "revisitar" foi para lá, e cada item tem um **gatilho*
 gatilhos vira lista de desejos, e lista de desejos se executa pela ordem de quem
 gosta mais, não pela ordem do que dói.
 
-**Fase 6 — a qualidade do que sai.** Acrescentada em 14/08/2026, depois de
-comparar a transcrição do app com a do Notion na mesma reunião. Carta em
-[FASE6.md](FASE6.md). O vocabulário do projeto, passado como `hotwords`, colapsa
-a segmentação do ASR em 3,8× — e é isso que quebra a atribuição de falantes e
-contamina os vetores de voz, além de custar fala e 4,6× no tempo de
-decodificação. A fase resolve o trade-off com medição, fecha o gate do VAD 0,15
-que está aberto desde a Fase 1, e conserta o aprendizado de voz.
-
-> Vem **depois da Fase 5** por decisão do dono do produto: nada nela bloqueia a
-> ata, o instalador ou o acabamento, e tudo nela melhora o que o app já entrega.
-> Mas ela nasce de **uma** reunião, e por isso a §10 da carta abre uma tarefa
-> que **começa agora e roda em paralelo às fases 3 a 5**: transcrever as
-> reuniões em paralelo por outras fontes — Notion, Teams/Meet, o próprio app sem
-> `hotwords` — e guardar as saídas junto da gravação. Sem esse corpus a fase
-> calibra um default com *n* = 1, que é o erro do resultado 3-C repetido.
+> **Dois blocos da carta já têm o gatilho disparado**, e por isso não são
+> hipótese: a §1.6 (a ata comparada com o resumo do Notion da mesma reunião) e a
+> §4 inteira (a transcrição — o `hotwords` colapsando a segmentação em 3,8×, o
+> que quebra a atribuição de falantes e contamina os vetores de voz). Os dois
+> saíram de saídas reais conferidas contra o áudio em 14/08/2026.
+>
+> E a **§5 não espera a fase**: transcrever e resumir as reuniões **em paralelo
+> por outras fontes** — Notion, Teams/Meet, o próprio app sem `hotwords` — e
+> guardar as saídas junto da gravação. Tudo o que a carta sabe hoje veio de
+> **uma** reunião; sem esse corpus a Fase 6 calibraria defaults com *n* = 1, que
+> é o erro do resultado 3-C repetido.
 
 ### A reordenação de 13/08/2026
 

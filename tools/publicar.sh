@@ -6,13 +6,17 @@
 #
 #   1. sem as três flags, sai um .exe de 193 KB que depende de DLLs soltas e
 #      não abre;
-#   2. sem -p:TokenHuggingFace, sai um binário sem o token embutido, que
-#      compila, publica, e só falha na diarização, na máquina do usuário.
+#   2. sem -p:TokenHuggingFace, saía um binário sem o token embutido, que
+#      compilava, publicava, e só falhava na diarização, na máquina do usuário.
 #
-# As duas se detectam por uma régua objetiva, e é isso que este script faz:
-# tamanho mínimo e exatamente uma ocorrência de hf_token. Se qualquer uma
-# falhar, ele para antes de copiar — o binário quebrado nunca chega na pasta
-# de quem usa.
+# As duas se detectam por uma régua objetiva, e é isso que este script faz. Se
+# qualquer uma falhar, ele para antes de copiar — o binário quebrado nunca chega
+# na pasta de quem usa.
+#
+# **A régua do token inverteu na Fase 4.** O defeito 2 não existe mais: os pesos
+# de diarização viajam dentro do instalador e o binário não embute token nenhum.
+# A régua continua no mesmo lugar, com o sinal trocado — agora ela reprova o
+# binário que TEM um token, porque este .exe é entregue a outras pessoas.
 #
 # ── Fase 2.5: o destino mudou de propósito ──────────────────────────────────
 #
@@ -44,7 +48,6 @@ set -euo pipefail
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 SAIDA="$RAIZ/dist/publicar"
 DESTINO="/mnt/c/Users/andre/MeetingApp"
-TOKEN="/mnt/c/Users/andre/.meeting-recorder/hf_token.txt"
 SEGREDO="/mnt/c/Users/andre/.meeting-recorder/google_client_secret.json"
 
 # De onde vêm os 4,3 GB de Python embarcado. Não se copia: o destino de teste
@@ -69,7 +72,12 @@ export PATH="$HOME/.dotnet:$PATH"
 # e o novo se chamam MeetingApp.exe, e barrar pelo nome impediria de publicar na
 # pasta de teste enquanto o usuário trabalha no app de produção — que é
 # exatamente o arranjo que esta fase pede.
-if [[ -n "${DESTINO:-}" ]]; then
+#
+# Com --so-build nada é copiado para lugar nenhum, então não há o que proteger:
+# barrar ali obrigaria a fechar o app para só montar o binário — que é
+# exatamente o que a Fase 4 faz o tempo todo, montando payload de instalador
+# enquanto o app grava a reunião do dia.
+if (( ! SO_BUILD )) && [[ -n "${DESTINO:-}" ]]; then
   aberto=$(/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command \
     "(Get-Process MeetingApp -ErrorAction SilentlyContinue).Path" 2>/dev/null | tr -d '\r')
   alvo=$(wslpath -w "$DESTINO" 2>/dev/null || echo "$DESTINO")
@@ -81,10 +89,13 @@ if [[ -n "${DESTINO:-}" ]]; then
   fi
 fi
 
-if [[ ! -f "$TOKEN" ]]; then
-  echo "ERRO: não achei o token em $TOKEN" >&2
-  echo "      Sem ele o binário publica e falha na diarização, na máquina do usuário." >&2
-  exit 1
+# O token do HuggingFace deixou de ser exigência na Fase 4: os pesos de
+# diarização viajam dentro do instalador e o binário não carrega segredo nenhum.
+# O que se confere agora é o contrário — que os pesos estão no destino.
+if [[ ! -f "$DESTINO/motores/diarizacao/modelos/community-1/config.yaml" ]]; then
+  echo "AVISO: não achei os pesos de diarização em $DESTINO/motores/diarizacao/modelos" >&2
+  echo "       Rode tools/empacotar_modelos_de_diarizacao.sh, senão a diarização" >&2
+  echo "       vai tentar o HuggingFace — e sem token embutido ela falha." >&2
 fi
 
 # O segredo do Google não é obrigatório para o app abrir, mas sem ele o app
@@ -105,7 +116,6 @@ rm -rf "$SAIDA"
 dotnet publish "$RAIZ/app-net/App/MeetingApp.App.csproj" \
   -c Release -r win-x64 \
   --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true \
-  -p:TokenHuggingFace="$TOKEN" \
   -p:SegredoDoGoogle="$SEGREDO" \
   -o "$SAIDA" --nologo -v q
 
@@ -119,10 +129,21 @@ if (( bytes < 10000000 )); then
   exit 1
 fi
 
-tokens=$(strings "$EXE" | grep -c hf_token || true)
-if (( tokens != 1 )); then
-  echo "ERRO: esperava 1 ocorrência de hf_token no binário, achei $tokens." >&2
-  echo "      O USERPROFILE do MSBuild é vazio no WSL: confira o caminho do token." >&2
+# A régua do token INVERTEU na Fase 4.
+#
+# Até a Fase 3 ela exigia exatamente uma ocorrência de hf_token: o binário sem
+# token compilava, publicava e só falhava na diarização, na máquina do usuário.
+# Agora o token não é mais embutido — os pesos de diarização viajam dentro do
+# instalador, e o binário entregue a outra pessoa não pode carregar segredo
+# nenhum. A mesma linha, com o sinal trocado: presença é o defeito.
+#
+# `grep -c ... || true` e não `grep -q`, pelo mesmo motivo de sempre: com
+# pipefail o grep -q mata o strings com SIGPIPE.
+tokens=$(strings "$EXE" | grep -c "hf_[A-Za-z0-9]\{20,\}" || true)
+if (( tokens != 0 )); then
+  echo "ERRO: achei $tokens token(s) do HuggingFace no binário." >&2
+  echo "      Desde a Fase 4 nada secreto pode ir junto: este .exe é entregue a" >&2
+  echo "      outras pessoas. Confira o EmbeddedResource em MeetingApp.Nucleo.csproj." >&2
   exit 1
 fi
 
@@ -140,7 +161,7 @@ if (( icones == 0 )); then
   exit 1
 fi
 
-printf '    tamanho: %.1f MB (ok)\n    token embutido: sim\n    ícones da bandeja: sim\n' \
+printf '    tamanho: %.1f MB (ok)\n    sem token do HuggingFace: sim\n    ícones da bandeja: sim\n' \
   "$(echo "$bytes/1000000" | bc -l)"
 
 if (( SO_BUILD )); then
