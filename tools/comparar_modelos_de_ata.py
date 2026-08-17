@@ -139,62 +139,108 @@ def rodar(pasta: Path, tipo: str, modelo: str) -> tuple[dict | None, str]:
     return {"segundos": duracao, "arquivo": guardada}, saida
 
 
+def media(xs: list[float]) -> float:
+    return sum(xs) / len(xs) if xs else 0.0
+
+
+def desvio(xs: list[float]) -> float:
+    """Desvio-padrão amostral — é ele que diz se a diferença entre modelos vale."""
+    if len(xs) < 2:
+        return 0.0
+    m = media(xs)
+    return (sum((x - m) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--gravacao", required=True)
+    ap.add_argument("--gravacao", action="append", required=True)
     ap.add_argument("--tipo", default="trabalho")
     ap.add_argument("--modelo", action="append", required=True)
+    ap.add_argument("--rodadas", type=int, default=2,
+                    help="repetições por modelo e reunião — é o que separa "
+                         "diferença de ruído")
     args = ap.parse_args()
 
-    pasta = GRAVACOES / args.gravacao
-    if not (pasta / "transcricao.json").is_file():
-        print(f"não achei transcrição em {pasta}", file=sys.stderr)
-        return 2
+    # (modelo, reunião, rodada) -> medidas
+    tudo: dict[str, list[dict]] = {m: [] for m in args.modelo}
+    falhas: dict[str, list[str]] = {m: [] for m in args.modelo}
 
-    d = json.loads((pasta / "transcricao.json").read_text(encoding="utf-8"))
-    segs = d.get("segments") or d.get("segmentos") or []
-    texto = " ".join((s.get("text") or "") for s in segs)
-    vozes = falantes(pasta / "transcricao.json")
-
-    print(f"reunião: {args.gravacao} · {len(segs)} trechos · tipo {args.tipo}")
-    print(f"números ditos na reunião: {len(numeros(texto))}\n")
-
-    resultados = []
-    for modelo in args.modelo:
-        print(f"==> {modelo}")
-        tempo, log = rodar(pasta, args.tipo, modelo)
-        if tempo is None:
-            print("    FALHOU")
-            for linha in log.strip().splitlines()[-6:]:
-                print(f"    {linha}")
-            resultados.append((modelo, None))
-            print()
+    for nome in args.gravacao:
+        pasta = GRAVACOES / nome
+        if not (pasta / "transcricao.json").is_file():
+            print(f"pulando {nome}: sem transcrição", file=sys.stderr)
             continue
 
-        m = medir_ata(tempo["arquivo"], texto, vozes)
-        m["segundos"] = tempo["segundos"]
-        resultados.append((modelo, m))
-        print(f"    {m['segundos']:.0f}s · {m['secoes']} seções · {m['acoes']} ações · "
-              f"recall {m['recall']:.0%}")
-        print()
+        d = json.loads((pasta / "transcricao.json").read_text(encoding="utf-8"))
+        segs = d.get("segments") or d.get("segmentos") or []
+        texto = " ".join((s.get("text") or "") for s in segs)
+        vozes = falantes(pasta / "transcricao.json")
+        dur = max((s.get("end") or 0) for s in segs) / 60
 
+        print(f"\n{'=' * 78}")
+        print(f"{nome} · {dur:.0f} min · {len(segs)} trechos · "
+              f"{len(numeros(texto))} números ditos")
+        print("=" * 78)
+
+        for rodada in range(1, args.rodadas + 1):
+            for modelo in args.modelo:
+                tempo, log = rodar(pasta, args.tipo, modelo)
+                etiqueta = f"{modelo.split('.gguf')[0][:26]:<26} r{rodada}"
+
+                if tempo is None:
+                    ultima = [l for l in log.strip().splitlines() if l.strip()][-1:]
+                    motivo = ultima[0][:90] if ultima else "sem saída"
+                    print(f"  {etiqueta}  FALHOU — {motivo}")
+                    falhas[modelo].append(f"{nome} r{rodada}: {motivo}")
+                    continue
+
+                m = medir_ata(tempo["arquivo"], texto, vozes)
+                m["segundos"] = tempo["segundos"]
+                m["reuniao"] = nome
+                tudo[modelo].append(m)
+                print(f"  {etiqueta}  {m['segundos']:>4.0f}s · recall {m['recall']:>4.0%} · "
+                      f"{m['acoes']:>2} ações ({m['acoes_sem_dono']} s/dono) · "
+                      f"maior seção {m['maior_secao']:>6,}")
+
+                # Renomear por rodada, senão a segunda sobrescreve a primeira e
+                # a variância — que é o que se está medindo — some.
+                novo = tempo["arquivo"].with_name(
+                    f"{tempo['arquivo'].stem}__r{rodada}.md")
+                tempo["arquivo"].replace(novo)
+
+    print(f"\n\n{'=' * 78}")
+    print("RESUMO")
     print("=" * 78)
-    print(f"{'modelo':<32} {'tempo':>6} {'recall':>7} {'ações':>6} "
-          f"{'s/dono':>7} {'maior seção':>12}")
+    print(f"{'modelo':<28} {'n':>3} {'falhas':>7} {'tempo':>7} "
+          f"{'recall':>14} {'s/dono':>8} {'pior seção':>11}")
     print("-" * 78)
-    for modelo, m in resultados:
-        if m is None:
-            print(f"{modelo:<32} {'—':>6} {'FALHOU':>7}")
-            continue
-        print(f"{modelo:<32} {m['segundos']:>5.0f}s {m['recall']:>6.0%} "
-              f"{m['acoes']:>6} {m['acoes_sem_dono']:>7} {m['maior_secao']:>11,}")
 
-    print()
-    for modelo, m in resultados:
-        if m and m["nomes_inventados"]:
-            print(f"  {modelo}: participantes que ninguém ouviu — "
-                  f"{', '.join(m['nomes_inventados'])}")
+    for modelo in args.modelo:
+        ms = tudo[modelo]
+        if not ms:
+            print(f"{modelo[:27]:<28} {0:>3} {len(falhas[modelo]):>7}  todas falharam")
+            continue
+
+        recalls = [m["recall"] for m in ms]
+        acoes = sum(m["acoes"] for m in ms)
+        semDono = sum(m["acoes_sem_dono"] for m in ms)
+        print(f"{modelo[:27]:<28} {len(ms):>3} {len(falhas[modelo]):>7} "
+              f"{media([m['segundos'] for m in ms]):>6.0f}s "
+              f"{media(recalls):>7.0%} ±{desvio(recalls):>4.0%} "
+              f"{(semDono / acoes if acoes else 0):>7.0%} "
+              f"{max(m['maior_secao'] for m in ms):>10,}")
+
+    print("\nO ± é o desvio entre rodadas. Quando ele encosta na diferença entre")
+    print("modelos, a diferença não é diferença — é a mesma moeda jogada duas vezes.")
+
+    for modelo in args.modelo:
+        for f in falhas[modelo]:
+            print(f"\n  falha · {modelo}: {f}")
+        inventados = {n for m in tudo[modelo] for n in m["nomes_inventados"]}
+        if inventados:
+            print(f"\n  {modelo}: participantes que ninguém ouviu — "
+                  f"{', '.join(sorted(inventados))}")
 
     print(f"\nAs atas ficaram em {SAIDA} — a régua diz onde olhar, não substitui olhar.")
     return 0
