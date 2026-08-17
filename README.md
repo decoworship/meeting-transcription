@@ -89,9 +89,10 @@ tools/montar_instalador.sh                   # o .exe que se entrega
 | **5** (corrente) | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
 | **6** | qualidade da transcrição e as revisões acumuladas — [docs/FASE6.md](docs/FASE6.md) |
 
-Aberto e sem fase dona: **a rota de atualização**. Existe gente com a 0.1.0
-instalada e nenhum jeito de saber que saiu versão nova —
-[docs/FASE4-HANDOFF.md](docs/FASE4-HANDOFF.md) §6.1.
+**A rota de atualização** está no primeiro degrau: o app avisa que saiu versão
+nova lendo um arquivo do próprio repositório, sem servidor para manter —
+[docs/ATUALIZACAO.md](docs/ATUALIZACAO.md). Baixar e trocar o binário sozinho
+espera a assinatura de código.
 
 ## HuggingFace
 

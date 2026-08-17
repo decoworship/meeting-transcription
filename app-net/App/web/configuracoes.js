@@ -178,7 +178,19 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
     + "para o cliente ou para o time.";
 
   pastas.append(campoPasta, campoExport, campoAtas, dica);
-  painel.append(pastas, blocoSobre());
+
+  // A única conexão que o app abre por conta própria, e por isso ela é
+  // desligável e fica à vista — junto do bloco que mostra a versão, que é onde
+  // a pergunta "estou atualizado?" nasce.
+  const aviso = bloco("Avisar de versão nova",
+    "Confere, ao abrir os Ajustes, se saiu uma versão mais nova. Vai um pedido "
+    + "de um arquivo público, sem identificação nenhuma — nada da sua reunião "
+    + "sai daqui.");
+  aviso.classList.add("bloco--chave");
+  aviso.appendChild(chave(config.avisar_de_atualizacao !== false,
+    async (v) => { await gravar({ avisar_de_atualizacao: v }); recarregar(); }));
+
+  painel.append(pastas, blocoSobre(), aviso);
   return painel;
 }
 
@@ -236,8 +248,77 @@ function blocoSobre() {
   acoes.className = "acoes";
   acoes.append(botao);
 
-  b.append(linha, acoes);
+  b.append(linha, acoes, blocoDeAtualizacao());
   return b;
+}
+
+/**
+ * Saiu versão nova?
+ *
+ * Mora dentro do bloco "Sobre" porque é a mesma pergunta: que versão eu tenho, e
+ * ela é a atual? Nasceu depois da Fase 4, quando o app passou a existir em
+ * máquina que não é a de quem o compila — antes disso, "atualizar" era
+ * recompilar.
+ *
+ * Ele **só avisa**. Não baixa nem troca binário: fazer isso sem assinatura de
+ * código seria ensinar o app a executar o que baixou da internet, e assinatura
+ * ainda não existe (FASE4-HANDOFF §6.1).
+ */
+function blocoDeAtualizacao() {
+  const caixa = document.createElement("div");
+
+  const linha = document.createElement("p");
+  linha.className = "campo__dica";
+  linha.textContent = "conferindo se saiu versão nova…";
+  caixa.appendChild(linha);
+
+  function desenhar(a) {
+    caixa.replaceChildren();
+
+    if (a.desligado) {
+      const p = document.createElement("p");
+      p.className = "campo__dica";
+      p.textContent = "O aviso de versão nova está desligado nesta máquina.";
+      caixa.appendChild(p);
+      return;
+    }
+
+    if (a.nao_deu) {
+      // Sem rede não é problema de quem está usando o app: some, discreto.
+      const p = document.createElement("p");
+      p.className = "campo__dica";
+      p.textContent = `Versão ${a.versao_instalada} — ${a.nao_deu}.`;
+      caixa.appendChild(p);
+      return;
+    }
+
+    if (!a.nova) {
+      const p = document.createElement("p");
+      p.className = "campo__dica";
+      p.textContent = "Esta é a versão mais recente.";
+      caixa.appendChild(p);
+      return;
+    }
+
+    const texto = `Saiu a versão ${a.nova.versao}`
+      + (a.nova.publicada ? ` (${dia(a.nova.publicada)})` : "")
+      + (a.nova.notas ? `: ${a.nova.notas}` : ".");
+    caixa.appendChild(alerta(texto, "atencao"));
+
+    const como = document.createElement("p");
+    como.className = "campo__dica";
+    como.textContent = a.nova.onde
+      ? `Baixe em ${a.nova.onde} e rode o instalador por cima — nada se perde.`
+      : "Peça o instalador novo e rode por cima desta instalação: gravações, "
+        + "transcrições, atas, notas, vozes e modelos baixados ficam onde estão.";
+    caixa.appendChild(como);
+  }
+
+  pedir("atualizacao").then(desenhar).catch(() => {
+    caixa.replaceChildren();
+  });
+
+  return caixa;
 }
 
 // ───────────────────────────────────────────────────────── aba Gravador

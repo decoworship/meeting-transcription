@@ -142,6 +142,9 @@ internal sealed class Resposta
 
     /// <summary>O motor de ata, que desde a Fase 4 se baixa em vez de vir junto.</summary>
     [JsonPropertyName("motor_de_ata")] public EstadoDoMotorDeAta? MotorDeAta { get; init; }
+
+    /// <summary>Saiu versão nova? É o único caminho até quem já instalou.</summary>
+    [JsonPropertyName("atualizacao")] public EstadoDaAtualizacao? Atualizacao { get; init; }
 }
 
 /// <summary>
@@ -360,6 +363,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(ConfiguracoesDoApp))]
 [JsonSerializable(typeof(Diagnostico))]
 [JsonSerializable(typeof(EstadoDoMotorDeAta))]
+[JsonSerializable(typeof(EstadoDaAtualizacao))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -614,6 +618,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "baixar-pacote":
                     await BaixarPacoteAsync(p);
+                    break;
+
+                case "atualizacao":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Atualizacao = await Atualizacao.ProcurarAsync(
+                            ConfiguracoesDoApp.Carregar(), ct: CancellationToken.None),
+                    });
                     break;
 
                 case "motor-de-ata":
