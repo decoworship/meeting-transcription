@@ -85,9 +85,13 @@ tools/montar_instalador.sh                   # o .exe que se entrega
 
 | fase | o quê |
 |---|---|
-| **4** (corrente) | o instalador (Inno Setup), com os modelos baixados na primeira execução — [docs/FASE4.md](docs/FASE4.md) |
-| **5** | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
+| **4** ✅ | o instalador — [docs/FASE4-HANDOFF.md](docs/FASE4-HANDOFF.md) |
+| **5** (corrente) | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
 | **6** | qualidade da transcrição e as revisões acumuladas — [docs/FASE6.md](docs/FASE6.md) |
+
+Aberto e sem fase dona: **a rota de atualização**. Existe gente com a 0.1.0
+instalada e nenhum jeito de saber que saiu versão nova —
+[docs/FASE4-HANDOFF.md](docs/FASE4-HANDOFF.md) §6.1.
 
 ## HuggingFace
 

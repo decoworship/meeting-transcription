@@ -3,12 +3,16 @@
 Três frentes, em ordem de dependência: validar o áudio gravado, melhorar o
 gravador, redesenhar a interface.
 
-> **Onde o plano está hoje (13/08/2026).** As fases 0, 1, 2 e 2.5 estão
-> concluídas: existe **um** app Windows nativo que grava na bandeja e transcreve
-> na janela, sem Python de interface e sem Docker. A ordem do que falta foi
-> **reordenada** neste dia — features, depois instalador, depois cosmética. A
-> lista de fases atualizada está em §5, "Fases"; a fase corrente tem carta
-> própria em [FASE3.md](FASE3.md).
+> **Onde o plano está hoje (15/08/2026).** As fases 0 a 4 estão concluídas:
+> existe **um app que se instala**, grava na bandeja, transcreve, separa
+> falantes e escreve a ata — e ele já rodou numa máquina que não é a de quem o
+> compilou. O que falta é acabamento visual (Fase 5) e qualidade da transcrição
+> (Fase 6). A lista completa está em §5, "Fases".
+>
+> **A dívida que a Fase 4 deixou aberta e não estava prevista:** não há rota de
+> atualização. Ver [FASE4-HANDOFF.md](FASE4-HANDOFF.md) §6.1 — ela precisa ser
+> decidida antes ou junto da Fase 5, porque toda correção das duas fases
+> seguintes depende de um caminho até quem já instalou.
 >
 > **Acrescentado em 14/08/2026:** uma **Fase 6**, de revisões, depois da 5
 > ([FASE6.md](FASE6.md)) — cada item com o gatilho que justifica fazê-lo. Ela
@@ -767,9 +771,20 @@ reunião. Carta em [FASE3.md](FASE3.md), estado final em
 > armadilha medida: o build de CUDA tem que casar com o driver — o 13.3 falha na
 > máquina do usuário e o 12.4 funciona.
 
-**Fase 4 — instalador.** Inno Setup, download dos modelos na primeira execução,
-migração do `%USERPROFILE%\.meeting-transcription` existente. Assinatura de
-código se e quando sair da própria máquina.
+**Fase 4 — instalador.** ✅ **Concluída em 15/08/2026.** Inno Setup por usuário,
+modelos e motor de ata baixados sob demanda, e o token do HuggingFace fora do
+binário — os pesos de diarização passaram a viajar dentro do app. Carta em
+[FASE4.md](FASE4.md), estado final em [FASE4-HANDOFF.md](FASE4-HANDOFF.md),
+texto para quem recebe em [INSTALAR.md](INSTALAR.md).
+
+> **1,59 GB**, e fechou pelo critério que importa: o instalador foi para a
+> máquina de um amigo e funcionou. Assinatura de código continua de fora.
+>
+> Ela deixa para as fases seguintes uma dívida que a própria carta subestimou:
+> **não há rota de atualização**. Existe um amigo com 0.1.0 instalado e nenhum
+> jeito de ele saber que saiu uma versão nova. O handoff §6.1 desenha os três
+> degraus, e traz o número que decide o desenho: o `.exe` tem 18,5 MB e os
+> motores têm 4,1 GB, então **quase toda versão nova é um arquivo de 18,5 MB**.
 
 **Fase 5 — acabamento visual.** O que era a Fase 3: o redesign da interface com
 o AA Design System (§3), sobre uma interface cujo conjunto de telas já parou de

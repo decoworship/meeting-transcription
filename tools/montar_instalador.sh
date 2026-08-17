@@ -109,8 +109,25 @@ versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
 # ── os motores ───────────────────────────────────────────────────────────────
 [[ -d "$MOTORES" ]] || reprovar "não achei os motores em $MOTORES"
 [[ -f "$MOTORES/python/python.exe" ]] || reprovar "falta o Python embarcado — o app abre e não transcreve."
+
+# Os sidecars do instalador têm que ser os DO REPOSITÓRIO.
+#
+# Este é um buraco real do ciclo de build, achado em 15/08/2026: o
+# `publicar.sh --so-build` sai antes de "sincronizando os sidecars", que só roda
+# no caminho de instalar. Então quem edita um motor.py, roda este script e manda
+# o instalador para um amigo empacota o motor **velho** — compila, passa nos
+# testes, passa em todas as outras réguas, e falha só na máquina de quem
+# recebeu. É a mesma família do EmbeddedResource com barra invertida.
+#
+# Reprova em vez de sincronizar de propósito: montar um instalador não deve
+# mexer, de lado, na instalação que o usuário está usando para trabalhar.
 for m in asr diarizacao modelos; do
   [[ -f "$MOTORES/$m/motor.py" ]] || reprovar "falta motores/$m/motor.py"
+  if ! diff -q "$RAIZ/motores/$m/motor.py" "$MOTORES/$m/motor.py" >/dev/null; then
+    reprovar "motores/$m/motor.py do repositório difere do que está em $MOTORES.
+      O instalador empacotaria o sidecar velho. Rode tools/publicar.sh (sem
+      --so-build) para sincronizar, ou copie o arquivo à mão."
+  fi
 done
 # O motor de ata NÃO viaja mais (1,1 GB, docs/FASE4.md §5): o app o baixa da
 # release oficial do llama.cpp quando fizer falta. Aqui a régua se inverte —
