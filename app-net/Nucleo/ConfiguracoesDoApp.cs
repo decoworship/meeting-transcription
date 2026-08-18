@@ -138,6 +138,41 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("avisar_de_atualizacao")]
     public bool AvisarDeAtualizacao { get; set; } = true;
 
+    /// <summary>Claro, escuro, ou o que o Windows estiver usando.</summary>
+    /// <remarks>
+    /// <para>
+    /// O tema escuro estava pronto no design system desde o começo — sessenta
+    /// linhas de tokens semânticos redefinidos — e não havia como chegar nele:
+    /// o <c>data-tema</c> do <c>index.html</c> era fixo em <c>claro</c>. Esta
+    /// chave é o caminho que faltava.
+    /// </para>
+    /// <para>
+    /// O padrão é <c>claro</c>, e não <c>auto</c>, de propósito: quem já usa o
+    /// app instalado não deve ver a interface trocar de cor porque atualizou.
+    /// Quem quer o escuro pede.
+    /// </para>
+    /// <para>
+    /// Os três valores são fechados. O valor sai daqui para dentro de um
+    /// atributo do HTML — ver <c>Conteudo.Buscar</c> —, então qualquer coisa
+    /// que não seja um dos três vira <c>claro</c> em vez de ser escrita na
+    /// página. Um <c>app.json</c> editado à mão não injeta marcação.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("tema")] public string Tema { get; set; } = TemaPadrao;
+
+    public const string TemaPadrao = "claro";
+
+    /// <summary>
+    /// Um tema qualquer reduzido a um dos três aceitos.
+    /// </summary>
+    /// <remarks>
+    /// A única definição do que é um tema válido, porque o valor atravessa a
+    /// ponte, o <c>app.json</c> e um atributo do HTML — e três lugares com a
+    /// mesma regra escrita à mão é como uma delas fica para trás.
+    /// </remarks>
+    public static string TemaAceito(string? tema) =>
+        tema is "escuro" or "auto" ? tema : TemaPadrao;
+
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-transcription", "app.json");

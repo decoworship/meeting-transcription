@@ -22,6 +22,23 @@ body {
   font-family: var(--fonte-ui);
 }
 
+/* A barra de rolagem vem do design system, não do Chromium.
+ *
+ * O `color-scheme: dark` dos tokens já faz o navegador desenhá-la escura, mas
+ * escura dele é cinza neutro (#2C2C2C) — e o próprio tokens.css diz, no
+ * cabeçalho do modo escuro, que "cinza neutro aqui mataria a identidade". O
+ * sistema é areia, e areia no escuro continua quente. São duas cores para
+ * corrigir a única superfície do app que ainda era de outra paleta.
+ *
+ * O polegar é --cor-borda-controle e não --cor-borda-forte, que era a escolha
+ * óbvia: medido no retrato, o forte dá 1,8:1 contra o fundo escuro, menos que
+ * os 3,4:1 do polegar padrão do Chromium que ele substitui. Barra de rolagem é
+ * controle, e um controle que some não é acabamento, é perda. */
+html {
+  scrollbar-color: var(--cor-borda-controle) var(--cor-fundo);
+  scrollbar-width: thin;
+}
+
 /* O sprite de ícones: presente no DOM, fora do fluxo e sem tamanho.
  *
  * `position:absolute` e não `display:none` porque o segundo já quebrou
@@ -550,6 +567,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * para as opções de ligar e desligar. */
 .bloco--chave { grid-template-columns: 1fr auto; align-items: center; gap: var(--espaco-4); }
 .bloco--chave > .bloco__titulo, .bloco--chave > .bloco__texto { grid-column: 1; }
+
+/* Opções exclusivas em linha, quebrando para coluna quando a janela aperta.
+ * O controle em si é o .aa-escolha do design system — inclusive o rádio, que
+ * ele já pinta certo nos dois temas. */
+.escolhas { display: flex; flex-wrap: wrap; gap: var(--espaco-3) var(--espaco-5); }
 
 /* ──────────────────────────────────────────────── cartões de modelo */
 

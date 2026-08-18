@@ -118,6 +118,19 @@ internal static partial class Win32
     [LibraryImport("user32.dll")]
     internal static partial IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    /// <summary>
+    /// Atributos da moldura da janela, que é do Windows e não da página.
+    /// </summary>
+    /// <remarks>
+    /// Usado para o <c>DWMWA_USE_IMMERSIVE_DARK_MODE</c>: sem ele o tema escuro
+    /// do app fica com a barra de título branca. Devolve HRESULT, e o chamador
+    /// ignora — em Windows anterior ao 10 20H1 o atributo não existe, e a barra
+    /// clara é o pior caso aceitável.
+    /// </remarks>
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmSetWindowAttribute(
+        IntPtr hwnd, int atributo, ref int valor, int tamanho);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DestroyWindow(IntPtr hWnd);

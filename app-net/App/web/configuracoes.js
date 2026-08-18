@@ -130,6 +130,62 @@ function campoDePasta(rotulo, valor, dica, aoMudar) {
   return raiz;
 }
 
+/**
+ * A escolha do tema.
+ *
+ * O tema inicial NÃO é aplicado aqui: quem o escreve é o núcleo, trocando o
+ * `data-tema` do index.html enquanto serve a página (ver App/Conteudo.cs). Se
+ * dependesse deste arquivo, a configuração chegaria pela ponte depois da
+ * primeira pintura, e quem escolheu escuro veria a interface piscar branca a
+ * cada abertura.
+ *
+ * O que é daqui é a troca com o app aberto — mexer no mesmo atributo, e a
+ * interface inteira vira de cor sem recarregar nada, porque tudo que pinta vem
+ * de token semântico.
+ */
+function blocoDeTema(config, gravar) {
+  const b = bloco("Aparência",
+    "O tema escuro usa a mesma paleta de areia, em carvão. Trocar vale na hora.");
+
+  // Rádio, e não uma chave de ligar: são três estados, e "auto" não é meio-termo
+  // entre claro e escuro — é entregar a decisão ao Windows.
+  const OPCOES = [
+    ["claro",  "Claro"],
+    ["escuro", "Escuro"],
+    ["auto",   "Igual ao Windows"],
+  ];
+
+  const atual = OPCOES.some(([v]) => v === config.tema) ? config.tema : "claro";
+
+  const grupo = document.createElement("div");
+  grupo.className = "escolhas";
+  grupo.setAttribute("role", "radiogroup");
+  grupo.setAttribute("aria-label", "Tema");
+
+  for (const [valor, rotulo] of OPCOES) {
+    const label = document.createElement("label");
+    label.className = "aa-escolha";
+
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "tema";
+    radio.value = valor;
+    radio.checked = valor === atual;
+    radio.addEventListener("change", () => {
+      // A tela vira primeiro e o disco depois: a resposta ao clique não deve
+      // esperar uma escrita em arquivo, e falhar ao gravar já tem seu aviso.
+      document.documentElement.dataset.tema = valor;
+      gravar({ tema: valor });
+    });
+
+    label.append(radio, document.createTextNode(rotulo));
+    grupo.appendChild(label);
+  }
+
+  b.appendChild(grupo);
+  return b;
+}
+
 // ─────────────────────────────────────────────────────────── aba Geral
 
 function abaGeral(config, gravador, gravar, estadoDoTexto) {
@@ -190,7 +246,7 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
   aviso.appendChild(chave(config.avisar_de_atualizacao !== false,
     async (v) => { await gravar({ avisar_de_atualizacao: v }); recarregar(); }));
 
-  painel.append(pastas, blocoSobre(), aviso);
+  painel.append(pastas, blocoDeTema(config, gravar), blocoSobre(), aviso);
   return painel;
 }
 

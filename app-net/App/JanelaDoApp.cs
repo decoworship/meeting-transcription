@@ -83,6 +83,11 @@ internal sealed class JanelaDoApp : IDisposable
         if (Hwnd == IntPtr.Zero)
             throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateWindowEx falhou");
 
+        // A barra de título é do Windows, não da página: sem isto ela fica
+        // branca por cima de um app escuro. Antes do ShowWindow, senão a
+        // primeira pintura sai clara e a barra pisca ao trocar.
+        PintarABarraDeTitulo(Hwnd);
+
         Win32.ShowWindow(Hwnd, Win32.SW_SHOW);
 
         // O WebView2 é assíncrono e completa pelo laço de mensagens, que quem
@@ -113,6 +118,12 @@ internal sealed class JanelaDoApp : IDisposable
         var ambiente = await CoreWebView2Environment.CreateAsync(null, dados);
         _controlador = await ambiente.CreateCoreWebView2ControllerAsync(Hwnd);
         _web = _controlador.CoreWebView2;
+
+        // O fundo que o WebView2 pinta ANTES da página existir, e ao
+        // redimensionar. O padrão é branco, e no tema escuro isso é um lampejo
+        // branco a cada abertura — o mesmo defeito que Conteudo.ComTema evita
+        // no lado do HTML, na metade do caminho que é do host.
+        _controlador.DefaultBackgroundColor = FundoInicial();
 
         Ajustar();
 
@@ -157,6 +168,85 @@ internal sealed class JanelaDoApp : IDisposable
 
         _web.Navigate(_telaInicial is { Length: > 0 } t
             ? $"{Conteudo.Raiz}#{t}" : Conteudo.Raiz);
+    }
+
+    /// <summary>
+    /// Manda o Windows desenhar a barra de título escura.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A moldura da janela — barra de título, botões de minimizar e fechar —
+    /// não é HTML, e por isso não muda de cor com o tema da página. Sem esta
+    /// chamada o tema escuro fica com uma faixa branca no alto, que é o
+    /// primeiro lugar em que o olho bate.
+    /// </para>
+    /// <para>
+    /// Vale só a partir do Windows 10 20H1; em versão anterior a chamada falha
+    /// e a barra continua clara, que é o pior caso aceitável. Trocar de tema
+    /// com o app aberto não repinta a barra — a página vira na hora, a moldura
+    /// vira na próxima abertura.
+    /// </para>
+    /// </remarks>
+    private static void PintarABarraDeTitulo(IntPtr hwnd)
+    {
+        if (!TemaEscuro()) return;
+
+        int sim = 1;
+        // 20 é o DWMWA_USE_IMMERSIVE_DARK_MODE. O 19 era o número no
+        // Windows 10 1809, e tentar os dois é o que a documentação sugere.
+        foreach (int atributo in new[] { 20, 19 })
+            _ = Win32.DwmSetWindowAttribute(hwnd, atributo, ref sim, sizeof(int));
+    }
+
+    /// <summary>O tema configurado é escuro, resolvendo o <c>auto</c>?</summary>
+    private static bool TemaEscuro()
+    {
+        string tema = ConfiguracoesDoApp.TemaAceito(ConfiguracoesDoApp.Carregar().Tema);
+        return tema == "escuro" || (tema == "auto" && WindowsEstaEscuro());
+    }
+
+    /// <summary>
+    /// A cor com que a janela abre, antes de qualquer HTML.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Os dois valores são o <c>--cor-fundo</c> do design system, copiados à
+    /// mão de <c>assets/ds/tokens/tokens.css</c> — é o único lugar do app em
+    /// que uma cor é escrita fora do CSS, e não há como evitá-lo: quem pinta
+    /// aqui é o WebView2, antes de existir folha de estilo. Se o token mudar
+    /// lá, muda aqui.
+    /// </para>
+    /// <para>
+    /// No <c>auto</c> a pergunta vai ao Windows, porque é o mesmo que o
+    /// <c>prefers-color-scheme</c> vai responder à página um instante depois —
+    /// e é o instante entre as duas respostas que esta função existe para
+    /// pintar da cor certa.
+    /// </para>
+    /// </remarks>
+    private static System.Drawing.Color FundoInicial()
+    {
+        return TemaEscuro()
+            ? System.Drawing.Color.FromArgb(0x1A, 0x17, 0x14)   // --cor-fundo, escuro
+            : System.Drawing.Color.FromArgb(0xF4, 0xEF, 0xE6);  // --cor-fundo, claro (areia-100)
+    }
+
+    /// <remarks>
+    /// A chave que a página "Personalização" do Windows escreve. Ausente em
+    /// Windows antigo, e aí o claro é a resposta certa — era o único tema.
+    /// </remarks>
+    private static bool WindowsEstaEscuro()
+    {
+        try
+        {
+            using var chave = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return chave?.GetValue("AppsUseLightTheme") is int v && v == 0;
+        }
+        catch (Exception)
+        {
+            // Registro ilegível não pode impedir a janela de abrir.
+            return false;
+        }
     }
 
     private static void Servir(CoreWebView2Environment ambiente,
