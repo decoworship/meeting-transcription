@@ -308,17 +308,46 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 /* ─────────────────────────────────────────────────────── transcrição */
 
-.revisao { display: grid; gap: var(--espaco-4); }
+.revisao { display: grid; gap: var(--espaco-3); }
+
+/* O .aa-pagina do design system respira 64px em cima, que é o certo para uma
+ * página de documento. A revisão não é uma: a barra de ferramentas gruda no
+ * topo logo abaixo do cabeçalho, e esses 64px só empurram a transcrição para
+ * fora da janela — na tela em que mais se lê do app inteiro. */
+.aa-pagina:has(> .revisao) { padding-top: var(--espaco-5); }
 
 /* Busca, estado e botões ficam colados no topo junto com os filtros: são as
  * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
  * rolar de volta para desligar um falante anula o filtro. */
+/* Uma linha que quebra sozinha, e não seis colunas contadas à mão.
+ *
+ * Eram `grid-template-columns: 1fr auto auto auto auto auto` para seis filhos.
+ * Só que há um sétimo e um oitavo — "Transcrever de novo" e "Apagar gravação",
+ * que só existem em algumas gravações — e eles caíam numa SEGUNDA LINHA,
+ * sozinhos, no meio do cabeçalho. Era daí que vinha "Apagar gravação" solto
+ * embaixo da busca, e uma faixa inteira de altura na tela em que mais se lê. */
 .ferramentas {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--espaco-3);
   align-items: center;
   padding: var(--espaco-2) 0;
+}
+
+/* A busca toma o que sobrar, e encolhe até caber em vez de empurrar o resto
+ * para a linha de baixo. */
+.ferramentas > .aa-entrada { flex: 1 1 12rem; min-width: 0; }
+
+/* As duas que destroem trabalho, empurradas para a direita e atrás de um
+ * fio. Continuam a um clique — as duas já perguntam antes —, mas param de
+ * dividir vizinhança com o que se clica todo dia. */
+.ferramentas__perigo {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding-left: var(--espaco-3);
+  border-left: 1px solid var(--cor-borda);
 }
 
 .filtros { display: flex; gap: var(--espaco-2); flex-wrap: wrap; padding-bottom: var(--espaco-2); }
@@ -381,10 +410,20 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .troca:hover { background: var(--cor-destaque); color: var(--cor-texto-invertido); }
 .troca:focus-visible { outline: var(--anel-foco); outline-offset: 1px; }
 
+/* Texto de leitura no token de texto de leitura.
+ *
+ * Estava em --texto-pequeno (13px), que o design system reserva para legenda e
+ * dica. Esta é a tela em que se passa mais tempo lendo do app inteiro — a
+ * transcrição de uma reunião de duas horas se lê inteira aqui —, e 13px é
+ * tamanho de nota de rodapé. --texto-corpo (15px) é o que o sistema chama de
+ * corpo, e é o que isto é.
+ *
+ * O custo é altura: cada trecho ganha cerca de 3 px. Vale, e é reversível numa
+ * linha se não valer. */
 .transcricao {
   display: grid;
   gap: 2px;
-  font-size: var(--texto-pequeno);
+  font-size: var(--texto-corpo);
   line-height: 1.7;
 }
 

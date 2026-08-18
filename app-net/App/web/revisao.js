@@ -166,6 +166,13 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
 
   ferramentas.append(busca, parar, estadoSalvo, botaoNotas, botaoFalantes, botaoExportar);
 
+  // As duas que destroem trabalho vão para um invólucro próprio, e o CSS o
+  // empurra para a direita atrás de um fio. Antes elas eram apenas o sétimo e o
+  // oitavo filho de uma grade de seis colunas, e por isso desciam para uma
+  // segunda linha bem no meio do cabeçalho.
+  const perigo = document.createElement("div");
+  perigo.className = "ferramentas__perigo";
+
   if (aoRefazer) {
     const refazer = document.createElement("button");
     refazer.className = "aa-btn aa-btn-texto";
@@ -177,12 +184,14 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
       if (confirm("Isto descarta os nomes e as correções desta reunião. Continuar?"))
         aoRefazer();
     });
-    ferramentas.appendChild(refazer);
+    perigo.appendChild(refazer);
   }
 
   // Apagar fica ao lado de refazer: são as duas ações que destroem trabalho, e
   // manter as duas no mesmo canto é mais legível que espalhá-las.
-  if (aoApagar) ferramentas.appendChild(aoApagar);
+  if (aoApagar) perigo.appendChild(aoApagar);
+
+  if (perigo.childElementCount) ferramentas.appendChild(perigo);
 
   const corpo = document.createElement("div");
   corpo.className = "transcricao";
