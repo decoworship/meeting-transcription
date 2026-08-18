@@ -69,6 +69,14 @@ MeetingApp.exe --web C:\caminho\para\app-net\App\web
 uv sync   # só para as ferramentas de medição em tools/
 ```
 
+**Os 4,3 GB de motores moram na instalação oficial**, em
+`AppData\Local\Programs\MeetingApp\motores`, e em nenhum outro lugar: a pasta
+de trabalho `C:\Users\andre\MeetingApp` foi apagada em 18/08/2026 para liberar
+disco. Os dois scripts leem de lá. O `publicar.sh` continua instalando na pasta
+de trabalho — um build meio pronto não pode cair no app que grava reunião — e a
+recria com o executável mais **junções** para os motores oficiais: 18 MB em vez
+de 4,3 GB. Apagar essa pasta é seguro; junção não é dona dos bytes.
+
 **Nunca publique com `dotnet publish` na mão.** As três flags
 (`--self-contained`, `PublishSingleFile`, `PublishTrimmed`) e o segredo do Google
 são obrigatórios, e cada um deles já saiu faltando num binário entregue ao

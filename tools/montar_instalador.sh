@@ -31,7 +31,13 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLICADO="$RAIZ/dist/publicar"
 PAYLOAD="$RAIZ/dist/instalador/payload"
 SAIDA="$RAIZ/dist/instalador"
-MOTORES="/mnt/c/Users/andre/MeetingApp/motores"
+# A instalação OFICIAL, a que o instalador produz — é ela que tem os 4,3 GB.
+#
+# Era C:\Users\andre\MeetingApp até 18/08/2026, quando o dono do produto apagou
+# aquela pasta para liberar disco: os motores estavam duplicados nas duas, e o
+# C: estava a 97%. Ler daqui é leitura pura, e o .iss já diz que os motores são
+# lidos onde já estão.
+MOTORES="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
 ISCC="/mnt/c/Users/andre/AppData/Local/Programs/Inno Setup 6/ISCC.exe"
 WEBVIEW2="https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 

@@ -138,37 +138,32 @@ Três coisas custaram uma tentativa cada, e ficam aqui:
   só trazer a janela VELHA para a frente e sair — o retrato sai da tela errada,
   sem erro nenhum. Aconteceu uma vez, e o retrato passou por bom.
 
-Uma armadilha a mais, esta no `tools/publicar.sh`: o `--destino` falha ao criar
-a junção dos motores. O `mklink /J` pelo `cmd.exe` responde *"The filename,
-directory name, or volume label syntax is incorrect"* mesmo com o `/s` e o `cd
-/mnt/c` que os comentários do script já documentam; os caminhos existem e o
-`dir` os lista pelo mesmo `cmd.exe`. O `New-Item -ItemType Junction` do
-PowerShell faz o mesmo trabalho e funciona. **Não corrigido** — fica como
-achado.
+Uma armadilha a mais, esta no `tools/publicar.sh`: o `--destino` falhava ao
+criar a junção dos motores. O `mklink /J` pelo `cmd.exe` responde *"The
+filename, directory name, or volume label syntax is incorrect"* mesmo com o
+`/s` e o `cd /mnt/c` que os comentários do script já documentavam; os caminhos
+existem e o `dir` os lista pelo mesmo `cmd.exe`. **Corrigido** com
+`New-Item -ItemType Junction` do PowerShell, que faz o mesmo trabalho — ver §8.
 
 ---
 
 ## 6. O que a fase deixa aberta
 
-### 6.1 O `--destino` do `publicar.sh` (§5)
-
-Uma linha, e a ferramenta é compartilhada com outra frente de trabalho.
-
-### 6.2 A moldura não repinta ao trocar de tema
+### 6.1 A moldura não repinta ao trocar de tema
 
 Escolher outro tema vira a página na hora; a barra de título do Windows só
 acompanha na próxima abertura. Repintar exigiria refazer a chamada do DWM a
 partir da ponte, e o custo não pareceu valer o ganho de um caso que acontece uma
 vez por instalação.
 
-### 6.3 A varredura não cobriu os estados que exigem uma gravação em curso
+### 6.2 A varredura não cobriu os estados que exigem uma gravação em curso
 
 Medidores de nível, o aviso de mute prolongado e a barra de progresso da
 transcrição não foram fotografados no escuro: todos precisam do app gravando ou
 transcrevendo, e o destino de teste não tem os motores. Nenhum deles usa cor
 fora de token — a conferência é de olho, não de código.
 
-### 6.4 O `.aa-pagina` do design system é largo demais para tela de app
+### 6.3 O `.aa-pagina` do design system é largo demais para tela de app
 
 A revisão precisou de `padding-top` próprio porque os 64px do `.aa-pagina` são
 de página de documento. Provavelmente vale para as outras telas também, e a
@@ -186,3 +181,33 @@ estava modificado. Criar um branch não resolve — branch é do repositório, n
 O commit `c7ce16f`, que fala de detecção de GPU, carrega junto a primeira leva
 da varredura de tokens desta fase. Não foi separado: o conteúdo está correto,
 só está arquivado no lugar errado.
+
+---
+
+## 8. Depois da fase: os motores mudaram de casa
+
+Em 18/08/2026, ao gerar a 0.3.0, o dono do produto **apagou
+`C:\Users\andre\MeetingApp`** para liberar disco — o `C:` estava a 97%, e os
+4,3 GB de Python embarcado estavam duplicados ali e na instalação que o
+instalador da Fase 4 produz. Decisão certa, e ela quebrou três defaults:
+
+- `montar_instalador.sh` reprovava em "falta o Python embarcado". Falha alta,
+  que é o comportamento desejável;
+- `publicar.sh` **recriava a pasta em silêncio**, com um executável que abre e
+  não transcreve. Este era o ruim: desfazia a limpeza a cada publicação;
+- a junção do `--destino` passava a apontar para o nada.
+
+Os dois scripts passaram a ler os motores de
+`AppData\Local\Programs\MeetingApp\motores`, a instalação oficial. O destino
+de publicação **continua** sendo `C:\Users\andre\MeetingApp`, e não a oficial:
+um build meio pronto não pode cair no app que grava reunião.
+
+A junção deixou de ser detalhe e virou a peça que faz isso funcionar, então ela
+foi consertada (§5) e ampliada: além do `python/`, agora liga também os pesos de
+diarização e o motor de ata. **Custo de uma instalação de teste completa e
+funcional: 18 MB.** Os três `motor.py` continuam sendo cópias de verdade — é o
+que impede uma publicação de teste de reescrever os sidecars do app de verdade.
+
+Medido: publicar num destino novo produz as três junções sem aviso nenhum, e
+`rm -rf` nesse destino **não toca** os 4,3 GB do alvo. Junção não é dona dos
+bytes.

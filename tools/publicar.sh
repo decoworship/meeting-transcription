@@ -20,8 +20,19 @@
 #
 # ── Fase 2.5: o destino mudou de propósito ──────────────────────────────────
 #
-# O padrão é C:\Users\andre\MeetingApp, que é o app de verdade — o que grava
-# reunião todo dia e o único que tem os 4,3 GB de motores ao lado.
+# O padrão é C:\Users\andre\MeetingApp, a instalação de trabalho.
+#
+# ── 18/08/2026: os motores saíram daqui ─────────────────────────────────────
+#
+# O dono do produto apagou esta pasta para liberar disco: os 4,3 GB de Python
+# embarcado estavam duplicados nela e na instalação que o instalador da Fase 4
+# produz, e o C: estava a 97%. Quem tem os motores agora é a instalação oficial,
+# em AppData\Local\Programs\MeetingApp — daí o MOTORES_FONTE apontar para lá.
+#
+# O destino continua sendo esta pasta, e não a oficial, de propósito: um build
+# meio pronto não pode cair no app que grava reunião. Ela volta a existir com o
+# executável e uma JUNÇÃO para os motores oficiais, o que custa 19 MB em vez de
+# 4,3 GB.
 #
 # Durante a Fase 2.5 o padrão era uma pasta de teste, MeetingUnificado, porque
 # os dois programas antigos ainda eram os que gravavam e o critério A exigia
@@ -50,9 +61,12 @@ SAIDA="$RAIZ/dist/publicar"
 DESTINO="/mnt/c/Users/andre/MeetingApp"
 SEGREDO="/mnt/c/Users/andre/.meeting-recorder/google_client_secret.json"
 
-# De onde vêm os 4,3 GB de Python embarcado. Não se copia: o destino de teste
-# ganha uma junção para esta pasta (ver adiante).
-MOTORES_FONTE="/mnt/c/Users/andre/MeetingApp/motores"
+# De onde vêm os 4,3 GB de Python embarcado. Não se copia: o destino ganha uma
+# junção para esta pasta (ver adiante).
+#
+# É a instalação OFICIAL, a que o instalador produz. Era a pasta de trabalho até
+# 18/08/2026, quando ela foi apagada para liberar disco — ver o cabeçalho.
+MOTORES_FONTE="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
 
 SO_BUILD=0
 while [[ $# -gt 0 ]]; do
@@ -177,31 +191,42 @@ cp "$SAIDA/MeetingApp.exe" "$DESTINO/"
 cp "$SAIDA/WebView2Loader.dll" "$DESTINO/"
 ls -la "$DESTINO/MeetingApp.exe"
 
-# Os motores vão junto, mas o Python embarcado NÃO é copiado: são 4,3 GB. No
-# destino padrão a pasta já está lá e este bloco não faz nada; ele existe para
-# quando se publica em OUTRA pasta — aí ela ganha uma junção do Windows para o
-# python/ da instalação, em vez de uma segunda cópia de 4,3 GB. Reversível
-# apagando a pasta.
+# O que é pesado NÃO é copiado: o destino ganha junções do Windows para a
+# instalação oficial. São 4,3 GB de Python embarcado, 3,5 GB de motor de ata e
+# 57 MB de pesos de diarização — copiar isso a cada publicação encheria o disco,
+# e foi exatamente o que levou o dono do produto a apagar a pasta de trabalho em
+# 18/08/2026. Reversível apagando a pasta: junção não é dono dos bytes.
 #
-# Só o python/ é compartilhado; os três motor.py são cópias de verdade, para uma
-# publicação de teste não reescrever os sidecars da instalação.
-if [[ ! -e "$DESTINO/motores/python" ]]; then
-  if [[ -d "$MOTORES_FONTE/python" ]]; then
-    echo "==> ligando motores/python por junção a $MOTORES_FONTE/python"
-    mkdir -p "$DESTINO/motores"
-    destino_win=$(wslpath -w "$DESTINO/motores/python")
-    fonte_win=$(wslpath -w "$MOTORES_FONTE/python")
-    # Duas armadilhas do cmd.exe chamado do WSL, as duas custaram uma tentativa:
-    #   - a partir de um caminho UNC (\\wsl.localhost\...) ele avisa e cai no
-    #     diretório do Windows; daí o subshell com cd para /mnt/c;
-    #   - sem /s ele remove a primeira e a última aspas do comando, deixando as
-    #     aspas dos caminhos desemparelhadas.
-    (cd /mnt/c && /mnt/c/Windows/System32/cmd.exe /s /c \
-       "mklink /J \"$destino_win\" \"$fonte_win\"") >/dev/null
-  else
-    echo "AVISO: não achei $MOTORES_FONTE/python — o app abre, mas não transcreve." >&2
+# Os três motor.py continuam sendo cópias DE VERDADE, e é a distinção que
+# importa: uma publicação de teste não pode reescrever os sidecars do app que
+# grava reunião.
+ligar_por_juncao() {
+  local relativo="$1" descricao="$2"
+  [[ -e "$DESTINO/motores/$relativo" ]] && return 0
+
+  if [[ ! -d "$MOTORES_FONTE/$relativo" ]]; then
+    echo "AVISO: não achei $MOTORES_FONTE/$relativo — $descricao" >&2
+    return 0
   fi
-fi
+
+  echo "==> ligando motores/$relativo por junção"
+  mkdir -p "$(dirname "$DESTINO/motores/$relativo")"
+
+  # New-Item do PowerShell, e não `mklink /J` pelo cmd.exe.
+  #
+  # O mklink daqui responde "The filename, directory name, or volume label
+  # syntax is incorrect" mesmo com o `/s` e com o subshell em /mnt/c que
+  # contornavam as duas armadilhas conhecidas do interop — e com os dois
+  # caminhos existindo, listáveis por `dir` no MESMO cmd.exe. Medido em
+  # 18/08/2026, na Fase 5. O New-Item faz o mesmo trabalho e funciona.
+  powershell.exe -NoProfile -Command \
+    "New-Item -ItemType Junction -Path '$(wslpath -w "$DESTINO/motores/$relativo")'" \
+    "-Target '$(wslpath -w "$MOTORES_FONTE/$relativo")' | Out-Null" >/dev/null
+}
+
+ligar_por_juncao python              "o app abre, mas não transcreve."
+ligar_por_juncao diarizacao/modelos  "o app transcreve, mas não separa falantes."
+ligar_por_juncao ata                 "o app transcreve, mas gerar ata falha."
 
 # O motor de ata é conferido, não copiado: são 3,5 GB que não mudam a cada
 # build. Sem ele o app abre e transcreve; só a ata falha, e falha na hora de
