@@ -112,15 +112,108 @@ motor de saída constrangida por gramática JSON o pensamento não tem onde cabe
 
 ---
 
+---
+
+## A reviravolta: quase tudo era defeito nosso
+
+> Acrescentado em 17/08/2026, depois de o dono do produto questionar a métrica e
+> pedir uma avaliação de qualidade. As conclusões acima **não sobreviveram**.
+
+A pergunta que abriu tudo: *"será que todos os números são mesmo importantes? Pode
+ser que os modelos decidiram certo quais colocar."*
+
+**Ele estava certo.** Dos 9 números que o Qwen3 "perdeu" numa reunião, os 9 eram
+hipótese ("não sei se seria 50, 70 ou 80"), conta em voz alta ("6299 mais 32 dá
+194") ou leitura de tela. Nenhum era fato a acompanhar. A régua punia o modelo
+por filtrar certo.
+
+Lendo as atas contra a transcrição inteira, o que eles perdem de verdade é outra
+coisa — e é o que importa:
+
+- **"Não corrija antes de falar comigo"**, dito com todas as letras pela líder do
+  cliente, sumiu das duas atas. É restrição, e restrição é decisão;
+- **100% das ações foram para quem mais falou.** A coordenadora se atribuiu
+  trabalho em voz alta e não apareceu em nenhuma ata;
+- e as duas atas traziam **uma segunda ata inteira dentro de uma seção**.
+
+### Quando dois modelos erram igual, a causa é o prompt
+
+Foram quatro defeitos, todos nossos:
+
+| # | defeito | causa |
+|---|---|---|
+| 1 | ata inteira dentro de uma seção | o recorte do `SKILL.md` levava o Passo 3 ("Toda ata começa assim") e o Passo 4 ("Saída em Markdown, direto na conversa") — o prompt pedia documento, o esquema pedia JSON |
+| 2 | lista de pendências escrita em `secoes` **e** no campo `acoes` | o esqueleto do tipo mostrava "## Ações" como seção. **Regra em texto não vence exemplo em estrutura** |
+| 3 | a lista de pendências saía **duas vezes** no documento | `RedatorDeAta` deduplicava pela chave de *entrada*: "Ações" e "Pendências" são entradas diferentes para a mesma saída |
+| 4 | **"Decisões técnicas" era engolida** | `EhCanonica` casava por prefixo `decis`, e substituía o raciocínio (por quê, alternativas descartadas, implicações) pela lista de uma linha |
+
+O 4 é o mais grave, e estava escondido atrás do 1: enquanto a ata duplicada
+existia, o modelo escrevia "Decisões técnicas" dentro dela e a seção aparecia.
+Consertar o 1 a fez sumir — e só aí ficou visível que **a seção mais valiosa da
+ata de sessão de trabalho nunca tinha chegado ao usuário pelo caminho certo**.
+
+### O que os consertos mudaram
+
+Medido nas mesmas 5 reuniões, 3 modelos, 2 rodadas:
+
+| | antes | depois |
+|---|---|---|
+| atas com pendências duplicadas | 30 de 30 | **0** |
+| atas com "Decisões técnicas" | 0 | **28** |
+| ações do Qwen3.5 por ata | **0** | 4,3 |
+| falhas por estouro de saída | 2 | 2 |
+| donos distintos por ata | ~1 | 2,6 a 2,9 |
+
+**O Qwen3.5 não estava desqualificado.** A conclusão de que "ele não escreve
+pendências" era um defeito nosso: o esqueleto mostrava "## Ações" como seção e o
+esquema pedia o campo `acoes`; ele escolhia a seção, e o redator não a escrevia.
+
+### O quadro final
+
+| modelo | n | falhas | tempo | recall | ações | donos |
+|---|---|---|---|---|---|---|
+| Qwen3 4B *(atual)* | 9 | 1 | 122 s | 79% ± 32% | 6,3 | 2,9 |
+| Qwen3.5 4B | 9 | 1 | 64 s | 69% ± 23% | 4,3 | 2,7 |
+| Gemma 4 E4B | 10 | **0** | 61 s | 67% ± 21% | 5,0 | 2,6 |
+
+Com os desvios em 21 a 32 pontos, **os três são indistinguíveis em qualidade**.
+Sobram duas diferenças que resistem ao ruído: o Qwen3 é **duas vezes mais lento**,
+e o Gemma é o único que não falhou nenhuma vez.
+
+### A lição que vale mais que a escolha do modelo
+
+Passamos de "qual modelo é melhor" para "quatro defeitos nossos custavam mais que
+qualquer diferença entre modelos". Antes de trocar de modelo, vale sempre ler a
+saída contra a entrada — a régua automática mediu 30 atas e não viu nenhum dos
+quatro.
+
+---
+
 ## A recomendação
 
-**Manter o Qwen3 4B como padrão e oferecer o Gemma 4 E4B como opção**, para quem
-tem placa folgada e quer ata em metade do tempo.
+> Revista em 17/08/2026, depois dos consertos.
 
-O recall não distingue os dois, e trocar o padrão é uma decisão que atinge todo
-mundo por um ganho — velocidade — que não é o que dói hoje. O que de fato
-recomenda o Gemma é a **confiabilidade**: zero falhas em 10 rodadas contra uma em
-9, e nunca a seção gigante.
+**Trocar o padrão para o Gemma 4 E4B**, e manter o Qwen3 4B como opção.
+
+O argumento mudou de lado com os consertos. Antes, o Gemma ganhava só em
+velocidade — que não era o que doía. Agora que os quatro defeitos saíram e os
+três modelos ficaram indistinguíveis em qualidade, o que resta a decidir é
+exatamente velocidade e confiabilidade, e nos dois o Gemma ganha: **metade do
+tempo** do atual (61 s contra 122 s) e **zero falhas em 10 rodadas**, incluindo
+a reunião de duas horas onde o atual falhou.
+
+O que a troca custa, e não é pouco: **4,98 GB contra 2,50 GB** de download e de
+VRAM. Numa placa de 6 GB isso é apertado, e é o motivo de o Qwen3 continuar
+sendo oferecido.
+
+**O Qwen3.5 volta à mesa** — a desqualificação dele era defeito nosso. Ele é tão
+rápido quanto o Gemma e ocupa metade do disco. Ficou de fora da recomendação por
+uma razão só: com 4,3 ações por ata contra 5,0 e 6,3, é o que menos registra
+pendência — e pendência é o que o produto existe para não deixar cair.
+
+**Nada disso se decide sem ler.** Estrutura, recall e formato se contam; se a ata
+é boa de ler, não. As 30 atas de cada geração estão em
+`C:\Users\andre\ata-comparacao` e `...-antes`.
 
 Acrescentar qualquer um deles ao catálogo é publicar uma versão nova do app — o
 catálogo é código —, e é por isso que a rota de atualização

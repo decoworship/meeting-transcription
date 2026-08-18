@@ -56,6 +56,49 @@ public sealed class ModelosDeAtaTests
         Assert.DoesNotContain("direto na conversa", regras);
     }
 
+    [Theory]
+    [InlineData("trabalho")]
+    [InlineData("cliente-update")]
+    [InlineData("sprint")]
+    [InlineData("kickoff")]
+    [InlineData("resultados")]
+    [InlineData("daily")]
+    public void OEsqueletoQueVaiAoModeloNaoMostraOQueORedatorEscreve(string id)
+    {
+        // Regra em texto não vence exemplo em estrutura. Enquanto o esqueleto
+        // mostrava "## Ações", o modelo escrevia a lista de pendências dentro de
+        // `secoes` **além** de preencher `acoes` — e a ata saía com duas listas.
+        string esqueleto = ModelosDeAta.Buscar(id)!.TextoParaPrompt();
+
+        int inicio = esqueleto.IndexOf("```markdown", StringComparison.Ordinal);
+        int fim = esqueleto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
+        string corpo = esqueleto[(inicio + 11)..fim];
+
+        foreach (string proibida in new[]
+                 { "## Ações", "## Pendências", "## Pontos em aberto", "## Resumo",
+                   "## Riscos e alertas", "## Riscos identificados" })
+            Assert.DoesNotContain(proibida, corpo);
+
+        // E o cabeçalho do documento, que é o que gerava a ata dentro da ata.
+        Assert.DoesNotContain("# Ata —", corpo);
+        Assert.DoesNotContain("**Participantes:**", corpo);
+
+        // Mas sobrou corpo: filtrar tudo deixaria o modelo sem estrutura.
+        Assert.Contains("## ", corpo);
+    }
+
+    [Fact]
+    public void ODecisoesTecnicasSobrevive()
+    {
+        // Ela não é a lista de decisões — é o raciocínio por trás delas, com
+        // alternativas descartadas e implicações. É o que dá valor à ata de
+        // sessão de trabalho, e um filtro guloso demais a levaria junto.
+        string esqueleto = ModelosDeAta.Buscar("trabalho")!.TextoParaPrompt();
+
+        Assert.Contains("## Decisões técnicas", esqueleto);
+        Assert.Contains("Alternativas descartadas", esqueleto);
+    }
+
     [Fact]
     public void OContratoDoJsonDizOQueOAppJaEscreve()
     {

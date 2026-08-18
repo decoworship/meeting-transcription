@@ -136,24 +136,30 @@ public static class RedatorDeAta
     }
 
     /// <summary>Escreve uma seção de campo próprio, uma vez só.</summary>
+    /// <remarks>
+    /// <b>A chave do "já escrevi" é o nome de saída, não o de entrada.</b> Era o
+    /// de entrada, e o efeito aparecia em toda ata de sessão de trabalho: o
+    /// esqueleto pede "Ações", que o redator escreve como "## Pendências" e
+    /// registra sob a chave <c>acoes</c>; no fim, a lista fixa pedia
+    /// "Pendências", que não estava registrada — e a mesma lista saía duas vezes
+    /// no documento. Medido em 17/08/2026, e por um bom tempo confundido com
+    /// mania do modelo.
+    /// </remarks>
     private static void Canonica(StringBuilder sb, string titulo, AtaGerada ata,
                                  HashSet<string> escritas)
     {
-        string chave = Normalizar(titulo);
-        if (!escritas.Add(chave)) return;
+        if (Canonizar(titulo) is not { } canonica) return;
+        if (!escritas.Add(canonica)) return;
 
-        if (chave.StartsWith("decis", StringComparison.Ordinal))
-            Lista(sb, "Decisões", ata.Decisoes);
-        else if (chave.StartsWith("pend", StringComparison.Ordinal)
-                 || chave.StartsWith("acoes", StringComparison.Ordinal)
-                 || chave.StartsWith("acao", StringComparison.Ordinal))
-            Acoes(sb, ata.Acoes);
-        else if (chave.StartsWith("pontos", StringComparison.Ordinal))
-            Lista(sb, "Pontos em aberto", ata.PontosEmAberto);
-        else if (chave.StartsWith("riscos", StringComparison.Ordinal))
-            Lista(sb, "Riscos e alertas", ata.Riscos);
-        else if (chave.StartsWith("observ", StringComparison.Ordinal))
-            Lista(sb, "Observações sobre a transcrição", ata.Observacoes);
+        switch (canonica)
+        {
+            case "Decisões": Lista(sb, "Decisões", ata.Decisoes); break;
+            case "Pendências": Acoes(sb, ata.Acoes); break;
+            case "Pontos em aberto": Lista(sb, "Pontos em aberto", ata.PontosEmAberto); break;
+            case "Riscos e alertas": Lista(sb, "Riscos e alertas", ata.Riscos); break;
+            case "Observações sobre a transcrição":
+                Lista(sb, "Observações sobre a transcrição", ata.Observacoes); break;
+        }
     }
 
     private static bool Parecido(string a, string b) =>
@@ -179,19 +185,38 @@ public static class RedatorDeAta
     /// Ele pode continuar preenchendo os dois; o arquivo sai com um só, e com o
     /// que é verificável (o campo), não com a prosa.
     /// </remarks>
-    private static bool EhCanonica(string titulo)
+    /// <summary>
+    /// O nome canônico da seção que o redator escreve, ou <c>null</c> se o
+    /// título é corpo do tipo e vem do modelo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Casamento exato, e não por prefixo.</b> A versão anterior aceitava
+    /// qualquer título começando com <c>decis</c>, e com isso engolia
+    /// <b>"Decisões técnicas"</b> — que não é a lista de decisões, é o raciocínio
+    /// por trás delas, com alternativas descartadas e implicações. Ou seja: a
+    /// seção mais valiosa da ata de sessão de trabalho era substituída pela lista
+    /// simples, em silêncio. Medido em 17/08/2026.
+    /// </para>
+    /// <para>
+    /// Os sinônimos entram na lista um a um, de propósito. É mais chato de manter
+    /// e não tem como pegar por engano o título que só se parece.
+    /// </para>
+    /// </remarks>
+    private static string? Canonizar(string titulo) => Normalizar(titulo) switch
     {
-        string t = Normalizar(titulo);
-        return t == "resumo"
-            || t.StartsWith("decis", StringComparison.Ordinal)
-            || t.StartsWith("pend", StringComparison.Ordinal)
-            || t.StartsWith("acoes", StringComparison.Ordinal)
-            || t.StartsWith("acao", StringComparison.Ordinal)
-            || t.StartsWith("action item", StringComparison.Ordinal)
-            || t.StartsWith("pontos em aberto", StringComparison.Ordinal)
-            || t.StartsWith("riscos", StringComparison.Ordinal)
-            || t.StartsWith("observ", StringComparison.Ordinal);
-    }
+        "resumo" => "Resumo",
+        "decisoes" => "Decisões",
+        "pendencias" or "acoes" or "acao" or "acoes imediatas"
+            or "action items" or "action item" => "Pendências",
+        "pontos em aberto" => "Pontos em aberto",
+        "riscos" or "riscos e alertas" or "riscos identificados" => "Riscos e alertas",
+        "observacoes" or "observacoes sobre a transcricao" =>
+            "Observações sobre a transcrição",
+        _ => null,
+    };
+
+    private static bool EhCanonica(string titulo) => Canonizar(titulo) is not null;
 
     private static void Lista(StringBuilder sb, string titulo, IReadOnlyList<string> itens)
     {

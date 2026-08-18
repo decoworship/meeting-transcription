@@ -157,6 +157,59 @@ public sealed class RedatorDeAtaTests
     };
 
     [Fact]
+    public void AListaDePendenciasSaiUmaVezSo()
+    {
+        // O esqueleto da sessão de trabalho pede "Ações"; o redator a escreve
+        // como "## Pendências" e, no fim, escrevia a lista fixa de novo — porque
+        // a chave de "já escrevi" era o título de ENTRADA, e "Ações" e
+        // "Pendências" são entradas diferentes para a mesma saída.
+        //
+        // O resultado eram duas listas idênticas de pendências em toda ata de
+        // sessão de trabalho, o que por um bom tempo passou por mania do modelo.
+        var ata = new AtaGerada
+        {
+            Acoes = [new AcaoDaAta
+            {
+                Acao = "Abrir o chamado", Responsavel = "Vanessa Levorato",
+                Prazo = "[prazo a definir]", Lado = "nosso",
+            }],
+        };
+
+        string md = RedatorDeAta.Escrever(ata, ModelosDeAta.Buscar("trabalho")!, Contexto());
+
+        Assert.Equal(1, md.Split("## Pendências").Length - 1);
+    }
+
+    [Fact]
+    public void DecisoesTecnicasNaoEEngolidaPelaListaDeDecisoes()
+    {
+        // "Decisões técnicas" não é a lista de decisões: é o raciocínio por trás
+        // delas — o porquê, as alternativas descartadas, as implicações. É o que
+        // dá valor à ata de sessão de trabalho.
+        //
+        // O casamento por prefixo ("decis") a tratava como canônica e a
+        // substituía pela lista simples, jogando fora o que o modelo escreveu.
+        var ata = new AtaGerada
+        {
+            Decisoes = ["Separar os casos em três cenários"],
+            Secoes = [new SecaoDaAta
+            {
+                Titulo = "Decisões técnicas",
+                Texto = "**Definido:** assumir o CRM como fonte.\n"
+                      + "**Alternativas descartadas:** usar o Quina — dado suspeito.",
+            }],
+        };
+
+        string md = RedatorDeAta.Escrever(ata, ModelosDeAta.Buscar("trabalho")!, Contexto());
+
+        Assert.Contains("## Decisões técnicas", md);
+        Assert.Contains("Alternativas descartadas", md);
+        // E a lista simples continua existindo, separada.
+        Assert.Contains("## Decisões", md);
+        Assert.Contains("Separar os casos em três cenários", md);
+    }
+
+    [Fact]
     public void OItemDeAcaoSaiNoFormatoDaSkill()
     {
         var ata = new AtaGerada

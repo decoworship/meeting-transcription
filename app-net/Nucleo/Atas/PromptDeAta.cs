@@ -131,7 +131,7 @@ public static class PromptDeAta
         sb.AppendLine("O modelo em Markdown abaixo serve para dizer **quais seções "
                       + "existem e o que vai em cada uma**. Ele não é o formato da sua "
                       + "resposta: você responde em JSON, e o app monta o Markdown.\n");
-        sb.AppendLine(tipo.Texto);
+        sb.AppendLine(tipo.TextoParaPrompt());
         sb.AppendLine("\n---\n");
 
         sb.AppendLine("# Dados da reunião\n");
