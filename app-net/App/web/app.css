@@ -790,10 +790,14 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .gravador__ponto[data-cor="laranja"]  { background: var(--cor-destaque); }
 .gravador__ponto[data-cor="amarelo"]  { background: var(--cor-atencao); }
 
+/* --texto-titulo-g, e não --texto-display, que era o token mais perto dos 28px
+ * soltos que estavam aqui. O motivo está no retrato: este elemento é o relógio
+ * E o rótulo de estado — parado, ele escreve "Parado". Uma palavra a 36px em
+ * monoespaçada vira grito, e o app passa a maior parte do tempo parado. */
 .gravador__tempo {
   margin: 0;
   font-family: var(--fonte-mono);
-  font-size: var(--texto-display);
+  font-size: var(--texto-titulo-g);
   line-height: 1.1;
   /* Tabular para os dígitos não dançarem a cada segundo. */
   font-variant-numeric: tabular-nums;
@@ -840,12 +844,20 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 /* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
  * no botão que a usa, e não perdida no meio do cartão. */
+/* A coluna do botão tem largura fixa, e não `auto`.
+ *
+ * Com `auto` cada cartão media o próprio botão, e "Refazer ata" é mais largo
+ * que "Gerar ata": o seletor e o botão dançavam de linha para linha, cada
+ * cartão com um alinhamento diferente do vizinho. Numa lista, o que denuncia
+ * isso não é um cartão — são dois, um debaixo do outro. */
 .ata__topo {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto 9.5rem;
   align-items: end;
   gap: var(--espaco-3);
 }
+
+.ata__topo > .aa-btn { width: 100%; }
 
 .ata__tipo { min-width: 14rem; margin: 0; }
 
@@ -856,10 +868,17 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   max-width: 68ch;
   border-top: 1px solid var(--cor-borda);
   padding-top: var(--espaco-3);
+  font-size: var(--texto-corpo);
 }
 
-.ata__texto h2 { font-size: var(--texto-medio); margin: var(--espaco-4) 0 var(--espaco-2); }
-.ata__texto h3 { font-size: var(--texto-base); margin: var(--espaco-3) 0 var(--espaco-1); }
+/* --texto-medio e --texto-base NÃO EXISTEM no tokens.json, e era isso que
+ * estava escrito aqui. Um var() que não resolve invalida a declaração inteira,
+ * então os dois títulos herdavam o tamanho do corpo: a ata saía sem hierarquia
+ * nenhuma, seção e parágrafo do mesmo tamanho, distinguidos só pelo negrito.
+ * Não aparece em teste nem em log — some em silêncio, que é como uma variável
+ * inventada sempre falha. */
+.ata__texto h2 { font-size: var(--texto-titulo-m); margin: var(--espaco-4) 0 var(--espaco-2); }
+.ata__texto h3 { font-size: var(--texto-corpo); margin: var(--espaco-3) 0 var(--espaco-1); }
 .ata__texto p { margin: 0 0 var(--espaco-2); line-height: 1.6; }
 .ata__texto ul { margin: 0 0 var(--espaco-3); padding-left: var(--espaco-4); }
 .ata__texto li { margin-bottom: var(--espaco-1); line-height: 1.5; }

@@ -183,6 +183,13 @@ export async function telaDoGravador(ctx) {
     tempo.textContent = g.gravando ? relogio(g.duracao_s) : "Parado";
     situacao.textContent = g.status;
 
+    // Este elemento é relógio E rótulo de estado: parado, ele escreve
+    // "Parado" — e o status que o núcleo manda diz a mesma palavra, então o
+    // cartão mostrava "Parado" duas vezes, uma grande e uma pequena logo
+    // abaixo. Comparar os textos em vez de testar `g.gravando` faz a regra
+    // valer para qualquer status futuro que repita o de cima.
+    situacao.hidden = situacao.textContent === tempo.textContent;
+
     principal.textContent = g.gravando ? "Parar gravação" : "Iniciar gravação";
     principal.className = g.gravando
       ? "aa-btn aa-btn-secundario aa-btn--grande" : "aa-btn aa-btn-primario aa-btn--grande";
