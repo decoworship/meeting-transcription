@@ -143,7 +143,27 @@ public static class ModelosDeAta
                 $"o SKILL.md mudou: não achei \"{marca}\". "
                 + "Ver ModelosDeAta.RegrasComuns e ATA.md §1.");
 
-        return skill[corte..].Replace(
+        // O recorte termina no Passo 3, e isso conserta um defeito medido.
+        //
+        // O SKILL.md é escrito para o Claude num chat: o Passo 3 manda escrever
+        // o cabeçalho da ata ("Toda ata começa assim", com um modelo em
+        // Markdown) e o Passo 4 manda entregar Markdown na conversa e oferecer
+        // conversão para .docx. Nenhum dos dois vale aqui — **quem escreve o
+        // cabeçalho é o RedatorDeAta, e a saída é JSON preso a um esquema**.
+        //
+        // Mandá-los assim mesmo produziu o pior defeito da ata, e nos dois
+        // modelos testados em 17/08/2026: o modelo escrevia uma ata inteira em
+        // Markdown, com cabeçalho, **dentro de uma seção** — e o redator
+        // acrescentava a dele em volta. Saía documento duplicado, seção de 2.500
+        // caracteres, e as duas falhas por estourar o limite de saída.
+        //
+        // Quando dois modelos independentes erram igual, a causa é o prompt.
+        const string fim = "## Passo 3";
+        int ate = skill.IndexOf(fim, corte, StringComparison.Ordinal);
+
+        string regras = (ate < 0 ? skill[corte..] : skill[corte..ate]).TrimEnd();
+
+        return regras.Replace(
             "## Passo 2: Regras comuns a todos os tipos", "## Regras");
     }
 

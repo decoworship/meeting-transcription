@@ -78,6 +78,40 @@ def falantes(transcricao: Path) -> set[str]:
     return {(s.get("speaker") or "").strip() for s in segs if s.get("speaker")}
 
 
+# Números que **dimensionam** algo: contagem de casos, volume, percentual, valor
+# com unidade. É o recorte que a medição de 17/08/2026 obrigou a fazer.
+#
+# A régua anterior contava todo número dito, e punia o modelo por acertar: dos 9
+# números que o Qwen3 "perdeu" numa reunião, os 9 eram hipótese ("não sei se
+# seria 50, 70 ou 80"), conta em voz alta ("6299 mais 32 dá 194") e leitura de
+# tela. Nenhum era fato a acompanhar, e o dono do produto tinha razão ao
+# desconfiar da métrica.
+#
+# O que continua contando é o que sustenta a análise — "13 mil casos", "5.700 de
+# ProRata", "130 mil registros" —, porque esses a ata perde de verdade.
+MATERIAL = re.compile(
+    r"\b\d{1,3}(?:[.,]\d{3})*\s*(?:mil|milhões?|milhão)\b"      # 13 mil, 130 mil
+    r"|\b\d{1,3}(?:[.,]\d{3})+\b"                                # 5.700
+    r"|\b\d{1,3}(?:[.,]\d+)?\s*%"                                # 100%
+    r"|R\$\s*\d[\d.,]*",                                         # R$ 19.000
+    re.I)
+
+
+def numeros_materiais(texto: str) -> set[str]:
+    return {re.sub(r"[^\d]", "", m.group(0)) for m in MATERIAL.finditer(texto)
+            if len(re.sub(r"[^\d]", "", m.group(0))) >= 2}
+
+
+def ata_duplicada(md: str) -> bool:
+    """O modelo escreveu uma ata inteira dentro de uma seção?
+
+    O sintoma é inconfundível: um título de seção que começa com `#`, porque o
+    redator prefixa `## ` no que o modelo mandou — e o modelo mandou `# Ata —`.
+    Foi o pior defeito das 30 atas medidas, e vinha do prompt, não do modelo.
+    """
+    return bool(re.search(r"^## #", md, flags=re.M)) or md.count("\n## Pendências") > 1
+
+
 def medir_ata(ata: Path, texto_da_reuniao: str, vozes: set[str]) -> dict:
     md = ata.read_text(encoding="utf-8")
 
@@ -87,9 +121,15 @@ def medir_ata(ata: Path, texto_da_reuniao: str, vozes: set[str]) -> dict:
     acoes = re.findall(r"^- \[ \] (.+)$", md, flags=re.M)
     sem_dono = sum(1 for a in acoes if "responsável a definir" in a)
 
-    ditos = numeros(texto_da_reuniao)
-    na_ata = numeros(md)
+    ditos = numeros_materiais(texto_da_reuniao)
+    na_ata = numeros_materiais(md)
     recuperados = ditos & na_ata
+
+    # Quantos donos distintos aparecem nas ações. Uma ata que dá tudo para a
+    # mesma pessoa não está atribuindo, está defaultando para quem mais falou —
+    # foi o que as duas atas fizeram na reunião de 14/08, onde a coordenadora se
+    # atribuiu trabalho e não apareceu em nenhuma delas.
+    donos = {d.strip() for d in re.findall(r"— \*\*(.+?)\*\* —", md)}
 
     # Nome na linha de participantes que ninguém ouviu falar. Comparação por
     # primeiro nome: a ata escreve "Daniel Prada" e a voz aprendida pode ser
@@ -109,6 +149,8 @@ def medir_ata(ata: Path, texto_da_reuniao: str, vozes: set[str]) -> dict:
         "maior_secao": maior,
         "acoes": len(acoes),
         "acoes_sem_dono": sem_dono,
+        "donos": len(donos - {"responsável a definir"}),
+        "duplicada": ata_duplicada(md),
         "numeros_ditos": len(ditos),
         "numeros_na_ata": len(recuperados),
         "recall": (len(recuperados) / len(ditos)) if ditos else 0.0,
@@ -200,8 +242,9 @@ def main() -> int:
                 m["reuniao"] = nome
                 tudo[modelo].append(m)
                 print(f"  {etiqueta}  {m['segundos']:>4.0f}s · recall {m['recall']:>4.0%} · "
-                      f"{m['acoes']:>2} ações ({m['acoes_sem_dono']} s/dono) · "
-                      f"maior seção {m['maior_secao']:>6,}")
+                      f"{m['acoes']:>2} ações / {m['donos']} donos · "
+                      f"maior seção {m['maior_secao']:>6,}"
+                      f"{'  ⚠ ATA DUPLICADA' if m['duplicada'] else ''}")
 
                 # Renomear por rodada, senão a segunda sobrescreve a primeira e
                 # a variância — que é o que se está medindo — some.
@@ -212,23 +255,25 @@ def main() -> int:
     print(f"\n\n{'=' * 78}")
     print("RESUMO")
     print("=" * 78)
-    print(f"{'modelo':<28} {'n':>3} {'falhas':>7} {'tempo':>7} "
-          f"{'recall':>14} {'s/dono':>8} {'pior seção':>11}")
+    print(f"{'modelo':<26} {'n':>3} {'falh':>5} {'dupl':>5} {'tempo':>6} "
+          f"{'recall':>13} {'ações':>6} {'donos':>6} {'pior seção':>11}")
     print("-" * 78)
 
     for modelo in args.modelo:
         ms = tudo[modelo]
         if not ms:
-            print(f"{modelo[:27]:<28} {0:>3} {len(falhas[modelo]):>7}  todas falharam")
+            print(f"{modelo[:25]:<26} {0:>3} {len(falhas[modelo]):>5}  todas falharam")
             continue
 
         recalls = [m["recall"] for m in ms]
         acoes = sum(m["acoes"] for m in ms)
         semDono = sum(m["acoes_sem_dono"] for m in ms)
-        print(f"{modelo[:27]:<28} {len(ms):>3} {len(falhas[modelo]):>7} "
-              f"{media([m['segundos'] for m in ms]):>6.0f}s "
-              f"{media(recalls):>7.0%} ±{desvio(recalls):>4.0%} "
-              f"{(semDono / acoes if acoes else 0):>7.0%} "
+        print(f"{modelo[:25]:<26} {len(ms):>3} {len(falhas[modelo]):>5} "
+              f"{sum(1 for m in ms if m['duplicada']):>5} "
+              f"{media([m['segundos'] for m in ms]):>5.0f}s "
+              f"{media(recalls):>6.0%} ±{desvio(recalls):>4.0%} "
+              f"{media([m['acoes'] for m in ms]):>6.1f} "
+              f"{media([m['donos'] for m in ms]):>6.1f} "
               f"{max(m['maior_secao'] for m in ms):>10,}")
 
     print("\nO ± é o desvio entre rodadas. Quando ele encosta na diferença entre")
