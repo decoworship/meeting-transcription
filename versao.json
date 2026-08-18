@@ -1,6 +1,6 @@
 {
-  "versao": "0.2.0",
+  "versao": "0.3.0",
   "publicada": "2026-08-18",
-  "notas": "A ata deixa de sair repetida, o raciocínio das decisões volta a aparecer, e as pendências param de cair todas na mesma pessoa. Reuniões longas não falham mais.",
+  "notas": "O app ganha tema escuro, em Ajustes → Geral. A tela de revisão mostra mais texto e em tamanho maior, e a ata volta a ter títulos.",
   "onde": ""
 }

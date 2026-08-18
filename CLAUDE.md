@@ -14,11 +14,18 @@ O projeto é **doc-driven**. Antes de mexer em qualquer coisa não trivial, leia
 dizem o que se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e
 por quê. Muito comentário no código aponta para eles.
 
-**As fases 0 a 4 estão concluídas.** O app se instala
-([docs/FASE4.md](docs/FASE4.md)), grava, transcreve, separa falantes e escreve a
-ata — e já rodou na máquina de outra pessoa. **A fase corrente é a 5**, o
-acabamento visual sobre o AA Design System (`docs/PLANO.md` §3); depois vem a 6,
-qualidade da transcrição ([docs/FASE6.md](docs/FASE6.md)).
+**As fases 0 a 5 estão concluídas.** O app se instala
+([docs/FASE4.md](docs/FASE4.md)), grava, transcreve, separa falantes, escreve a
+ata e abre no tema que a pessoa escolheu — e já rodou na máquina de outra
+pessoa. A Fase 5, o acabamento visual sobre o AA Design System, fechou em
+18/08/2026 ([docs/FASE5-HANDOFF.md](docs/FASE5-HANDOFF.md)). **A fase corrente é
+a 6**, qualidade da transcrição ([docs/FASE6.md](docs/FASE6.md)).
+
+**O tema mora no `app.json` e é aplicado pelo núcleo**, que reescreve o
+`data-tema` do `index.html` enquanto o serve (`App/Conteudo.cs`). Não é
+JavaScript: a ponte é assíncrona e o tema chegaria depois da primeira pintura.
+O `data-tema="claro"` do HTML é procurado por texto exato — mudá-lo faz o tema
+parar de funcionar em silêncio.
 
 **A rota de atualização existe no primeiro degrau**: o app avisa que saiu versão
 nova, lendo o `versao.json` do próprio repositório — sem servidor
@@ -37,7 +44,7 @@ junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 289 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 336 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB

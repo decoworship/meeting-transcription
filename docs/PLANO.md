@@ -3,16 +3,23 @@
 Três frentes, em ordem de dependência: validar o áudio gravado, melhorar o
 gravador, redesenhar a interface.
 
-> **Onde o plano está hoje (15/08/2026).** As fases 0 a 4 estão concluídas:
+> **Onde o plano está hoje (18/08/2026).** As fases 0 a **5** estão concluídas:
 > existe **um app que se instala**, grava na bandeja, transcreve, separa
-> falantes e escreve a ata — e ele já rodou numa máquina que não é a de quem o
-> compilou. O que falta é acabamento visual (Fase 5) e qualidade da transcrição
-> (Fase 6). A lista completa está em §5, "Fases".
+> falantes, escreve a ata e agora **abre no tema que a pessoa escolheu** — e ele
+> já rodou numa máquina que não é a de quem o compilou. O que falta é qualidade
+> da transcrição (Fase 6). A lista completa está em §5, "Fases".
 >
-> **A dívida que a Fase 4 deixou aberta e não estava prevista:** não há rota de
-> atualização. Ver [FASE4-HANDOFF.md](FASE4-HANDOFF.md) §6.1 — ela precisa ser
-> decidida antes ou junto da Fase 5, porque toda correção das duas fases
-> seguintes depende de um caminho até quem já instalou.
+> **A Fase 5 fechou em 18/08/2026** ([FASE5-HANDOFF.md](FASE5-HANDOFF.md)). O
+> que ela pedia está feito, menos os componentes React, recusados com motivo. O
+> achado maior não estava na carta: o tema escuro existia inteiro no design
+> system desde o começo e **não havia como chegar nele** — o `data-tema` era
+> literal, e a palavra não aparecia em nenhum outro lugar do app.
+>
+> **A dívida que a Fase 4 deixou aberta e não estava prevista:** não havia rota
+> de atualização. ✅ **Resolvida no primeiro degrau** em 18/08/2026 — o app avisa
+> que saiu versão nova, lendo o `versao.json` do repositório
+> ([ATUALIZACAO.md](ATUALIZACAO.md)). Baixar e trocar o binário sozinho fica
+> para depois da assinatura de código.
 >
 > **Acrescentado em 14/08/2026:** uma **Fase 6**, de revisões, depois da 5
 > ([FASE6.md](FASE6.md)) — cada item com o gatilho que justifica fazê-lo. Ela
@@ -184,6 +191,14 @@ posterior e opcional — inclusive editável depois no app.
 
 ## 3. Redesign da interface com o AA Design System — a Fase 5
 
+> **✅ CONCLUÍDA em 18/08/2026.** O que a fase entregou, o que ela recusou e o
+> que ela deixou aberto está em [FASE5-HANDOFF.md](FASE5-HANDOFF.md). Em
+> resumo: o `app.css` não tem mais nenhum valor fora de token nem nenhuma
+> variável inexistente; o **tema escuro deixou de ser inalcançável** e virou
+> três opções em Ajustes › Geral; a revisão devolveu 89 px de leitura. Os
+> componentes React foram **recusados com motivo** — a página não tem passo de
+> build e a CSP teria de ser afrouxada para trocar HTML que funciona.
+>
 > **Reordenada em 13/08/2026.** Isto era a Fase 3 e passou a ser a **Fase 5**, a
 > última: depois das features (Fase 3 nova, [FASE3.md](FASE3.md)) e do
 > instalador (Fase 4). O motivo está no fim desta seção, e a decisão inteira em
@@ -252,17 +267,24 @@ Com a interface própria já escrita em WebView2 — trilho, cartões, revisão,
 gravador, ajustes, tudo em HTML e nas classes do design system —, o que restou
 do redesign é acabamento, e cabe numa lista curta:
 
-- **fidelidade aos tokens**: conferir tela a tela o que ficou de valor solto
-  contra `tokens.json`, agora que existe um catálogo de telas estável;
-- **as fontes** (Fraunces e Hanken Grotesk) auto-hospedadas dentro do
-  executável, com o peso disso medido contra o orçamento de tamanho;
-- **os componentes React do design system**, hoje enfim utilizáveis — mas só
+- ✅ **fidelidade aos tokens**: conferir tela a tela o que ficou de valor solto
+  contra `tokens.json`, agora que existe um catálogo de telas estável.
+  *29 valores para token, e mais duas variáveis que simplesmente não existiam —
+  `--texto-medio` e `--texto-base` — e faziam a ata sair sem hierarquia;*
+- ✅ **as fontes** (Fraunces e Hanken Grotesk) auto-hospedadas dentro do
+  executável. *Já estava pronto desde a Fase 2.5;*
+- ❌ **os componentes React do design system**, hoje enfim utilizáveis — mas só
   onde pagarem por si: trocar HTML que funciona por React para "usar o design
-  system" é custo sem ganho, e a CSP fechada da página é uma régua a respeitar;
-- **o tema escuro de ponta a ponta**, incluindo os estados que ninguém olhou
-  ainda (esqueletos, alertas, medidores de nível);
-- **densidade e tipografia da tela de revisão**, que é onde se passa mais tempo
-  lendo.
+  system" é custo sem ganho, e a CSP fechada da página é uma régua a respeitar.
+  *Não pagam: sem passo de build, React exigiria um empacotador, e a CSP teria
+  de ser afrouxada. Recusado, e não pendente;*
+- ✅ **o tema escuro de ponta a ponta**, incluindo os estados que ninguém olhou
+  ainda (esqueletos, alertas, medidores de nível). *Era pior do que parecia —
+  não havia como chegar no tema escuro. Feito, menos os estados que exigem uma
+  gravação em curso (FASE5-HANDOFF §6.3);*
+- ✅ **densidade e tipografia da tela de revisão**, que é onde se passa mais
+  tempo lendo. *89 px recuperados, e a causa não era espaçamento: a barra de
+  ferramentas tinha seis colunas declaradas para oito filhos.*
 
 Nada disto muda a qualidade da transcrição, e é exatamente por isso que vem
 depois de tudo.

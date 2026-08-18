@@ -3,6 +3,28 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.3.0 — o tema escuro, e a tela de ler fica maior
+
+**O app tem tema escuro.** Em Ajustes → Geral → Aparência: claro, escuro, ou
+igual ao Windows. Ele já estava desenhado desde o começo — a mesma paleta de
+areia, em carvão, porque cinza neutro tiraria a cara do app — e simplesmente não
+havia como chegar nele. Continua abrindo no claro se você não escolher nada.
+
+**A tela de revisão mostra mais texto.** A barra de cima comia quase metade da
+janela: agora a transcrição começa quase 90 pixels mais acima, e cabem três
+trechos a mais sem rolar. O texto também ficou maior — é a tela em que se passa
+mais tempo lendo, e ela estava com tamanho de nota de rodapé.
+
+**"Apagar gravação" saiu do meio da barra de ferramentas.** Ficava entre a busca
+e os filtros, no caminho do que se clica todo dia. Foi para a direita, separada
+do resto.
+
+**A ata volta a ter títulos.** As seções da ata estavam saindo do mesmo tamanho
+dos parágrafos, o que fazia um documento de duas páginas parecer um bloco só.
+
+**Dois acertos pequenos:** o gravador parado não escreve mais "Parado" duas
+vezes, e os cartões da tela de Atas param de dançar de linha para linha.
+
 ## 0.2.0 — a ata fica inteira
 
 Esta versão é quase toda sobre a **ata**. Quatro defeitos faziam com que boa
