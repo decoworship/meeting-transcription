@@ -44,6 +44,93 @@ public sealed class ModelosDeAtaTests
         // usuário, e quem classifica é a tela (ATA.md §1).
         Assert.DoesNotContain("Passo 1", regras);
         Assert.DoesNotContain("pergunte ao usuário antes de escrever", regras);
+
+        // E o Passo 3 e o Passo 4, que são de chat e não deste motor: o 3 manda
+        // escrever o cabeçalho da ata, o 4 manda entregar Markdown na conversa e
+        // oferecer .docx. Mandá-los fazia o modelo escrever uma ata inteira em
+        // Markdown DENTRO de uma seção do JSON — medido nos dois modelos em
+        // 17/08/2026, e é o defeito que produzia a seção de 2.500 caracteres.
+        Assert.DoesNotContain("Passo 3", regras);
+        Assert.DoesNotContain("Passo 4", regras);
+        Assert.DoesNotContain("Toda ata começa assim", regras);
+        Assert.DoesNotContain("direto na conversa", regras);
+    }
+
+    [Theory]
+    [InlineData("trabalho")]
+    [InlineData("cliente-update")]
+    [InlineData("sprint")]
+    [InlineData("kickoff")]
+    [InlineData("resultados")]
+    [InlineData("daily")]
+    public void OEsqueletoQueVaiAoModeloNaoMostraOQueORedatorEscreve(string id)
+    {
+        // Regra em texto não vence exemplo em estrutura. Enquanto o esqueleto
+        // mostrava "## Ações", o modelo escrevia a lista de pendências dentro de
+        // `secoes` **além** de preencher `acoes` — e a ata saía com duas listas.
+        string esqueleto = ModelosDeAta.Buscar(id)!.TextoParaPrompt();
+
+        int inicio = esqueleto.IndexOf("```markdown", StringComparison.Ordinal);
+        int fim = esqueleto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
+        string corpo = esqueleto[(inicio + 11)..fim];
+
+        foreach (string proibida in new[]
+                 { "## Ações", "## Pendências", "## Pontos em aberto", "## Resumo",
+                   "## Riscos e alertas", "## Riscos identificados" })
+            Assert.DoesNotContain(proibida, corpo);
+
+        // E o cabeçalho do documento, que é o que gerava a ata dentro da ata.
+        Assert.DoesNotContain("# Ata —", corpo);
+        Assert.DoesNotContain("**Participantes:**", corpo);
+
+        // Mas sobrou corpo: filtrar tudo deixaria o modelo sem estrutura.
+        Assert.Contains("## ", corpo);
+    }
+
+    [Fact]
+    public void ODecisoesTecnicasSobrevive()
+    {
+        // Ela não é a lista de decisões — é o raciocínio por trás delas, com
+        // alternativas descartadas e implicações. É o que dá valor à ata de
+        // sessão de trabalho, e um filtro guloso demais a levaria junto.
+        string esqueleto = ModelosDeAta.Buscar("trabalho")!.TextoParaPrompt();
+
+        Assert.Contains("## Decisões técnicas", esqueleto);
+        Assert.Contains("Alternativas descartadas", esqueleto);
+    }
+
+    [Fact]
+    public void OContratoDoJsonDizOQueOAppJaEscreve()
+    {
+        // Estas regras não moram no SKILL.md de propósito: ele é fonte única e a
+        // mesma cópia serve à skill de chat, onde nada disto faz sentido.
+        string contrato = PromptDeAta.ContratoDoJson;
+
+        // O defeito da ata duplicada.
+        Assert.Contains("nunca repita", contrato, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Resumo", contrato);
+
+        // O viés de dar todas as ações a quem mais falou.
+        Assert.Contains("Quem fala mais não é dono de tudo", contrato);
+
+        // A decisão que mais custa quando some: a restrição.
+        Assert.Contains("Restrição também é decisão", contrato);
+    }
+
+    [Fact]
+    public void OPromptMontadoNaoMandaEscreverCabecalho()
+    {
+        // A régua de ponta a ponta: o que de fato chega ao modelo. As duas
+        // instruções abaixo estavam no prompt e disputavam com o esquema JSON.
+        var tipo = ModelosDeAta.Buscar("trabalho")!;
+        string prompt = PromptDeAta.Montar(tipo, new ContextoDaReuniao(), [], []);
+
+        Assert.DoesNotContain("Toda ata começa assim", prompt);
+        Assert.DoesNotContain("Saída em Markdown, direto na conversa", prompt);
+
+        // E o modelo precisa saber que o esqueleto em Markdown é catálogo de
+        // seções, não formato de resposta.
+        Assert.Contains("Ele não é o formato da sua resposta", prompt);
     }
 
     [Fact]

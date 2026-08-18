@@ -49,6 +49,69 @@ public static class PromptDeAta
         + "automáticas. Siga as regras e a estrutura dadas. Responda APENAS com o objeto "
         + "JSON pedido, preenchido com o conteúdo real da reunião.";
 
+    /// <summary>
+    /// As regras que só existem porque a saída deste app é JSON, e não conversa.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O <c>SKILL.md</c> é escrito para o Claude num chat e é fonte única — a
+    /// mesma cópia serve à skill de verdade. Então o que é específico deste
+    /// motor mora aqui, e não lá.
+    /// </para>
+    /// <para>
+    /// Cada regra abaixo nasceu de um defeito visto nas 30 atas medidas em
+    /// 17/08/2026, e não de suposição sobre o que um modelo faria.
+    /// </para>
+    /// </remarks>
+    public const string ContratoDoJson = """
+        # O que você escreve, e o que o app escreve
+
+        Você preenche campos de um JSON. O app monta o Markdown a partir deles.
+
+        **O app já escreve, e você não deve repetir em lugar nenhum:**
+
+        - o título da ata e o cabeçalho com data, duração, cliente e participantes;
+        - as seções **Resumo**, **Decisões**, **Pendências**, **Pontos em aberto**,
+          **Riscos e alertas** e **Observações sobre a transcrição** — elas saem
+          dos campos `resumo`, `decisoes`, `acoes`, `pontos_em_aberto`, `riscos` e
+          `observacoes`.
+
+        Em `secoes` vai **só o corpo específico deste tipo de ata**. Nunca escreva
+        um título começando com `#`, e nunca repita, dentro de uma seção, uma
+        decisão, ação ou pendência que já está no campo próprio dela.
+
+        # Quem é o dono de cada ação
+
+        Antes de fechar o campo `acoes`, percorra a lista de participantes **um por
+        um** e pergunte: *o que ficou para esta pessoa?*
+
+        Quem fala mais não é dono de tudo. Quem coordena a reunião normalmente
+        também sai com tarefas — pedir a alguém que envie algo é tarefa de quem
+        pede, quando ele disse que faria algo com o que receber. "Me manda o número
+        do chamado que eu falo com o fulano" são **duas** ações, uma de cada lado.
+
+        Se ninguém assumiu, use `[responsável a definir]`. Inventar dono é pior que
+        admitir que não houve.
+
+        # Restrição também é decisão
+
+        Vai em `decisoes` não só o que o grupo escolheu fazer, mas o que ele
+        combinou **não** fazer, ou fazer só sob condição:
+
+        - "não corrija antes de falar comigo";
+        - "só seguimos depois que o cliente confirmar";
+        - "vamos assumir X como verdade até alguém provar o contrário".
+
+        São as que mais custam quando somem da ata, porque alguém age sem elas.
+
+        # Números
+
+        Registre os números que **dimensionam** algo: volume, valor, percentual,
+        prazo, contagem de casos. Ignore aritmética falada em voz alta durante a
+        análise — hipótese ("não sei se seria 50, 70 ou 80"), conta em andamento
+        ("6299 mais 32 dá 194") e leitura de tela não são fatos a acompanhar.
+        """;
+
     public static string Montar(ModeloDeAta tipo, ContextoDaReuniao ctx,
                                 IReadOnlyList<SegmentoFinal> segmentos,
                                 IReadOnlyList<Fato> roteiro)
@@ -58,11 +121,17 @@ public static class PromptDeAta
         sb.AppendLine(ModelosDeAta.RegrasComuns());
         sb.AppendLine("\n---\n");
 
+        sb.AppendLine(ContratoDoJson);
+        sb.AppendLine("\n---\n");
+
         sb.AppendLine("# Estrutura desta ata\n");
         sb.AppendLine($"O tipo desta reunião **já foi definido**: {tipo.Nome}. "
                       + "Produza as seções da estrutura abaixo, na ordem dela, no campo "
                       + "`secoes` do JSON. Não classifique a reunião de novo.\n");
-        sb.AppendLine(tipo.Texto);
+        sb.AppendLine("O modelo em Markdown abaixo serve para dizer **quais seções "
+                      + "existem e o que vai em cada uma**. Ele não é o formato da sua "
+                      + "resposta: você responde em JSON, e o app monta o Markdown.\n");
+        sb.AppendLine(tipo.TextoParaPrompt());
         sb.AppendLine("\n---\n");
 
         sb.AppendLine("# Dados da reunião\n");

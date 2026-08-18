@@ -199,6 +199,30 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
             if (pedido <= teto && pedido <= cabeNaPlaca) return (pedido, ctk, ctv);
         }
 
+        // Nada coube **pela conta**. Isso não é o mesmo que não caber.
+        //
+        // Medido em 17/08/2026 com o Gemma 4 E4B: a conta disse que só cabiam
+        // 17.281 tokens, e o llama.cpp carregou 32.768 sem reclamar. O motivo é
+        // que a fórmula trata todas as camadas como iguais, e o Gemma usa janela
+        // deslizante — 512 tokens de cache na maioria das camadas, dimensões
+        // menores nelas, e 18 camadas compartilhando KV. A conta errou para mais
+        // em cerca de cinco vezes.
+        //
+        // Modelar isso arquitetura por arquitetura é uma corrida que se perde: a
+        // próxima família traz outro truque. **Quem conhece a arquitetura é o
+        // llama.cpp.** Então a estimativa fica com o papel que ela faz bem —
+        // escolher a quantização do cache — e perde o papel de porteiro: se ela
+        // acha que não cabe, tenta assim mesmo, com o cache mais apertado, e
+        // quem decide é a alocação de verdade.
+        if (pedido <= teto) return (pedido, "q4_0", "q4_0");
+
+        // O único limite que é mesmo nosso: o contexto que o modelo foi treinado
+        // para ter. Passar dele não dá erro — dá saída ruim, em silêncio.
+        throw new InvalidOperationException(
+            $"esta reunião precisa de ~{precisa:N0} tokens de contexto, e o modelo "
+            + $"{modelo.Nome} vai até {teto:N0}. Gere a ata de um trecho menor, ou "
+            + $"escolha um modelo de contexto maior em Ajustes › Modelos.");
+
         // Chegar aqui é não caber. As duas causas são diferentes e pedem coisas
         // diferentes de quem lê, então a mensagem separa as duas — dizer "não
         // cabe na placa" quando o limite é do modelo manda a pessoa comprar
@@ -207,18 +231,6 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         // E dizer isso **agora** é o ponto: antes vinha um JSON de erro do
         // servidor depois de o modelo já ter carregado e o usuário já ter
         // esperado.
-        if (precisa > teto)
-            throw new InvalidOperationException(
-                $"esta reunião precisa de ~{precisa:N0} tokens de contexto, e o modelo "
-                + $"{modelo.Nome} vai até {teto:N0}. Gere a ata de um trecho menor, ou "
-                + $"escolha um modelo de contexto maior em Ajustes › Modelos.");
-
-        long comQ4 = modelo.BytesDeCachePorToken("q4_0", "q4_0");
-        throw new InvalidOperationException(
-            $"esta reunião precisa de ~{precisa:N0} tokens de contexto e não cabe nesta placa. "
-            + $"Cabem ~{paraCache / comQ4:N0} tokens com o cache mais apertado. "
-            + $"Gere a ata de um trecho menor, ou use um modelo de ata mais leve em "
-            + $"Ajustes › Modelos.");
     }
 
     public async Task<AtaGerada> GerarAsync(
@@ -373,6 +385,16 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         //
         // Baixa, mas não zero: ata é registro, não criação. Zero deixa o modelo
         // repetitivo em listas longas.
+        //
+        // **enable_thinking: false** — medido em 17/08/2026. O Qwen3.5 4B é
+        // modelo de raciocínio e, com o padrão do template, gastou os 8.192
+        // tokens de saída inteiros pensando: a ata saiu pela metade e a falha
+        // parecia do tamanho do limite, não do modo do modelo. Para escrever ata
+        // o raciocínio é orçamento gasto no lugar errado — o que faz a ata ser
+        // verificável é o esquema e o verificador, não a deliberação do modelo.
+        //
+        // Modelo que não conhece a variável simplesmente a ignora no Jinja, e é
+        // por isso que ela pode ir em todos sem um "se".
         string corpo = $$"""
         {
           "messages": [
@@ -381,6 +403,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
           ],
           "temperature": 0.3,
           "max_tokens": {{TokensDeSaida}},
+          "chat_template_kwargs": {"enable_thinking": false},
           "response_format": {
             "type": "json_schema",
             "json_schema": {"name": "ata", "strict": true, "schema": {{AtaGerada.Esquema}}}

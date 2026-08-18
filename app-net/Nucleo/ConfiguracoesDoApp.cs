@@ -101,6 +101,25 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
         = "cliente-update";
 
+    /// <summary>Conferir, de vez em quando, se saiu versão nova.</summary>
+    /// <remarks>
+    /// <para>
+    /// Ligado por padrão, e desligável. É a <b>única</b> conexão que o app abre
+    /// por conta própria — a promessa de que a reunião não sai da máquina
+    /// continua inteira, porque o que vai nessa conexão é um GET sem parâmetro
+    /// nenhum: nada de identificador, nada de versão instalada, nada de
+    /// telemetria. Quem hospeda vê um download de um arquivo público, como
+    /// qualquer visita a uma página.
+    /// </para>
+    /// <para>
+    /// Existe porque o app passou a ser instalado na máquina de outras pessoas
+    /// (Fase 4), e sem isto elas só ficam sabendo de uma correção se alguém
+    /// contar. Ver <see cref="Atualizacao"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("avisar_de_atualizacao")]
+    public bool AvisarDeAtualizacao { get; set; } = true;
+
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-transcription", "app.json");

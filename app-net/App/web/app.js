@@ -127,6 +127,56 @@ function etiquetaDe(g) {
   return etiqueta;
 }
 
+/**
+ * Uma linha, no alto da lista, quando saiu versão nova.
+ *
+ * **Por que aqui e não só nos Ajustes.** O aviso existe para chegar a quem não
+ * é quem compila o app — e essa pessoa não abre Ajustes por esporte. A tela de
+ * Reuniões é a que ela vê todo dia; um aviso que ninguém encontra é o mesmo que
+ * aviso nenhum.
+ *
+ * Uma linha, dispensável com um clique, e nunca um diálogo por cima: quem abriu
+ * o app queria ver as reuniões, não conversar sobre versões.
+ *
+ * Assíncrono e à prova de falha: sem rede, sem GitHub, sem nada — a lista
+ * aparece igual e ninguém fica sabendo que houve uma tentativa.
+ */
+let avisoDeVersaoDispensado = false;
+
+function avisarDeVersaoNova() {
+  if (avisoDeVersaoDispensado) return;
+
+  pedir("atualizacao").then((r) => {
+    const a = r.atualizacao;
+    if (!a?.nova || avisoDeVersaoDispensado) return;
+
+    const linha = document.createElement("div");
+    linha.className = "aa-alerta aa-alerta--atencao";
+
+    const ponto = document.createElement("span");
+    ponto.className = "aa-alerta__ponto";
+
+    const texto = document.createElement("span");
+    texto.textContent = `Saiu a versão ${a.nova.versao}`
+      + (a.nova.notas ? ` — ${a.nova.notas}` : ".")
+      + " A sua é a " + a.versao_instalada + ".";
+
+    const dispensar = document.createElement("button");
+    dispensar.className = "aa-btn aa-btn-texto";
+    dispensar.type = "button";
+    dispensar.textContent = "Dispensar";
+    dispensar.addEventListener("click", () => {
+      avisoDeVersaoDispensado = true;
+      linha.remove();
+    });
+
+    linha.append(ponto, texto, dispensar);
+    tela.prepend(linha);
+  }).catch(() => {
+    // Sem rede não é assunto de quem só queria ver as reuniões.
+  });
+}
+
 export async function telaDeLista() {
   fecharGavetas();
   destino("ir-reunioes");
@@ -138,6 +188,7 @@ export async function telaDeLista() {
     const { gravacoes } = await pedir("gravacoes");
     tela.setAttribute("aria-busy", "false");
     tela.replaceChildren();
+    avisarDeVersaoNova();
 
     if (gravacoes.length === 0) {
       cabecalho("Reuniões", "Nenhuma gravação encontrada", false);

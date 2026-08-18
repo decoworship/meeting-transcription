@@ -39,6 +39,75 @@ public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUs
             return titulos;
         }
     }
+
+    /// <summary>
+    /// As seções que o <b>app</b> escreve a partir dos campos do JSON.
+    /// </summary>
+    /// <remarks>
+    /// Toda referência de tipo lista algumas delas no esqueleto, porque foi
+    /// escrita para o Claude num chat, onde quem escreve o documento inteiro é o
+    /// modelo. Aqui não: quem escreve é o <see cref="RedatorDeAta"/>, a partir
+    /// de <c>decisoes</c>, <c>acoes</c>, <c>pontos_em_aberto</c>, <c>riscos</c>
+    /// e <c>observacoes</c>.
+    /// </remarks>
+    private static readonly HashSet<string> DoRedator = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Resumo", "Decisões", "Pendências", "Ações", "Ações imediatas",
+        "Próximos passos", "Pontos em aberto", "Riscos e alertas",
+        "Riscos identificados", "Observações sobre a transcrição",
+    };
+
+    /// <summary>
+    /// O esqueleto como ele deve chegar ao modelo: só o corpo específico do tipo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Medido em 17/08/2026, depois de consertar a ata duplicada e ela voltar
+    /// menor: o modelo continuava escrevendo uma seção <c>Pendências</c> dentro
+    /// de <c>secoes</c>, <b>além</b> de preencher <c>acoes</c> — e o redator
+    /// escrevia a dele em seguida. Duas listas de pendências na mesma ata.
+    /// </para>
+    /// <para>
+    /// A causa era a mesma de antes: o esqueleto mostrava a seção, e o modelo
+    /// obedecia. Regra em texto ("não repita") não vence exemplo em estrutura —
+    /// então a seção sai do exemplo.
+    /// </para>
+    /// <para>
+    /// <b>"Decisões técnicas" fica</b>, e a distinção importa: ela não é a lista
+    /// de decisões, é o raciocínio por trás delas — o "por quê", as alternativas
+    /// descartadas e as implicações, que é justamente o que dá valor à ata de
+    /// sessão de trabalho.
+    /// </para>
+    /// </remarks>
+    public string TextoParaPrompt()
+    {
+        int inicio = Texto.IndexOf("```markdown", StringComparison.Ordinal);
+        if (inicio < 0) return Texto;
+        int fim = Texto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
+        if (fim < 0) return Texto;
+
+        var mantidas = new List<string>();
+        bool copiando = true;
+
+        foreach (string linha in Texto[(inicio + 11)..fim].Split('\n'))
+        {
+            string t = linha.TrimEnd();
+
+            // O cabeçalho do documento e a linha de participantes saem sempre:
+            // quem os escreve é o redator, e mostrá-los convidava o modelo a
+            // escrever uma ata inteira dentro de um campo.
+            if (t.StartsWith("# Ata", StringComparison.Ordinal)) { copiando = false; continue; }
+            if (t.StartsWith("**Participantes:**", StringComparison.Ordinal)) continue;
+
+            if (t.StartsWith("## ", StringComparison.Ordinal))
+                copiando = !DoRedator.Contains(t[3..].Trim());
+
+            if (copiando) mantidas.Add(linha);
+        }
+
+        string corpo = string.Join('\n', mantidas).Trim('\n');
+        return Texto[..(inicio + 11)] + "\n" + corpo + "\n" + Texto[fim..];
+    }
 }
 
 /// <summary>
@@ -143,7 +212,27 @@ public static class ModelosDeAta
                 $"o SKILL.md mudou: não achei \"{marca}\". "
                 + "Ver ModelosDeAta.RegrasComuns e ATA.md §1.");
 
-        return skill[corte..].Replace(
+        // O recorte termina no Passo 3, e isso conserta um defeito medido.
+        //
+        // O SKILL.md é escrito para o Claude num chat: o Passo 3 manda escrever
+        // o cabeçalho da ata ("Toda ata começa assim", com um modelo em
+        // Markdown) e o Passo 4 manda entregar Markdown na conversa e oferecer
+        // conversão para .docx. Nenhum dos dois vale aqui — **quem escreve o
+        // cabeçalho é o RedatorDeAta, e a saída é JSON preso a um esquema**.
+        //
+        // Mandá-los assim mesmo produziu o pior defeito da ata, e nos dois
+        // modelos testados em 17/08/2026: o modelo escrevia uma ata inteira em
+        // Markdown, com cabeçalho, **dentro de uma seção** — e o redator
+        // acrescentava a dele em volta. Saía documento duplicado, seção de 2.500
+        // caracteres, e as duas falhas por estourar o limite de saída.
+        //
+        // Quando dois modelos independentes erram igual, a causa é o prompt.
+        const string fim = "## Passo 3";
+        int ate = skill.IndexOf(fim, corte, StringComparison.Ordinal);
+
+        string regras = (ate < 0 ? skill[corte..] : skill[corte..ate]).TrimEnd();
+
+        return regras.Replace(
             "## Passo 2: Regras comuns a todos os tipos", "## Regras");
     }
 

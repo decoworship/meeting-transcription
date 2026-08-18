@@ -20,11 +20,12 @@ ata — e já rodou na máquina de outra pessoa. **A fase corrente é a 5**, o
 acabamento visual sobre o AA Design System (`docs/PLANO.md` §3); depois vem a 6,
 qualidade da transcrição ([docs/FASE6.md](docs/FASE6.md)).
 
-**A dívida aberta que atravessa as duas:** não há rota de atualização. Existe
-gente com 0.1.0 instalado e nenhum jeito de saber que saiu versão nova —
-[docs/FASE4-HANDOFF.md](docs/FASE4-HANDOFF.md) §6.1 desenha os três degraus. O
-número que decide o desenho: o `.exe` tem 18,5 MB e os motores têm 4,1 GB, então
-quase toda versão nova é um arquivo de 18,5 MB.
+**A rota de atualização existe no primeiro degrau**: o app avisa que saiu versão
+nova, lendo o `versao.json` do próprio repositório — sem servidor
+([docs/ATUALIZACAO.md](docs/ATUALIZACAO.md)). Ela é pré-requisito de acrescentar
+modelo, porque o catálogo é código: oferecer um modelo novo é publicar uma versão
+nova do app. Baixar e trocar o binário sozinho fica para depois da assinatura de
+código.
 
 **Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
 outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas
@@ -58,7 +59,10 @@ são obrigatórios, e cada um deles já saiu faltando num binário entregue ao
 usuário. O `publicar.sh` confere as réguas antes de copiar.
 
 **Gerar uma versão nova** é editar `<Version>` em `app-net/Directory.Build.props`
-(um lugar só), escrever o `CHANGELOG.md` e rodar o `montar_instalador.sh`. O
+(um lugar só), escrever o `CHANGELOG.md`, subir o mesmo número no `versao.json`
+— que é o canal do aviso de atualização, ver [docs/ATUALIZACAO.md](docs/ATUALIZACAO.md) —
+e rodar o `montar_instalador.sh`. **É o `git push` que faz o aviso aparecer** na
+máquina de quem já instalou, então ele vem depois de o instalador existir. O
 `AppId` do `.iss` nunca muda — é por ele que o Windows sabe que é atualização e
 não um segundo programa. Se algum `motor.py` mudou, rode o `publicar.sh` antes:
 o `--so-build` não sincroniza os sidecars, e a régua reprova o build em vez de

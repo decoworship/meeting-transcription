@@ -157,6 +157,59 @@ public sealed class RedatorDeAtaTests
     };
 
     [Fact]
+    public void AListaDePendenciasSaiUmaVezSo()
+    {
+        // O esqueleto da sessão de trabalho pede "Ações"; o redator a escreve
+        // como "## Pendências" e, no fim, escrevia a lista fixa de novo — porque
+        // a chave de "já escrevi" era o título de ENTRADA, e "Ações" e
+        // "Pendências" são entradas diferentes para a mesma saída.
+        //
+        // O resultado eram duas listas idênticas de pendências em toda ata de
+        // sessão de trabalho, o que por um bom tempo passou por mania do modelo.
+        var ata = new AtaGerada
+        {
+            Acoes = [new AcaoDaAta
+            {
+                Acao = "Abrir o chamado", Responsavel = "Vanessa Levorato",
+                Prazo = "[prazo a definir]", Lado = "nosso",
+            }],
+        };
+
+        string md = RedatorDeAta.Escrever(ata, ModelosDeAta.Buscar("trabalho")!, Contexto());
+
+        Assert.Equal(1, md.Split("## Pendências").Length - 1);
+    }
+
+    [Fact]
+    public void DecisoesTecnicasNaoEEngolidaPelaListaDeDecisoes()
+    {
+        // "Decisões técnicas" não é a lista de decisões: é o raciocínio por trás
+        // delas — o porquê, as alternativas descartadas, as implicações. É o que
+        // dá valor à ata de sessão de trabalho.
+        //
+        // O casamento por prefixo ("decis") a tratava como canônica e a
+        // substituía pela lista simples, jogando fora o que o modelo escreveu.
+        var ata = new AtaGerada
+        {
+            Decisoes = ["Separar os casos em três cenários"],
+            Secoes = [new SecaoDaAta
+            {
+                Titulo = "Decisões técnicas",
+                Texto = "**Definido:** assumir o CRM como fonte.\n"
+                      + "**Alternativas descartadas:** usar o Quina — dado suspeito.",
+            }],
+        };
+
+        string md = RedatorDeAta.Escrever(ata, ModelosDeAta.Buscar("trabalho")!, Contexto());
+
+        Assert.Contains("## Decisões técnicas", md);
+        Assert.Contains("Alternativas descartadas", md);
+        // E a lista simples continua existindo, separada.
+        Assert.Contains("## Decisões", md);
+        Assert.Contains("Separar os casos em três cenários", md);
+    }
+
+    [Fact]
     public void OItemDeAcaoSaiNoFormatoDaSkill()
     {
         var ata = new AtaGerada
@@ -319,32 +372,39 @@ public sealed class MotorDeAtaTests
     [Fact]
     public void OQueNaoCabeERecusadoAntesDeCarregarOModelo()
     {
-        // 200 mil caracteres são ~83 mil tokens: cabem no modelo, não cabem numa
-        // placa de 6 GB. O que se protege aqui é o MOMENTO da recusa: agora, com
-        // números, e não depois de subir 2,5 GB e receber um JSON do servidor.
-        var erro = Assert.Throws<InvalidOperationException>(
-            () => MotorDeAta.Dimensionar(200_000, Qwen3_4B, Rtx2060));
+        // 200 mil caracteres são ~83 mil tokens: cabem no modelo, e pela conta
+        // não cabem numa placa de 6 GB.
+        //
+        // **A conta não barra.** Medido em 17/08/2026 com o Gemma 4 E4B: a
+        // fórmula disse que só cabiam 17.281 tokens e o llama.cpp carregou
+        // 32.768 sem reclamar, porque a janela deslizante torna o cache cinco
+        // vezes mais barato do que a conta supõe. Modelar cada arquitetura é uma
+        // corrida que se perde; quem conhece a arquitetura é o llama.cpp.
+        //
+        // Então a estimativa escolhe a quantização e entrega a decisão final a
+        // quem sabe: pede o contexto com o cache mais apertado.
+        var (contexto, ctk, ctv) = MotorDeAta.Dimensionar(200_000, Qwen3_4B, Rtx2060);
 
-        Assert.Contains("não cabe nesta placa", erro.Message);
-        Assert.Contains("tokens", erro.Message);
-        // Uma saída, e não só um lamento.
-        Assert.Contains("Modelos", erro.Message);
+        Assert.True(contexto >= 83_072, $"contexto {contexto} não cobre o que o prompt pede");
+        Assert.Equal("q4_0", ctk);
+        Assert.Equal("q4_0", ctv);
     }
 
     [Fact]
     public void SemSaberAVramNaoSeInventaLimite()
     {
-        // Numa máquina onde o nvidia-smi não responde, recusar por uma conta
-        // chutada seria pior que deixar o llama.cpp reclamar. O mesmo prompt que
-        // uma RTX 2060 recusa passa aqui, porque não há placa conhecida para
-        // dizer que não.
+        // Numa máquina onde o nvidia-smi não responde, o que muda é a escolha da
+        // quantização — e não se o pedido acontece. Sem placa conhecida não há
+        // motivo para apertar o cache: pede-se q8_0, que é o que preserva
+        // qualidade, e a alocação de verdade dirá se coube.
         int caracteres = 200_000;
 
-        Assert.Throws<InvalidOperationException>(
-            () => MotorDeAta.Dimensionar(caracteres, Qwen3_4B, Rtx2060));
+        var comPlaca = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, Rtx2060);
+        var semPlaca = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, vramBytes: 0);
 
-        var (contexto, _, _) = MotorDeAta.Dimensionar(caracteres, Qwen3_4B, vramBytes: 0);
-        Assert.True(contexto >= 83_072, $"contexto {contexto} foi limitado sem saber a placa");
+        Assert.Equal(comPlaca.Contexto, semPlaca.Contexto);
+        Assert.Equal("q4_0", comPlaca.Ctk);
+        Assert.Equal("q8_0", semPlaca.Ctk);
     }
 
     [Fact]

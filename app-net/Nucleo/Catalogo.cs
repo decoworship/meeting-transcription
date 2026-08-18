@@ -182,6 +182,38 @@ public static class Catalogo
             TamanhoMedido = true,
             Nota = "Ata de reunião de 30 min em ~1 min; de 2 h em ~4 min, na RTX 2060.",
         },
+        // Os dois candidatos medidos em 17/08/2026, em 5 reuniões e 2 rodadas
+        // cada — ver docs/MODELOS-DE-ATA.md. Entram como **opção**, e o padrão
+        // segue o Qwen3: com os quatro defeitos de prompt e redator corrigidos,
+        // os três empataram em qualidade, e trocar o padrão atinge todo mundo.
+        new PacoteDeModelo
+        {
+            Id = "gemma-4-e4b",
+            Nome = "Gemma 4 E4B",
+            Familia = "ata",
+            Descricao = "O mais confiável nos testes, e o mais rápido. Pede placa folgada.",
+            Repositorio = "unsloth/gemma-4-E4B-it-GGUF",
+            Arquivo = "gemma-4-E4B-it-Q4_K_M.gguf",
+            NomeLocal = "gemma-4-e4b-q4km.gguf",
+            TamanhoEsperadoBytes = 4_977_171_584,
+            TamanhoMedido = true,
+            Nota = "61 s por ata e nenhuma falha em 10 rodadas, contra 122 s do padrão. "
+                 + "Mas são 5 GB: numa placa de 6 GB fica apertado.",
+        },
+        new PacoteDeModelo
+        {
+            Id = "qwen3.5-4b",
+            Nome = "Qwen3.5 4B",
+            Familia = "ata",
+            Descricao = "Rápido como o Gemma e metade do tamanho. Registra menos pendências.",
+            Repositorio = "unsloth/Qwen3.5-4B-GGUF",
+            Arquivo = "Qwen3.5-4B-Q4_K_M.gguf",
+            NomeLocal = "qwen3.5-4b-q4km.gguf",
+            TamanhoEsperadoBytes = 2_740_937_888,
+            TamanhoMedido = true,
+            Nota = "64 s por ata, mas 4,3 pendências por ata contra 5,0 e 6,3 dos outros "
+                 + "— e pendência é o que a ata existe para não deixar cair.",
+        },
         new PacoteDeModelo
         {
             Id = "qwen3-1.7b-instruct",
