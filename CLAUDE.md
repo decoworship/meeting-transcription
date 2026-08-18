@@ -27,6 +27,15 @@ JavaScript: a ponte é assíncrona e o tema chegaria depois da primeira pintura.
 O `data-tema="claro"` do HTML é procurado por texto exato — mudá-lo faz o tema
 parar de funcionar em silêncio.
 
+**Há um defeito aberto e sem causa**: a transcrição travou o computador do
+segundo usuário (RTX 4050 Laptop, 0.1.0). O torch enxerga a placa dele
+normalmente — a hipótese de queda para CPU foi descartada com dado. O que a
+0.2.1 entregou foi **capacidade de diagnóstico**, não conserto:
+`Nucleo/Registro.cs` escreve o que o app faz em
+`%USERPROFILE%\.meeting-transcription\registro.log`. Ver
+[docs/FASE6.md](docs/FASE6.md) §3.0 — é o único item daquela carta que não espera
+gatilho.
+
 **A rota de atualização existe no primeiro degrau**: o app avisa que saiu versão
 nova, lendo o `versao.json` do próprio repositório — sem servidor
 ([docs/ATUALIZACAO.md](docs/ATUALIZACAO.md)). Ela é pré-requisito de acrescentar
@@ -44,7 +53,7 @@ junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 336 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 340 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB

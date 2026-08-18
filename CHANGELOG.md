@@ -25,6 +25,24 @@ dos parágrafos, o que fazia um documento de duas páginas parecer um bloco só.
 **Dois acertos pequenos:** o gravador parado não escreve mais "Parado" duas
 vezes, e os cartões da tela de Atas param de dançar de linha para linha.
 
+## 0.2.1 — dá para saber o que aconteceu
+
+Uma transcrição travou o computador de um usuário, e não havia nada para olhar
+depois. Esta versão é sobre isso.
+
+**O app passa a manter um registro** em `%USERPROFILE%\.meeting-transcription\registro.log`:
+o que ele fez, em qual placa, e o que os motores disseram. Nada de transcrição,
+nome de cliente ou de participante entra ali — e o arquivo só sai da sua máquina
+se você mandar. O caminho dele aparece no bloco de diagnóstico.
+
+**A transcrição diz onde está rodando** — "transcrevendo em NVIDIA GeForce
+RTX 2060" — em vez de deixar você adivinhar.
+
+**E recusa rodar na CPU sem você mandar.** Transcrever pela CPU leva horas e
+consome muita memória; num computador apertado, o suficiente para travá-lo. Se a
+sua máquina não tem placa NVIDIA e você quer mesmo assim, ligue "Transcrever sem
+placa" em Ajustes → Transcrição.
+
 ## 0.2.0 — a ata fica inteira
 
 Esta versão é quase toda sobre a **ata**. Quatro defeitos faziam com que boa

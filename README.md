@@ -89,6 +89,10 @@ tools/montar_instalador.sh                   # o .exe que se entrega
 | **5** (corrente) | acabamento visual sobre o AA Design System — [docs/PLANO.md](docs/PLANO.md) §3 |
 | **6** | qualidade da transcrição e as revisões acumuladas — [docs/FASE6.md](docs/FASE6.md) |
 
+**Aberto:** a transcrição travou a máquina do segundo usuário e a causa ainda não
+é conhecida — [docs/FASE6.md](docs/FASE6.md) §3.0. A 0.2.1 deu ao app um registro
+em disco para que a próxima ocorrência seja diagnosticável.
+
 **A rota de atualização** está no primeiro degrau: o app avisa que saiu versão
 nova lendo um arquivo do próprio repositório, sem servidor para manter —
 [docs/ATUALIZACAO.md](docs/ATUALIZACAO.md). Baixar e trocar o binário sozinho

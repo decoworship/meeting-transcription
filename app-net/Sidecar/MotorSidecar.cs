@@ -77,12 +77,33 @@ public sealed class MotorSidecar : IDisposable
         JobDosMotores.Adotar(processo);
 
         var registro = new List<string>();
+
+        // O motor ainda não existe quando a drenagem começa — ele nasce depois
+        // do handshake. O holder é o que permite a mesma tarefa servir os dois
+        // momentos: antes, só acumula; depois, também repassa.
+        MotorSidecar? criado = null;
+
         _ = Task.Run(async () =>
         {
             // Drenado sempre: um stderr cheio bloqueia o processo do outro lado.
             while (await processo.StandardError.ReadLineAsync() is { } linha)
             {
-                lock (registro) registro.Add(linha);
+                lock (registro)
+                {
+                    registro.Add(linha);
+                    // Uma transcrição de duas horas rende centenas de linhas de
+                    // aviso, e guardá-las todas é vazamento lento. O que a
+                    // mensagem de morte usa é a cauda.
+                    if (registro.Count > 500) registro.RemoveRange(0, 200);
+                }
+
+                // **Repassar também depois do handshake**, que é onde estava o
+                // buraco: o interessante — carga do modelo, dispositivo
+                // escolhido, avisos de CUDA — acontece DEPOIS de o motor dizer
+                // que está pronto, e antes disto essas linhas morriam em
+                // memória. Foi o que faltou para diagnosticar a máquina de um
+                // usuário em 18/08/2026.
+                criado?.AoRegistrar?.Invoke(linha);
             }
         }, CancellationToken.None);
 
@@ -97,6 +118,7 @@ public sealed class MotorSidecar : IDisposable
                     $"o motor falou '{pronto.Tipo}' onde o handshake era esperado.");
 
             var motor = new MotorSidecar(processo, pronto.Motor ?? "?", pronto.Versao ?? "?");
+            criado = motor;
             lock (registro)
             {
                 foreach (string l in registro) motor.AoRegistrar?.Invoke(l);

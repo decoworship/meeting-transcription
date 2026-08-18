@@ -10,7 +10,9 @@ justifica fazê-lo. Uma fase de revisões sem gatilhos vira lista de desejos, e
 lista de desejos se executa pela ordem de quem gosta mais — não pela ordem do
 que dói.
 
-**A ordem é a do incômodo, não a desta lista.** Nada aqui é obrigatório.
+**A ordem é a do incômodo, não a desta lista.** Nada aqui é obrigatório — com
+**uma exceção**, acrescentada em 18/08/2026: a §3.0 não é revisão nem melhoria.
+É um usuário que não consegue transcrever, com a causa em aberto.
 
 ---
 
@@ -268,6 +270,76 @@ existe e faz o mesmo caminho: dava para rodá-lo num teste com um motor falso.
 ---
 
 ## 3. O que vem de fases anteriores e continua de pé
+
+### 3.0 O travamento na máquina de outra pessoa — **aberto, sem causa**
+
+**Gatilho:** já disparou. É o único item desta carta que representa um usuário
+sem conseguir usar o app.
+
+Relatado em 18/08/2026 pelo segundo usuário do app — RTX 4050 Laptop, Windows
+10.0.26200, driver 595.97, versão 0.1.0. **O gravador funcionou; a transcrição
+travou o computador dele.**
+
+#### O que já foi descartado
+
+| hipótese | como caiu |
+|---|---|
+| o torch não enxerga a placa | ele enxerga: `cuda 12.4`, `is_available() True`, `device_count() 1`, `init()` sem exceção, conferido na máquina dele |
+| queda silenciosa para CPU por falta de CUDA | consequência da anterior — não houve queda por esse motivo |
+| payload incompleto pelo emagrecimento do instalador | os cortes (`curand`, `cusolverMg`, `tests`, `*.pyi`) foram medidos com o pipeline rodando, e nada em `torch/lib` os referencia |
+
+**A primeira hipótese estava errada, e é o registro que importa aqui:** o
+diagnóstico dizia "placa: RTX 4050" e a conclusão fácil era queda para CPU. Foi a
+resposta do usuário que a derrubou, não o raciocínio.
+
+#### As hipóteses que sobraram, e o que separa uma da outra
+
+1. **Driver de vídeo caindo sob carga** (`VIDEO_TDR_FAILURE`) — comum em
+   notebook, e coerente com "o PC travou" em vez de "o app deu erro". Separa-se
+   pelo Monitor de Confiabilidade: houve tela azul, e com qual código;
+2. **Memória do sistema.** Duas fontes somam antes de a transcrição começar:
+   - o passo do mix mantém **três `float[]` de 460 MB** para uma reunião de 2 h
+     (`mic`, `sistema` e o `mix`), ~1,4 GB em pico. Ver `Nucleo/Faixas.cs`;
+   - as gravações dele estão no **OneDrive**, que sincroniza o `mix.wav` de
+     centenas de MB no exato momento em que a GPU está ocupada;
+3. **VRAM.** RTX 4050 Laptop tem 6 GB, e o `large-v3` em fp16 ocupa ~3,1 GB com
+   o display na mesma placa. Isso normalmente produz erro do CTranslate2, e não
+   travamento — o que enfraquece a hipótese sem eliminá-la.
+
+#### O que foi feito, e por que não é o conserto
+
+A 0.2.1 entregou **capacidade de diagnóstico**, não correção:
+
+- `Nucleo/Registro.cs` — o app passou a escrever o que faz, em qual placa, e o
+  que os motores dizem. Antes disto **não havia nada para olhar**, e é essa a
+  lição de fundo: o `stderr` dos motores era capturado desde a Fase 2 e só
+  aparecia se o processo morresse;
+- a transcrição recusa a CPU sem escolha explícita (chave em Ajustes ›
+  Transcrição). **Não vai barrar este usuário** — a placa dele funciona;
+- o progresso e o log dizem o dispositivo.
+
+#### O que decide o próximo passo
+
+Duas respostas, e elas apontam para consertos opostos:
+
+- o **`registro.log`** da reprodução. Se ele termina abruptamente, o sistema caiu
+  junto e a pista é o driver; se termina com exceção, ela nomeia a causa;
+- o **Monitor de Confiabilidade**: tela azul ou congelamento, e o código.
+
+Mais: quanta RAM o notebook tem, e a duração da reunião.
+
+**O conserto que já está desenhado, esperando confirmação:** fazer o mix em
+blocos, o que derruba o pico de 1,4 GB para alguns MB. Vale por si, e é a
+resposta certa se a pista for memória — mas fazê-lo agora seria consertar a
+hipótese mais confortável em vez da causa.
+
+#### O que este caso ensina, além dele mesmo
+
+**Software que roda na máquina de outra pessoa precisa deixar rastro.** O bloco
+de diagnóstico da Fase 4 dá a *foto* — versão, placa, modelos — e respondeu bem
+às perguntas que ele foi feito para responder. A pergunta aqui era outra: o que o
+app *fez*. Uma foto não responde isso, e a distância entre as duas custou uma
+hipótese errada e uma versão inteira.
 
 ### 3.1 Motores como pacotes por acelerador
 
