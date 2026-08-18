@@ -186,6 +186,32 @@ public sealed class Transcritor(Motores motores)
                          : null;
     }
 
+    /// <summary>
+    /// O que dizer quando o motor não achou a placa.
+    /// </summary>
+    /// <remarks>
+    /// Dois casos, e a saída de cada um é diferente — juntá-los numa frase só
+    /// mandaria metade das pessoas fazer a coisa errada. Se o Windows enxerga
+    /// uma placa que o motor não enxerga, isso é <b>defeito</b>, e o caminho é
+    /// mandar o diagnóstico. Se não há placa nenhuma, é escolha informada, e o
+    /// caminho é a chave nos ajustes.
+    /// </remarks>
+    public static string SemPlaca(DispositivoDoMotor placa)
+    {
+        string comum =
+            " Transcrever pela CPU leva horas e consome muita memória — numa máquina"
+            + " já apertada, o suficiente para derrubá-la. Se quiser mesmo assim,"
+            + " ligue \"Transcrever sem placa\" em Ajustes › Transcrição.";
+
+        if (Diagnostico.PlacaNvidia() is { Length: > 0 } doWindows)
+            return $"o Windows enxerga a placa ({doWindows}), mas o motor de transcrição "
+                 + $"não: {placa.Motivo ?? "sem detalhe"}. Isso é um defeito — mande o "
+                 + "bloco de diagnóstico de Ajustes › Sobre." + comum;
+
+        return "não há placa NVIDIA disponível para a transcrição"
+             + (placa.Motivo is { Length: > 0 } m ? $" ({m})" : "") + "." + comum;
+    }
+
     /// <param name="modelo">
     /// Tamanho do modelo de ASR. Vem da tela, que por sua vez o carrega das
     /// preferências do projeto — modelo menor é a saída para quem precisa de
@@ -246,6 +272,20 @@ public sealed class Transcritor(Motores motores)
         using (var asr = await MotorSidecar.IniciarAsync(
                    motores.Python, argsAsr, ct, ambiente))
         {
+            // A placa, perguntada ao motor ANTES de carregar o modelo.
+            //
+            // Relatado em 18/08/2026: a transcrição caiu para CPU numa máquina
+            // com RTX 4050 e o large-v3 comeu RAM por horas até derrubar o
+            // Windows. Rodar em CPU não é um modo do app — é o que acontece
+            // quando o motor não acha a placa, e a diferença entre as duas
+            // coisas precisa ser dita antes, não descoberta depois.
+            var placa = await asr.DispositivoAsync(ct);
+            if (!placa.Cuda && !ConfiguracoesDoApp.Carregar().PermitirCpu)
+                throw new MotorException(SemPlaca(placa));
+
+            progresso?.Invoke(new Progresso(
+                "asr", 0, placa.Cuda ? $"transcrevendo em {placa.Nome}" : "transcrevendo em CPU"));
+
             transcricao = await asr.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
                 (pct, texto) => progresso?.Invoke(new Progresso("asr", pct, texto)), ct);
         }

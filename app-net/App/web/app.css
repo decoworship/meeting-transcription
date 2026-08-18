@@ -72,7 +72,7 @@ body {
   background: transparent;
   color: var(--cor-texto-suave);
   font: inherit;
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   font-weight: 600;
   cursor: pointer;
 }
@@ -106,7 +106,7 @@ body {
   box-shadow: 0 0 0 2px var(--cor-superficie);
   opacity: 0;
   transform: scale(.4);
-  transition: opacity .15s, transform .15s;
+  transition: opacity var(--transicao-rapida), transform var(--transicao-rapida);
 }
 
 .trilho__item[data-ocupado="true"] .trilho__ponto {
@@ -131,7 +131,7 @@ body {
 .barra {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-suspenso);
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas: "voltar titulo" "voltar sub";
@@ -147,7 +147,7 @@ body {
 .barra__titulo {
   grid-area: titulo;
   font-family: var(--fonte-display);
-  font-size: 1.5rem;
+  font-size: var(--texto-titulo-g);
   margin: 0;
 }
 
@@ -241,7 +241,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   width: 0;
   background: var(--cor-acao);
   border-radius: inherit;
-  transition: width .3s ease;
+  transition: width var(--transicao-lenta);
 }
 
 /* ────────────────────────────────────────────────── notas da reunião */
@@ -311,7 +311,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .controles {
   position: sticky;
   top: var(--altura-da-barra);
-  z-index: 5;
+  z-index: calc(var(--z-suspenso) - 1);
   background: var(--cor-fundo);
   border-bottom: 1px solid var(--cor-borda);
   margin-bottom: var(--espaco-3);
@@ -324,7 +324,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   background: var(--cor-superficie);
   cursor: pointer;
   font: inherit;
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   font-weight: 600;
   padding: 4px 12px;
   border-radius: var(--raio-pilula);
@@ -352,7 +352,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   background: var(--cor-destaque-bg);
   color: var(--cor-destaque-texto);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--texto-rotulo);
   line-height: 1;
   padding: 2px 5px;
   margin-left: 6px;
@@ -398,21 +398,21 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .trecho__tempo {
   color: var(--cor-texto-suave);
   font-family: var(--fonte-mono);
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   padding-top: 2px;
 }
 
 .trecho__falante { font-weight: 600; }
 .trecho__texto { margin: 0; }
-.trecho__texto mark { background: var(--cor-destaque-bg); color: inherit; border-radius: 3px; }
+.trecho__texto mark { background: var(--cor-destaque-bg); color: inherit; border-radius: var(--raio-pequeno); }
 
 /* ─────────────────────────────────────────────── gaveta e modal */
 
 .veu {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / .35);
-  z-index: 20;
+  background: var(--cor-veu);
+  z-index: var(--z-cortina);
 }
 
 .gaveta {
@@ -421,12 +421,12 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   right: 0;
   bottom: 0;
   width: min(28rem, 92vw);
-  z-index: 21;
+  z-index: var(--z-modal);
   background: var(--cor-superficie);
   border-left: 1px solid var(--cor-borda);
   display: grid;
   grid-template-rows: auto 1fr;
-  box-shadow: -8px 0 32px rgb(0 0 0 / .12);
+  box-shadow: var(--sombra-grande);
 }
 
 .gaveta--larga { width: min(46rem, 96vw); }
@@ -439,7 +439,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   border-bottom: 1px solid var(--cor-borda);
 }
 
-.gaveta__topo h2 { margin: 0; font-family: var(--fonte-display); font-size: 1.25rem; }
+.gaveta__topo h2 { margin: 0; font-family: var(--fonte-display); font-size: var(--texto-titulo-m); }
 
 .gaveta__corpo {
   padding: var(--espaco-5);
@@ -458,9 +458,9 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   color: var(--cor-texto);
 }
 
-.modal::backdrop { background: rgb(0 0 0 / .35); }
+.modal::backdrop { background: var(--cor-veu); }
 .modal__corpo { padding: var(--espaco-5); display: grid; gap: var(--espaco-4); }
-.modal__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.15rem; }
+.modal__titulo { margin: 0; font-family: var(--fonte-display); font-size: var(--texto-titulo-m); }
 .modal__acoes { display: flex; gap: var(--espaco-3); justify-content: flex-end; }
 
 /* ───────────────────────────────────────────────────── falantes */
@@ -469,7 +469,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .tabela-falantes th {
   text-align: left;
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--cor-texto-suave);
@@ -481,7 +481,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .tabela-falantes input { width: 100%; }
 .numero { text-align: right; font-family: var(--fonte-mono); }
 
-.barra-share { height: 6px; border-radius: 3px; background: var(--cor-superficie-2); }
+.barra-share { height: 6px; border-radius: var(--raio-pilula); background: var(--cor-superficie-2); }
 .barra-share > div { height: 100%; border-radius: inherit; }
 
 /* ─────────────────────────────────────────────────── configurações */
@@ -543,7 +543,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   background: var(--cor-superficie);
 }
 
-.bloco__titulo { margin: 0; font-family: var(--fonte-display); font-size: 1.05rem; }
+.bloco__titulo { margin: 0; font-family: var(--fonte-display); font-size: var(--texto-titulo-m); }
 .bloco__texto { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
 
 /* Título e descrição à esquerda, controle à direita — o padrão da referência
@@ -574,7 +574,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   display: flex;
   flex-wrap: wrap;
   gap: var(--espaco-3);
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   color: var(--cor-texto-suave);
 }
 
@@ -591,7 +591,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 
 .modelo__acao .aa-progresso { width: 100%; height: 6px; }
-.modelo__acao .campo__dica { font-size: 11px; text-align: right; }
+.modelo__acao .campo__dica { font-size: var(--texto-rotulo); text-align: right; }
 
 /* ─────────────────────────────────────────────────────────── vozes */
 
@@ -617,7 +617,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 
 .amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
-.amostra__proc { color: var(--cor-texto-suave); font-family: var(--fonte-mono); font-size: 11px; }
+.amostra__proc { color: var(--cor-texto-suave); font-family: var(--fonte-mono); font-size: var(--texto-rotulo); }
 .amostra__acoes { display: flex; gap: var(--espaco-2); }
 
 /* O play de cada amostra é um botão de ícone: ele repete por linha, e o nome
@@ -682,7 +682,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .projeto__topo:hover { background: var(--cor-superficie-2); }
 .projeto__topo:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
-.projeto__seta { color: var(--cor-texto-suave); font-size: 10px; }
+.projeto__seta { color: var(--cor-texto-suave); font-size: var(--texto-rotulo); }
 .projeto__topo .campo__dica { justify-self: end; }
 
 .projeto__corpo {
@@ -732,7 +732,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .gravador__tempo {
   margin: 0;
   font-family: var(--fonte-mono);
-  font-size: 1.75rem;
+  font-size: var(--texto-display);
   line-height: 1.1;
   /* Tabular para os dígitos não dançarem a cada segundo. */
   font-variant-numeric: tabular-nums;
@@ -751,14 +751,14 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   grid-column: 2;
   margin: 0;
   color: var(--cor-texto-suave);
-  font-size: 11px;
+  font-size: var(--texto-rotulo);
   /* Nome de endpoint passa de 60 caracteres com facilidade. */
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 .medidor {
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--raio-pilula);
   background: var(--cor-superficie-2);
   overflow: hidden;
 }
@@ -771,7 +771,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * barra parada e uma barra baixa se parecem demais para deixar sem cor. */
 .medidor[data-morto="true"] { background: var(--cor-erro-bg); box-shadow: inset 0 0 0 1px var(--cor-erro); }
 
-.caminho { font-family: var(--fonte-mono); font-size: 11px; word-break: break-all; }
+.caminho { font-family: var(--fonte-mono); font-size: var(--texto-rotulo); word-break: break-all; }
 
 /* ─────────────────────────────────────────────────────────────── atas */
 
@@ -835,6 +835,6 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 /* O triângulo padrão do <details> é do navegador e destoa do resto; a seta
  * própria gira ao abrir. */
 .ata__resumo::-webkit-details-marker { display: none; }
-.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform .15s; }
+.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform var(--transicao-rapida); }
 .ata__dobra[open] > .ata__resumo::before { transform: rotate(90deg); }
 .ata__resumo:focus-visible { outline: var(--anel-foco); }

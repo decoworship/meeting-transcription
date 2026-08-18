@@ -49,7 +49,7 @@ def _achar_cuda() -> None:
 
 _achar_cuda()
 
-VERSAO = "1"
+VERSAO = "2"
 
 
 def _enviar(**campos) -> None:
@@ -68,6 +68,53 @@ class Modelo:
         self._tamanho = tamanho
         self._modelo = None
         self.dispositivo = "?"
+        self.motivo: str | None = None
+
+    def diagnostico(self) -> dict:
+        """O que o torch enxerga da placa — e, quando não enxerga, por quê.
+
+        Existe porque o app tinha duas opiniões sobre a mesma pergunta. O bloco
+        de diagnóstico da tela pergunta ao ``nvidia-smi``, que responde pela
+        presença do driver; quem decide o dispositivo da transcrição é o
+        ``torch.cuda.is_available()``, que depende também das DLLs de CUDA
+        estarem alcançáveis. Os dois discordaram na máquina de um usuário em
+        18/08/2026: a tela dizia "RTX 4050" e o modelo rodava na CPU.
+
+        "Rodar na CPU" não é só lento: o ``large-v3`` em CPU come RAM por horas,
+        e na máquina dele **derrubou o Windows**. Então a resposta desta função é
+        o que permite o app parar antes, em vez de descobrir no fim.
+        """
+        import torch
+
+        cuda = torch.cuda.is_available()
+        info = {
+            "cuda": cuda,
+            "torch": getattr(torch, "__version__", "?"),
+            # None aqui significa build de CPU do torch — é o caso em que nenhuma
+            # configuração da máquina do usuário resolveria.
+            "cuda_do_torch": torch.version.cuda,
+            "placas": torch.cuda.device_count() if cuda else 0,
+        }
+        if cuda:
+            try:
+                info["nome"] = torch.cuda.get_device_name(0)
+            except Exception:                                # nunca fatal
+                pass
+            return info
+
+        # Sem CUDA, a pergunta que importa é qual das três causas é a desta
+        # máquina — e cada uma tem uma saída diferente.
+        if torch.version.cuda is None:
+            info["motivo"] = ("o torch empacotado é a versão de CPU; nenhuma "
+                              "configuração desta máquina faria a placa funcionar")
+        elif torch.cuda.device_count() == 0:
+            info["motivo"] = ("o torch tem CUDA " + str(torch.version.cuda)
+                              + ", mas não encontrou placa nenhuma — driver antigo "
+                                "demais para esta versão de CUDA, ou DLL de CUDA "
+                                "faltando ao lado do torch")
+        else:
+            info["motivo"] = "o torch não conseguiu iniciar o CUDA nesta máquina"
+        return info
 
     def carregar(self, id_req: int) -> None:
         if self._modelo is not None:
@@ -75,15 +122,20 @@ class Modelo:
 
         _enviar(id=id_req, tipo="progresso", pct=0.0, texto="carregando o modelo")
         from faster_whisper import WhisperModel
-        import torch
 
-        cuda = torch.cuda.is_available()
+        placa = self.diagnostico()
+        cuda = placa["cuda"]
+        self.dispositivo = "cuda" if cuda else "cpu"
+        self.motivo = placa.get("motivo")
+
+        if not cuda:
+            _log(f"SEM CUDA: {self.motivo}")
+
         self._modelo = WhisperModel(
             self._tamanho,
             device="cuda" if cuda else "cpu",
             compute_type="float16" if cuda else "int8",
         )
-        self.dispositivo = "cuda" if cuda else "cpu"
         _log(f"modelo {self._tamanho} carregado em {self.dispositivo}")
 
     def transcrever(self, caminho: str, id_req: int,
@@ -121,7 +173,7 @@ class Modelo:
                         pct=min(s.end / duracao, 0.99), texto="transcrevendo")
 
         return {"segmentos": segmentos, "idioma": info.language, "duracao": duracao,
-                "dispositivo": self.dispositivo}
+                "dispositivo": self.dispositivo, "motivo": self.motivo}
 
 
 def main() -> int:
@@ -145,8 +197,17 @@ def main() -> int:
 
         id_req = req.get("id")
         try:
-            if req.get("op") != "transcrever":
-                raise RuntimeError(f"operação desconhecida: {req.get('op')!r}")
+            op = req.get("op")
+
+            # Responder "que placa você usaria?" sem carregar o modelo: é o que
+            # deixa a tela perguntar de graça, e o que o usuário manda de volta
+            # quando a transcrição sai lenta.
+            if op == "dispositivo":
+                _enviar(id=id_req, tipo="resultado", **modelo.diagnostico())
+                continue
+
+            if op != "transcrever":
+                raise RuntimeError(f"operação desconhecida: {op!r}")
 
             caminho = req.get("audio") or ""
             if not os.path.isfile(caminho):

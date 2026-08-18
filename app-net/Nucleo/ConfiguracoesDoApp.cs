@@ -101,6 +101,24 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
         = "cliente-update";
 
+    /// <summary>Transcrever mesmo quando a placa não estiver disponível.</summary>
+    /// <remarks>
+    /// <para>
+    /// Desligado por padrão, e não é excesso de zelo: em 18/08/2026 a
+    /// transcrição de um usuário caiu para CPU numa máquina <b>com</b> RTX 4050,
+    /// e o <c>large-v3</c> em CPU consumiu RAM por horas até **derrubar o
+    /// Windows**. Um app que grava reunião não pode ter esse modo de falha
+    /// ligado por acidente.
+    /// </para>
+    /// <para>
+    /// Quem de fato não tem placa liga isto e aceita o custo — a tela diz qual
+    /// é. O que a chave impede é o caso em que a placa existe e o motor não a
+    /// enxerga: aí rodar em CPU não é escolha, é defeito disfarçado de
+    /// lentidão.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("permitir_cpu")] public bool PermitirCpu { get; set; }
+
     /// <summary>Conferir, de vez em quando, se saiu versão nova.</summary>
     /// <remarks>
     /// <para>

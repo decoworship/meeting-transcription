@@ -130,6 +130,31 @@ public sealed class MotorSidecar : IDisposable
 
     /// <param name="vocabulario">Termos do projeto, como <c>hotwords</c> do ASR.</param>
     /// <inheritdoc cref="DiarizarAsync"/>
+    /// <summary>
+    /// Qual placa o motor usaria, perguntado <b>antes</b> de carregar o modelo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Custa o import do torch (uns segundos) e não carrega os 3 GB do modelo.
+    /// É barato o bastante para perguntar sempre, e é o que evita descobrir
+    /// tarde demais que a transcrição foi para a CPU.
+    /// </para>
+    /// <para>
+    /// <b>Por que não basta o nvidia-smi.</b> O bloco de diagnóstico da tela
+    /// pergunta ao driver; quem decide o dispositivo é o torch, que precisa
+    /// também das DLLs de CUDA alcançáveis. Os dois discordaram na máquina de um
+    /// usuário em 18/08/2026 — a tela dizia "RTX 4050" e o modelo rodava na CPU,
+    /// até o Windows cair por falta de RAM.
+    /// </para>
+    /// </remarks>
+    public async Task<DispositivoDoMotor> DispositivoAsync(CancellationToken ct = default)
+    {
+        var m = await ExecutarAsync(
+            new Requisicao { Id = _proximoId++, Op = "dispositivo" }, null, ct);
+
+        return new DispositivoDoMotor(m.Cuda ?? false, m.Nome, m.CudaDoTorch, m.Motivo);
+    }
+
     public async Task<Transcricao> TranscreverAsync(
         string caminhoDoAudio, string? vocabulario = null, string? idioma = null,
         Action<double, string>? progresso = null, CancellationToken ct = default)
@@ -147,7 +172,7 @@ public sealed class MotorSidecar : IDisposable
 
         return new Transcricao(
             (m.Segmentos ?? []).Select(s => new SegmentoDeTexto(s.Inicio, s.Fim, s.Texto ?? "")).ToList(),
-            m.Idioma, m.Duracao ?? 0);
+            m.Idioma, m.Duracao ?? 0, m.Dispositivo, m.Motivo);
     }
 
     /// <summary>

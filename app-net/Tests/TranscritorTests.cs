@@ -79,6 +79,45 @@ public sealed class TranscritorTests : IDisposable
     }
 
     [Fact]
+    public void PlacaVistaPeloWindowsMasNaoPeloMotorEDefeito()
+    {
+        // O caso relatado em 18/08/2026: o bloco de diagnóstico dizia
+        // "RTX 4050" e a transcrição rodava na CPU até derrubar o Windows.
+        //
+        // As duas causas pedem coisas diferentes de quem lê, e juntá-las numa
+        // frase só mandaria metade das pessoas fazer a coisa errada.
+        string frase = Transcritor.SemPlaca(new MeetingApp.Sidecar.DispositivoDoMotor(
+            Cuda: false, Nome: null, CudaDoTorch: "12.4",
+            Motivo: "o torch tem CUDA 12.4, mas não encontrou placa nenhuma"));
+
+        // Em máquina sem placa (o CI, e o Linux desta suíte) a frase é a outra —
+        // o que se protege aqui é que ela sempre diga a saída.
+        Assert.Contains("Ajustes", frase);
+        Assert.Contains("CPU", frase);
+        Assert.Contains("12.4", frase);
+    }
+
+    [Fact]
+    public void SemPlacaNenhumaAFraseNaoAcusaDefeito()
+    {
+        // Quem de fato não tem placa não precisa mandar diagnóstico para
+        // ninguém: precisa saber que dá para ligar, e o que custa.
+        string frase = Transcritor.SemPlaca(new MeetingApp.Sidecar.DispositivoDoMotor(
+            Cuda: false, Nome: null, CudaDoTorch: null, Motivo: null));
+
+        Assert.Contains("Transcrever sem placa", frase);
+        Assert.DoesNotContain("Isso é um defeito", frase);
+    }
+
+    [Fact]
+    public void TranscreverSemPlacaEDesligadoPorPadrao()
+    {
+        // A chave existe para tornar a escolha deliberada. Ligada por padrão,
+        // ela não protegeria de nada — que era exatamente o estado anterior.
+        Assert.False(new ConfiguracoesDoApp().PermitirCpu);
+    }
+
+    [Fact]
     public void ATelemetriaDoPyannoteSaiDesligadaEmTodoSidecar()
     {
         // A chave NÃO tem valor padrão do lado do pyannote: sem ela o

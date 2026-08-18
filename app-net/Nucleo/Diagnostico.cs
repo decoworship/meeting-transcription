@@ -182,7 +182,15 @@ public sealed class Diagnostico
         var b = new StringBuilder();
         b.Append("MeetingApp ").Append(Versao).Append('\n');
         b.Append(Windows).Append('\n');
-        b.Append("placa: ").Append(Placa ?? "nenhuma NVIDIA encontrada — vai rodar em CPU").Append('\n');
+        // "segundo o Windows" não é preciosismo: esta linha vem do nvidia-smi,
+        // que responde pela presença do driver. Quem decide o dispositivo da
+        // transcrição é o torch, que precisa também das DLLs de CUDA
+        // alcançáveis — e os dois discordaram na máquina de um usuário em
+        // 18/08/2026, com a tela dizendo "RTX 4050" enquanto o modelo rodava na
+        // CPU. Um bloco de diagnóstico que esconde de onde veio o dado manda
+        // quem lê procurar no lugar errado.
+        b.Append("placa (segundo o Windows): ")
+         .Append(Placa ?? "nenhuma NVIDIA encontrada — vai rodar em CPU").Append('\n');
         b.Append("motores: ").Append(Motores ?? "no lugar").Append('\n');
         b.Append("modelos instalados: ")
          .Append(Modelos.Count > 0 ? string.Join(", ", Modelos) : "nenhum").Append('\n');

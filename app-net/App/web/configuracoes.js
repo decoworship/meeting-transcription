@@ -704,6 +704,21 @@ function abaTranscricao(config, gravar) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
+  // A placa, e o que fazer quando ela não aparece.
+  //
+  // Relatado em 18/08/2026: numa máquina com RTX 4050 a transcrição caiu para
+  // CPU e o large-v3 consumiu RAM por horas até derrubar o Windows. Desde
+  // então o pipeline recusa a CPU por padrão — e esta é a chave que torna a
+  // exceção uma escolha, para quem de fato não tem placa.
+  const semPlaca = bloco("Transcrever sem placa",
+    "Por padrão o app recusa transcrever quando não encontra a placa de vídeo. "
+    + "Ligue só se esta máquina não tem placa NVIDIA: a transcrição passa a "
+    + "levar horas em vez de minutos e consome muita memória.");
+  semPlaca.classList.add("bloco--chave");
+  semPlaca.appendChild(chave(config.permitir_cpu === true,
+    (v) => gravar({ permitir_cpu: v })));
+  painel.appendChild(semPlaca);
+
   const refazer = bloco("Transcrever de novo");
   refazer.classList.add("bloco--chave");
   const texto = document.createElement("p");

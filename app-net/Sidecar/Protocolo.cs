@@ -14,8 +14,28 @@ public sealed record SegmentoDeFalante(double Inicio, double Fim, string Falante
 public sealed record SegmentoDeTexto(double Inicio, double Fim, string Texto);
 
 /// <summary>O que o motor de ASR devolve por gravação.</summary>
+/// <param name="Dispositivo">
+/// "cuda" ou "cpu" — o que o motor <b>de fato</b> usou.
+/// </param>
+/// <param name="MotivoDaCpu">
+/// Quando caiu para CPU, por quê. Nulo quando rodou na placa.
+/// </param>
+/// <remarks>
+/// Os dois últimos campos existem desde 18/08/2026, quando a transcrição de um
+/// usuário rodou na CPU numa máquina com RTX 4050 e <b>derrubou o Windows</b>
+/// por falta de RAM. O motor já mandava o dispositivo; o núcleo o descartava.
+/// </remarks>
 public sealed record Transcricao(
-    IReadOnlyList<SegmentoDeTexto> Segmentos, string? Idioma, double Duracao);
+    IReadOnlyList<SegmentoDeTexto> Segmentos, string? Idioma, double Duracao,
+    string? Dispositivo = null, string? MotivoDaCpu = null);
+
+/// <summary>O que o motor enxerga da placa, antes de carregar modelo nenhum.</summary>
+/// <param name="Cuda">O torch achou uma placa utilizável.</param>
+/// <param name="Nome">O modelo da placa, quando achou.</param>
+/// <param name="CudaDoTorch">A versão de CUDA do torch. Nula num build de CPU.</param>
+/// <param name="Motivo">Por que não achou, quando não achou.</param>
+public sealed record DispositivoDoMotor(
+    bool Cuda, string? Nome, string? CudaDoTorch, string? Motivo);
 
 /// <summary>
 /// Uma linha vinda do motor. Ver docs/SIDECAR.md para o contrato.
@@ -42,6 +62,21 @@ internal sealed class Mensagem
     [JsonPropertyName("segmentos")] public List<SegmentoJson>? Segmentos { get; init; }
     [JsonPropertyName("idioma")] public string? Idioma { get; init; }
     [JsonPropertyName("duracao")] public double? Duracao { get; init; }
+
+    /// <summary>"cuda" ou "cpu": onde o motor rodou de verdade.</summary>
+    [JsonPropertyName("dispositivo")] public string? Dispositivo { get; init; }
+
+    /// <summary>Por que não foi para a placa, quando não foi.</summary>
+    [JsonPropertyName("motivo")] public string? Motivo { get; init; }
+
+    /// <summary>Da operação <c>dispositivo</c>: o torch achou CUDA?</summary>
+    [JsonPropertyName("cuda")] public bool? Cuda { get; init; }
+
+    /// <summary>Da operação <c>dispositivo</c>: a versão de CUDA do torch.</summary>
+    [JsonPropertyName("cuda_do_torch")] public string? CudaDoTorch { get; init; }
+
+    /// <summary>Da operação <c>dispositivo</c>: o nome da placa, se houver.</summary>
+    [JsonPropertyName("nome")] public string? Nome { get; init; }
 
     /// <summary>O vetor que identifica uma voz (operação "voz").</summary>
     [JsonPropertyName("vetor")] public float[]? Vetor { get; init; }
