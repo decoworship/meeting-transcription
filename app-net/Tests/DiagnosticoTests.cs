@@ -77,6 +77,16 @@ public sealed class DiagnosticoTests
     }
 
     [Fact]
+    public void OBlocoDizOndeEstaOLog()
+    {
+        // A foto não bastou em 18/08/2026: a transcrição de um usuário derrubou
+        // o Windows dele e o bloco dizia que estava tudo no lugar. O caminho do
+        // registro é o que leva da foto para o filme.
+        Assert.Contains("registro:", Exemplo().ComoTexto());
+        Assert.Contains("registro.log", Exemplo().ComoTexto());
+    }
+
+    [Fact]
     public void OTextoCabeNumaMensagemENaoTemLinhaVazia()
     {
         // Ele é colado num chat. Um bloco que rola por vinte linhas não é colado;
@@ -84,7 +94,7 @@ public sealed class DiagnosticoTests
         var linhas = Exemplo("NVIDIA GeForce RTX 2060 (driver 595.97)")
             .ComoTexto().Split('\n');
 
-        Assert.InRange(linhas.Length, 5, 10);
+        Assert.InRange(linhas.Length, 5, 12);
         Assert.All(linhas, l => Assert.NotEqual("", l.Trim()));
     }
 

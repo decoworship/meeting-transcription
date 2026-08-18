@@ -1,6 +1,6 @@
 {
-  "versao": "0.2.0",
+  "versao": "0.2.1",
   "publicada": "2026-08-18",
-  "notas": "A ata deixa de sair repetida, o raciocínio das decisões volta a aparecer, e as pendências param de cair todas na mesma pessoa. Reuniões longas não falham mais.",
+  "notas": "A transcrição avisa em qual placa está rodando e recusa a CPU por engano. O app passa a manter um registro do que fez, para problemas poderem ser diagnosticados à distância.",
   "onde": ""
 }

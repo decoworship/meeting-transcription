@@ -264,6 +264,10 @@ public sealed class Transcritor(Motores motores)
         // o desligamento da telemetria do pyannote. Ver Motores.Ambiente().
         var ambiente = Motores.Ambiente();
 
+        Registro.Escrever("pipeline",
+            $"transcrever {Path.GetFileName(pastaDaGravacao)} · modelo {escolhido} · "
+            + $"diarizar={diarizar}");
+
         Transcricao transcricao;
         string[] argsAsr = modelo is { Length: > 0 }
             ? [motores.ScriptAsr, "--modelo", modelo]
@@ -272,6 +276,10 @@ public sealed class Transcritor(Motores motores)
         using (var asr = await MotorSidecar.IniciarAsync(
                    motores.Python, argsAsr, ct, ambiente))
         {
+            // O que o motor diz de si — dispositivo, carga do modelo, avisos de
+            // CUDA — passa a existir em disco. Era tudo o que faltava para
+            // diagnosticar a máquina de quem instalou.
+            asr.AoRegistrar += l => Registro.Escrever("asr", l);
             // A placa, perguntada ao motor ANTES de carregar o modelo.
             //
             // Relatado em 18/08/2026: a transcrição caiu para CPU numa máquina
@@ -280,6 +288,10 @@ public sealed class Transcritor(Motores motores)
             // quando o motor não acha a placa, e a diferença entre as duas
             // coisas precisa ser dita antes, não descoberta depois.
             var placa = await asr.DispositivoAsync(ct);
+            Registro.Escrever("asr", placa.Cuda
+                ? $"dispositivo: {placa.Nome} (CUDA {placa.CudaDoTorch})"
+                : $"dispositivo: CPU — {placa.Motivo ?? "sem detalhe"}");
+
             if (!placa.Cuda && !ConfiguracoesDoApp.Carregar().PermitirCpu)
                 throw new MotorException(SemPlaca(placa));
 
@@ -297,6 +309,7 @@ public sealed class Transcritor(Motores motores)
         {
             using var diar = await MotorSidecar.IniciarAsync(
                 motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
+            diar.AoRegistrar += l => Registro.Escrever("diarizacao", l);
             diarizacao = await diar.DiarizarAsync(sistema,
                 (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)), ct);
         }

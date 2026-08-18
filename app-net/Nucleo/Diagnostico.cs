@@ -195,6 +195,9 @@ public sealed class Diagnostico
         b.Append("modelos instalados: ")
          .Append(Modelos.Count > 0 ? string.Join(", ", Modelos) : "nenhum").Append('\n');
         b.Append("em uso: ").Append(string.Join(", ", Escolhidos)).Append('\n');
+        // O caminho do log fecha o bloco de propósito: é o que a pessoa abre
+        // quando a foto não basta — e a foto não bastou em 18/08/2026.
+        b.Append("registro: ").Append(Registro.Caminho).Append('\n');
         b.Append("gravações: ").Append(PastaDasGravacoes);
         if (DiscoLivreGb >= 0) b.Append(" (").Append(DiscoLivreGb.ToString("0.#")).Append(" GB livres)");
         return b.ToString();
