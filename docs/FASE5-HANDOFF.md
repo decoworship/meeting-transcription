@@ -5,7 +5,8 @@ carta é a §3 do [PLANO.md](PLANO.md) — esta fase nunca teve arquivo próprio
 porque nasceu como "Fase 3, o redesign" e foi reduzida a acabamento quando a
 Fase 2.5 escreveu a interface inteira já sobre o design system.
 
-Executada em 18/08/2026, na branch `feat/fase-5-acabamento`.
+Executada em 18/08/2026, na branch `feat/fase-5-acabamento`, **entregue na
+0.3.0** — instalador de 1,59 GB, publicado no mesmo dia.
 
 **A fase fechou por medição, e não por opinião.** Cada item abaixo foi conferido
 abrindo o app na máquina, tela a tela, nos dois temas, e amostrando pixels do
@@ -211,3 +212,31 @@ que impede uma publicação de teste de reescrever os sidecars do app de verdade
 Medido: publicar num destino novo produz as três junções sem aviso nenhum, e
 `rm -rf` nesse destino **não toca** os 4,3 GB do alvo. Junção não é dona dos
 bytes.
+
+---
+
+## 9. A fase fechada
+
+Entregue como **0.3.0**, junto com a 0.2.1 da outra frente do mesmo dia — o
+merge teve quatro conflitos, todos de número de versão e nenhum de código.
+
+  main         c365c11, 340 testes
+  instalador   dist/instalador/MeetingApp-0.3.0-instalador.exe, 1,59 GB
+  privacidade  17 526 arquivos conferidos, aprovado
+
+Mesmo tamanho da 0.2.1, e é o esperado: o que mudou foi CSS, uma chave de
+configuração e cinquenta linhas de C#, dentro de um payload que os 4,3 GB de
+Python embarcado dominam.
+
+Duas coisas custaram tempo e valem como aviso a quem montar a próxima:
+
+- **não edite um script de shell enquanto ele roda.** O bash lê o arquivo sob
+  demanda, não de uma vez: seis linhas acrescentadas no meio da execução
+  deslocaram o que ele ainda ia ler, e ele tentou executar um pedaço de
+  comentário (`pode: command not found`). Custou os quinze minutos da
+  conferência de privacidade, que teve de rodar de novo;
+- **a conferência de privacidade é a etapa lenta**, e é ela que justifica o
+  `--pular-build`: são 17 526 arquivos e 5,66 GB varridos através da fronteira
+  WSL/Windows. Ela é afiada — achou a palavra "Vivo", que é um cliente, dentro
+  de uma DLL do ffmpeg, reconheceu o demuxer do formato de vídeo dos anos 90 e
+  ignorou com a justificativa escrita.
