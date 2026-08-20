@@ -8,15 +8,17 @@ Três arquivos por versão, todos obrigatórios:
 
 | arquivo | o que diz |
 |---|---|
-| `decoworship.MeetingApp.yaml` | o índice: identificador, versão, idioma padrão |
+| `decoworship.PulseMeet.yaml` | o índice: identificador, versão, idioma padrão |
 | `...locale.pt-BR.yaml` | nome, licença, descrição — o que aparece no `winget show` |
 | `...installer.yaml` | a URL, o SHA256 e como instalar em silêncio |
 
 ## O identificador ainda pode mudar — e só agora
 
-O `PackageIdentifier` é `decoworship.MeetingApp`, e o app passou a se chamar
-**PulseMeet** na 0.4.0. Trocá-lo para `decoworship.PulseMeet` é de graça
-**enquanto nada tiver sido submetido ao `microsoft/winget-pkgs`** — e nada foi.
+O `PackageIdentifier` virou `decoworship.PulseMeet` na 0.4.0, junto com o nome
+do app. Foi de graça porque **nada tinha sido submetido ao
+`microsoft/winget-pkgs`** — e continua sem ser. Enquanto for assim, ele pode
+mudar de novo; a pasta `0.3.0/` guarda o desenho anterior, com o identificador
+antigo, porque é o que casa com o release v0.3.0 que existe.
 Depois da primeira submissão aceita, o mesmo `PackageIdentifier` é a única coisa
 que faz o `winget upgrade` reconhecer as versões seguintes: trocá-lo ali vira um
 segundo pacote, e quem instalou pelo primeiro nunca mais recebe atualização.
@@ -35,10 +37,10 @@ Do Windows, com o manifesto numa pasta local (o winget não lê caminho UNC do
 WSL de forma confiável — copie para o `C:`):
 
 ```powershell
-winget validate --manifest C:\caminho\0.3.0
-winget install --manifest C:\caminho\0.3.0
-winget list MeetingApp        # confere que o ProductCode casou
-winget uninstall MeetingApp
+winget validate --manifest C:\caminho\0.4.0
+winget install --manifest C:\caminho\0.4.0
+winget list PulseMeet         # confere que o ProductCode casou
+winget uninstall PulseMeet
 ```
 
 O `winget list` é a parte que se esquece: se ele não achar o pacote, o
@@ -51,7 +53,7 @@ O SHA256 muda a cada build — o instalador não é reproduzível. Não copie o
 número da versão anterior.
 
 ```powershell
-wingetcreate update decoworship.MeetingApp `
+wingetcreate update decoworship.PulseMeet `
   --version 0.4.0 `
   --urls https://github.com/decoworship/meeting-transcription/releases/download/v0.4.0/MeetingApp-0.4.0-instalador.exe `
   --submit --token $env:GITHUB_TOKEN
