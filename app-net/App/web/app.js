@@ -2,7 +2,7 @@ import { pedir } from "/ponte.js";
 import { telaDeRevisao, abrirPainel } from "/revisao.js";
 import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
-import { abrirGaveta, fecharGavetas, alerta, campo, secao,
+import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
@@ -35,7 +35,21 @@ export function quando(nome) {
 
 export const tituloDe = (g) => g.titulo || quando(g.nome);
 
+/**
+ * Troca o título da moldura — e, com ele, a tela.
+ *
+ * Toda tela chama isto ao se montar, e <b>só</b> ao se montar: é o único ponto
+ * do app por onde todas as trocas de tela passam, incluindo as que moram noutro
+ * módulo e o recebem por <code>ctx</code>. Por isso o áudio para aqui, e não em
+ * cada destino — um destino novo não pode nascer esquecendo de parar o que a
+ * tela anterior estava tocando.
+ *
+ * O que ele <b>não</b> pega são as gavetas, que não passam por aqui. É de
+ * propósito: abrir os falantes enquanto se ouve um trecho não deve cortar o
+ * áudio (ver <code>pararAudio</code> em pecas.js).
+ */
 function cabecalho(t, sub, comVoltar) {
+  pararAudio();
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;

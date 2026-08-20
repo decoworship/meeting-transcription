@@ -1,0 +1,29 @@
+PackageIdentifier: decoworship.MeetingApp
+PackageVersion: 0.3.0
+InstallerType: inno
+# O .iss tem PrivilegesRequired=lowest e DefaultDirName={localappdata}\Programs.
+# Instalação por usuário, sem UAC — declarar outra coisa aqui faz o winget
+# pedir elevação e depois não achar o que instalou.
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: 2026-08-18
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/decoworship/meeting-transcription/releases/download/v0.3.0/MeetingApp-0.3.0-instalador.exe
+    InstallerSha256: 3B16A7489751CB6E97DE713B0D95B2A4068E0F6CD013C1C57082132EBCB93BB5
+    # O AppId do MeetingApp.iss, com o sufixo _is1 que o Inno acrescenta ao
+    # registrar em Programas e Recursos. É por ele que `winget upgrade` sabe
+    # que a versão instalada é este pacote. O AppId nunca muda.
+    ProductCode: '{8B6F3A21-4C5E-4E17-9A2D-1F0B7C4E9D33}_is1'
+    AppsAndFeaturesEntries:
+      - ProductCode: '{8B6F3A21-4C5E-4E17-9A2D-1F0B7C4E9D33}_is1'
+        UpgradeCode: '{8B6F3A21-4C5E-4E17-9A2D-1F0B7C4E9D33}'
+        DisplayName: MeetingApp
+        DisplayVersion: 0.3.0
+        Publisher: decoworship
+ManifestType: installer
+ManifestVersion: 1.6.0

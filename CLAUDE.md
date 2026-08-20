@@ -27,21 +27,50 @@ JavaScript: a ponte é assíncrona e o tema chegaria depois da primeira pintura.
 O `data-tema="claro"` do HTML é procurado por texto exato — mudá-lo faz o tema
 parar de funcionar em silêncio.
 
-**Há um defeito aberto e sem causa**: a transcrição travou o computador do
-segundo usuário (RTX 4050 Laptop, 0.1.0). O torch enxerga a placa dele
-normalmente — a hipótese de queda para CPU foi descartada com dado. O que a
-0.2.1 entregou foi **capacidade de diagnóstico**, não conserto:
-`Nucleo/Registro.cs` escreve o que o app faz em
-`%USERPROFILE%\.meeting-transcription\registro.log`. Ver
-[docs/FASE6.md](docs/FASE6.md) §3.0 — é o único item daquela carta que não espera
-gatilho.
+**Há um defeito aberto**: o computador do segundo usuário (RTX 4050 Laptop,
+16 GB) **desliga sozinho** durante a transcrição — não trava, e não dá tela
+azul. O `registro.log` da 0.2.1 mostrou que o **ASR termina bem, na GPU**, e que
+o corte vem da **diarização em diante**; isso derrubou as três hipóteses
+anteriores (queda para CPU, VRAM, memória do sistema, driver/TDR). Desligamento
+seco sob carga de GPU é **corte de energia** — térmica ou entrega —, e
+provavelmente não é conserto nosso. Ver [docs/FASE6.md](docs/FASE6.md) §3.0 — é
+o único item daquela carta que não espera gatilho.
+
+**O que era nosso, a 0.4.0 consertou:** o app jogava fora um ASR que tinha dado
+certo, porque o `transcricao.json` só era escrito no fim de tudo.
+`Nucleo/Retomada.cs` grava o texto assim que ele existe, marcado com o que falta
+(`pending`), e transcrever de novo pula o ASR. **Não retomar é sempre seguro;
+retomar o parcial errado devolve o texto de outro modelo em silêncio** — por
+isso modelo, idioma e vocabulário são conferidos, e na dúvida o ASR roda de
+novo.
+
+**O registro ainda tem um buraco**: só há quatro `Registro.Escrever` no
+`Transcritor`, todos antes da diarização. Um desligamento na diarização e um no
+pós-processamento deixam o mesmo log. A 0.4.1 fecha isso — e faz o app ler o
+Event Log e amostrar o `nvidia-smi` sozinho, porque pedir isso ao usuário já
+custou duas idas e voltas com respostas erradas.
+
+**O app se chama PulseMeet desde 19/08/2026**, e o símbolo é o monograma M.
+Nenhum dos dois está fechado, então **a marca é uma constante só**: `Marca.Nome`
+em `Nucleo/Marca.cs` e o `#define Marca` do `.iss`, com um teste que falha se os
+dois discordarem. O que carrega o nome antigo por baixo — `AppId`,
+`MeetingApp.exe`, a pasta de instalação, o mutex, os namespaces e os
+`LogicalName` dos recursos — **não muda nunca**, e cada um quebra algo diferente
+se mudar. O símbolo é `assets/logo.svg`, e `tools/gerar_icone.py` gera dele os
+seis `.ico`. Tudo em [docs/MARCA.md](docs/MARCA.md). **O winget é o único ponto
+com prazo**: enquanto os manifestos não forem submetidos, o `PackageIdentifier`
+ainda pode ser trocado de graça.
 
 **A rota de atualização existe no primeiro degrau**: o app avisa que saiu versão
 nova, lendo o `versao.json` do próprio repositório — sem servidor
 ([docs/ATUALIZACAO.md](docs/ATUALIZACAO.md)). Ela é pré-requisito de acrescentar
 modelo, porque o catálogo é código: oferecer um modelo novo é publicar uma versão
 nova do app. Baixar e trocar o binário sozinho fica para depois da assinatura de
-código.
+código — mas **o winget faz esse degrau sem que o app aprenda nada**: desde
+19/08/2026 o instalador sai como release público, e o manifesto vive em
+`instalador/winget/`. Ele ainda não está no `microsoft/winget-pkgs`, e por isso
+o `winget upgrade` ainda não funciona: falta separar os motores do instalador,
+que é o que torna 1,59 GB submissível e um update de 18 MB possível.
 
 **Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
 outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas
@@ -85,10 +114,16 @@ usuário. O `publicar.sh` confere as réguas antes de copiar.
 **Gerar uma versão nova** é editar `<Version>` em `app-net/Directory.Build.props`
 (um lugar só), escrever o `CHANGELOG.md`, subir o mesmo número no `versao.json`
 — que é o canal do aviso de atualização, ver [docs/ATUALIZACAO.md](docs/ATUALIZACAO.md) —
-e rodar o `montar_instalador.sh`. **É o `git push` que faz o aviso aparecer** na
-máquina de quem já instalou, então ele vem depois de o instalador existir. O
-`AppId` do `.iss` nunca muda — é por ele que o Windows sabe que é atualização e
-não um segundo programa. Se algum `motor.py` mudou, rode o `publicar.sh` antes:
+e rodar o `montar_instalador.sh`. Depois disso vem o release: `gh release create`
+com o instalador, os três YAMLs do winget copiados de
+`instalador/winget/<versão anterior>` com a versão e o **SHA256 novos**, e o
+campo `onde` do `versao.json` apontando para a página do release. O passo a passo
+com as armadilhas está em [docs/ATUALIZACAO.md](docs/ATUALIZACAO.md); o manifesto
+em si, em [instalador/winget/LEIAME.md](instalador/winget/LEIAME.md). **É o
+`git push` que faz o aviso aparecer** na máquina de quem já instalou, então ele
+vem depois de o instalador existir. O `AppId` do `.iss` nunca muda — é por ele
+que o Windows sabe que é atualização e não um segundo programa, e é dele que sai
+o `ProductCode` do manifesto. Se algum `motor.py` mudou, rode o `publicar.sh` antes:
 o `--so-build` não sincroniza os sidecars, e a régua reprova o build em vez de
 deixar o instalador empacotar o motor velho.
 

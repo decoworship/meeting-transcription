@@ -1,7 +1,11 @@
-# Meeting Transcription
+# PulseMeet
 
 Aplicativo Windows nativo que **grava** reuniões em duas faixas e as
 **transcreve** com separação de falantes, tudo local e sem nuvem.
+
+O nome e o símbolo são recentes e ainda podem mudar; onde eles moram e o que
+custa trocá-los está em [docs/MARCA.md](docs/MARCA.md). O repositório continua
+`meeting-transcription`, e o executável, `MeetingApp.exe`.
 
 Um executável, um ícone na bandeja, uma janela. Publicado sob a
 [licença MIT](LICENSE).

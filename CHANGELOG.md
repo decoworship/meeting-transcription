@@ -3,6 +3,58 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.4.0 — o app agora se chama PulseMeet, e a transcrição não se perde mais
+
+**Nome novo, símbolo novo.** O app se chama **PulseMeet**, e o ícone deixou de
+ser o monograma A para ser um M — o mesmo círculo, o mesmo traço, as linhas de
+dentro redesenhadas. O que muda para você é o que está escrito: o título da
+janela, o balão da bandeja, os atalhos e o texto do instalador. O que **não**
+muda é onde o app mora nem como ele se atualiza: a pasta continua
+`...\Programs\MeetingApp`, o executável continua `MeetingApp.exe`, e o Windows
+continua reconhecendo esta versão como atualização da anterior — sem segunda
+entrada em "Aplicativos Instalados" e sem baixar os 4,3 GB de motores de novo.
+O nome ainda pode mudar de novo; nada do que você tem instalado depende dele.
+
+**O texto é salvo assim que fica pronto.** Até agora a transcrição só ia para o
+disco no fim de tudo — depois de separar os falantes, de procurar as vozes
+conhecidas, de montar o arquivo. Se alguma coisa acontecesse no meio, o texto,
+que já estava pronto havia minutos, ia junto. Agora ele é gravado no instante em
+que existe: você abre a gravação e lê a reunião, mesmo que o resto não tenha
+terminado. A lista avisa quando é uma transcrição pela metade.
+
+**Transcrever de novo aproveita o que já foi feito.** Se a primeira tentativa
+chegou a transcrever o texto, a segunda pula direto para a separação de
+falantes, em vez de passar o áudio inteiro pelo modelo outra vez. Numa reunião
+de uma hora isso é a diferença entre alguns minutos e alguns segundos. Se você
+mudar o modelo, o idioma ou o vocabulário, ela refaz tudo — porque aí o texto
+sairia diferente.
+
+Isto saiu de um caso real: um usuário cujo computador desliga sozinho durante a
+separação de falantes, e que perdia a reunião inteira toda vez. A causa do
+desligamento continua em investigação; o que esta versão conserta é o app jogar
+fora um trabalho que deu certo.
+
+**O áudio para quando você sai da reunião.** Ouvir os trechos para conferir quem
+fala e depois ir para o Gravador, para as Atas ou para os Ajustes deixava a
+gravação tocando por cima da tela nova — sem nenhum botão à vista para pará-la.
+Abrir os falantes ou as notas continua não cortando o áudio, que é o que se
+espera de quem só quer mexer em algo sem perder o lugar no texto.
+
+**Quem falou para de sumir dentro dos trechos longos.** Quando duas ou três
+pessoas falavam sem pausa, o modelo juntava tudo num trecho só — às vezes de
+quarenta segundos — e o trecho inteiro ficava no nome de uma pessoa. As outras
+sumiam da transcrição e, com ela, da ata. Agora o trecho é cortado onde a
+separação de falantes diz que a voz mudou, na palavra exata.
+
+**O vocabulário do projeto deixou de ser sussurrado ao modelo.** Ele era usado
+duas vezes: durante a transcrição e depois dela, para corrigir a grafia. As duas
+medições dizem que os nomes se recuperam igual pelos dois caminhos — e o
+primeiro cobrava caro, juntando a fala em blocos longos, que é exatamente o
+problema do parágrafo acima. Na mesma reunião: 787 trechos em vez de 207, mais
+fala aproveitada, e quatro vezes menos tempo para transcrever. A correção da
+grafia continua igual. Quem quiser o comportamento antigo, a chave está em
+Ajustes → Transcrição.
+
 ## 0.3.0 — o tema escuro, e a tela de ler fica maior
 
 **O app tem tema escuro.** Em Ajustes → Geral → Aparência: claro, escuro, ou

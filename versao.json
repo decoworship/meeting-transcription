@@ -1,6 +1,6 @@
 {
-  "versao": "0.3.0",
-  "publicada": "2026-08-18",
-  "notas": "O app ganha tema escuro, em Ajustes → Geral. A tela de revisão mostra mais texto e em tamanho maior, e a ata volta a ter títulos.",
+  "versao": "0.4.0",
+  "publicada": "2026-08-19",
+  "notas": "O app agora se chama PulseMeet, com símbolo novo. A transcrição não se perde mais se o computador desligar no meio, e quem falou para de sumir dentro dos trechos longos.",
   "onde": ""
 }

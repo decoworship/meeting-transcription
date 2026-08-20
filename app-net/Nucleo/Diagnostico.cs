@@ -30,6 +30,16 @@ namespace MeetingApp.Nucleo;
 /// </remarks>
 public sealed class Diagnostico
 {
+    /// <summary>
+    /// O nome do produto, para a tela não precisar saber qual é.
+    /// </summary>
+    /// <remarks>
+    /// Calculado, não recebido: a marca mora no <see cref="Nucleo.Marca"/>, e
+    /// mandá-la junto do diagnóstico é o que evita uma segunda cópia dela no
+    /// JavaScript. Ver <c>configuracoes.js</c>.
+    /// </remarks>
+    [JsonPropertyName("marca")] public string Marca => Nucleo.Marca.Nome;
+
     [JsonPropertyName("versao")] public required string Versao { get; init; }
     [JsonPropertyName("windows")] public required string Windows { get; init; }
 
@@ -180,7 +190,7 @@ public sealed class Diagnostico
     public string ComoTexto()
     {
         var b = new StringBuilder();
-        b.Append("MeetingApp ").Append(Versao).Append('\n');
+        b.Append(Marca).Append(' ').Append(Versao).Append('\n');
         b.Append(Windows).Append('\n');
         // "segundo o Windows" não é preciosismo: esta linha vem do nvidia-smi,
         // que responde pela presença do driver. Quem decide o dispositivo da

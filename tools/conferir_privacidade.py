@@ -22,6 +22,11 @@ A segunda é a que vale, e ela só funciona **nesta máquina**: os termos saem d
 seus próprios dados. Rodá-la numa máquina sem histórico não prova nada, e ela
 avisa quando isso acontece em vez de passar em silêncio.
 
+Um achado da régua 2 é perdoado em dois casos, os dois declarados em voz alta no
+relatório: um ``HOMONIMO`` registrado à mão, e o termo que **já está no
+código-fonte do repositório** -- aí a presença dele no que viaja está explicada
+por nós. Ver ``explicado_pela_fonte``.
+
 O que ela **não** verifica, e está registrado de propósito: o segredo OAuth do
 Google vai embutido no binário, por decisão (docs/FASE4.md §4). Ele é a
 credencial do aplicativo, não a sua conta — o seu ``google_token.json`` fica de
@@ -42,6 +47,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
 
 # Os mesmos Excludes do instalador/MeetingApp.iss. Duplicados aqui de propósito,
 # e é uma duplicação que se defende: se um dia eles divergirem, esta régua passa
@@ -99,6 +106,60 @@ def homonimo(caminho: Path, termo: str) -> str | None:
     for padrao, alvo, motivo in HOMONIMOS:
         if termo == alvo and padrao.search(str(caminho)):
             return motivo
+    return None
+
+
+# ── o que é nosso não é vazamento ────────────────────────────────────────────
+#
+# Achado em 19/08/2026, montando a 0.4.0: a régua reprovou 'Sprint' dentro do
+# MeetingApp.exe. Não era vazamento nenhum -- o dono do produto tem um projeto
+# chamado "Sprint", e a palavra está no binário porque o app embute a skill de
+# ata `assets/atas/sprint.md` desde que as skills existem (e, de quebra, porque
+# o runtime da Microsoft exporta `__stdio_common_vsprintf_s`).
+#
+# Não é caso isolado: as skills se chamam sprint, daily, kickoff, resultados,
+# trabalho e cliente-update. Qualquer projeto batizado com uma dessas palavras
+# reprova todo build a partir daí, e a régua que reprova sempre é uma régua que
+# se desliga.
+#
+# O critério que resolve os seis de uma vez sem abrir exceção nominal: **se o
+# termo já está no código-fonte do repositório, a presença dele no que viaja
+# está explicada por nós, e não pelos seus dados.** É o mesmo raciocínio dos
+# HOMÓNIMOS acima, generalizado -- e com a mesma exigência de dizer em voz alta
+# o que foi perdoado e por quê.
+#
+# **O que ele pressupõe**, e é bom estar escrito: que o repositório em si esteja
+# limpo de dado pessoal. Ele é público, então essa suposição já era condição de
+# existir; se um nome de cliente for parar num arquivo versionado, o problema
+# está no commit, e é lá que se conserta -- não aqui.
+FONTES = ["app-net", "assets", "motores", "src", "docs", "CHANGELOG.md", "README.md"]
+
+# dist/ é o próprio payload: deixá-lo entrar faria o achado explicar a si mesmo.
+FORA_DA_FONTE = ["bin", "obj", "dist", ".git", ".venv", "__pycache__"]
+
+
+def explicado_pela_fonte(termo: str, raiz: Path) -> Path | None:
+    """O arquivo versionado que já contém o termo, ou ``None``.
+
+    Duas etapas, pelo mesmo motivo do ``_candidatos``: o ``grep -F`` acha onde
+    olhar, e o regex de fronteira -- o mesmo que a régua usa no payload --
+    responde se é o termo mesmo, e não um pedaço de outra palavra.
+    """
+    alvos = [str(raiz / f) for f in FONTES if (raiz / f).exists()]
+    if not alvos:
+        return None
+
+    excluir = [f"--exclude-dir={d}" for d in FORA_DA_FONTE]
+    achado = subprocess.run(["grep", "-rlF", *excluir, "--", termo, *alvos],
+                            capture_output=True, text=True)
+    p8, _ = _padroes([termo])
+    for linha in achado.stdout.splitlines():
+        caminho = Path(linha)
+        try:
+            if p8.search(caminho.read_bytes()):
+                return caminho
+        except OSError:
+            continue
     return None
 
 
@@ -329,6 +390,12 @@ def main() -> int:
             if (motivo := homonimo(caminho, termo)) is not None:
                 print(f"  ignorado: {termo!r} em {caminho.name}")
                 print(f"            {motivo}")
+                continue
+            if (fonte := explicado_pela_fonte(termo, RAIZ)) is not None:
+                print(f"  explicado: {termo!r} em {caminho.name}")
+                print(f"             a mesma palavra está em "
+                      f"{fonte.relative_to(RAIZ)}, no repositório — "
+                      f"o que viaja veio de lá, não dos seus dados")
                 continue
             reprovas.append(f"vazamento: {termo!r} dentro de {caminho}")
             vazamentos += 1

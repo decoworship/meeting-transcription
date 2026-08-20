@@ -11,7 +11,7 @@
 //   todo mundo sem sair de onde se estava lendo.
 
 import { pedir } from "/ponte.js";
-import { corDoFalante, abrirGaveta, secao, campo, alerta,
+import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
          campoComSugestoes, preencherSugestoes } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
 
@@ -85,8 +85,9 @@ export function abrirPainel(qual) {
 }
 
 export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoApagar }) {
-  audio.pause();
-  audio.removeAttribute("src");
+  // O `cabecalho` mais abaixo também pararia o áudio, mas ele é recebido de
+  // fora: quem monta esta tela não pode depender de a moldura fazê-lo.
+  pararAudio();
 
   estado = {
     gravacao,
@@ -154,11 +155,7 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   parar.type = "button";
   parar.textContent = "⏸";
   parar.title = "Parar o áudio";
-  parar.addEventListener("click", () => {
-    audio.pause();
-    for (const o of document.querySelectorAll("[data-tocando]"))
-      o.removeAttribute("data-tocando");
-  });
+  parar.addEventListener("click", pararAudio);
 
   const estadoSalvo = document.createElement("span");
   estadoSalvo.className = "campo__dica";

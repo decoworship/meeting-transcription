@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gera assets/logo.ico a partir de assets/logo.svg.
+"""Gera os ícones do app e da bandeja a partir de assets/logo.svg.
 
 Por que o ícone tem fundo próprio
 ---------------------------------
@@ -21,13 +21,34 @@ Uso:
     uv run python tools/gerar_icone.py
 """
 
+import io
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+try:
+    import cairosvg
+except ImportError:                          # sem uv sync, ainda dá para gerar
+    cairosvg = None
+
 RAIZ = Path(__file__).resolve().parent.parent
-ORIGEM = RAIZ / "assets" / "logo-256.png"   # render do logo.svg, silhueta preta
+SVG = RAIZ / "assets" / "logo.svg"           # a arte; trocar a marca é trocar isto
+PNG = RAIZ / "assets" / "logo-256.png"       # o render de reserva, gerado daqui
 DESTINO = RAIZ / "assets" / "logo.ico"
+
+
+def arte(lado: int) -> Image.Image:
+    """A silhueta do logo no tamanho pedido: preta, com alfa, sem fundo.
+
+    Rasteriza o SVG direto em cada tamanho em vez de reduzir um PNG grande --
+    num desenho de traço fino a diferença aparece justamente nos 16 e 24 px,
+    que são os tamanhos em que o ícone de fato vive. Sem o cairosvg instalado
+    cai para o logo-256.png, que este mesmo script regrava a cada execução.
+    """
+    if cairosvg is not None:
+        png = cairosvg.svg2png(url=str(SVG), output_width=lado, output_height=lado)
+        return Image.open(io.BytesIO(png)).convert("RGBA")
+    return Image.open(PNG).convert("RGBA").resize((lado, lado), Image.LANCZOS)
 
 FUNDO = (45, 45, 48, 255)        # #2D2D30, o cinza escuro da identidade do app
 FIGURA = (245, 245, 245)         # quase-branco: contraste alto sem estourar
@@ -53,7 +74,7 @@ def pastilha(tamanho: int) -> Image.Image:
     folga = 0.20 if tamanho <= 32 else 0.16
     lado = int(g * (1 - 2 * folga))
 
-    logo = Image.open(ORIGEM).convert("RGBA").resize((lado, lado), Image.LANCZOS)
+    logo = arte(lado)
     # A origem é silhueta preta com alfa; troca-se a cor preservando o alfa,
     # que é o que mantém a forma.
     branco = Image.new("RGBA", logo.size, FIGURA + (0,))
@@ -128,15 +149,22 @@ def silhueta(tamanho: int, cor: tuple[int, int, int]) -> Image.Image:
     escala = 4
     g = tamanho * escala
 
-    logo = Image.open(ORIGEM).convert("RGBA").resize((g, g), Image.LANCZOS)
+    logo = arte(g)
     tingido = Image.new("RGBA", (g, g), cor + (0,))
     tingido.putalpha(logo.getchannel("A"))
     return tingido.resize((tamanho, tamanho), Image.LANCZOS)
 
 
 def main() -> None:
-    if not ORIGEM.is_file():
-        raise SystemExit(f"falta {ORIGEM} (render do logo.svg em 256 px)")
+    if not SVG.is_file():
+        raise SystemExit(f"falta {SVG}")
+
+    # O PNG de reserva sai da mesma arte, sempre: é o que impede o fallback de
+    # gerar o ícone da marca anterior sem ninguém perceber.
+    if cairosvg is not None:
+        cairosvg.svg2png(url=str(SVG), write_to=str(PNG),
+                         output_width=256, output_height=256)
+        print(f"{PNG.relative_to(RAIZ)}: regravado do logo.svg")
 
     escrever_ico([pastilha(t) for t in TAMANHOS], DESTINO)
     print(f"{DESTINO.relative_to(RAIZ)}: {len(TAMANHOS)} tamanhos "

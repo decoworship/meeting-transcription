@@ -38,7 +38,7 @@ internal sealed class Bandeja : IDisposable
         _sair = sair;
 
         _icone = new IconeDeNotificacao(janela.Hwnd,
-            IconesDaBandeja.Obter(CorDaBandeja.Cinza), "Reuniões — parado");
+            IconesDaBandeja.Obter(CorDaBandeja.Cinza), $"{Nucleo.Marca.Nome} — parado");
 
         janela.AoEventoDaBandeja = AoEvento;
         janela.AoRenascerABarra = () => _icone.Adicionar();
@@ -64,7 +64,7 @@ internal sealed class Bandeja : IDisposable
     /// <summary>O ícone e o tooltip acompanhando o estado.</summary>
     public void Redesenhar()
     {
-        string txt = "Reuniões — "
+        string txt = Nucleo.Marca.Nome + " — "
             + _gravador.Estado.TextoDeStatus(_gravador.DuracaoAtual, null).Split('\n')[0];
         _icone.Atualizar(IconesDaBandeja.Obter(_gravador.Estado.Cor), txt);
     }
@@ -83,7 +83,7 @@ internal sealed class Bandeja : IDisposable
     private void Avisar(string texto, uint tipo, bool sempre)
     {
         if (!sempre && !_gravador.Estado.NotificacoesLigadas) return;
-        _icone.Balao("Reuniões", texto, tipo);
+        _icone.Balao(Nucleo.Marca.Nome, texto, tipo);
     }
 
     // ─────────────────────────────────────────────────────────── menu

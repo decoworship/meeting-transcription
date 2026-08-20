@@ -78,6 +78,33 @@ public sealed class ConfiguracoesDoApp
     /// </remarks>
     [JsonPropertyName("filtrar_silencio")] public bool FiltrarSilencio { get; set; }
 
+    /// <summary>
+    /// Mandar o vocabulário do projeto ao ASR como <c>hotwords</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Desligado por padrão</b>, e a chave existe mais para poder medir do
+    /// que para escolher. O vocabulário tem dois usos que sempre andaram
+    /// juntos: enviesar o modelo enquanto ele transcreve, e corrigir a grafia
+    /// depois (<see cref="CorrecaoFonetica"/>). A Fase 0 mediu que os dois
+    /// recuperam nomes na mesma medida — 36 contra 36 — e concluiu que o
+    /// primeiro era dispensável. A correção foi escrita; o hotwords ficou
+    /// ligado por esquecimento.
+    /// </para>
+    /// <para>
+    /// O que ele cobrava, medido em duas gravações: <b>207 segmentos contra
+    /// 787</b> no mesmo áudio, 84,1% de cobertura da fala contra 89,8%, e 1514 s
+    /// de decodificação contra 331 s. Segmento longo é falante errado, porque a
+    /// atribuição é um rótulo por segmento. Ver docs/FASE6.md §4.1.
+    /// </para>
+    /// <para>
+    /// Ligar continua sendo possível porque a régua da §5 pede exatamente esta
+    /// comparação — o mesmo app, no mesmo áudio, com e sem — e porque quem
+    /// tiver vocabulário muito fora do comum pode querer os dois.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("usar_hotwords")] public bool UsarHotwords { get; set; }
+
     /// <summary>O GGUF que escreve as atas, dentro de motores/ata/modelos.</summary>
     /// <remarks>
     /// Nome de arquivo, e não caminho: o motor sabe onde a pasta fica, e guardar

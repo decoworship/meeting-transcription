@@ -223,13 +223,32 @@ public sealed class Transcritor(Motores motores)
     /// foi dito ele é tempo de GPU gasto à toa. Vem das preferências do projeto,
     /// e até 13/08/2026 a escolha era colhida na tela e ignorada aqui.
     /// </param>
+    /// <param name="usarHotwords">
+    /// Mandar o vocabulário do projeto ao ASR como <c>hotwords</c>.
+    /// <b>Desligado por padrão desde 19/08/2026</b>, e o vocabulário continua
+    /// servindo à correção fonética de qualquer jeito. Ver FASE6 §4.1.
+    /// </param>
     public async Task<ResultadoDaTranscricao> ExecutarAsync(
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
         string? modelo = null, string? cliente = null, string? projeto = null,
         bool diarizar = true, bool corrigirFonetica = true,
+        bool usarHotwords = false,
         CancellationToken ct = default)
     {
+        // O vocabulário se divide em dois usos que sempre foram tratados como
+        // um: enviesar o ASR (hotwords) e corrigir a grafia depois
+        // (CorrecaoFonetica). A Fase 0 mediu que os dois recuperam nomes na
+        // mesma medida — 36 contra 36 — e concluiu que o primeiro era
+        // dispensável; a correção foi escrita, e o hotwords nunca foi desligado.
+        // O app pagava os dois e recebia um, e o que ele pagava era a
+        // segmentação: 207 segmentos contra 787 no mesmo áudio, com 15 deles
+        // passando de 25 s. Ver FASE6 §4.1.
+        //
+        // Só esta variável vai ao motor. `vocabulario` segue inteiro para a
+        // correção fonética adiante, que é o mecanismo que ficou.
+        string? vocabularioDoAsr = usarHotwords ? vocabulario : null;
+
         if (motores.OQueFalta() is { } falta) throw new MotorException(falta);
 
         string mic = Path.Combine(pastaDaGravacao, "mic.wav");
@@ -249,14 +268,6 @@ public sealed class Transcritor(Motores motores)
         if (Catalogo.OQueImpede(escolhido) is { } semModelo)
             throw new MotorException(semModelo);
 
-        progresso?.Invoke(new Progresso("mix", 0, "somando as duas faixas"));
-        var faixas = Faixas.Ler(mic, sistema);
-
-        // O mix vai para junto da gravação: é derivado e refazível, mas enquanto
-        // o pipeline roda ele precisa existir num caminho que o motor abra.
-        string caminhoDoMix = Path.Combine(pastaDaGravacao, "mix.wav");
-        faixas.EscreverMix(caminhoDoMix);
-
         // ASR primeiro, diarização depois, cada um no seu processo: numa placa
         // de 6 GB os dois modelos não cabem juntos, e processos separados fazem
         // a VRAM do primeiro voltar antes de o segundo subir.
@@ -266,40 +277,57 @@ public sealed class Transcritor(Motores motores)
 
         Registro.Escrever("pipeline",
             $"transcrever {Path.GetFileName(pastaDaGravacao)} · modelo {escolhido} · "
-            + $"diarizar={diarizar}");
+            + $"diarizar={diarizar} · hotwords={usarHotwords}");
 
-        Transcricao transcricao;
-        string[] argsAsr = modelo is { Length: > 0 }
-            ? [motores.ScriptAsr, "--modelo", modelo]
-            : [motores.ScriptAsr];
+        // O texto que já existe em disco, quando existe. Ver Retomada.
+        // `vocabularioDoAsr` e não `vocabulario`: com o hotwords desligado o
+        // vocabulário não decide mais a saída do ASR, e um parcial recusado por
+        // uma vírgula mexida no vocabulário custaria uma transcrição inteira à
+        // toa. Ligar ou desligar a chave, esse sim, invalida o parcial — porque
+        // aí o texto sai mesmo diferente.
+        var jaFeito = Retomada.Ler(pastaDaGravacao, escolhido, idioma, vocabularioDoAsr);
 
-        using (var asr = await MotorSidecar.IniciarAsync(
-                   motores.Python, argsAsr, ct, ambiente))
+        // As faixas são lidas nos dois caminhos: mesmo retomando, AtribuirDono
+        // precisa delas para dizer o que é do microfone.
+        progresso?.Invoke(new Progresso(
+            "mix", 0, jaFeito is null ? "somando as duas faixas" : "lendo as faixas"));
+        var faixas = Faixas.Ler(mic, sistema);
+
+        List<SegmentoFinal> segmentos;
+        string? idiomaDetectado;
+        double duracaoDoAudio;
+
+        if (jaFeito is not null)
         {
-            // O que o motor diz de si — dispositivo, carga do modelo, avisos de
-            // CUDA — passa a existir em disco. Era tudo o que faltava para
-            // diagnosticar a máquina de quem instalou.
-            asr.AoRegistrar += l => Registro.Escrever("asr", l);
-            // A placa, perguntada ao motor ANTES de carregar o modelo.
-            //
-            // Relatado em 18/08/2026: a transcrição caiu para CPU numa máquina
-            // com RTX 4050 e o large-v3 comeu RAM por horas até derrubar o
-            // Windows. Rodar em CPU não é um modo do app — é o que acontece
-            // quando o motor não acha a placa, e a diferença entre as duas
-            // coisas precisa ser dita antes, não descoberta depois.
-            var placa = await asr.DispositivoAsync(ct);
-            Registro.Escrever("asr", placa.Cuda
-                ? $"dispositivo: {placa.Nome} (CUDA {placa.CudaDoTorch})"
-                : $"dispositivo: CPU — {placa.Motivo ?? "sem detalhe"}");
+            Registro.Escrever("pipeline",
+                $"retomando: {jaFeito.Segmentos.Count} segmentos já transcritos em disco, "
+                + "o ASR não roda de novo");
+            progresso?.Invoke(new Progresso("asr", 1, "texto já transcrito, retomando"));
 
-            if (!placa.Cuda && !ConfiguracoesDoApp.Carregar().PermitirCpu)
-                throw new MotorException(SemPlaca(placa));
+            segmentos = jaFeito.Segmentos;
+            idiomaDetectado = jaFeito.Idioma;
+            duracaoDoAudio = jaFeito.Duracao ?? 0;
+        }
+        else
+        {
+            (segmentos, idiomaDetectado, duracaoDoAudio) = await RodarAsrAsync(
+                pastaDaGravacao, faixas, modelo, vocabularioDoAsr, idioma, ambiente,
+                progresso, ct);
 
-            progresso?.Invoke(new Progresso(
-                "asr", 0, placa.Cuda ? $"transcrevendo em {placa.Nome}" : "transcrevendo em CPU"));
+            // Só o que não depende da diarização, para o parcial já valer na
+            // tela. O resto — filtro, correção, falantes — roda adiante, nos
+            // dois caminhos, sobre o texto cru.
+            Montagem.AtribuirDono(segmentos, faixas);
 
-            transcricao = await asr.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
-                (pct, texto) => progresso?.Invoke(new Progresso("asr", pct, texto)), ct);
+            Retomada.Escrever(pastaDaGravacao, new ResultadoDaTranscricao
+            {
+                Language = idiomaDetectado,
+                Duration = duracaoDoAudio,
+                Client = cliente,
+                Project = projeto,
+                Date = DataDaReuniao(pastaDaGravacao),
+                Segments = segmentos,
+            }, escolhido, idioma, vocabularioDoAsr);
         }
 
         // A diarização roda só no system.wav: o que o microfone captou já se sabe
@@ -324,9 +352,18 @@ public sealed class Transcritor(Motores motores)
 
         progresso?.Invoke(new Progresso("montagem", 0, "juntando texto e falantes"));
 
-        var segmentos = transcricao.Segmentos
-            .Select(s => new SegmentoFinal { Start = s.Inicio, End = s.Fim, Text = s.Texto })
-            .ToList();
+        // Antes de qualquer coisa que reescreva texto: o corte usa as palavras
+        // para montar o texto de cada pedaço, e a correção fonética adiante
+        // deixa as duas coisas desencontradas. Ver Montagem.RepartirPorFalante.
+        int cortados = Montagem.RepartirPorFalante(segmentos, diarizacao);
+        if (cortados > 0)
+            Registro.Escrever("pipeline",
+                $"{cortados} segmentos tinham mais de um falante dentro e foram cortados "
+                + $"— {segmentos.Count} trechos no total");
+
+        // As palavras já serviram. Não vão para o arquivo pronto: ele precisa
+        // sair como sempre saiu. Ver SegmentoFinal.Words.
+        foreach (var seg in segmentos) seg.Words = null;
 
         if (filtrarSilencio) FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
 
@@ -372,8 +409,8 @@ public sealed class Transcritor(Motores motores)
 
         var resultado = new ResultadoDaTranscricao
         {
-            Language = transcricao.Idioma,
-            Duration = transcricao.Duracao,
+            Language = idiomaDetectado,
+            Duration = duracaoDoAudio,
             Client = cliente,
             Project = projeto,
             Date = DataDaReuniao(pastaDaGravacao),
@@ -385,5 +422,76 @@ public sealed class Transcritor(Motores motores)
 
         progresso?.Invoke(new Progresso("montagem", 1, "pronto"));
         return resultado;
+    }
+
+    /// <summary>
+    /// O mix e o ASR: a etapa cara, isolada para que a retomada possa pulá-la.
+    /// </summary>
+    /// <remarks>
+    /// Devolve o texto <b>cru</b>, sem filtro de silêncio, correção fonética nem
+    /// falantes. É o que <see cref="Retomada"/> grava em disco, e o que os dois
+    /// caminhos do pipeline tratam adiante do mesmo jeito.
+    /// </remarks>
+    private async Task<(List<SegmentoFinal> Segmentos, string? Idioma, double Duracao)>
+        RodarAsrAsync(string pastaDaGravacao, Faixas faixas, string? modelo,
+                      string? vocabulario, string? idioma,
+                      Dictionary<string, string> ambiente,
+                      Action<Progresso>? progresso, CancellationToken ct)
+    {
+        // O mix vai para junto da gravação: é derivado e refazível, mas enquanto
+        // o pipeline roda ele precisa existir num caminho que o motor abra.
+        string caminhoDoMix = Path.Combine(pastaDaGravacao, "mix.wav");
+        faixas.EscreverMix(caminhoDoMix);
+
+        Transcricao transcricao;
+        string[] argsAsr = modelo is { Length: > 0 }
+            ? [motores.ScriptAsr, "--modelo", modelo]
+            : [motores.ScriptAsr];
+
+        using (var asr = await MotorSidecar.IniciarAsync(
+                   motores.Python, argsAsr, ct, ambiente))
+        {
+            // O que o motor diz de si — dispositivo, carga do modelo, avisos de
+            // CUDA — passa a existir em disco. Era tudo o que faltava para
+            // diagnosticar a máquina de quem instalou.
+            asr.AoRegistrar += l => Registro.Escrever("asr", l);
+            // A placa, perguntada ao motor ANTES de carregar o modelo.
+            //
+            // Relatado em 18/08/2026: a transcrição caiu para CPU numa máquina
+            // com RTX 4050 e o large-v3 comeu RAM por horas até derrubar o
+            // Windows. Rodar em CPU não é um modo do app — é o que acontece
+            // quando o motor não acha a placa, e a diferença entre as duas
+            // coisas precisa ser dita antes, não descoberta depois.
+            var placa = await asr.DispositivoAsync(ct);
+            Registro.Escrever("asr", placa.Cuda
+                ? $"dispositivo: {placa.Nome} (CUDA {placa.CudaDoTorch})"
+                : $"dispositivo: CPU — {placa.Motivo ?? "sem detalhe"}");
+
+            if (!placa.Cuda && !ConfiguracoesDoApp.Carregar().PermitirCpu)
+                throw new MotorException(SemPlaca(placa));
+
+            progresso?.Invoke(new Progresso(
+                "asr", 0, placa.Cuda ? $"transcrevendo em {placa.Nome}" : "transcrevendo em CPU"));
+
+            transcricao = await asr.TranscreverAsync(caminhoDoMix, vocabulario, idioma,
+                (pct, texto) => progresso?.Invoke(new Progresso("asr", pct, texto)), ct);
+        }
+
+        var segmentos = transcricao.Segmentos
+            .Select(s => new SegmentoFinal
+            {
+                Start = s.Inicio,
+                End = s.Fim,
+                Text = s.Texto,
+                // O alinhamento por palavra vai adiante em vez de ser descartado
+                // aqui: é o que Montagem.RepartirPorFalante usa para cortar o
+                // segmento na troca de falante. Ver FASE6 §4.5.
+                Words = s.Palavras?.Count > 0
+                    ? [.. s.Palavras.Select(p => new PalavraDita
+                        { Start = p.Inicio, End = p.Fim, Text = p.Texto })]
+                    : null,
+            })
+            .ToList();
+        return (segmentos, transcricao.Idioma, transcricao.Duracao);
     }
 }

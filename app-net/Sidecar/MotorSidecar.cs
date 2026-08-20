@@ -193,7 +193,10 @@ public sealed class MotorSidecar : IDisposable
             progresso, ct);
 
         return new Transcricao(
-            (m.Segmentos ?? []).Select(s => new SegmentoDeTexto(s.Inicio, s.Fim, s.Texto ?? "")).ToList(),
+            (m.Segmentos ?? []).Select(s => new SegmentoDeTexto(
+                s.Inicio, s.Fim, s.Texto ?? "",
+                s.Palavras?.Select(p => new Palavra(p.Inicio, p.Fim, p.Texto ?? "")).ToList()))
+                .ToList(),
             m.Idioma, m.Duracao ?? 0, m.Dispositivo, m.Motivo);
     }
 

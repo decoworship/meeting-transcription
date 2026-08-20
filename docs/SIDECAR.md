@@ -85,12 +85,22 @@ Zero ou mais vezes. `pct` entre 0 e 1.
 ```json
 {"id": 1, "tipo": "resultado", "segmentos": [{"inicio": 0.5, "fim": 3.2, "falante": "SPEAKER_00"}]}
 {"id": 2, "tipo": "resultado", "idioma": "pt", "duracao": 120.98,
- "segmentos": [{"inicio": 0.5, "fim": 3.2, "texto": " bom dia a todos"}]}
+ "segmentos": [{"inicio": 0.5, "fim": 3.2, "texto": " bom dia a todos",
+                "palavras": [{"inicio": 0.5, "fim": 0.9, "texto": " bom"}]}]}
 ```
 
 Um só formato de segmento para os dois motores: a diarização preenche
 `falante`, o ASR preenche `texto`. O texto sai como o modelo o produziu,
 espaço à esquerda e tudo — aparar é apresentação.
+
+`palavras` só o ASR manda, e desde 19/08/2026. O alinhamento sempre foi
+calculado e o núcleo sempre o descartou; ele existe no protocolo para o núcleo
+poder **cortar o segmento na troca de falante**, que é o que faz a fala de quem
+divide um trecho longo com outra pessoa parar de sumir (`docs/FASE6.md` §4.1 e
+§4.5). Cada palavra traz o espaço à esquerda pela mesma razão do `texto`:
+concatená-las devolve o texto do segmento sem inventar separador. O cliente
+trata a ausência como "não dá para cortar", nunca como erro — motor antigo
+continua servindo.
 
 ```json
 {"id": 1, "tipo": "erro", "mensagem": "não foi possível ler o áudio: ..."}

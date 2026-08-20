@@ -1,0 +1,7 @@
+# Manifesto de versão — o índice dos outros dois arquivos.
+# Ver instalador/winget/LEIAME.md.
+PackageIdentifier: decoworship.MeetingApp
+PackageVersion: 0.3.0
+DefaultLocale: pt-BR
+ManifestType: version
+ManifestVersion: 1.6.0

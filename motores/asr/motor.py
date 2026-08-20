@@ -167,7 +167,16 @@ class Modelo:
         duracao = info.duration or 0.0
         segmentos = []
         for s in geracao:
-            segmentos.append({"inicio": s.start, "fim": s.end, "texto": s.text})
+            # As palavras vão junto. O alinhamento por palavra já era calculado
+            # (word_timestamps=True acima) e jogado fora aqui — e é exatamente o
+            # insumo que permite cortar um segmento na troca de falante, que é o
+            # defeito da FASE6 §4.1: um rótulo por segmento do ASR faz sumir
+            # quem falou dentro de um segmento longo.
+            segmentos.append({
+                "inicio": s.start, "fim": s.end, "texto": s.text,
+                "palavras": [{"inicio": p.start, "fim": p.end, "texto": p.word}
+                             for p in (s.words or [])],
+            })
             if duracao > 0:
                 _enviar(id=id_req, tipo="progresso",
                         pct=min(s.end / duracao, 0.99), texto="transcrevendo")

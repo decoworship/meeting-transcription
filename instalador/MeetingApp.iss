@@ -1,4 +1,4 @@
-; MeetingApp — instalador (Fase 4)
+; O instalador (Fase 4). O nome do produto está no #define Marca, abaixo.
 ;
 ; Quem monta o payload e chama isto é tools/montar_instalador.sh. Compilar este
 ; arquivo na mão produz um instalador sem as réguas, que é exatamente o defeito
@@ -40,18 +40,30 @@
   #define Saida "."
 #endif
 
+; ─────────────────────────────────────────────────────────────── a marca
+;
+; O nome que a pessoa lê. Tem de bater com Nucleo/Marca.cs — o MarcaTests
+; compara os dois e falha se discordarem, porque uma versão em que o instalador
+; diz um nome e a bandeja diz outro passa despercebida até chegar no usuário.
+;
+; O que NÃO segue a marca, por baixo: o AppId, o DefaultDirName, o AppMutex, o
+; nome do .exe e o OutputBaseFilename. Trocar qualquer um deles transforma a
+; atualização num segundo programa instalado, ou deixa o atalho de quem já tem
+; o app apontando para o vazio.
+#define Marca "PulseMeet"
+
 [Setup]
 ; O AppId nunca muda. É por ele que o Windows sabe que 0.1.1 é atualização de
 ; 0.1.0, e não um segundo programa; trocá-lo deixaria duas entradas em
 ; "Aplicativos Instalados" e duas pastas de 5 GB.
 AppId={{8B6F3A21-4C5E-4E17-9A2D-1F0B7C4E9D33}
-AppName=MeetingApp
+AppName={#Marca}
 AppVersion={#Versao}
-AppVerName=MeetingApp {#Versao}
+AppVerName={#Marca} {#Versao}
 VersionInfoVersion={#Versao}
 AppPublisher=decoworship
 DefaultDirName={localappdata}\Programs\MeetingApp
-DefaultGroupName=MeetingApp
+DefaultGroupName={#Marca}
 DisableProgramGroupPage=yes
 DisableDirPage=no
 ; Sem UAC: instalação por usuário. Ver o motivo 1 no cabeçalho.
@@ -87,7 +99,7 @@ Name: "atalhonaarea"; Description: "Criar atalho na área de trabalho"; \
   GroupDescription: "Atalhos:"
 ; Marcada por padrão, e de propósito: um gravador de reunião que não está aberto
 ; quando a reunião começa não grava nada.
-Name: "iniciarcomwindows"; Description: "Iniciar o MeetingApp junto com o Windows"; \
+Name: "iniciarcomwindows"; Description: "Iniciar o {#Marca} junto com o Windows"; \
   GroupDescription: "Ao ligar o computador:"
 
 [Files]
@@ -131,8 +143,8 @@ Source: "{#Payload}\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; \
   Flags: deleteafterinstall; Check: not TemWebView2
 
 [Icons]
-Name: "{group}\MeetingApp"; Filename: "{app}\MeetingApp.exe"
-Name: "{userdesktop}\MeetingApp"; Filename: "{app}\MeetingApp.exe"; \
+Name: "{group}\{#Marca}"; Filename: "{app}\MeetingApp.exe"
+Name: "{userdesktop}\{#Marca}"; Filename: "{app}\MeetingApp.exe"; \
   Tasks: atalhonaarea
 
 [Registry]
@@ -146,7 +158,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; \
   StatusMsg: "Instalando o componente WebView2 do Windows…"; \
   Check: not TemWebView2; Flags: waituntilterminated
-Filename: "{app}\MeetingApp.exe"; Description: "Abrir o MeetingApp"; \
+Filename: "{app}\MeetingApp.exe"; Description: "Abrir o {#Marca}"; \
   Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
@@ -280,7 +292,7 @@ begin
   if UninstallSilent then Exit;
 
   MsgBox(
-    'O MeetingApp foi removido.' + #13#10#13#10 +
+    'O {#Marca} foi removido.' + #13#10#13#10 +
     'O que NÃO foi apagado, de propósito:' + #13#10#13#10 +
     '• as gravações, transcrições, atas e notas' + #13#10 +
     '• as configurações e as vozes aprendidas, em:' + #13#10 +

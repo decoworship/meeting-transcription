@@ -281,7 +281,7 @@ function blocoSobre() {
     texto = d.texto;
     // A versão e a placa na linha visível: são as duas que a pessoa quer saber
     // sem clicar em nada. O resto está no bloco copiado.
-    linha.textContent = `MeetingApp ${d.versao} — `
+    linha.textContent = `${d.marca} ${d.versao} — `
       + (d.placa ?? "sem placa NVIDIA; a transcrição vai rodar em CPU");
     botao.disabled = false;
   }).catch((e) => {
@@ -849,6 +849,30 @@ function abaTranscricao(config, gravar) {
   silencio.append(porQue, chave(config.filtrar_silencio,
     (v) => gravar({ filtrar_silencio: v })), cuidado);
   painel.appendChild(silencio);
+
+  // ---- o hotwords
+  //
+  // Desligado desde 19/08/2026. A chave existe mais para poder medir do que
+  // para escolher — a comparação com e sem, no mesmo áudio, é o que a régua de
+  // fontes paralelas pede (FASE6 §5).
+  const hot = bloco("Dar o vocabulário ao modelo enquanto ele transcreve");
+  hot.classList.add("bloco--chave");
+  const oQueCusta = document.createElement("p");
+  oQueCusta.className = "bloco__texto";
+  oQueCusta.textContent = "Desligado, o vocabulário continua sendo usado para "
+    + "corrigir a grafia depois — que é o que recupera \"Dimi\" de \"Jimmy\". "
+    + "Ligado, ele também é sussurrado ao modelo durante a transcrição, e isso "
+    + "faz o modelo juntar a fala em blocos longos: na mesma reunião, 207 "
+    + "trechos em vez de 787, e quatro vezes mais tempo para transcrever.";
+  const porQueImporta = document.createElement("p");
+  porQueImporta.className = "campo__dica";
+  porQueImporta.textContent = "Quem falou é decidido por trecho. Num trecho de "
+    + "40 segundos com três pessoas dentro, duas somem — e é por isso que a "
+    + "chave está desligada: as duas medições dizem que os nomes se recuperam "
+    + "igual pelos dois caminhos.";
+  hot.append(oQueCusta, chave(config.usar_hotwords === true,
+    (v) => gravar({ usar_hotwords: v })), porQueImporta);
+  painel.appendChild(hot);
 
   return painel;
 }

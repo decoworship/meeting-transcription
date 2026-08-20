@@ -996,6 +996,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     modelo: p.Modelo, cliente: cliente, projeto: projeto,
                     diarizar: p.Diarizar ?? true,
                     corrigirFonetica: cfgDaTranscricao.CorrecaoFonetica,
+                    usarHotwords: cfgDaTranscricao.UsarHotwords,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
@@ -1635,6 +1636,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         // separado: são dois campos por gravação, e um pedido por cartão faria a
         // lista piscar preenchendo-se aos poucos.
         var dados = DadosDaReuniao.Ler(pasta);
+
+        // Um parcial é texto de verdade — e é meia transcrição. A gravação conta
+        // como transcrita porque a reunião está lá para ler, mas quem abrir
+        // precisa saber por que ninguém tem nome. Ver Nucleo/Retomada.cs.
+        if (Retomada.EstaPendente(pasta))
+            avisos.Add("A transcrição foi interrompida antes de separar os falantes. "
+                       + "Transcreva de novo para completá-la — o texto já pronto é aproveitado.");
 
         return new GravacaoResumo
         {

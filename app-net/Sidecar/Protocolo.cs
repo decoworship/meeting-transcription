@@ -10,8 +10,26 @@ namespace MeetingApp.Sidecar;
 /// </remarks>
 public sealed record SegmentoDeFalante(double Inicio, double Fim, string Falante);
 
+/// <summary>Uma palavra com o tempo em que foi dita, vinda do alinhamento do ASR.</summary>
+public sealed record Palavra(double Inicio, double Fim, string Texto);
+
 /// <summary>Um trecho transcrito, vindo do ASR. Sem falante: quem atribui é o núcleo.</summary>
-public sealed record SegmentoDeTexto(double Inicio, double Fim, string Texto);
+/// <param name="Palavras">
+/// O alinhamento por palavra, quando o motor o mandou.
+/// </param>
+/// <remarks>
+/// <b>As palavras existem para poder cortar o segmento.</b> O motor sempre
+/// calculou o alinhamento (<c>word_timestamps=True</c>) e o núcleo sempre o
+/// descartou — pagava-se o custo e perdia-se o uso. Um segmento de 43 s com
+/// três pessoas dentro recebe <b>um</b> rótulo de falante, e duas somem; com as
+/// palavras dá para cortá-lo onde a diarização diz que o falante mudou. Ver
+/// docs/FASE6.md §4.1 e §4.5.
+///
+/// Vem vazia de motor antigo, e o núcleo trata isso como "não dá para cortar",
+/// nunca como erro.
+/// </remarks>
+public sealed record SegmentoDeTexto(double Inicio, double Fim, string Texto,
+                                     IReadOnlyList<Palavra>? Palavras = null);
 
 /// <summary>O que o motor de ASR devolve por gravação.</summary>
 /// <param name="Dispositivo">
@@ -97,6 +115,17 @@ internal sealed class SegmentoJson
     [JsonPropertyName("inicio")] public double Inicio { get; init; }
     [JsonPropertyName("fim")] public double Fim { get; init; }
     [JsonPropertyName("falante")] public string? Falante { get; init; }
+    [JsonPropertyName("texto")] public string? Texto { get; init; }
+
+    /// <summary>Só o ASR preenche, e só desde 19/08/2026. Ver <see cref="Palavra"/>.</summary>
+    [JsonPropertyName("palavras")] public List<PalavraJson>? Palavras { get; init; }
+}
+
+/// <summary>Uma palavra alinhada, como o motor a manda.</summary>
+internal sealed class PalavraJson
+{
+    [JsonPropertyName("inicio")] public double Inicio { get; init; }
+    [JsonPropertyName("fim")] public double Fim { get; init; }
     [JsonPropertyName("texto")] public string? Texto { get; init; }
 }
 

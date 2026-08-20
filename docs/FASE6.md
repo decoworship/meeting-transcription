@@ -267,18 +267,59 @@ reais pela linha de comando, mas a `Ponte` é interna ao executável e a suíte 
 a alcança — a mesma fronteira que a Fase 1 desenhou. O `Cli/GeradorDeAta.cs`
 existe e faz o mesmo caminho: dava para rodá-lo num teste com um motor falso.
 
+### 2.7 O áudio não parava ao sair da reunião — ✅ **feito em 19/08/2026**
+
+**Gatilho:** já disparou. Reportado pelo dono do produto no uso normal — ouvir
+uma reunião para conferir os falantes, sair dela, e a gravação continuar tocando
+por cima da tela nova.
+
+O `<audio>` é **um só para o app inteiro** e mora fora das telas, em
+[`index.html`](../app-net/App/web/index.html). Isso foi decisão de desenho, e
+continua certa: abrir a gaveta dos falantes enquanto se ouve um trecho não pode
+cortar o áudio — a gaveta existe justamente para não perder o lugar no texto.
+
+O defeito é que "sobreviver à gaveta" virou "sobreviver a tudo". `telaDeRevisao`
+parava o áudio ao **entrar** numa revisão, então trocar de reunião funcionava por
+acidente; sair para o Gravador, para as Atas ou para os Ajustes, não. E o áudio
+que ficava tocando era o de uma tela que já não existia — nem o botão ⏸ da
+revisão estava mais lá para pará-lo.
+
+**O conserto foi escolher o gargalo certo.** Parar o áudio em cada destino é
+convidar o próximo destino a esquecer. Toda tela chama `cabecalho()` ao se
+montar — e **só** ao se montar, inclusive as que moram noutro módulo e o recebem
+por `ctx` —, então é lá que o áudio para
+([`app.js`](../app-net/App/web/app.js)). As gavetas não passam por `cabecalho`,
+e é por isso que elas continuam não cortando o áudio: a distinção que o desenho
+queria passou a ser a distinção que o código faz.
+
+`pararAudio()` foi para [`pecas.js`](../app-net/App/web/pecas.js) porque quem
+toca são **duas** telas — os trechos da revisão e as amostras de voz dos Ajustes
+—, e as duas dividem o mesmo elemento e a mesma marca `data-tocando`. Ele também
+limpa o `onended` (que dispararia num botão de outra tela) e solta a `src`: o
+mix de uma reunião de 2 h passa de 200 MB, e mantê-lo aberto por uma tela que
+não toca nada não paga.
+
+*O que fica de fora, de propósito:* esconder a janela para a bandeja não para o
+áudio. Não foi relatado, e o app é feito para continuar trabalhando escondido —
+mas é o mesmo desenho, e se incomodar o gancho já existe.
+
 ---
 
 ## 3. O que vem de fases anteriores e continua de pé
 
-### 3.0 O travamento na máquina de outra pessoa — **aberto, sem causa**
+### 3.0 O desligamento na máquina de outra pessoa — **aberto; a causa agora tem forma**
 
 **Gatilho:** já disparou. É o único item desta carta que representa um usuário
 sem conseguir usar o app.
 
 Relatado em 18/08/2026 pelo segundo usuário do app — RTX 4050 Laptop, Windows
-10.0.26200, driver 595.97, versão 0.1.0. **O gravador funcionou; a transcrição
-travou o computador dele.**
+10.0.26200, driver 595.97, 16 GB de RAM, versão 0.1.0. **O gravador funcionou; a
+transcrição derrubou o computador dele.**
+
+> **Corrigido em 19/08/2026, pelo próprio usuário:** não é travamento e não há
+> tela azul — **a máquina desliga sozinha**. A descrição de 18/08 dizia
+> "travou", e foi ela que fez esta carta perseguir driver e memória por uma
+> versão inteira. Ver "O sintoma real" abaixo.
 
 #### O que já foi descartado
 
@@ -318,20 +359,125 @@ A 0.2.1 entregou **capacidade de diagnóstico**, não correção:
   Transcrição). **Não vai barrar este usuário** — a placa dele funciona;
 - o progresso e o log dizem o dispositivo.
 
+#### O que o registro da 0.2.1 respondeu — 19/08/2026
+
+O `registro.log` da reprodução chegou, e ele **move a investigação inteira**:
+
+| hora (local) | o que o log diz |
+|---|---|
+| 09:05:27 | pipeline começa — gravação de 17/08, modelo `medium`, `diarizar=True` |
+| 09:05:30 | placa reconhecida: RTX 4050, CUDA 12.4 |
+| 09:05:37 | `medium` carregado **em cuda** |
+| ~09:08:00 | **o ASR terminou**, sem erro |
+| 09:08:02-03 | pyannote `community-1` carregado **em cuda** |
+| 09:08:08 | primeira janela de embedding — e **fim do arquivo** |
+
+**O ASR não é o problema, e nunca foi.** Ele rodou inteiro, na GPU, e entregou.
+Todas as hipóteses acima miravam implicitamente o whisper; o log as tira do
+caminho. O que quer que aconteça, acontece da **diarização em diante**.
+
+Um alerta a ignorar de vez: o bloco de `torchcodec` que ocupa metade do log é
+**ruído esperado e já contornado** — `motores/diarizacao/motor.py` tem um
+`_ler_wav` justamente para nunca usar o torchcodec, e o comentário lá já
+descreve esse sintoma. O pyannote grita no import e depois recebe o áudio
+pronto.
+
+#### O sintoma real, e o que ele elimina
+
+O usuário corrigiu a descrição de 18/08: **não é travamento e não há tela azul —
+o computador desliga sozinho.** Com isso, e com 16 GB de RAM confirmados, as
+três hipóteses da tabela anterior caem:
+
+- **memória do sistema** — cai. O ASR levou 2min24, o que põe a reunião na casa
+  de 45-60 min; o pico das faixas aí é ~600 MB em 16 GB. E o pico do mix já
+  tinha passado *antes* do ASR, que sobreviveu;
+- **VRAM** — cai. `medium` dá o mesmo resultado, e ele roda em placa de 6 GB sem
+  apertar;
+- **driver caindo sob carga (TDR)** — cai, e era a mais promissora. Um TDR dá
+  tela azul ou reseta o driver com o app vivo. **Nada disso desliga o
+  computador.**
+
+Desligamento abrupto, sem tela azul, sob carga de GPU, é **corte de energia** —
+não é falha de software. Software trava, dá erro, ou dá tela azul; não corta a
+alimentação. Sobram **térmica** e **entrega de energia** (e "estava na tomada"
+não elimina a segunda: sob carga, o notebook complementa o adaptador puxando da
+bateria).
+
+E há um detalhe que aponta para térmica: ele **não desliga no ASR, desliga na
+diarização**. A GPU passa 2min24 aquecendo no whisper e a etapa seguinte entra
+com a placa já quente. Não é a carga que mata — é a carga em cima da anterior.
+
+O `.evtx` que o usuário exportou trouxe um `Kernel-Power 521` às 09:08:58 local
+(Level 4, informativo, inventário de bateria: 1 válida, 0 com erro). **Não é o
+evento 41** e não confirma corte de energia. O que ele dá é uma pista de tempo:
+às 09:08:58 o Windows ainda escrevia no log de eventos, então o desligamento foi
+*em ou depois* disso — o silêncio do `registro.log` a partir de 09:08:08 é o app
+diarizando sem registrar nada, não sinal de morte.
+
+#### O limite do instrumento que a 0.2.1 criou
+
+O `registro.log` **não diz quando desligou**. Entre 09:08:08 e o fim do pipeline
+não existe uma única linha: a diarização é uma chamada síncrona muda, e depois
+dela a montagem, o filtro de silêncio e a escrita também não registram nada — há
+só quatro `Registro.Escrever` no `Transcritor`, todos no começo. Um desligamento
+na diarização e um vinte minutos depois, no pós-processamento, deixam
+**exatamente o mesmo log**.
+
+É a mesma lição de 18/08 aplicada à segunda metade do pipeline. E há uma
+reincidência de produto junto: `Registro.Ultimas()` existe e **ninguém a chama**
+— o bloco de diagnóstico imprime o *caminho* do log, não o conteúdo. O usuário
+clicou em copiar diagnóstico, colou, e o log ficou no disco dele.
+
+#### O que a 0.4.0 entregou — 19/08/2026
+
+Não é o conserto do desligamento, que provavelmente não é nosso. É o conserto do
+que **era** nosso: **o app jogava fora um trabalho que tinha dado certo.**
+
+- `Nucleo/Retomada.cs` — o `transcricao.json` passa a ser escrito **assim que o
+  ASR termina**, marcado com o que falta (`pending`). Quem abrir a gravação lê a
+  reunião mesmo que a máquina tenha desligado na diarização;
+- a mesma marca serve de retomada: transcrever de novo **pula o ASR** e vai
+  direto aos falantes. Modelo, idioma e vocabulário são conferidos — os três que
+  decidem a saída do ASR —, e qualquer mudança refaz tudo, porque retomar um
+  parcial do `medium` para quem pediu `large-v3` devolveria o texto errado sem
+  avisar;
+- a lista de gravações avisa quando a transcrição está pela metade.
+
+Efeito colateral que ajuda o caso: o `Faixas.Mix()` do filtro de silêncio agora
+acontece fora do caminho da diarização, e o mix não é reescrito na retomada.
+
 #### O que decide o próximo passo
 
-Duas respostas, e elas apontam para consertos opostos:
+O `registro.log` e a RAM já vieram, e estão acima. O que falta separar térmica
+de energia — **e a lição de 19/08 é que pedir isso ao usuário é caro**: ele
+mandou o bloco de diagnóstico no lugar do log, e depois o evento errado do
+Visualizador de Eventos. Duas idas e voltas para duas respostas parciais.
 
-- o **`registro.log`** da reprodução. Se ele termina abruptamente, o sistema caiu
-  junto e a pista é o driver; se termina com exceção, ela nomeia a causa;
-- o **Monitor de Confiabilidade**: tela azul ou congelamento, e o código.
+**O caminho é o app perguntar sozinho**, e é o que a 0.4.1 deve fazer:
 
-Mais: quanta RAM o notebook tem, e a duração da reunião.
+1. **ler o Event Log** (`System.Diagnostics.Eventing.Reader`, canal *Sistema*,
+   legível sem privilégio de administrador) na janela em que o app estava
+   transcrevendo, procurando `EventLog 6008` (desligamento inesperado, com hora
+   exata), `Kernel-Power 41`, `BugCheck 1001` e `Kernel-Boot 27`. Escrever a
+   conclusão no registro. Cuidado com o `PublishTrimmed` e com os testes
+   `net8.0` portáteis — isso é Windows-only e usa reflexão;
+2. **amostrar o `nvidia-smi`** a cada ~15 s durante a transcrição — temperatura,
+   potência, clock. Se for térmica, a última linha antes do corte mostra a GPU a
+   97 °C e a investigação acaba ali. A infraestrutura já existe em
+   `Nucleo/Diagnostico.cs`;
+3. **marcador de transcrição em andamento**, apagado ao terminar: um marcador
+   órfão no próximo início prova que a máquina caiu, e em qual etapa;
+4. **marcos de etapa no registro**, que é o buraco descrito acima;
+5. **as últimas linhas do registro dentro do bloco de diagnóstico** — o
+   `Registro.Ultimas()` que hoje ninguém chama.
 
-**O conserto que já está desenhado, esperando confirmação:** fazer o mix em
-blocos, o que derruba o pico de 1,4 GB para alguns MB. Vale por si, e é a
-resposta certa se a pista for memória — mas fazê-lo agora seria consertar a
-hipótese mais confortável em vez da causa.
+**O conserto que continua desenhado, e agora sem gatilho:** fazer o mix em
+blocos derruba o pico de 1,4 GB para alguns MB. A hipótese de memória caiu neste
+caso, então ele deixou de ser urgente — vale por si, quando incomodar.
+
+**A única coisa que ainda se pede ao usuário é de uma linha:** transcrever com a
+separação de falantes desligada. Se sobreviver, confirma que é a segunda carga
+de GPU que derruba — e ele sai com a reunião transcrita.
 
 #### O que este caso ensina, além dele mesmo
 
@@ -411,6 +557,34 @@ preço dos dois mecanismos e recebe o benefício de um.**
 desligar o `hotwords`. Ganha-se segmentação, fala, e 4,6× no tempo de
 decodificação.
 
+> ✅ **Feito em 19/08/2026, pelos dois lados.**
+>
+> **O `hotwords` saiu do caminho.** `usar_hotwords` no `app.json`, **desligado
+> por padrão**, com chave em Ajustes › Transcrição
+> (`ConfiguracoesDoApp.UsarHotwords`). O vocabulário continua indo inteiro para
+> a `CorrecaoFonetica`, que é o mecanismo que a Fase 0 mediu como suficiente —
+> **só o que ia ao motor deixou de ir**. Uma variável, `vocabularioDoAsr`,
+> separa os dois usos que sempre andaram colados.
+>
+> **A chave não é conveniência, é a régua da §5.** A comparação que fecha este
+> item é o mesmo app, no mesmo áudio, com e sem — e ela agora é uma linha de
+> comando duas vezes: o `Sidecar.exe` ganhou `--hotwords` e passou a imprimir as
+> réguas da tabela acima (palavras, segmentos acima de 25 s, cobertura da fala).
+> Ter que abrir o JSON para contar é o que faz uma comparação não ser refeita.
+>
+> **E o conserto de raiz entrou junto** — `Montagem.RepartirPorFalante`, que é o
+> que a §4.5 destravou. Ele ataca o dano em vez da causa: onde a diarização diz
+> que o falante mudou no meio de um segmento, o segmento é **cortado na
+> palavra**. Os dois são independentes de propósito. O `hotwords` desligado
+> encurta os segmentos; o corte conserta os que continuarem longos — e eles
+> continuam existindo, porque o VAD tem `max_speech_duration_s=25` e 25 s dão
+> para duas pessoas.
+>
+> *O que fica:* **medir**. A tabela acima é de uma reunião, e o número que
+> importa agora — quantos falantes o corte recupera — só se mede contra uma
+> fonte que saiba quem falou. É o Teams/Meet da §5, e é a única coisa deste
+> item que ainda espera.
+
 ### 4.2 Os vetores de voz aprendem de áudio com mais de uma pessoa
 
 **Gatilho:** já disparou, e este é o que **persiste entre reuniões**.
@@ -466,6 +640,21 @@ não é opção**, porque parece uma rede que não existe.
 `word_timestamps=True`; a [linha 114](../motores/asr/motor.py#L114) guarda só
 `inicio`, `fim` e `texto`. Paga-se o alinhamento por palavra e descarta-se
 exatamente o insumo que resolveria a atribuição de falante.
+
+> ✅ **Feito em 19/08/2026.** As palavras atravessam o caminho inteiro: o motor
+> as emite, o protocolo as carrega (`Palavra`, `SegmentoDeTexto.Palavras`), e o
+> núcleo as guarda em `SegmentoFinal.Words`.
+>
+> **Elas existem só enquanto servem.** Ficam no **parcial** — a retomada chega à
+> diarização com o texto do disco, e sem elas não teria como cortar, justamente
+> nas gravações que já custaram uma queda de máquina — e são **apagadas** assim
+> que o corte acontece. O arquivo pronto sai como sempre saiu, e a paridade com
+> o `history/` do Python continua medível byte a byte. É a mesma regra do
+> `pending`, e pelo mesmo motivo.
+>
+> **O que elas destravaram** está na §4.1: `Montagem.RepartirPorFalante`.
+> Segmento sem palavras — parcial escrito antes desta data, motor antigo — sai
+> intacto: o pior caso é o comportamento de antes, nunca um resultado pior.
 
 ### 4.6 A escolha do modelo de diarização não chega ao pipeline
 

@@ -137,3 +137,34 @@ export function corDoFalante(nome, ordem) {
   if (nome === "You") return PALETA[0];
   return PALETA[1 + (ordem % (PALETA.length - 1))];
 }
+
+/**
+ * Para o áudio e apaga a marca de quem estava tocando.
+ *
+ * O <audio> é um só para o app inteiro (ver index.html): ele fica fora das
+ * telas para sobreviver a abrir uma gaveta, que é o comportamento certo — quem
+ * abre os falantes enquanto ouve um trecho não quer o áudio cortado. Mas
+ * sobreviver à gaveta virou sobreviver à <b>troca de tela</b>: saindo de uma
+ * reunião para outra, para o Gravador ou para os Ajustes, a gravação anterior
+ * continuava tocando por cima da tela nova, sem nada visível para pará-la.
+ *
+ * Por isso mora aqui e não em revisao.js: quem toca são duas telas — os trechos
+ * da revisão e as amostras de voz dos Ajustes —, e as duas dividem o mesmo
+ * elemento e a mesma marca `data-tocando`.
+ */
+export function pararAudio() {
+  const audio = document.getElementById("audio");
+  if (!audio) return;
+
+  audio.pause();
+  // Sem isto o `onended` da amostra de voz dispararia depois, num botão que
+  // pode já não existir na tela nova.
+  audio.onended = null;
+  // Solta o arquivo: o mix de uma reunião de 2 h passa de 200 MB, e mantê-lo
+  // aberto por uma tela que não toca nada não paga. A revisão volta a montar a
+  // src no próximo clique, e a amostra de voz sempre atribui a sua.
+  audio.removeAttribute("src");
+
+  for (const o of document.querySelectorAll("[data-tocando]"))
+    o.removeAttribute("data-tocando");
+}

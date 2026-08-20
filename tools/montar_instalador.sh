@@ -127,12 +127,22 @@ versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
 #
 # Reprova em vez de sincronizar de propósito: montar um instalador não deve
 # mexer, de lado, na instalação que o usuário está usando para trabalhar.
+#
+# **A instrução da mensagem abaixo envelheceu em 18/08/2026**, quando os motores
+# mudaram de casa: o publicar.sh sincroniza os sidecars na pasta de TRABALHO
+# (C:\Users\andre\MeetingApp), e o MOTORES daqui aponta para a instalação
+# OFICIAL. Rodar o publicar.sh e voltar aqui reprova de novo, com a mesma
+# mensagem, o que manda quem lê rodá-lo uma terceira vez. As duas saídas que
+# funcionam estão na mensagem.
 for m in asr diarizacao modelos; do
   [[ -f "$MOTORES/$m/motor.py" ]] || reprovar "falta motores/$m/motor.py"
   if ! diff -q "$RAIZ/motores/$m/motor.py" "$MOTORES/$m/motor.py" >/dev/null; then
     reprovar "motores/$m/motor.py do repositório difere do que está em $MOTORES.
-      O instalador empacotaria o sidecar velho. Rode tools/publicar.sh (sem
-      --so-build) para sincronizar, ou copie o arquivo à mão."
+      O instalador empacotaria o sidecar velho. Duas saídas:
+        1. tools/publicar.sh (sem --so-build) e depois ESTE script com
+           --motores /mnt/c/Users/andre/MeetingApp/motores — é lá que o
+           publicar.sh sincroniza, e de lá os pesados saem por junção;
+        2. copie o motor.py à mão para $MOTORES."
   fi
 done
 # O motor de ata NÃO viaja mais (1,1 GB, docs/FASE4.md §5): o app o baixa da

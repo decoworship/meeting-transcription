@@ -28,6 +28,10 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "python-docx>=1.0.0",
     "whisperx",
+    # O gerar_icone.py rasteriza o assets/logo.svg em cada tamanho de ícone.
+    # Sem ele o script ainda roda, reduzindo o logo-256.png -- e o traço fino
+    # da marca borra justamente nos 16 e 24 px.
+    "cairosvg>=2.7.0",
 ]
 
 [build-system]
