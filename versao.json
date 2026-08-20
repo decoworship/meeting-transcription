@@ -1,6 +1,6 @@
 {
   "versao": "0.4.0",
-  "publicada": "2026-08-19",
+  "publicada": "2026-08-20",
   "notas": "O app agora se chama PulseMeet, com símbolo novo. A transcrição não se perde mais se o computador desligar no meio, e quem falou para de sumir dentro dos trechos longos.",
   "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.4.0"
 }
