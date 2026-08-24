@@ -62,9 +62,20 @@ public sealed class AtaGerada
     [JsonPropertyName("riscos")] public List<string> Riscos { get; set; } = [];
 
     /// <summary>
-    /// O que o modelo achou digno de nota sobre a transcrição — e, depois, o que
-    /// o verificador mexeu.
+    /// O que o verificador mexeu e o que a conferência de cobertura achou.
     /// </summary>
+    /// <remarks>
+    /// <b>O modelo preenche, e o <see cref="VerificadorDeAta"/> descarta o que
+    /// ele escreveu.</b> Não é desperdício por acidente: o campo continua no
+    /// esquema porque tirá-lo faria o modelo espalhar as observações pelas
+    /// outras seções, que é pior. Ele escreve, e a lista é substituída pela
+    /// medição.
+    /// <para>
+    /// O motivo está na FASE6 §1.6: a seção afirmava que todos os números foram
+    /// registrados e listava onze que faltavam, na mesma página. Uma medição e
+    /// uma opinião sobre a medição, sem como distinguir qual é a fonte.
+    /// </para>
+    /// </remarks>
     [JsonPropertyName("observacoes")] public List<string> Observacoes { get; set; } = [];
 
     public static AtaGerada? DeJson(string json) =>

@@ -32,14 +32,38 @@ public static class VerificadorDeAta
         var notas = new List<string>();
 
         ConferirDonos(ata, conhecidos, notas);
+        // Entre os dois de propósito: o de cima acabou de esvaziar os donos que
+        // o modelo inventou, e é justamente aí que a fala tem o que dizer. O de
+        // baixo confere o lado a partir do dono — e agora encontra dono onde
+        // antes só havia "[responsável a definir]". Ver DonoPelaFala.
+        notas.AddRange(DonoPelaFala.Atribuir(ata, segmentos, pessoas ?? []));
         ConferirLados(ata, pessoas ?? [], notas);
         ConferirDecisoes(ata, segmentos, notas);
         ConferirRiscos(ata, segmentos, notas);
         ConferirOmissoes(ata, roteiro, notas);
 
-        // As observações do modelo ficam; as do verificador entram depois, para
-        // quem lê saber o que é leitura da máquina e o que é conferência.
-        ata.Observacoes.AddRange(notas);
+        // ── As observações do modelo NÃO ficam ──────────────────────────────
+        //
+        // Ficavam, e a seção se contradizia dentro de si mesma. Medido em
+        // 14/08/2026 (FASE6 §1.6, defeito 4): a ata afirmava "todos foram
+        // registrados com precisão conforme o contexto" e, quatro linhas
+        // abaixo, listava onze números que não apareciam nela. E inventava
+        // leitura — "o termo 'SVA' foi corrigido para 'suspensão temporária'",
+        // quando na reunião são duas coisas distintas que alguém pede para
+        // relembrar.
+        //
+        // A conferência de cobertura é determinística e boa; o problema era
+        // deixar o **modelo narrar** o que ela achou. Um documento cujo valor é
+        // ser auditável não pode ter, na mesma seção, uma medição e uma opinião
+        // sobre a medição — quem lê não tem como saber qual das duas é a fonte.
+        //
+        // O que se perde: as observações do modelo às vezes eram úteis ("o áudio
+        // some entre 12:03 e 12:07"). Perder isso é aceitável porque não havia
+        // como separar o útil do inventado, e o inventado tinha a mesma cara de
+        // certeza. Se voltar a fazer falta, o caminho é um campo próprio para
+        // problemas de áudio, verificável contra o silêncio das faixas — não
+        // prosa livre.
+        ata.Observacoes = notas;
         return ata;
     }
 
@@ -271,6 +295,7 @@ public static class VerificadorDeAta
         // Teto na listagem: numa reunião longa, metade dos números é contexto de
         // fala ("o 500 mega"), e uma observação com 40 itens não é lida.
         var mostrar = faltando.Take(12).ToList();
+
         notas.Add("Números citados na reunião que não aparecem nesta ata: "
                   + string.Join(", ", mostrar)
                   + (faltando.Count > mostrar.Count ? $" (e mais {faltando.Count - mostrar.Count})" : "")

@@ -161,6 +161,45 @@ relembrar, não uma correção.
 deixar o **modelo** narrar o que ela achou. A lista deduplicada, emitida pelo
 C#, sem prosa em volta, diz a mesma coisa sem poder se contradizer.
 
+> ✅ **Os quatro atacados em 20/08/2026. Três fechados, o quarto pela metade.**
+>
+> **Defeito 1 — o lado da pendência.** `Atas/DonoPelaFala.cs`. O buraco não era
+> a regra, era a **ordem em que as coisas se sabem**: o verificador confere o
+> *dono* e o lado vem do dono, e ele acabara de esvaziar o dono inventado
+> ("Vivo") — de modo que não sobrava nada de onde tirar o lado, e o palpite do
+> modelo ficava de pé. Agora, entre um passo e outro, a transcrição responde:
+> quem diz "eu vou te mandar" é o dono, e o lado dele vem do domínio do e-mail.
+> **Conservador por construção** — exige primeira pessoa, verbo de compromisso e
+> 60% de eco do conteúdo da ação no mesmo trecho; faltando qualquer um, a ação
+> continua sem dono, que é o estado honesto. E a fala citada vai para as
+> observações: a ata é auditável ou não é nada.
+>
+> **Defeito 2 — a unidade.** O roteiro passou a carregar o substantivo que
+> acompanha o número ("129 mil *(registros)*") e o prompt manda usar aquele e
+> nenhum outro. Achado ao escrever o teste: a **ordem da alternância** do regex
+> fazia "129 mil" casar como "129", e a unidade lida virava "mil" — o número
+> saía do roteiro menor do que foi dito, e isso já era assim antes.
+>
+> **Defeito 4 — a seção que se contradizia.** As observações do modelo passaram
+> a ser **descartadas**: a seção é só a medição do verificador. O campo continua
+> no esquema porque tirá-lo faria o modelo espalhar a prosa pelas outras seções.
+> O que se perde é a observação ocasionalmente útil sobre o áudio — aceitável
+> porque não havia como separá-la do inventado, e o inventado tinha a mesma cara
+> de certeza.
+>
+> **Defeito 3 — a omissão: só a metade determinística.** O que faltava não era
+> só o modelo esquecer, era **material que nunca chegava a ele**. O roteiro
+> ganhou uma terceira categoria, `risco` — dependência, bloqueio, incidente,
+> prazo apertado —, que é o que faltava para a seção `riscos` parar de sair
+> vazia numa reunião que tinha um; e os verbos de compromisso passaram a incluir
+> "apresentar", "marcar", "agendar", que é como a apresentação para a Carla foi
+> dita. **O resto continua aberto** e depende das duas passadas da §1.1: nada
+> disto ajuda o modelo a *escolher* melhor o que é relevante.
+>
+> *Régua:* nada disto foi medido contra uma ata nova. A comparação que fecha o
+> item é gerar de novo a ata da mesma reunião e conferir os quatro pontos — é o
+> que a §5 pede, e é a régua que este item sempre teve.
+
 > **A leitura geral.** O resumo do Notion é mais fácil de ler e mais completo em
 > cobertura de assunto; a ata do app é mais confiável no que afirma e é a única
 > das duas que se pode auditar. **A distância encolheu com o roteiro de fatos e

@@ -5,6 +5,27 @@ nos commits e nos `docs/*-HANDOFF.md`.
 
 ## Ainda não lançado
 
+**A ata para de arquivar do lado errado a pendência que é sua.** Quando o
+responsável não estava claro, a ata chutava o lado — e uma entrega nossa
+arquivada como do cliente não é cobrada por ninguém, some das duas listas ao
+mesmo tempo. Agora ela procura na transcrição quem se comprometeu ("eu vou te
+mandar isso") e usa o e-mail da agenda para dizer de que lado essa pessoa está.
+A frase que decidiu fica escrita nas observações, para você conferir.
+
+**Números param de ganhar unidade inventada.** "129 mil registros" virava
+"R$ 129 mil" — o número certo com a unidade errada, que num documento feito para
+ser citado é pior que a omissão. A palavra dita na reunião agora acompanha o
+número.
+
+**A seção "Observações sobre a transcrição" para de se contradizer.** Ela
+afirmava que tudo tinha sido registrado e, logo abaixo, listava onze números que
+faltavam. Agora ela traz só a conferência — o que foi conferido e o que ficou de
+fora —, sem comentário do modelo por cima.
+
+**Riscos ditos na reunião chegam à ata.** A seção de riscos saía vazia mesmo
+quando alguém tinha falado de dependência, bloqueio ou incidente aberto: essas
+falas nunca chegavam ao modelo. Agora chegam, marcadas.
+
 **Há um segundo modelo de separação de falantes para escolher.** Em Ajustes →
 Clientes, o campo "Modelo de diarização" agora oferece o *pyannote 3.1* além do
 padrão. O padrão continua sendo o melhor dos dois nas medições — o 3.1 está ali
