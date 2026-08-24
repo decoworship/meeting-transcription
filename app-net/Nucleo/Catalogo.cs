@@ -239,21 +239,25 @@ public static class Catalogo
         // A tela de Modelos continua dizendo qual modelo separa os falantes; o
         // que ela não faz mais é fingir que há o que escolher ou baixar.
 
-        // O "Pyannote 3.1" saiu da lista na Fase 4, e o motivo não é de
-        // empacotamento: **nada nunca o carregou.** O pipeline pede o
-        // community-1 pelo nome (motores/diarizacao/motor.py), e a escolha de
-        // modelo de diarização — `diarizacao_padrao` no app.json e `diar_model`
-        // nas preferências do projeto — é colhida na tela, salva, e ignorada.
-        // Oferecer o download de 26 MB de um modelo que o app não sabe usar é
-        // gastar a atenção de quem escolhe com uma escolha que não existe.
+        // O "Pyannote 3.1" saiu da lista na Fase 4 por dois motivos, e **só um
+        // deles caiu**.
         //
-        // Ele também tem portão no HuggingFace, então desde que o token saiu do
-        // binário esse download falharia com 401 — o que tornou visível um
-        // defeito que já estava lá, calado.
+        // O primeiro era que nada nunca o carregava: o pipeline pedia o
+        // community-1 pelo nome, e a escolha de modelo — `diarizacao_padrao` no
+        // app.json e `diar_model` nas preferências do projeto — era colhida na
+        // tela, salva, e ignorada. **Isso foi consertado em 20/08/2026**: a
+        // escolha atravessa o pipeline e chega ao motor (FASE6 §4.6), e a lista
+        // do seletor sai do disco, por Motores.ModelosDeDiarizacao.
         //
-        // Ligar o seletor de verdade é trabalho de pipeline, e está na Fase 6.
-        // Quando ele existir, esta entrada volta — junto de um caminho local
-        // para os pesos, como o community-1 tem hoje.
+        // O segundo continua de pé: ele tem portão no HuggingFace, e desde que
+        // o token saiu do binário o download falha com 401. Um cartão aqui
+        // ofereceria 26 MB que não baixam.
+        //
+        // **Por isso a entrada não volta ainda.** Ela volta no dia em que os
+        // pesos vierem locais, como os do community-1 vêm — o que é trabalho de
+        // `tools/empacotar_modelos_de_diarizacao.sh` e uma decisão de licença,
+        // não de código. Quando isso acontecer, o seletor já o oferece sozinho:
+        // ele lista o que está em disco, e não uma constante.
     ];
 
     /// <summary>

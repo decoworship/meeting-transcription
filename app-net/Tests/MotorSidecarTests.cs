@@ -116,7 +116,7 @@ public sealed class MotorSidecarTests
         using var cts = new CancellationTokenSource();
 
         var relogio = Stopwatch.StartNew();
-        var tarefa = m.DiarizarAsync("x.wav", null, cts.Token);
+        var tarefa = m.DiarizarAsync("x.wav", null, ct: cts.Token);
         cts.CancelAfter(TimeSpan.FromMilliseconds(200));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => tarefa);

@@ -25,6 +25,17 @@ public sealed class Faixas
     public static Faixas Ler(string caminhoMic, string caminhoSistema) =>
         new(LerWav(caminhoMic), LerWav(caminhoSistema));
 
+    /// <summary>
+    /// Uma faixa só, para quem não precisa das duas.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Ler"/> com o mesmo caminho nos dois argumentos lê o arquivo
+    /// duas vezes e guarda duas cópias — numa reunião de 2 h são 460 MB
+    /// desnecessários, e memória em pico é assunto aberto neste app
+    /// (docs/FASE6.md §3.0). Quem só quer medir energia no microfone usa isto.
+    /// </remarks>
+    public static float[] LerUma(string caminho) => LerWav(caminho);
+
     /// <summary>Escreve um WAV 16 kHz mono — o formato das duas faixas.</summary>
     public static void Escrever(string caminho, float[] amostras) =>
         EscreverWav(caminho, amostras);

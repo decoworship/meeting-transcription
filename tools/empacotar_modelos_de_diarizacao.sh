@@ -48,6 +48,7 @@ done
 
 ALVO="$DESTINO/motores/diarizacao/modelos"
 PIPELINE="$ALVO/community-1"
+PIPELINE31="$ALVO/pyannote-3.1"
 VOZ="$ALVO/wespeaker-voxceleb-resnet34-LM"
 
 # Os nomes das pastas são os que o motor procura, e não os do repositório: quem
@@ -56,6 +57,7 @@ VOZ="$ALVO/wespeaker-voxceleb-resnet34-LM"
 # caminhos exatos.
 
 mkdir -p "$PIPELINE/segmentation" "$PIPELINE/embedding" "$PIPELINE/plda" "$VOZ"
+mkdir -p "$PIPELINE31/segmentation" "$PIPELINE31/embedding"
 
 # O cache do HuggingFace desta máquina, que já tem os dois. Copiar de lá é
 # instantâneo e não depende de rede nem de portão.
@@ -113,6 +115,52 @@ pegar pyannote/speaker-diarization-community-1 plda/xvec_transform.npz        "$
 echo "==> modelo de voz (wespeaker)"
 pegar pyannote/wespeaker-voxceleb-resnet34-LM pytorch_model.bin "$VOZ/pytorch_model.bin"
 
+# ── o pyannote 3.1, como segunda opção ──────────────────────────────────────
+#
+# Ele voltou em 20/08/2026, quando a escolha de modelo de diarização passou a
+# chegar ao motor (docs/FASE6.md §4.6). Antes disso era um download para um
+# modelo que o app não sabia carregar.
+#
+# **Ele é MIT, e não CC-BY como o community-1.** MIT permite redistribuir com o
+# aviso de licença junto — que é o que o LICENSE baixado abaixo cumpre.
+#
+# O community-1 vence por 6,7 pontos de DER (Fase 0), então o 3.1 não é o
+# padrão. Ele existe para poder comparar na máquina de quem usa, e porque um
+# seletor com uma opção só não é um seletor.
+echo "==> pipeline de diarização (pyannote 3.1)"
+
+# O peso é só a segmentação: o embedding do 3.1 é o **mesmo** wespeaker que o
+# motor já usa para as vozes, e ele é copiado logo abaixo em vez de baixado de
+# novo.
+pegar pyannote/segmentation-3.0 pytorch_model.bin "$PIPELINE31/segmentation/pytorch_model.bin"
+pegar pyannote/segmentation-3.0 LICENSE           "$PIPELINE31/LICENSE-segmentation-3.0"
+pegar pyannote/speaker-diarization-3.1 config.yaml "$PIPELINE31/config.yaml.remoto"
+
+# ── por que o config.yaml precisa ser reescrito ─────────────────────────────
+#
+# O do community-1 já aponta os pesos por `$model/...`, caminho relativo à
+# própria pasta — é isso que faz a carga local funcionar. O do 3.1 **não**:
+#
+#     segmentation: pyannote/segmentation-3.0
+#     embedding: pyannote/wespeaker-voxceleb-resnet34-LM
+#
+# São nomes de repositório. Copiá-lo como veio produziria uma pasta que parece
+# local e vai à rede na primeira reunião — e, pior, a um repositório com
+# portão, que é o defeito que a Fase 4 acabou de tirar do app.
+#
+# A reescrita troca só essas duas linhas. Tudo o mais — os limiares do
+# clustering, que são o modelo — vem do arquivo original e não de uma cópia
+# escrita aqui, que envelheceria em silêncio se o upstream mudasse.
+sed -e 's|^\(\s*\)segmentation: pyannote/segmentation-3.0\s*$|\1segmentation: $model/segmentation|' \
+    -e 's|^\(\s*\)embedding: pyannote/wespeaker-voxceleb-resnet34-LM\s*$|\1embedding: $model/embedding|' \
+    "$PIPELINE31/config.yaml.remoto" > "$PIPELINE31/config.yaml"
+rm -f "$PIPELINE31/config.yaml.remoto"
+
+# O embedding do 3.1 é o mesmo modelo de voz que já está empacotado. Cópia e
+# não link: o instalador leva arquivos, e um link simbólico dentro dele viraria
+# um arquivo de texto com um caminho do WSL na máquina de quem instalou.
+cp "$VOZ/pytorch_model.bin" "$PIPELINE31/embedding/pytorch_model.bin"
+
 echo "==> atribuição"
 cat > "$ALVO/ATRIBUICAO.md" <<'MD'
 # Modelos de diarização
@@ -132,6 +180,22 @@ modificação, sob os termos das respectivas licenças.
 - origem: https://huggingface.co/pyannote/wespeaker-voxceleb-resnet34-LM
 - licença: **CC-BY-4.0** (https://creativecommons.org/licenses/by/4.0/)
 
+## pyannote/speaker-diarization-3.1 e pyannote/segmentation-3.0
+
+- autoria: Hervé Bredin e colaboradores
+- origem: https://huggingface.co/pyannote/speaker-diarization-3.1
+          https://huggingface.co/pyannote/segmentation-3.0
+- licença: **MIT** — o texto está em `pyannote-3.1/LICENSE-segmentation-3.0`
+
+O `config.yaml` deste pipeline **foi modificado**: as duas referências a
+repositórios do HuggingFace (`pyannote/segmentation-3.0` e
+`pyannote/wespeaker-voxceleb-resnet34-LM`) foram trocadas pelos caminhos locais
+`$model/segmentation` e `$model/embedding`. Nenhum peso foi alterado, e nenhum
+hiperparâmetro do pipeline foi tocado.
+
+O `embedding/pytorch_model.bin` desta pasta é uma cópia do
+`wespeaker-voxceleb-resnet34-LM` acima — é o mesmo modelo que o 3.1 usa.
+
 A biblioteca que os carrega, `pyannote.audio`, é MIT.
 
 Se você citar este app num trabalho, cite também os artigos do pyannote —
@@ -147,6 +211,10 @@ for f in "$PIPELINE/config.yaml" \
          "$PIPELINE/embedding/pytorch_model.bin" \
          "$PIPELINE/plda/plda.npz" \
          "$PIPELINE/plda/xvec_transform.npz" \
+         "$PIPELINE31/config.yaml" \
+         "$PIPELINE31/segmentation/pytorch_model.bin" \
+         "$PIPELINE31/embedding/pytorch_model.bin" \
+         "$PIPELINE31/LICENSE-segmentation-3.0" \
          "$VOZ/pytorch_model.bin"; do
   [[ -f "$f" ]] || { echo "ERRO: falta $f" >&2; exit 1; }
 done
@@ -156,6 +224,8 @@ done
 # pode ser pequeno.
 for f in "$PIPELINE/segmentation/pytorch_model.bin" \
          "$PIPELINE/embedding/pytorch_model.bin" \
+         "$PIPELINE31/segmentation/pytorch_model.bin" \
+         "$PIPELINE31/embedding/pytorch_model.bin" \
          "$VOZ/pytorch_model.bin"; do
   bytes=$(stat -c%s "$f")
   if (( bytes < 1000000 )); then
@@ -167,9 +237,19 @@ done
 # O config.yaml aponta os pesos por "$model/..." — caminho relativo à própria
 # pasta. É isso que faz a carga local funcionar; um config que aponte para um
 # repositório remoto reintroduziria a rede sem ninguém perceber.
-grep -q '\$model/segmentation' "$PIPELINE/config.yaml" || {
-  echo "ERRO: o config.yaml não usa \$model/ — a carga local não vai resolver" >&2
-  echo "      os pesos, e o pyannote vai tentar a rede." >&2
+for c in "$PIPELINE/config.yaml" "$PIPELINE31/config.yaml"; do
+  grep -q '\$model/segmentation' "$c" || {
+    echo "ERRO: $c não usa \$model/ — a carga local não vai resolver" >&2
+    echo "      os pesos, e o pyannote vai tentar a rede." >&2
+    exit 1
+  }
+done
+
+# E o inverso, só para o 3.1: se a reescrita não pegou, o nome do repositório
+# continua lá e o arquivo passaria na régua acima por causa da outra linha.
+grep -q 'pyannote/segmentation-3.0\|pyannote/wespeaker' "$PIPELINE31/config.yaml" && {
+  echo "ERRO: $PIPELINE31/config.yaml ainda cita repositório do HuggingFace." >&2
+  echo "      A reescrita do sed não pegou — o upstream mudou o formato." >&2
   exit 1
 }
 

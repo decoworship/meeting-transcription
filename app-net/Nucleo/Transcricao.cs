@@ -376,7 +376,17 @@ public static class Montagem
         foreach (var d in diarizacao)
         {
             double sobreposicao = Math.Min(fim, d.Fim) - Math.Max(inicio, d.Inicio);
-            if (sobreposicao > maior) { maior = sobreposicao; melhor = d.Falante; }
+            if (sobreposicao <= 0) continue;
+
+            // Empate vai para o dono, e isso não é preferência: os dois lados
+            // não têm o mesmo peso. O trecho do pyannote é estimativa sobre o
+            // system.wav; o trecho do dono é o que entrou pelo microfone dele.
+            // Numa palavra coberta pelos dois — que é o que sobreposição de
+            // fala produz —, uma das fontes sabe e a outra acha.
+            bool ganha = sobreposicao > maior
+                         || (Math.Abs(sobreposicao - maior) < 1e-6
+                             && d.Falante == VozDoDono.Rotulo);
+            if (ganha) { maior = sobreposicao; melhor = d.Falante; }
         }
         return melhor;
     }
@@ -395,9 +405,17 @@ public static class Montagem
     public static void AtribuirFalantes(
         List<SegmentoFinal> segmentos, IReadOnlyList<SegmentoDeFalante> diarizacao)
     {
-        var nomes = diarizacao.Select(d => d.Falante).Distinct().Order(StringComparer.Ordinal)
+        // O dono não é renumerado. Ele entra na mesma lista que o pyannote
+        // (VozDoDono.Juntar), mas o rótulo dele não é uma etiqueta anônima a
+        // resolver depois — é o nome que o app sempre gravou, e virar
+        // "Speaker 2" faria a única atribuição certa da gravação parecer
+        // estimativa.
+        var nomes = diarizacao.Select(d => d.Falante).Distinct()
+            .Where(f => f != VozDoDono.Rotulo)
+            .Order(StringComparer.Ordinal)
             .Select((cru, i) => (cru, nome: $"Speaker {i + 1}"))
             .ToDictionary(x => x.cru, x => x.nome);
+        nomes[VozDoDono.Rotulo] = VozDoDono.Rotulo;
 
         foreach (var seg in segmentos)
         {
@@ -416,8 +434,20 @@ public static class Montagem
             // "Unknown" e não nulo: é o que o app atual grava, e um rótulo
             // explícito diz "ninguém foi identificado aqui" onde a ausência
             // pareceria esquecimento.
-            seg.Speaker = total.Count == 0
-                ? "Unknown"
+            if (total.Count == 0)
+            {
+                seg.Speaker = "Unknown";
+                continue;
+            }
+
+            // O mesmo desempate do DonoDoIntervalo, e pelo mesmo motivo: quando
+            // o dono e o pyannote cobrem o trecho igualmente, um deles leu o
+            // canal da pessoa e o outro estimou. Sem isto, o pedaço recém-cortado
+            // na fronteira do dono voltava a sair com o nome do outro.
+            double maior = total.Values.Max();
+            seg.Speaker = total.TryGetValue(VozDoDono.Rotulo, out double doDono)
+                          && Math.Abs(doDono - maior) < 1e-6
+                ? VozDoDono.Rotulo
                 : nomes[total.MaxBy(p => p.Value).Key];
         }
     }

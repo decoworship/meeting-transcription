@@ -47,7 +47,7 @@ acrescentar sem quebrar (a mesma regra do `meta.json`).
 ### Motor → cliente, uma vez, ao subir
 
 ```json
-{"tipo": "pronto", "motor": "diarizacao", "versao": "1"}
+{"tipo": "pronto", "motor": "diarizacao", "versao": "4"}
 ```
 
 O cliente espera esta linha antes de enviar qualquer coisa. Se o processo
@@ -58,11 +58,25 @@ diferentes.
 ### Cliente → motor
 
 ```json
-{"id": 1, "op": "diarizar", "audio": "C:\\...\\system.wav"}
+{"id": 1, "op": "diarizar", "audio": "C:\\...\\system.wav", "modelo": "community-1"}
 {"id": 2, "op": "transcrever", "audio": "C:\\...\\mix.wav", "vocabulario": "Acme, Élio", "idioma": "pt"}
 ```
 
-`vocabulario` e `idioma` são opcionais. O vocabulário chega ao faster-whisper
+`modelo`, `vocabulario` e `idioma` são opcionais.
+
+`modelo` é o nome da **pasta** dentro de `motores/diarizacao/modelos`, e escolhe
+qual pipeline separa os falantes; ausente, o motor usa o `community-1`. O motor
+recarrega quando o nome muda — manter o pipeline quente é o que faz a segunda
+reunião não pagar o carregamento de novo, e sem a recarga comparar dois modelos
+na mesma sessão devolveria a saída do primeiro nas duas medições. Um nome com
+separador ou `..` é recusado antes de virar caminho: ele vem de arquivo de
+configuração editável à mão.
+
+> **O `modelo` não é o modelo de voz.** O mesmo motor carrega duas coisas: o
+> pipeline que separa falantes, que se escolhe, e o modelo que transforma voz em
+> vetor, que **não** se escolhe — trocá-lo invalidaria toda voz já aprendida,
+> porque vetores de modelos diferentes não são comparáveis, e a comparação não
+> falha: ela passa a errar em silêncio. O vocabulário chega ao faster-whisper
 como `hotwords` — não como `initial_prompt`, que só enviesa a primeira janela
 de 30 s e é truncado em 223 tokens, descartando em silêncio justamente os nomes
 que vêm primeiro.

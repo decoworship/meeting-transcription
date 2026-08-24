@@ -10,6 +10,17 @@ namespace MeetingApp.Sidecar;
 /// </remarks>
 public sealed record SegmentoDeFalante(double Inicio, double Fim, string Falante);
 
+/// <summary>Um vetor de voz e o modelo que o produziu.</summary>
+/// <param name="Modelo">
+/// Nulo quando o motor é anterior a 20/08/2026 e não sabia dizer.
+/// </param>
+/// <remarks>
+/// Os dois andam juntos porque um sem o outro é perigoso: comparar vetores de
+/// modelos diferentes devolve um número plausível e errado, e o erro aparece
+/// como "o app chamou a Vanessa de Carla" meses depois. Ver docs/VOZES.md §7.
+/// </remarks>
+public sealed record VozExtraida(float[] Vetor, string? Modelo);
+
 /// <summary>Uma palavra com o tempo em que foi dita, vinda do alinhamento do ASR.</summary>
 public sealed record Palavra(double Inicio, double Fim, string Texto);
 
@@ -99,6 +110,16 @@ internal sealed class Mensagem
     /// <summary>O vetor que identifica uma voz (operação "voz").</summary>
     [JsonPropertyName("vetor")] public float[]? Vetor { get; init; }
 
+    /// <summary>
+    /// Qual modelo produziu o vetor (operação "voz").
+    /// </summary>
+    /// <remarks>
+    /// Vetores de modelos diferentes não são comparáveis, e a comparação não
+    /// falha: ela devolve um número plausível e errado. Este campo é o que
+    /// permite ao núcleo recusar a comparação em vez de fazê-la mal.
+    /// </remarks>
+    [JsonPropertyName("modelo")] public string? ModeloDaVoz { get; init; }
+
     // "erro"
     [JsonPropertyName("mensagem")] public string? MensagemDeErro { get; init; }
 }
@@ -179,6 +200,19 @@ internal sealed class Requisicao
 
     /// <summary>Intervalos de fala, para a operação de extrair voz.</summary>
     [JsonPropertyName("trechos")] public List<TrechoJson>? Trechos { get; init; }
+
+    /// <summary>
+    /// Qual pipeline de diarização usar, pelo nome da pasta em
+    /// <c>motores/diarizacao/modelos</c>.
+    /// </summary>
+    /// <remarks>
+    /// Nulo é o padrão do motor. Só a operação <c>diarizar</c> olha — o modelo
+    /// de <b>voz</b> não é escolhível, e trocá-lo invalidaria toda voz já
+    /// aprendida. Ver docs/FASE6.md §4.6.
+    /// </remarks>
+    [JsonPropertyName("modelo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Modelo { get; init; }
 }
 
 internal sealed class TrechoJson

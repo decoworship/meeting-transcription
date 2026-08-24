@@ -3,6 +3,52 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## Ainda não lançado
+
+**Há um segundo modelo de separação de falantes para escolher.** Em Ajustes →
+Clientes, o campo "Modelo de diarização" agora oferece o *pyannote 3.1* além do
+padrão. O padrão continua sendo o melhor dos dois nas medições — o 3.1 está ali
+para comparar numa reunião de verdade, que é a única régua que vale.
+
+**As vozes aprendidas até aqui foram aposentadas.** Elas foram colhidas por um
+caminho que podia deixar entrar, no perfil de uma pessoa, um pedaço em que outra
+falava — e não há como saber quais foram afetadas. O app volta a aprender do
+zero: da próxima vez que você nomear alguém, a voz dele é guardada limpa e passa
+a ser reconhecida de novo. As antigas não foram apagadas, continuam na tela de
+Vozes, marcadas e sem efeito — apagá-las é escolha sua.
+
+**As vozes aprendidas passaram a saber de qual modelo vieram.** O app reconhece
+quem já foi nomeado comparando uma "impressão digital" da voz — e essa impressão
+só faz sentido dentro do modelo que a produziu. Se o modelo mudar, a comparação
+não daria erro: daria um nome errado com cara de certeza. Agora cada voz guarda
+o seu, e um modelo novo simplesmente aprende todo mundo de novo, sem apagar o
+que já existia. Nada muda hoje — o modelo é o mesmo desde sempre.
+
+**A escolha do modelo de diarização passou a valer.** Em Ajustes → Clientes há
+um campo "Modelo de diarização" por projeto. Ele existia, guardava o que você
+escolhesse, e o app transcrevia com outro — a escolha nunca saía do disco. Agora
+ela chega ao motor, e a lista mostra o que está de fato instalado na sua
+máquina, em vez de uma opção vazia. Hoje há um modelo só, então na prática nada
+muda para você; o que muda é que o campo parou de mentir, e um modelo novo
+aparece sozinho ali no dia em que vier junto com o app.
+
+**Da ata dá para ir direto à transcrição.** Dentro da ata aberta, ao lado de
+Copiar e Exportar, há agora "Ver a transcrição". A ata afirma coisas, e conferir
+onde elas foram ditas obrigava a sair para Reuniões e achar na lista a mesma
+reunião que já estava na tela.
+
+**As vozes param de aprender áudio com mais de uma pessoa dentro.** Quando o app
+guarda a voz de alguém para reconhecê-la nas próximas reuniões, ele escolhe
+trechos em que só essa pessoa fala. A conferência olhava o que vinha antes e
+depois do trecho, mas não o trecho por dentro — e um pedaço em que você falou por
+cima entrava no perfil da outra pessoa. Agora entra na conta o seu microfone, que
+diz com certeza quando você estava falando, e o trecho analisado é o mesmo que
+fica guardado para você poder ouvir.
+
+> As vozes **já aprendidas** continuam como estão: um perfil não se conserta
+> depois de formado. Se alguém passar a ser reconhecido errado com frequência, o
+> caminho é apagar e ensinar de novo.
+
 ## 0.4.0 — o app agora se chama PulseMeet, e a transcrição não se perde mais
 
 **Nome novo, símbolo novo.** O app se chama **PulseMeet**, e o ícone deixou de

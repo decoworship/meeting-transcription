@@ -28,6 +28,49 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
     }
 
     /// <summary>
+    /// Os pipelines de diarização que existem em disco, pelo nome da pasta.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A lista sai do disco e não de uma constante</b>, e é isso que a torna
+    /// confiável: até 20/08/2026 a tela oferecia "Modelo de diarização" a partir
+    /// do catálogo, que perdeu a família <c>diarizacao</c> na Fase 4 — de modo
+    /// que o seletor tinha uma opção morta e o valor escolhido era ignorado
+    /// (docs/FASE6.md §4.6). Ler a pasta faz o seletor e o motor não terem como
+    /// discordar.
+    /// </para>
+    /// <para>
+    /// O critério é o mesmo do motor — uma pasta com <c>config.yaml</c> dentro
+    /// de <c>modelos/</c> —, e está escrito nos dois lugares de propósito: o
+    /// motor precisa dele para carregar e o núcleo para oferecer, e um pedido
+    /// pelo sidecar só para listar pastas custaria subir o Python.
+    /// </para>
+    /// <para>
+    /// Vazia quando o empacotador ainda não rodou. Nesse caso o motor cai no
+    /// HuggingFace, e a tela não oferece escolha nenhuma — que é a verdade.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> ModelosDeDiarizacao()
+    {
+        try
+        {
+            string raiz = Path.Combine(
+                Path.GetDirectoryName(ScriptDiarizacao) ?? ".", "modelos");
+            if (!Directory.Exists(raiz)) return [];
+
+            return [.. Directory.EnumerateDirectories(raiz)
+                .Where(d => File.Exists(Path.Combine(d, "config.yaml")))
+                .Select(Path.GetFileName)
+                .OfType<string>()
+                .Order(StringComparer.Ordinal)];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
     /// O token do HuggingFace, quando esta máquina tem um. Normalmente não tem.
     /// </summary>
     /// <remarks>
@@ -223,6 +266,12 @@ public sealed class Transcritor(Motores motores)
     /// foi dito ele é tempo de GPU gasto à toa. Vem das preferências do projeto,
     /// e até 13/08/2026 a escolha era colhida na tela e ignorada aqui.
     /// </param>
+    /// <param name="modeloDeDiarizacao">
+    /// Qual pipeline separa os falantes, pelo nome da pasta em
+    /// <c>motores/diarizacao/modelos</c>. Nulo usa o padrão do motor.
+    /// <b>Não</b> é o modelo de voz: aquele não se troca, porque vetores de
+    /// modelos diferentes não são comparáveis. Ver FASE6 §4.6.
+    /// </param>
     /// <param name="usarHotwords">
     /// Mandar o vocabulário do projeto ao ASR como <c>hotwords</c>.
     /// <b>Desligado por padrão desde 19/08/2026</b>, e o vocabulário continua
@@ -233,7 +282,7 @@ public sealed class Transcritor(Motores motores)
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
         string? modelo = null, string? cliente = null, string? projeto = null,
         bool diarizar = true, bool corrigirFonetica = true,
-        bool usarHotwords = false,
+        bool usarHotwords = false, string? modeloDeDiarizacao = null,
         CancellationToken ct = default)
     {
         // O vocabulário se divide em dois usos que sempre foram tratados como
@@ -277,7 +326,8 @@ public sealed class Transcritor(Motores motores)
 
         Registro.Escrever("pipeline",
             $"transcrever {Path.GetFileName(pastaDaGravacao)} · modelo {escolhido} · "
-            + $"diarizar={diarizar} · hotwords={usarHotwords}");
+            + $"diarizar={diarizar} ({modeloDeDiarizacao ?? "padrão"}) · "
+            + $"hotwords={usarHotwords}");
 
         // O texto que já existe em disco, quando existe. Ver Retomada.
         // `vocabularioDoAsr` e não `vocabulario`: com o hotwords desligado o
@@ -339,7 +389,8 @@ public sealed class Transcritor(Motores motores)
                 motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
             diar.AoRegistrar += l => Registro.Escrever("diarizacao", l);
             diarizacao = await diar.DiarizarAsync(sistema,
-                (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)), ct);
+                (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)),
+                modeloDeDiarizacao, ct);
         }
         else
         {
@@ -351,6 +402,21 @@ public sealed class Transcritor(Motores motores)
         }
 
         progresso?.Invoke(new Progresso("montagem", 0, "juntando texto e falantes"));
+
+        // O dono entra na linha do tempo junto com o pyannote, e não depois
+        // dele. É o que faz um segmento em sobreposição ser CORTADO na fronteira
+        // em vez de trocar de dono por inteiro — ver Nucleo/VozDoDono.cs. Sem
+        // isto, toda vez que o dono falava junto com alguém, a fala dele saía
+        // atribuída ao outro; era a causa de 30% dos erros de rótulo medidos.
+        var trilhaDoDono = VozDoDono.Trilha(faixas);
+        if (trilhaDoDono.Count > 0)
+            Registro.Escrever("pipeline",
+                $"a faixa do microfone rendeu {trilhaDoDono.Count} trechos do dono");
+        else
+            Registro.Escrever("pipeline",
+                "sem trilha do dono: o microfone capta o alto-falante "
+                + $"(vazamento {VozDoDono.Vazamento(faixas):F4}) ou está vazio");
+        diarizacao = VozDoDono.Juntar(diarizacao, trilhaDoDono);
 
         // Antes de qualquer coisa que reescreva texto: o corte usa as palavras
         // para montar o texto de cada pedaço, e a correção fonética adiante
@@ -387,7 +453,12 @@ public sealed class Transcritor(Motores motores)
         }
 
         Montagem.AtribuirFalantes(segmentos, diarizacao);
-        Montagem.AtribuirDono(segmentos, faixas);
+
+        // Rede, e não regra principal: quando a trilha do dono não existe — sem
+        // microfone, ou com vazamento de alto-falante — o teste por segmento é
+        // o comportamento de antes de 21/08/2026, que rodou em campo. Quando ela
+        // existe, o AtribuirFalantes já resolveu, e isto não muda nada.
+        if (trilhaDoDono.Count == 0) Montagem.AtribuirDono(segmentos, faixas);
 
         // Quem já foi nomeado antes chega nomeado. Roda depois de tudo porque
         // precisa dos falantes montados, e nunca derruba a transcrição: não
@@ -396,7 +467,9 @@ public sealed class Transcritor(Motores motores)
         {
             progresso?.Invoke(new Progresso("montagem", 0.5, "procurando vozes conhecidas"));
             var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
-                .ReconhecerAsync(pastaDaGravacao, segmentos, ct);
+                // As faixas já estão em memória aqui; a guarda de contaminação
+                // sai de graça. Ver AprendizadoDeVozes.TrechosDe.
+                .ReconhecerAsync(pastaDaGravacao, segmentos, faixas.Mic, ct);
 
             foreach (var seg in segmentos)
                 if (seg.Speaker is { } r && conhecidos.TryGetValue(r, out string? nome))
