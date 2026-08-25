@@ -218,7 +218,7 @@ public static class VerificadorDeAta
             var palavras = Palavras(decisao).ToList();
             if (palavras.Count == 0) continue;
 
-            int eco = palavras.Count(faladas.Contains);
+            int eco = palavras.Count(p => Ecoa(p, faladas));
             double proporcao = (double)eco / palavras.Count;
 
             if (proporcao < 0.5)
@@ -270,7 +270,7 @@ public static class VerificadorDeAta
             var palavras = Palavras(risco).ToList();
             if (palavras.Count == 0) continue;
 
-            if ((double)palavras.Count(faladas.Contains) / palavras.Count >= 0.5)
+            if ((double)palavras.Count(p => Ecoa(p, faladas)) / palavras.Count >= 0.5)
                 sobreviventes.Add(risco);
             else
                 caidos++;
@@ -353,6 +353,52 @@ public static class VerificadorDeAta
         Regex.Matches(texto.ToLowerInvariant(), @"[\p{L}\p{Nd}]{4,}")
              .Select(m => m.Value)
              .Where(p => !Vazias.Contains(p));
+
+    /// <summary>
+    /// A palavra da ata ecoa alguma da fala, tolerando flexão.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nasceu de três falsos positivos medidos</b>, em três atas diferentes.
+    /// A régua comparava palavra inteira, e o modelo reescreve o que ouviu:
+    /// a fala diz "tem que ser <i>casado</i>" e a ata escreve "tratadas de forma
+    /// <i>casada</i>"; a fala diz "<i>desconto</i>" e "<i>diferença</i>", a ata
+    /// escreve "<i>descontos</i>" e "<i>diferenças</i>". Nenhuma casava, e
+    /// decisões reais eram rebaixadas para "pontos em aberto" com uma frase que
+    /// soa autoritativa: <i>"quase nada dela aparece na transcrição"</i>.
+    /// </para>
+    /// <para>
+    /// <b>Prefixo comum, e não radical de verdade.</b> Um stemmer português
+    /// completo erraria mais do que ganharia aqui — e esta rede é grosseira de
+    /// propósito. Duas palavras ecoam quando compartilham pelo menos quatro
+    /// letras iniciais <b>e</b> 60% da mais longa: <c>casada</c>/<c>casado</c>
+    /// (5 de 6), <c>desconto</c>/<c>descontos</c> (8 de 9),
+    /// <c>igual</c>/<c>iguais</c> (4 de 6).
+    /// </para>
+    /// <para>
+    /// <b>Os 60% são o que impede a rede de virar peneira.</b> Sem eles,
+    /// <c>conta</c> casaria com <c>contrato</c> e <c>financeiro</c> com
+    /// <c>finalizar</c> — e uma decisão inventada passaria por qualquer
+    /// transcrição que falasse do mesmo assunto. Medido: com o corte,
+    /// decisão de uma reunião continua sendo rejeitada contra a transcrição
+    /// de outra.
+    /// </para>
+    /// </remarks>
+    private static bool Ecoa(string palavra, IReadOnlyCollection<string> faladas)
+    {
+        if (faladas.Contains(palavra)) return true;
+
+        foreach (string dita in faladas)
+        {
+            int comum = 0;
+            int teto = Math.Min(palavra.Length, dita.Length);
+            while (comum < teto && palavra[comum] == dita[comum]) comum++;
+
+            if (comum >= 4 && comum >= 0.6 * Math.Max(palavra.Length, dita.Length))
+                return true;
+        }
+        return false;
+    }
 
     private static readonly HashSet<string> Vazias = new(StringComparer.OrdinalIgnoreCase)
     {
