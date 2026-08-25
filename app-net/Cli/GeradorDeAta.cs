@@ -50,6 +50,8 @@ public static class GeradorDeAta
         var (convidados, emails) = ConvidadosDaAgenda.Ler(pasta);
         var pessoas = Organizacoes.Classificar(
             convidados, emails, ConfiguracoesDoApp.Carregar().DominiosDaCasa);
+        // O nome canônico, e não o cru: ver a nota em App/Ponte.cs.
+        if (pessoas.Count > 0) convidados = [.. pessoas.Select(p => p.Nome)];
 
         var ctx = new ContextoDaReuniao
         {
