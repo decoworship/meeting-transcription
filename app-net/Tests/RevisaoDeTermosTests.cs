@@ -90,6 +90,19 @@ public sealed class RevisaoDeTermosTests
     }
 
     [Fact]
+    public void SiglaSoEhTrocadaPorSigla()
+    {
+        // Medido no acervo com o vocabulário de verdade: "São" fica a uma
+        // edição de "SAS", e a regra propunha a troca. "São" é português comum
+        // — aparece em "São Paulo" e no verbo — e a forma da palavra é o sinal
+        // que separa as duas coisas.
+        Assert.Empty(Propor("a base São Paulo tem os dados", "SAS, CMF, IAM"));
+
+        // Sigla contra sigla continua valendo.
+        Assert.Single(Propor("subiu no SAZ ontem", "SAS, CMF, IAM"));
+    }
+
+    [Fact]
     public void SemEntidadesNaoProporNada()
     {
         // A regra não inventa alvo: sem vocabulário e sem agenda, ela se cala.

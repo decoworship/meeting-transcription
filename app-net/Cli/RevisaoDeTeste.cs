@@ -27,6 +27,12 @@ public static class RevisaoDeTeste
         var (nomes, emails) = ConvidadosDaAgenda.Ler(pasta);
         var pessoas = Organizacoes.Classificar(nomes, emails, []);
         var entidades = new List<string>();
+
+        // O vocabulário do projeto é a fonte mais rica, e é a que o Transcritor
+        // usa. Sem ela este modo mediria um cenário que o app nunca vive.
+        var prefs = new Projetos().Preferencias(vinculo.Cliente ?? "", vinculo.Projeto ?? "");
+        if (prefs?.InitialPrompt is { Length: > 0 } voc) entidades.Add(voc);
+
         if (vinculo.Cliente is { Length: > 0 }) entidades.Add(vinculo.Cliente);
         if (vinculo.Projeto is { Length: > 0 }) entidades.Add(vinculo.Projeto);
         entidades.AddRange(pessoas.Select(p => p.Nome).Where(n => n.Contains(' ')));

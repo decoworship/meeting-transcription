@@ -289,10 +289,18 @@ public static class RevisaoDeTermos
         int menor = int.MaxValue;
         bool empate = false;
 
+        bool escritaEhSigla = Sigla.IsMatch(escrita);
         foreach (string alvo in alvos)
         {
             string b = Chave(alvo);
             if (Math.Abs(a.Length - b.Length) > DiferencaDeTamanho) continue;
+
+            // **Sigla só é trocada por sigla.** Medido em 25/08 no acervo com o
+            // vocabulário de verdade: "São" ficava a uma edição de "SAS" e a
+            // regra propunha trocar — e "São" é português comum, aparece em
+            // "São Paulo" e no verbo. A forma da palavra é o sinal que separa
+            // as duas coisas, e ele é de graça.
+            if (Sigla.IsMatch(alvo) && !escritaEhSigla) continue;
 
             int d = Distancia(a, b, DistanciaPara(a, b));
             if (d > DistanciaPara(a, b)) continue;
