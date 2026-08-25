@@ -46,6 +46,49 @@ public static class Organizacoes
     /// <param name="convidados">
     /// O que o <c>meta.json</c> guarda: nomes, e-mails, ou uma mistura dos dois.
     /// </param>
+    /// <summary>
+    /// Classifica pareando o nome de exibição da agenda com o e-mail dele.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O e-mail decide o lado; o nome de exibição decide como a pessoa é
+    /// chamada.</b> Usar só o e-mail joga fora o nome bom que o
+    /// <c>meta.json</c> já guarda: <c>lilianioshimoto@telefonica.com</c> vira
+    /// "Lilianioshimoto", uma palavra só, enquanto <c>attendees</c> traz
+    /// "Lilian Ioshimoto".
+    /// </para>
+    /// <para>
+    /// <b>Não é cosmético.</b> Com o nome grudado, ela não casa com o falante
+    /// "Lilian Ioshimoto" da transcrição — e aí a <see cref="Presenca"/> a
+    /// declara como quem não falou <i>e</i> conta um falante não identificado,
+    /// errando nas duas pontas. O <see cref="VerificadorDeAta"/> tem o mesmo
+    /// problema ao decidir de que lado está a pendência dela.
+    /// </para>
+    /// <para>
+    /// As duas listas do <c>meta.json</c> são paralelas — mesmo índice, mesma
+    /// pessoa. Quando os tamanhos não batem, o pareamento é abandonado inteiro
+    /// e vale o e-mail: parear na marra alinharia gente errada, e um nome
+    /// trocado é pior que um nome feio.
+    /// </para>
+    /// <para>
+    /// O nome de exibição só vence quando <b>parece nome</b> — tem espaço. A
+    /// agenda às vezes repete ali o local-part (<c>andre.monlevade</c>), e nesse
+    /// caso o <see cref="NomeLegivel"/> do e-mail sai melhor.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<Pessoa> Classificar(
+        IReadOnlyList<string> nomes, IReadOnlyList<string> emails,
+        IEnumerable<string> dominiosDaCasa)
+    {
+        if (emails.Count == 0) return Classificar(nomes, dominiosDaCasa);
+
+        var pessoas = Classificar(emails, dominiosDaCasa);
+        if (nomes.Count != emails.Count) return pessoas;
+
+        return [.. pessoas.Select((p, i) =>
+            nomes[i].Contains(' ') ? p with { Nome = nomes[i].Trim() } : p)];
+    }
+
     public static IReadOnlyList<Pessoa> Classificar(
         IEnumerable<string> convidados, IEnumerable<string> dominiosDaCasa)
     {

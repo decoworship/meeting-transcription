@@ -114,18 +114,24 @@ public static class RedatorDeAta
                 ? linha
                 : Todos(ctx);
 
-        var linhas = new List<string> { PorOrganizacao("Falaram", quadro.Falaram, ctx) };
+        // Duas linhas, e não três: a lista inteira em cima, quem falou embaixo,
+        // e quem não falou o leitor tira da diferença. Uma terceira linha
+        // dizendo "não falaram" gasta espaço para repetir o que a subtração já
+        // diz — e obriga a ata a afirmar ausência, que é mais do que a
+        // transcrição sabe.
+        var linhas = new List<string> { PorOrganizacao("Convidados", ctx.Pessoas, ctx) };
+
+        // Na ordem do convite, e não na ordem em que falaram: é o que faz a
+        // diferença entre as duas linhas ser vista de relance.
+        var falaram = ctx.Pessoas.Where(quadro.Falaram.Contains).Select(p => p.Nome).ToList();
+        string segunda = falaram.Count > 0 ? $"**Falaram:** {string.Join(", ", falaram)}" : "";
 
         if (quadro.NaoIdentificados > 0)
-            linhas[0] += $" · **+{quadro.NaoIdentificados}** "
-                         + (quadro.NaoIdentificados == 1
-                             ? "falante não identificado" : "falantes não identificados");
-
-        // "não falaram", e não "não participaram": a transcrição sabe quem
-        // falou, não quem entrou. Ver Nucleo/Atas/Presenca.cs.
-        if (quadro.SoConvidados.Count > 0)
-            linhas.Add("**Convidados que não falaram:** "
-                       + string.Join(", ", quadro.SoConvidados.Select(p => p.Nome)));
+            segunda += (segunda.Length > 0 ? " · " : "")
+                       + $"**+{quadro.NaoIdentificados}** "
+                       + (quadro.NaoIdentificados == 1
+                           ? "falante não identificado" : "falantes não identificados");
+        linhas.Add(segunda);
 
         return string.Join("\n", linhas.Where(l => l.Length > 0));
     }

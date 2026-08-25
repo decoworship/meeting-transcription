@@ -1154,8 +1154,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 var (convidados, emails) = ConvidadosDaAgenda(pasta);
                 // Quem é da casa e quem é do cliente sai do domínio do e-mail, e
                 // não de dedução do modelo: ver Nucleo/Atas/Organizacoes.cs.
+                // Nome de exibição e e-mail juntos: o e-mail diz o lado, o nome
+                // diz como a pessoa é chamada. Ver Organizacoes.Classificar.
                 var pessoas = Organizacoes.Classificar(
-                    emails.Count > 0 ? emails : convidados, cfg.DominiosDaCasa);
+                    convidados, emails, cfg.DominiosDaCasa);
 
                 var ctx = new ContextoDaReuniao
                 {
