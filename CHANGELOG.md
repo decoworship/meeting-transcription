@@ -3,7 +3,36 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
-## 0.5.0 — ainda não lançada (build de teste)
+## 0.5.0 — 25/08/2026
+
+**A ata diz quem falou, e não só quem foi convidado.** O cabeçalho listava a
+lista inteira da agenda como "Participantes" — numa reunião com onze convidados
+e seis falantes, cinco pessoas que nunca abriram a boca apareciam como se
+tivessem participado. Agora são duas linhas: os convidados em cima, quem falou
+embaixo, na mesma ordem, e a diferença é a sua leitura. Falante que a separação
+não conseguiu nomear vira uma contagem, para a ata não dizer que menos gente
+falou do que falou.
+
+**Os nomes param de sair pela metade.** Quando a agenda não traz o nome de
+alguém, o app o deduzia do e-mail — e `lilianioshimoto@telefonica.com` virava
+"Lilianioshimoto", uma palavra só. Isso não era só feio: com o nome grudado ela
+não casava com a fala dela na transcrição, então saía ao mesmo tempo como quem
+não falou e como "falante não identificado". O nome que a agenda tem é usado
+quando existe, e o e-mail continua decidindo de que lado da mesa a pessoa está.
+
+**O responsável para de sair como endereço de e-mail.** A agenda mistura nome
+próprio e e-mail na mesma lista, e a ata copiava o que via: pendências saíam
+atribuídas a "dimi.randel" ou "andre.monlevade". Pior, às vezes o app misturava
+os dois estilos, não reconhecia mais a pessoa e **apagava um responsável certo** —
+trocando uma pendência com dono por uma sem dono, que ninguém cobra.
+
+**Decisões e pendências param de sumir da ata.** Quando o app escrevia a ata por
+um caminho e o modelo respondia por outro, seções inteiras eram descartadas em
+silêncio. Uma daily de 38 minutos saiu com resumo e mais nada, enquanto quatro
+pendências com responsável e prazo tinham sido geradas e jogadas fora. Varrendo
+as gravações desta máquina: **52 itens perdidos em 5 reuniões**. Agora eles são
+recuperados, passam pelas mesmas conferências do resto, e a ata avisa que houve
+remontagem.
 
 **A ata para de arquivar do lado errado a pendência que é sua.** Quando o
 responsável não estava claro, a ata chutava o lado — e uma entrega nossa

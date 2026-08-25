@@ -1,6 +1,6 @@
 {
-  "versao": "0.4.0",
-  "publicada": "2026-08-20",
-  "notas": "O app agora se chama PulseMeet, com símbolo novo. A transcrição não se perde mais se o computador desligar no meio, e quem falou para de sumir dentro dos trechos longos.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.4.0"
+  "versao": "0.5.0",
+  "publicada": "2026-08-25",
+  "notas": "A ata passa a dizer quem realmente falou, e não só quem foi convidado. Nomes e responsáveis param de sair pela metade ou como endereço de e-mail, e decisões e pendências param de sumir. A sua fala deixa de ser atribuída a outra pessoa quando você fala por cima de alguém.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.5.0"
 }
