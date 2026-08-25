@@ -63,6 +63,17 @@ public static class RevisaoDeTermos
     /// <summary>Diferença de tamanho tolerada entre o escrito e o termo.</summary>
     public const int DiferencaDeTamanho = 2;
 
+    /// <summary>
+    /// O quanto uma proposta pode se afastar, venha de onde vier.
+    /// </summary>
+    /// <remarks>
+    /// Mais frouxo que o da regra, porque o modelo enxerga o que ela não
+    /// enxerga: <c>Tim → Teams</c> e <c>Tulsa → Tools</c> são três edições e
+    /// estão certos. Mas não é sem teto — sem ele, "Cláudio → Andre Monlevade"
+    /// passava.
+    /// </remarks>
+    public const int DistanciaDoModelo = 4;
+
     /// <summary>Abaixo disto a palavra é curta demais para duas edições.</summary>
     /// <remarks>
     /// Em três letras, duas edições transformam qualquer coisa em qualquer
@@ -173,6 +184,22 @@ public static class RevisaoDeTermos
             if (Chave(de) == Chave(para)) continue;                  // identidade
             if (!porChave.TryGetValue(Chave(para), out string? canonico)) continue;
 
+            // **Expandir nome não é corrigir.** O modelo propôs "Yuri → Andre
+            // Yuri", "Diego → Diego Lacerda" e "Andre → Andre Monlevade" —
+            // medido em 25/08 sobre uma gravação real. Nenhuma é erro de
+            // escuta: a pessoa disse o primeiro nome, e disse certo. Com dois
+            // Andrés na reunião, a terceira ainda escolhia o errado.
+            if (Chave(canonico).Contains(Chave(de), StringComparison.Ordinal)
+                || Chave(de).Contains(Chave(canonico), StringComparison.Ordinal))
+                continue;
+
+            // **O alvo tem que ser alcançável por erro de escuta.** Sem isto o
+            // modelo propôs "Cláudio → Andre Monlevade", que nenhum ASR
+            // produziria. O teto é frouxo de propósito — o modelo acerta
+            // "Tim → Teams", que são três edições, e é para isso que ele existe.
+            if (Distancia(Chave(de), Chave(canonico), DistanciaDoModelo) > DistanciaDoModelo)
+                continue;
+
             // A grafia que vale é a do vocabulário, e não a que o propositor
             // digitou: o modelo escreve "gccb" e o projeto escreve "GCCB".
             boas.Add(p with { Para = canonico });
@@ -215,12 +242,39 @@ public static class RevisaoDeTermos
         return antes.Length > 0 && !".!?…".Contains(antes[^1]);
     }
 
-    private static List<string> Alvos(IEnumerable<string> entidades) =>
-        [.. entidades
-            .SelectMany(e => (e ?? "").Split([',', ';', '\n'], StringSplitOptions.TrimEntries
-                                                              | StringSplitOptions.RemoveEmptyEntries))
-            .Where(e => e.Length >= TamanhoMinimo)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+    /// <summary>
+    /// Os alvos possíveis, com as entidades compostas abertas.
+    /// </summary>
+    /// <remarks>
+    /// <b>"Coca Cola - GCCB" precisa render "GCCB".</b> O cliente é digitado
+    /// como um rótulo humano, e o pedaço que o ASR erra é a sigla dentro dele —
+    /// medido em 25/08: com a entidade inteira, <c>G6CB</c> não tinha alvo e
+    /// nem a regra nem o modelo o alcançavam.
+    ///
+    /// Nome de pessoa <b>não</b> é aberto: "Andre Yuri" render "Andre" faria a
+    /// regra tratar como erro o primeiro nome de quem tem sobrenome — e com dois
+    /// Andrés na reunião, escolheria o errado.
+    /// </remarks>
+    public static List<string> Alvos(IEnumerable<string> entidades)
+    {
+        var saida = new List<string>();
+        foreach (string bruto in entidades)
+        foreach (string e in (bruto ?? "").Split([',', ';', '\n'],
+                                                 StringSplitOptions.TrimEntries
+                                                 | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (e.Length < TamanhoMinimo) continue;
+            saida.Add(e);
+
+            // Só o que tem separador não-espaço: "Coca Cola - GCCB" abre,
+            // "Andre Yuri" não.
+            if (e.Contains(" - ") || e.Contains('/') || e.Contains('('))
+                saida.AddRange(e.Split([" - ", "/", "(", ")"], StringSplitOptions.TrimEntries
+                                                               | StringSplitOptions.RemoveEmptyEntries)
+                                .Where(x => x.Length >= TamanhoMinimo));
+        }
+        return [.. saida.Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
 
     /// <summary>O termo mais próximo, ou nulo se nenhum está perto o bastante.</summary>
     /// <remarks>

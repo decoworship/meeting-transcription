@@ -26,6 +26,15 @@ double? cancelarEm = double.TryParse(arg.GetValueOrDefault("cancelar-em"), out d
 
 // A ata é o terceiro modo, e existe pelo mesmo motivo dos outros dois: provar o
 // caminho antes de existir tela. Ver Cli/GeradorDeAta.cs.
+if (arg.GetValueOrDefault("revisar") is { Length: > 0 } pastaDaRevisao)
+{
+    using var revCts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; revCts.Cancel(); };
+    return await RevisaoDeTeste.ExecutarAsync(
+        pastaDaRevisao, arg.GetValueOrDefault("modelo"),
+        arg.ContainsKey("com-modelo"), revCts.Token);
+}
+
 if (arg.GetValueOrDefault("ata") is { Length: > 0 } pastaDaAta)
 {
     using var ataCts = new CancellationTokenSource();

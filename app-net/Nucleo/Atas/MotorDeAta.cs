@@ -270,6 +270,63 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     }
 
     /// <summary>
+    /// Sobe o motor uma vez e faz várias perguntas presas ao mesmo esquema.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Uma subida para N perguntas</b>, porque carregar o modelo custa entre
+    /// 6 e 9 segundos e a revisão de termos faz uma pergunta por pedaço da
+    /// transcrição. Subir por pergunta multiplicaria esse custo pelo número de
+    /// pedaços.
+    /// </para>
+    /// <para>
+    /// <b>O esquema não é conveniência, é o que faz a resposta existir.</b>
+    /// Medido em 25/08 com o Qwen3.5: sem esquema e com raciocínio ligado, o
+    /// modelo achou a resposta certa ("G6CB é o erro"), continuou se
+    /// questionando — <i>"Wait, I should check if G6CB is actually GCB + 6?"</i>
+    /// — e estourou 3.000 tokens sem emitir nada. O esquema tira a deliberação
+    /// do caminho: o que sai já é a estrutura pedida.
+    /// </para>
+    /// </remarks>
+    public async Task<IReadOnlyList<string>> ResponderAsync(
+        string sistema, IReadOnlyList<string> perguntas, string nomeDoEsquema,
+        string esquema, int tokensDeSaida,
+        Action<ProgressoDaAta>? progresso = null, CancellationToken ct = default)
+    {
+        if (perguntas.Count == 0) return [];
+        if (caminhos.OQueFalta() is { } falta) throw new InvalidOperationException(falta);
+
+        var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
+        int maior = perguntas.Max(p => p.Length);
+        var (contexto, ctk, ctv) = Dimensionar(maior, modelo, VramDaPlaca());
+        int porta = PortaLivre();
+
+        progresso?.Invoke(new ProgressoDaAta("modelo", 0.05, "carregando o modelo"));
+
+        using var processo = Subir(porta, contexto, ctk, ctv);
+        try
+        {
+            using var registroDeMorte = ct.Register(() => Matar(processo));
+            await EsperarSubirAsync(processo, porta, ct);
+
+            var respostas = new List<string>(perguntas.Count);
+            for (int i = 0; i < perguntas.Count; i++)
+            {
+                progresso?.Invoke(new ProgressoDaAta(
+                    "lendo", 0.1 + 0.85 * i / perguntas.Count,
+                    $"revisando ({i + 1} de {perguntas.Count})"));
+                respostas.Add(await PedirAsync(porta, sistema, perguntas[i], nomeDoEsquema,
+                                               esquema, tokensDeSaida, ct));
+            }
+            return respostas;
+        }
+        finally
+        {
+            Matar(processo);
+        }
+    }
+
+    /// <summary>
     /// A memória total da placa, em bytes. Zero quando não há placa ou não deu.
     /// </summary>
     /// <remarks>
@@ -371,7 +428,13 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         throw new TimeoutException("o motor de ata não respondeu em 2 minutos");
     }
 
-    private static async Task<string> PedirAsync(int porta, string prompt, CancellationToken ct)
+    private static Task<string> PedirAsync(int porta, string prompt, CancellationToken ct) =>
+        PedirAsync(porta, PromptDeAta.Sistema, prompt, "ata", AtaGerada.Esquema,
+                   TokensDeSaida, ct);
+
+    private static async Task<string> PedirAsync(
+        int porta, string sistema, string prompt, string nomeDoEsquema, string esquema,
+        int tokensDeSaida, CancellationToken ct)
     {
         // Sem timeout no cliente: uma reunião de duas horas leva minutos, e o
         // relógio que interrompe é o do usuário — o cancelamento mata o
@@ -398,15 +461,15 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         string corpo = $$"""
         {
           "messages": [
-            {"role": "system", "content": {{Texto(PromptDeAta.Sistema)}}},
+            {"role": "system", "content": {{Texto(sistema)}}},
             {"role": "user", "content": {{Texto(prompt)}}}
           ],
           "temperature": 0.3,
-          "max_tokens": {{TokensDeSaida}},
+          "max_tokens": {{tokensDeSaida}},
           "chat_template_kwargs": {"enable_thinking": false},
           "response_format": {
             "type": "json_schema",
-            "json_schema": {"name": "ata", "strict": true, "schema": {{AtaGerada.Esquema}}}
+            "json_schema": {"name": {{Texto(nomeDoEsquema)}}, "strict": true, "schema": {{esquema}}}
           }
         }
         """;
@@ -436,7 +499,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         if (escolha.TryGetProperty("finish_reason", out var razao)
             && razao.GetString() == "length")
             throw new InvalidOperationException(
-                $"o modelo escreveu mais do que o limite de {TokensDeSaida:N0} tokens e a ata "
+                $"o modelo escreveu mais do que o limite de {tokensDeSaida:N0} tokens e a ata "
                 + "saiu pela metade. Isso costuma ser o modelo se alongando numa seção só; "
                 + "tente outro tipo de ata, ou um modelo melhor em Ajustes › Modelos.");
 
