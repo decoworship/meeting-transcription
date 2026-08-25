@@ -67,12 +67,22 @@ public static class RevisaoDeTermos
     /// O quanto uma proposta pode se afastar, venha de onde vier.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Mais frouxo que o da regra, porque o modelo enxerga o que ela não
-    /// enxerga: <c>Tim → Teams</c> e <c>Tulsa → Tools</c> são três edições e
+    /// enxerga: <c>Tim → Teams</c> e <c>Kino → Kenan</c> são três edições e
     /// estão certos. Mas não é sem teto — sem ele, "Cláudio → Andre Monlevade"
     /// passava.
+    /// </para>
+    /// <para>
+    /// <b>Era quatro, e quatro foi medido demais.</b> Numa reunião real de 33
+    /// minutos com 53 entidades no vocabulário, o modelo propôs
+    /// <c>Emdux → CMF</c> (era Amdocs) e <c>Endit → Kenan</c> (é uma pessoa) —
+    /// as duas a exatamente quatro edições, as duas erradas. Em três, elas caem
+    /// e <c>Kino → Kenan</c> fica. O que se perde é <c>Tulsa → Tools</c>, que
+    /// era acerto num caso sintético; dado real ganha de caso sintético.
+    /// </para>
     /// </remarks>
-    public const int DistanciaDoModelo = 4;
+    public const int DistanciaDoModelo = 3;
 
     /// <summary>Abaixo disto a palavra é curta demais para duas edições.</summary>
     /// <remarks>
@@ -173,7 +183,8 @@ public static class RevisaoDeTermos
         IEnumerable<Proposta> propostas, IEnumerable<string> entidades)
     {
         var alvos = Alvos(entidades);
-        var porChave = alvos.ToDictionary(Chave, a => a, StringComparer.Ordinal);
+        var porChave = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string a in alvos) porChave.TryAdd(Chave(a), a);
 
         var boas = new List<Proposta>();
         foreach (var p in propostas)
@@ -273,7 +284,18 @@ public static class RevisaoDeTermos
                                                                | StringSplitOptions.RemoveEmptyEntries)
                                 .Where(x => x.Length >= TamanhoMinimo));
         }
-        return [.. saida.Distinct(StringComparer.OrdinalIgnoreCase)];
+        // **Deduplicado pela mesma chave que compara, e não pelo texto.** A
+        // agenda traz "Andre Monlevade" e o vocabulário traz "André Monlevade":
+        // são diferentes como texto, iguais como alvo. Sem isto o dicionário de
+        // Validar estourava com "An item with the same key has already been
+        // added" — e derrubava a transcrição inteira, que já estava pronta.
+        // Apareceu ao ligar o vocabulário de verdade de um projeto.
+        //
+        // Vence a primeira grafia: a lista chega com o vocabulário na frente, e
+        // é ele que a pessoa escreveu à mão.
+        var porChave = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string alvo in saida) porChave.TryAdd(Chave(alvo), alvo);
+        return [.. porChave.Values];
     }
 
     /// <summary>O termo mais próximo, ou nulo se nenhum está perto o bastante.</summary>

@@ -103,6 +103,20 @@ public sealed class RevisaoDeTermosTests
     }
 
     [Fact]
+    public void DuasGrafiasDoMesmoNomeNaoDerrubam()
+    {
+        // "André Monlevade" vem do vocabulário e "Andre Monlevade" da agenda:
+        // diferentes como texto, iguais como alvo. Isto derrubava a transcrição
+        // inteira com "An item with the same key has already been added" — e o
+        // texto já estava pronto quando a revisão roda.
+        var e = new[] { "André Monlevade, Kenan", "Andre Monlevade" };
+
+        var ps = RevisaoDeTermos.Validar(RevisaoDeTermos.Propor(["o Kenon caiu"], e), e);
+
+        Assert.Equal("Kenan", Assert.Single(ps).Para);
+    }
+
+    [Fact]
     public void SemEntidadesNaoProporNada()
     {
         // A regra não inventa alvo: sem vocabulário e sem agenda, ela se cala.

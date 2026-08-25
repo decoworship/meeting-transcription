@@ -124,7 +124,11 @@ public static class PropositorDeModelo
         - proponha troca APENAS quando o contexto deixar claro;
         - NUNCA troque uma palavra que está correta e faz sentido na frase;
         - o alvo da troca tem que ser um dos termos conhecidos acima;
-        - não repita uma palavra que já está certa;
+        - NÃO complete nome: se está escrito "Carla" e a lista tem "Carla Hack",
+          está certo do jeito que está — a pessoa disse só o primeiro nome;
+        - NÃO troque uma palavra por ela mesma;
+        - o que você procura é a palavra que soa parecido e está ERRADA, como
+          uma sigla com letra trocada ou um nome de sistema escrito de ouvido;
         - se não houver nada a trocar, devolva a lista vazia.
 
         Trecho da transcrição:
