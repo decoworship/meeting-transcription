@@ -259,6 +259,16 @@ public static class RedatorDeAta
 
     private static bool EhCanonica(string titulo) => Canonizar(titulo) is not null;
 
+    /// <summary>
+    /// O nome canônico de um título, ou <c>null</c> quando ele é corpo do tipo.
+    /// </summary>
+    /// <remarks>
+    /// Público para o <see cref="SecaoDobrada"/>: quem decide o que é seção de
+    /// campo próprio é este arquivo, e ter a régua em dois lugares faria as duas
+    /// divergirem no dia em que um sinônimo novo aparecesse.
+    /// </remarks>
+    public static string? NomeCanonico(string titulo) => Canonizar(titulo);
+
     private static void Lista(StringBuilder sb, string titulo, IReadOnlyList<string> itens)
     {
         var uteis = itens.Where(i => i.Trim().Length > 0).ToList();

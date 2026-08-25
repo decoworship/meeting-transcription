@@ -31,6 +31,13 @@ public static class VerificadorDeAta
     {
         var notas = new List<string>();
 
+        // Primeiro de todos: o que o modelo mandou como seção em vez de campo
+        // volta para o campo. Antes das outras conferências porque é isso que
+        // põe o conteúdo recuperado debaixo delas — dono, lado e eco valem para
+        // a decisão que chegou pelo caminho errado igual à que chegou certo.
+        // Ver Nucleo/Atas/SecaoDobrada.cs.
+        notas.AddRange(SecaoDobrada.Dobrar(ata));
+
         ConferirDonos(ata, conhecidos, notas);
         // Entre os dois de propósito: o de cima acabou de esvaziar os donos que
         // o modelo inventou, e é justamente aí que a fala tem o que dizer. O de
