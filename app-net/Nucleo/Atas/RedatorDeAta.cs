@@ -105,16 +105,51 @@ public static class RedatorDeAta
     /// </remarks>
     private static string Participantes(ContextoDaReuniao ctx)
     {
-        var casa = ctx.Pessoas.Where(p => p.DaCasa == true).Select(p => p.Nome).ToList();
-        var cliente = ctx.Pessoas.Where(p => p.DaCasa == false).Select(p => p.Nome).ToList();
+        var quadro = Presenca.Cruzar(ctx.Pessoas, ctx.Falantes);
+
+        // Sem como separar, o cabeçalho é o de antes: listar todo mundo junto é
+        // menos errado que dizer que ninguém falou.
+        if (!quadro.DaParaSeparar)
+            return PorOrganizacao("Participantes", ctx.Pessoas, ctx) is { Length: > 0 } linha
+                ? linha
+                : Todos(ctx);
+
+        var linhas = new List<string> { PorOrganizacao("Falaram", quadro.Falaram, ctx) };
+
+        if (quadro.NaoIdentificados > 0)
+            linhas[0] += $" · **+{quadro.NaoIdentificados}** "
+                         + (quadro.NaoIdentificados == 1
+                             ? "falante não identificado" : "falantes não identificados");
+
+        // "não falaram", e não "não participaram": a transcrição sabe quem
+        // falou, não quem entrou. Ver Nucleo/Atas/Presenca.cs.
+        if (quadro.SoConvidados.Count > 0)
+            linhas.Add("**Convidados que não falaram:** "
+                       + string.Join(", ", quadro.SoConvidados.Select(p => p.Nome)));
+
+        return string.Join("\n", linhas.Where(l => l.Length > 0));
+    }
+
+    /// <summary>Uma linha de gente, separada por lado quando os dois existem.</summary>
+    private static string PorOrganizacao(string rotulo, IReadOnlyList<Pessoa> gente,
+                                         ContextoDaReuniao ctx)
+    {
+        var casa = gente.Where(p => p.DaCasa == true).Select(p => p.Nome).ToList();
+        var cliente = gente.Where(p => p.DaCasa == false).Select(p => p.Nome).ToList();
 
         if (casa.Count > 0 && cliente.Count > 0)
         {
             string nomeDoCliente = ctx.Cliente is { Length: > 0 } c ? c : "cliente";
-            return $"**Participantes:** {string.Join(", ", casa)} · "
+            return $"**{rotulo}:** {string.Join(", ", casa)} · "
                    + $"**{nomeDoCliente}:** {string.Join(", ", cliente)}";
         }
 
+        var todos = gente.Select(p => p.Nome).ToList();
+        return todos.Count > 0 ? $"**{rotulo}:** {string.Join(", ", todos)}" : "";
+    }
+
+    private static string Todos(ContextoDaReuniao ctx)
+    {
         var todos = ctx.Pessoas.Select(p => p.Nome)
             .Concat(ctx.Convidados).Concat(ctx.Falantes)
             .Where(n => n is { Length: > 0 } && !PromptDeAta.EhRotuloGenerico(n))
