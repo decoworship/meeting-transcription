@@ -756,7 +756,7 @@ function abaModelos(catalogo, config, gravar) {
 
 // ────────────────────────────────────────────────────── aba Transcrição
 
-function abaTranscricao(config, gravar) {
+function abaTranscricao(config, gravar, diarizadores = []) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
@@ -873,6 +873,53 @@ function abaTranscricao(config, gravar) {
   hot.append(oQueCusta, chave(config.usar_hotwords === true,
     (v) => gravar({ usar_hotwords: v })), porQueImporta);
   painel.appendChild(hot);
+
+  // ---- qual modelo separa os falantes
+  //
+  // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este
+  // é o padrão do app, e é onde as pessoas foram procurar — a escolha existia
+  // apenas dentro da linha de um projeto, que precisa ser expandida para
+  // aparecer, e por isso parecia não existir.
+  //
+  // A lista vem do disco (Motores.ModelosDeDiarizacao), não de constante: é o
+  // que faz um modelo novo aparecer sozinho no dia em que for empacotado, e o
+  // que impede a tela de oferecer o que o motor não sabe carregar.
+  const sep = bloco("Modelo que separa os falantes",
+    "Vale para todas as reuniões, menos as de um projeto que tenha escolhido "
+    + "outro em Clientes.");
+
+  if (diarizadores.length === 0) {
+    const semNada = document.createElement("p");
+    semNada.className = "campo__dica";
+    // Dizer a verdade em vez de um seletor vazio: nesta instalação a
+    // diarização vai tentar o HuggingFace e falhar.
+    semNada.textContent = "Nenhum modelo de diarização encontrado nesta "
+      + "instalação. Separar falantes não vai funcionar até reinstalar o app.";
+    sep.appendChild(semNada);
+  } else {
+    const campoSep = campo("Modelo", "select", { opcoes: diarizadores });
+    const sel = campoSep.querySelector("select");
+    diarizadores.forEach((nome, n) => { sel.options[n].value = nome; });
+    sel.value = config.diarizacao_padrao ?? diarizadores[0];
+    // Um padrão apontando para pasta que não existe mais não pode sumir em
+    // silêncio: ele decide como toda reunião é transcrita.
+    if (sel.selectedIndex === -1) {
+      const solto = document.createElement("option");
+      solto.value = config.diarizacao_padrao;
+      solto.textContent = `${config.diarizacao_padrao} (não instalado)`;
+      sel.appendChild(solto);
+      sel.value = config.diarizacao_padrao;
+    }
+    sel.addEventListener("change", (e) => gravar({ diarizacao_padrao: e.target.value }));
+
+    const qual = document.createElement("p");
+    qual.className = "campo__dica";
+    qual.textContent = "O community-1 é o padrão e ganhou do pyannote 3.1 por "
+      + "6,7 pontos na medição da Fase 0. O 3.1 está aqui para comparar numa "
+      + "reunião sua, que é a única régua que vale.";
+    sep.append(campoSep, qual);
+  }
+  painel.appendChild(sep);
 
   return painel;
 }
@@ -1442,7 +1489,7 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       geral: () => abaGeral(config, gravador, gravar, (t) => { estado.textContent = t; }),
       gravador: () => abaGravador(gravador, mexerNoGravador),
       modelos: () => abaModelos(catalogo, config, gravar),
-      transcricao: () => abaTranscricao(config, gravar),
+      transcricao: () => abaTranscricao(config, gravar, diarizadores ?? []),
       clientes: () => abaClientes(clientes, catalogo, diarizadores ?? []),
       vozes: () => abaVozes(vozes, mexerNaVoz),
     }[atual]();

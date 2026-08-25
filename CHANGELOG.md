@@ -3,7 +3,7 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
-## Ainda não lançado
+## 0.5.0 — ainda não lançada (build de teste)
 
 **A ata para de arquivar do lado errado a pendência que é sua.** Quando o
 responsável não estava claro, a ata chutava o lado — e uma entrega nossa

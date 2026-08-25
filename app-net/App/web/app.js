@@ -527,7 +527,12 @@ async function telaDePreparo(g) {
   for (const id of ["modelo", "idioma", "diarizacao"])
     document.getElementById(id).addEventListener("change", guardarVocabulario);
 
-  botao.addEventListener("click", () => transcrever(g, botao, painel));
+  // O modelo de diarização vai por parâmetro, e não por variável de módulo:
+  // `transcrever` é irmã de `telaDePreparo`, não aninhada nela, e ler a
+  // variável da outra dava "modeloDeDiarizacao is not defined" no clique de
+  // transcrever — com a tela já montada e tudo o mais funcionando.
+  botao.addEventListener("click",
+                         () => transcrever(g, botao, painel, modeloDeDiarizacao));
 
   // Reencontrar uma transcrição já em curso é o motivo de esta tela existir do
   // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa
@@ -647,7 +652,11 @@ async function abrirResultado(g) {
   }
 }
 
-async function transcrever(g, botao, painel) {
+/**
+ * @param modeloDeDiarizacao o que o projeto escolheu, ou null para o padrão do
+ *   app. Vem de fora porque quem o carrega é a tela de preparo.
+ */
+async function transcrever(g, botao, painel, modeloDeDiarizacao = null) {
   botao.disabled = true;
 
   try {

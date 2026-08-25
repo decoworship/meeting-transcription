@@ -200,6 +200,34 @@ C#, sem prosa em volta, diz a mesma coisa sem poder se contradizer.
 > item é gerar de novo a ata da mesma reunião e conferir os quatro pontos — é o
 > que a §5 pede, e é a régua que este item sempre teve.
 
+> ## ✅ A régua foi corrida em 25/08/2026
+>
+> A ata da `2026-08-13_14-30-15` foi refeita com o **mesmo modelo** da medição
+> original (Qwen3-4B) e sobre a **mesma transcrição** — só o código mudou, que é
+> o que torna a comparação legível. O estado anterior ficou guardado em
+> `baseline-antes-da-fase6/` dentro da pasta da gravação.
+>
+> | defeito | antes (17/08) | depois (25/08) |
+> |---|---|---|
+> | **2** unidade | *"106 produtos, totalizando **R$ 2.300.000** … em um universo de 129.000 registros"*; 2 ocorrências de `R$` | *"106 produtos, com **129 mil registros zerados**"*; **zero** `R$` na ata inteira |
+> | **3** riscos | seção **vazia**, 1 risco derrubado | **2 riscos**, e o primeiro é o que a análise nomeou: *"o cliente pode realizar levantamento de dados de agosto em tempo real"* |
+> | **4** observações | 4 linhas, **2 delas prosa do modelo** | 3 linhas, **todas do verificador** |
+> | **1** lado | 5 pendências em `nosso` | 4 pendências em `cliente` — **não testável nesta reunião**, ver abaixo |
+>
+> **O defeito 1 não se mede aqui, e a tentativa provou outra coisa.** Esta
+> gravação é anterior à Fase 3 e tem `attendee_emails: null`; sem e-mail o
+> `ConferirLados` sai na primeira linha de propósito, e o `DonoPelaFala` não age
+> porque as ações já vinham com dono. **O lado virou de `nosso` para `cliente`
+> entre duas gerações da mesma ata, mesmo modelo, mesma transcrição** — ou seja,
+> sem e-mail o lado é sorteado pelo modelo. Isso dispara o gatilho da §2.1.
+>
+> *O que ficou em aberto:* a lista de "números que não aparecem nesta ata"
+> cresceu de **8 para 15**. Parte é efeito direto do conserto do regex — antes
+> capturava `180`, agora `180 mil`, e algumas aparecem nas duas formas (`130` e
+> `130 mil`) —, mas não está descartado que a cobertura tenha caído. As seções
+> também mudaram de forma (4 seções e 0 decisões viraram 2 e 3). **Não é melhora
+> nem piora até alguém olhar item a item.**
+
 > **A leitura geral.** O resumo do Notion é mais fácil de ler e mais completo em
 > cobertura de assunto; a ata do app é mais confiável no que afirma e é a única
 > das duas que se pode auditar. **A distância encolheu com o roteiro de fatos e
@@ -266,6 +294,16 @@ lado, de propósito.
 **Tem conserto barato:** o `calendar_event_id` está no `meta.json` das gravações
 antigas, e o evento no Google ainda tem os e-mails. Uma migração que relê os
 eventos e preenche os e-mails que faltam resolveria o histórico inteiro.
+
+> ⚠️ **O gatilho disparou em 25/08/2026**, e com medição. Ver a régua da §1.6: a
+> ata da `2026-08-13_14-30-15` foi gerada duas vezes, com o mesmo modelo e a
+> mesma transcrição, e as pendências saíram **todas em `nosso`** numa e **todas
+> em `cliente`** na outra. Sem `attendee_emails` o lado não é decidido — é
+> sorteado, e não há nada na ata que avise.
+>
+> **Isto agora bloqueia o defeito 1 da §1.6**, que é o mais caro dos quatro: ele
+> só é testável em gravação que tenha e-mail. Enquanto a migração não roda,
+> nenhuma reunião anterior a 14/08/2026 serve de régua para ele.
 
 ### 2.2 Nome e e-mail casados por posição
 
