@@ -105,16 +105,57 @@ public static class RedatorDeAta
     /// </remarks>
     private static string Participantes(ContextoDaReuniao ctx)
     {
-        var casa = ctx.Pessoas.Where(p => p.DaCasa == true).Select(p => p.Nome).ToList();
-        var cliente = ctx.Pessoas.Where(p => p.DaCasa == false).Select(p => p.Nome).ToList();
+        var quadro = Presenca.Cruzar(ctx.Pessoas, ctx.Falantes);
+
+        // Sem como separar, o cabeçalho é o de antes: listar todo mundo junto é
+        // menos errado que dizer que ninguém falou.
+        if (!quadro.DaParaSeparar)
+            return PorOrganizacao("Participantes", ctx.Pessoas, ctx) is { Length: > 0 } linha
+                ? linha
+                : Todos(ctx);
+
+        // Duas linhas, e não três: a lista inteira em cima, quem falou embaixo,
+        // e quem não falou o leitor tira da diferença. Uma terceira linha
+        // dizendo "não falaram" gasta espaço para repetir o que a subtração já
+        // diz — e obriga a ata a afirmar ausência, que é mais do que a
+        // transcrição sabe.
+        var linhas = new List<string> { PorOrganizacao("Convidados", ctx.Pessoas, ctx) };
+
+        // Na ordem do convite, e não na ordem em que falaram: é o que faz a
+        // diferença entre as duas linhas ser vista de relance.
+        var falaram = ctx.Pessoas.Where(quadro.Falaram.Contains).Select(p => p.Nome).ToList();
+        string segunda = falaram.Count > 0 ? $"**Falaram:** {string.Join(", ", falaram)}" : "";
+
+        if (quadro.NaoIdentificados > 0)
+            segunda += (segunda.Length > 0 ? " · " : "")
+                       + $"**+{quadro.NaoIdentificados}** "
+                       + (quadro.NaoIdentificados == 1
+                           ? "falante não identificado" : "falantes não identificados");
+        linhas.Add(segunda);
+
+        return string.Join("\n", linhas.Where(l => l.Length > 0));
+    }
+
+    /// <summary>Uma linha de gente, separada por lado quando os dois existem.</summary>
+    private static string PorOrganizacao(string rotulo, IReadOnlyList<Pessoa> gente,
+                                         ContextoDaReuniao ctx)
+    {
+        var casa = gente.Where(p => p.DaCasa == true).Select(p => p.Nome).ToList();
+        var cliente = gente.Where(p => p.DaCasa == false).Select(p => p.Nome).ToList();
 
         if (casa.Count > 0 && cliente.Count > 0)
         {
             string nomeDoCliente = ctx.Cliente is { Length: > 0 } c ? c : "cliente";
-            return $"**Participantes:** {string.Join(", ", casa)} · "
+            return $"**{rotulo}:** {string.Join(", ", casa)} · "
                    + $"**{nomeDoCliente}:** {string.Join(", ", cliente)}";
         }
 
+        var todos = gente.Select(p => p.Nome).ToList();
+        return todos.Count > 0 ? $"**{rotulo}:** {string.Join(", ", todos)}" : "";
+    }
+
+    private static string Todos(ContextoDaReuniao ctx)
+    {
         var todos = ctx.Pessoas.Select(p => p.Nome)
             .Concat(ctx.Convidados).Concat(ctx.Falantes)
             .Where(n => n is { Length: > 0 } && !PromptDeAta.EhRotuloGenerico(n))
@@ -217,6 +258,16 @@ public static class RedatorDeAta
     };
 
     private static bool EhCanonica(string titulo) => Canonizar(titulo) is not null;
+
+    /// <summary>
+    /// O nome canônico de um título, ou <c>null</c> quando ele é corpo do tipo.
+    /// </summary>
+    /// <remarks>
+    /// Público para o <see cref="SecaoDobrada"/>: quem decide o que é seção de
+    /// campo próprio é este arquivo, e ter a régua em dois lugares faria as duas
+    /// divergirem no dia em que um sinônimo novo aparecesse.
+    /// </remarks>
+    public static string? NomeCanonico(string titulo) => Canonizar(titulo);
 
     private static void Lista(StringBuilder sb, string titulo, IReadOnlyList<string> itens)
     {

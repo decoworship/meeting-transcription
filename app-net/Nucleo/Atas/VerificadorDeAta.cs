@@ -31,6 +31,13 @@ public static class VerificadorDeAta
     {
         var notas = new List<string>();
 
+        // Primeiro de todos: o que o modelo mandou como seção em vez de campo
+        // volta para o campo. Antes das outras conferências porque é isso que
+        // põe o conteúdo recuperado debaixo delas — dono, lado e eco valem para
+        // a decisão que chegou pelo caminho errado igual à que chegou certo.
+        // Ver Nucleo/Atas/SecaoDobrada.cs.
+        notas.AddRange(SecaoDobrada.Dobrar(ata));
+
         ConferirDonos(ata, conhecidos, notas);
         // Entre os dois de propósito: o de cima acabou de esvaziar os donos que
         // o modelo inventou, e é justamente aí que a fala tem o que dizer. O de
@@ -82,8 +89,11 @@ public static class VerificadorDeAta
         var validos = conhecidos
             .Where(n => n is { Length: > 0 } && !PromptDeAta.EhRotuloGenerico(n))
             .ToList();
-        var primeiros = validos
-            .Select(n => n.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0])
+        // O ponto vale por espaço. O modelo mistura os dois estilos que a
+        // agenda lhe mostrou e escreve "vanessa.levorato sao bernado"; sem esta
+        // tolerância o verificador não a reconhece e apaga um dono CERTO —
+        // medido numa ata gerada de ponta a ponta em 25/08.
+        var primeiros = validos.Select(n => Pedacos(n)[0])
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var acao in ata.Acoes)
@@ -105,8 +115,7 @@ public static class VerificadorDeAta
             bool conhecido = validos.Any(
                 v => v.Contains(dono, StringComparison.OrdinalIgnoreCase)
                      || dono.Contains(v, StringComparison.OrdinalIgnoreCase))
-                || dono.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                       .Any(parte => primeiros.Contains(parte));
+                || Pedacos(dono).Any(primeiros.Contains);
 
             // "Andre Monlevade (Vivo)" quando Andre é da nossa equipe: o modelo
             // deduz organização do contexto e erra. O nome fica; a organização
@@ -171,6 +180,12 @@ public static class VerificadorDeAta
                       + "cliente foi decidido pelo domínio do e-mail da agenda, e não pelo "
                       + "assunto da conversa.");
     }
+
+    /// <summary>As partes de um nome, com ponto e sublinhado valendo espaço.</summary>
+    private static string[] Pedacos(string n) =>
+        (n ?? "").Replace('.', ' ').Replace('_', ' ')
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries) is { Length: > 0 } p
+            ? p : [""];
 
     private static string PrimeiroNome(string n) =>
         n.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? n;

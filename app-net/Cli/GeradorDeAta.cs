@@ -45,8 +45,18 @@ public static class GeradorDeAta
         }
 
         var vinculo = DadosDaReuniao.Ler(pasta);
+        // Os mesmos Pessoas que o app monta. Sem eles o cabeçalho desta ata sai
+        // pelo caminho antigo, e é esta ata que as ferramentas de medição leem.
+        var (convidados, emails) = ConvidadosDaAgenda.Ler(pasta);
+        var pessoas = Organizacoes.Classificar(
+            convidados, emails, ConfiguracoesDoApp.Carregar().DominiosDaCasa);
+        // O nome canônico, e não o cru: ver a nota em App/Ponte.cs.
+        if (pessoas.Count > 0) convidados = [.. pessoas.Select(p => p.Nome)];
+
         var ctx = new ContextoDaReuniao
         {
+            Convidados = convidados,
+            Pessoas = pessoas,
             Cliente = vinculo.Cliente ?? dados.Client,
             Projeto = vinculo.Projeto ?? dados.Project,
             Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
@@ -87,7 +97,7 @@ public static class GeradorDeAta
 
         int antes = ata.Observacoes.Count;
         VerificadorDeAta.Conferir(ata, dados.Segments,
-            [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro);
+            [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, pessoas);
         int mexeu = ata.Observacoes.Count - antes;
         Console.WriteLine(mexeu > 0
             ? $"verificador: {mexeu} observação(ões) — ver o fim da ata"

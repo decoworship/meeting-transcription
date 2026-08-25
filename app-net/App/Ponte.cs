@@ -1151,11 +1151,20 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             {
                 var vinculo = DadosDaReuniao.Ler(pasta);
                 var cfg = ConfiguracoesDoApp.Carregar();
-                var (convidados, emails) = ConvidadosDaAgenda(pasta);
+                var (convidados, emails) = ConvidadosDaAgenda.Ler(pasta);
                 // Quem é da casa e quem é do cliente sai do domínio do e-mail, e
                 // não de dedução do modelo: ver Nucleo/Atas/Organizacoes.cs.
+                // Nome de exibição e e-mail juntos: o e-mail diz o lado, o nome
+                // diz como a pessoa é chamada. Ver Organizacoes.Classificar.
                 var pessoas = Organizacoes.Classificar(
-                    emails.Count > 0 ? emails : convidados, cfg.DominiosDaCasa);
+                    convidados, emails, cfg.DominiosDaCasa);
+                // A partir daqui vale o nome canônico, e não o cru do meta.json.
+                // Ele mistura nome próprio com local-part de e-mail na mesma
+                // lista ("Andre Yuri" ao lado de "dimi.randel"), e o modelo copia
+                // o que vê: numa ata gerada de ponta a ponta em 25/08 três
+                // responsáveis saíram como "dimi.randel", "andre.monlevade" e
+                // "thiago.souza". Ver Organizacoes.Classificar.
+                if (pessoas.Count > 0) convidados = [.. pessoas.Select(p => p.Nome)];
 
                 var ctx = new ContextoDaReuniao
                 {
@@ -1216,35 +1225,6 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// só têm os nomes, e nelas a organização de cada um fica desconhecida — o
     /// que é melhor que fingir saber.
     /// </remarks>
-    private static (List<string> Nomes, List<string> Emails) ConvidadosDaAgenda(string pasta)
-    {
-        var nomes = new List<string>();
-        var emails = new List<string>();
-        try
-        {
-            string meta = Path.Combine(pasta, "meta.json");
-            if (!File.Exists(meta)) return (nomes, emails);
-
-            using var doc = JsonDocument.Parse(File.ReadAllText(meta));
-            if (!doc.RootElement.TryGetProperty("meeting", out var reuniao))
-                return (nomes, emails);
-
-            if (reuniao.TryGetProperty("attendees", out var a)
-                && a.ValueKind == JsonValueKind.Array)
-                foreach (var x in a.EnumerateArray())
-                    if (x.GetString() is { Length: > 0 } n) nomes.Add(n);
-
-            if (reuniao.TryGetProperty("attendee_emails", out var e)
-                && e.ValueKind == JsonValueKind.Array)
-                foreach (var x in e.EnumerateArray())
-                    if (x.GetString() is { Length: > 0 } m) emails.Add(m);
-        }
-        catch (Exception)
-        {
-            // meta.json ilegível não pode impedir de escrever a ata.
-        }
-        return (nomes, emails);
-    }
 
     /// <summary>
     /// Como chamar a reunião numa frase: o título da agenda, ou a pasta.
