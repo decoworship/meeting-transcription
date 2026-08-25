@@ -25,11 +25,16 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
-VERSAO = "3"
+VERSAO = "4"
 
 # O mesmo modelo que o app Python usa. Trocar mudaria o espaço vetorial e
 # invalidaria toda voz já aprendida — os vetores de modelos diferentes não são
 # comparáveis, e a comparação não falha: ela só passa a errar.
+# ATENÇÃO: este é o modelo de VOZ, e ele não é escolhível. A escolha de modelo
+# de diarização (`modelo` na requisição) troca o *pipeline* que separa os
+# falantes; trocar o de voz invalidaria toda voz já aprendida, porque vetores de
+# modelos diferentes não são comparáveis — e a comparação não falha, ela só passa
+# a errar em silêncio. São duas coisas no mesmo motor, e só uma delas se troca.
 MODELO_DE_VOZ = "pyannote/wespeaker-voxceleb-resnet34-LM"
 PIPELINE_DE_DIARIZACAO = "pyannote/speaker-diarization-community-1"
 
@@ -48,9 +53,23 @@ PIPELINE_DE_DIARIZACAO = "pyannote/speaker-diarization-community-1"
 _LOCAIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelos")
 
 
-def _pipeline_local() -> str | None:
-    """A pasta do pipeline embarcado, ou ``None`` quando ele não veio junto."""
-    pasta = os.path.join(_LOCAIS, "community-1")
+#: O pipeline usado quando ninguém pede outro.
+PADRAO = "community-1"
+
+
+def _pipeline_local(nome: str = PADRAO) -> str | None:
+    """A pasta de um pipeline embarcado, ou ``None`` quando ele não está lá.
+
+    O nome é o da pasta dentro de ``modelos/``. É por aqui que a escolha de
+    modelo de diarização chega ao pyannote — até 20/08/2026 ela era colhida,
+    salva em disco e ignorada, e o pipeline pedia o ``community-1`` pelo nome
+    (docs/FASE6.md §4.6).
+    """
+    # O nome vem de arquivo de configuração e vira caminho: uma pasta só, sem
+    # separador e sem "..", senão `diar_model` editado à mão lê fora de modelos/.
+    if not nome or os.path.basename(nome) != nome or nome in (".", ".."):
+        return None
+    pasta = os.path.join(_LOCAIS, nome)
     return pasta if os.path.isfile(os.path.join(pasta, "config.yaml")) else None
 
 
@@ -74,12 +93,22 @@ class Pipeline:
 
     def __init__(self) -> None:
         self._pipeline = None
+        self._modelo = None
         self._voz = None
         self.dispositivo = "?"
 
-    def carregar(self, id_req: int) -> None:
-        if self._pipeline is not None:
+    def carregar(self, id_req: int, modelo: str | None = None) -> None:
+        modelo = modelo or PADRAO
+
+        # Trocar de modelo recarrega. Manter o pipeline quente é o que faz a
+        # segunda reunião não pagar o carregamento de novo, e a comparação entre
+        # dois modelos na mesma sessão devolveria a saída do primeiro nas duas
+        # medições — errada, e calada.
+        if self._pipeline is not None and self._modelo == modelo:
             return
+        if self._pipeline is not None:
+            _log(f"trocando o pipeline de {self._modelo} para {modelo}")
+            self._pipeline = None
 
         _enviar(id=id_req, tipo="progresso", pct=0.0, texto="carregando o modelo")
         from pyannote.audio import Pipeline as PyannotePipeline
@@ -91,7 +120,7 @@ class Pipeline:
         # então o HuggingFace (a máquina de quem desenvolve, que pode não ter
         # rodado o empacotador). Os pesos são os mesmos nos dois casos — o que
         # muda é precisar ou não de token e de rede.
-        local = _pipeline_local()
+        local = _pipeline_local(modelo)
         if local:
             _log(f"pipeline local: {local}")
             self._pipeline = PyannotePipeline.from_pretrained(local)
@@ -99,16 +128,29 @@ class Pipeline:
             token = os.environ.get("HF_TOKEN")
             if not token:
                 raise RuntimeError(
-                    f"o pipeline de diarização não está em {_LOCAIS} e não há "
-                    "HF_TOKEN no ambiente para baixá-lo. Rode "
+                    f"o pipeline de diarização {modelo!r} não está em {_LOCAIS} "
+                    "e não há HF_TOKEN no ambiente para baixá-lo. Rode "
                     "tools/empacotar_modelos_de_diarizacao.sh."
                 )
-            self._pipeline = PyannotePipeline.from_pretrained(
-                PIPELINE_DE_DIARIZACAO, token=token
-            )
+            # Só o padrão tem nome de repositório conhecido aqui; qualquer outro
+            # nome é usado como veio, que é o que permite experimentar um
+            # pipeline do HuggingFace numa máquina que tenha token.
+            repo = PIPELINE_DE_DIARIZACAO if modelo == PADRAO else modelo
+            _log(f"pipeline do HuggingFace: {repo}")
+            self._pipeline = PyannotePipeline.from_pretrained(repo, token=token)
+        self._modelo = modelo
         self.dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
         self._pipeline.to(torch.device(self.dispositivo))
         _log(f"pipeline carregado em {self.dispositivo}")
+
+    #: Como o modelo de voz se identifica nas amostras guardadas.
+    #:
+    #: São os **pesos**, e não o caminho: local ou do HuggingFace, são os
+    #: mesmos bytes e produzem o mesmo espaço vetorial. É esta identidade que o
+    #: núcleo carimba em cada voz aprendida, para nunca comparar vetores de
+    #: modelos diferentes (docs/VOZES.md §7).
+    def modelo_de_voz(self) -> str:
+        return MODELO_DE_VOZ
 
     def vetor_de_voz(self, caminho: str, trechos: list[dict], id_req: int) -> list[float]:
         """O vetor que identifica uma voz, extraído dos trechos indicados.
@@ -160,8 +202,9 @@ class Pipeline:
         vetor = self._voz({"waveform": junto, "sample_rate": taxa})
         return np.asarray(vetor).astype(float).ravel().tolist()
 
-    def diarizar(self, caminho: str, id_req: int) -> list[dict]:
-        self.carregar(id_req)
+    def diarizar(self, caminho: str, id_req: int,
+                 modelo: str | None = None) -> list[dict]:
+        self.carregar(id_req, modelo)
         _enviar(id=id_req, tipo="progresso", pct=0.3, texto="analisando falantes")
 
         saida = self._pipeline(self._ler_wav(caminho))
@@ -234,9 +277,12 @@ def main() -> int:
 
             if op == "voz":
                 vetor = pipeline.vetor_de_voz(caminho, req.get("trechos") or [], id_req)
-                _enviar(id=id_req, tipo="resultado", vetor=vetor)
+                # O modelo vai junto do vetor: sem ele o núcleo não teria como
+                # saber que dois vetores não são comparáveis.
+                _enviar(id=id_req, tipo="resultado", vetor=vetor,
+                        modelo=pipeline.modelo_de_voz())
             else:
-                segmentos = pipeline.diarizar(caminho, id_req)
+                segmentos = pipeline.diarizar(caminho, id_req, req.get("modelo"))
                 _enviar(id=id_req, tipo="resultado", segmentos=segmentos)
 
         except Exception as e:

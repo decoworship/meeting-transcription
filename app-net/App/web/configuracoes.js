@@ -756,7 +756,7 @@ function abaModelos(catalogo, config, gravar) {
 
 // ────────────────────────────────────────────────────── aba Transcrição
 
-function abaTranscricao(config, gravar) {
+function abaTranscricao(config, gravar, diarizadores = []) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
@@ -874,12 +874,59 @@ function abaTranscricao(config, gravar) {
     (v) => gravar({ usar_hotwords: v })), porQueImporta);
   painel.appendChild(hot);
 
+  // ---- qual modelo separa os falantes
+  //
+  // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este
+  // é o padrão do app, e é onde as pessoas foram procurar — a escolha existia
+  // apenas dentro da linha de um projeto, que precisa ser expandida para
+  // aparecer, e por isso parecia não existir.
+  //
+  // A lista vem do disco (Motores.ModelosDeDiarizacao), não de constante: é o
+  // que faz um modelo novo aparecer sozinho no dia em que for empacotado, e o
+  // que impede a tela de oferecer o que o motor não sabe carregar.
+  const sep = bloco("Modelo que separa os falantes",
+    "Vale para todas as reuniões, menos as de um projeto que tenha escolhido "
+    + "outro em Clientes.");
+
+  if (diarizadores.length === 0) {
+    const semNada = document.createElement("p");
+    semNada.className = "campo__dica";
+    // Dizer a verdade em vez de um seletor vazio: nesta instalação a
+    // diarização vai tentar o HuggingFace e falhar.
+    semNada.textContent = "Nenhum modelo de diarização encontrado nesta "
+      + "instalação. Separar falantes não vai funcionar até reinstalar o app.";
+    sep.appendChild(semNada);
+  } else {
+    const campoSep = campo("Modelo", "select", { opcoes: diarizadores });
+    const sel = campoSep.querySelector("select");
+    diarizadores.forEach((nome, n) => { sel.options[n].value = nome; });
+    sel.value = config.diarizacao_padrao ?? diarizadores[0];
+    // Um padrão apontando para pasta que não existe mais não pode sumir em
+    // silêncio: ele decide como toda reunião é transcrita.
+    if (sel.selectedIndex === -1) {
+      const solto = document.createElement("option");
+      solto.value = config.diarizacao_padrao;
+      solto.textContent = `${config.diarizacao_padrao} (não instalado)`;
+      sel.appendChild(solto);
+      sel.value = config.diarizacao_padrao;
+    }
+    sel.addEventListener("change", (e) => gravar({ diarizacao_padrao: e.target.value }));
+
+    const qual = document.createElement("p");
+    qual.className = "campo__dica";
+    qual.textContent = "O community-1 é o padrão e ganhou do pyannote 3.1 por "
+      + "6,7 pontos na medição da Fase 0. O 3.1 está aqui para comparar numa "
+      + "reunião sua, que é a única régua que vale.";
+    sep.append(campoSep, qual);
+  }
+  painel.appendChild(sep);
+
   return painel;
 }
 
 // ──────────────────────────────────────────────────────── aba Clientes
 
-function abaClientes(clientes, catalogo) {
+function abaClientes(clientes, catalogo, diarizadores) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
@@ -927,7 +974,7 @@ function abaClientes(clientes, catalogo) {
     pessoa.appendChild(topo);
 
     for (const projeto of [...clientes[nome]].sort((a, b) => a.localeCompare(b, "pt-BR")))
-      pessoa.appendChild(linhaDeProjeto(nome, projeto, catalogo));
+      pessoa.appendChild(linhaDeProjeto(nome, projeto, catalogo, diarizadores));
 
     b.appendChild(pessoa);
   }
@@ -997,7 +1044,7 @@ function botaoApagar(pergunta, aoConfirmar) {
  * cliente é o gesto que se faz aqui — "o outro está usando qual modelo?" — e
  * trocar de tela a cada um transformaria a comparação em ida e volta.
  */
-function linhaDeProjeto(cliente, projeto, catalogo) {
+function linhaDeProjeto(cliente, projeto, catalogo, diarizadores) {
   const caixa = document.createElement("div");
   caixa.className = "projeto";
 
@@ -1070,7 +1117,12 @@ function linhaDeProjeto(cliente, projeto, catalogo) {
     resumir();
 
     const asr = catalogo.filter((i) => i.pacote.familia === "asr");
-    const diar = catalogo.filter((i) => i.pacote.familia === "diarizacao");
+    // Do disco, e não do catálogo: a família "diarizacao" saiu dele na Fase 4,
+    // quando os pesos passaram a viajar dentro do instalador — e este seletor
+    // ficou com uma opção morta oferecendo uma escolha que não existia. Vem na
+    // mesma leitura do catálogo, na subida da tela. Ver
+    // Motores.ModelosDeDiarizacao e FASE6 §4.6.
+    const diar = diarizadores;
 
     // O modelo do projeto pode ser um que não está mais no catálogo — projeto
     // criado no app Python, ou pacote removido. Mostrar "(padrão)" e não a
@@ -1101,12 +1153,22 @@ function linhaDeProjeto(cliente, projeto, catalogo) {
       gravar({ language: e.target.value.trim() || null }));
 
     const campoDiar = campo("Modelo de diarização", "select", {
-      opcoes: ["(usar o padrão do app)", ...diar.map((i) => i.pacote.nome)],
+      opcoes: ["(usar o padrão do app)", ...diar],
     });
     const selDiar = campoDiar.querySelector("select");
     selDiar.options[0].value = "";
-    diar.forEach((i, n) => { selDiar.options[n + 1].value = i.pacote.id; });
+    diar.forEach((nome, n) => { selDiar.options[n + 1].value = nome; });
     selDiar.value = prefs.diar_model ?? "";
+    // Um modelo escolhido que não está mais em disco não pode sumir em silêncio:
+    // ele decide como este cliente é transcrito, e cair para o padrão sem avisar
+    // mudaria isso sem ninguém pedir. Mesma regra do modelo de transcrição.
+    if (selDiar.selectedIndex === -1) {
+      const solto = document.createElement("option");
+      solto.value = prefs.diar_model;
+      solto.textContent = `${prefs.diar_model} (não instalado)`;
+      selDiar.appendChild(solto);
+      selDiar.value = prefs.diar_model;
+    }
     selDiar.addEventListener("change", (e) =>
       gravar({ diar_model: e.target.value || null }));
 
@@ -1208,6 +1270,10 @@ function linhaDeAmostra(pessoa, a, aoMudar) {
   const linha = document.createElement("div");
   linha.className = "amostra";
   linha.dataset.quarentena = String(a.quarentena);
+  // Inerte por qualquer um dos dois motivos: mesma aparência, porque a
+  // consequência é a mesma — esta amostra não participa de nada.
+  linha.dataset.outroModelo =
+    String(a.outro_modelo === true || a.regras_antigas === true);
 
   const tocar = document.createElement("button");
   tocar.className = "tocar";
@@ -1232,6 +1298,14 @@ function linhaDeAmostra(pessoa, a, aoMudar) {
   proc.textContent = [
     dia(a.criada_em), a.faixa, segundos(a.duracao_s),
     a.dispositivo, a.gravacao,
+    // Dito na mesma linha da procedência porque é procedência: de qual modelo
+    // esta voz veio. Sem isto a tela mostraria amostras de alguém que o app
+    // não reconhece, sem nada explicando a contradição.
+    a.outro_modelo === true ? "de um modelo de voz antigo" : null,
+    // Duas causas diferentes para a mesma inércia, e a diferença importa para
+    // quem decide se apaga ou espera: uma volta se o modelo voltar, a outra
+    // não volta nunca.
+    a.regras_antigas === true ? "aprendida antes da guarda de contaminação" : null,
   ].filter(Boolean).join(" · ");
 
   const acoes = document.createElement("span");
@@ -1346,11 +1420,12 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, vozes, gravador;
+  let config, clientes, catalogo, diarizadores, vozes, gravador;
   try {
     // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
-    [{ config }, { clientes }, { catalogo }, { vozes }, { gravador }] = await Promise.all([
+    [{ config }, { clientes }, { catalogo, diarizadores }, { vozes },
+     { gravador }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
       pedir("gravador"),
     ]);
@@ -1414,8 +1489,8 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       geral: () => abaGeral(config, gravador, gravar, (t) => { estado.textContent = t; }),
       gravador: () => abaGravador(gravador, mexerNoGravador),
       modelos: () => abaModelos(catalogo, config, gravar),
-      transcricao: () => abaTranscricao(config, gravar),
-      clientes: () => abaClientes(clientes, catalogo),
+      transcricao: () => abaTranscricao(config, gravar, diarizadores ?? []),
+      clientes: () => abaClientes(clientes, catalogo, diarizadores ?? []),
       vozes: () => abaVozes(vozes, mexerNaVoz),
     }[atual]();
     conteudo.appendChild(estado);

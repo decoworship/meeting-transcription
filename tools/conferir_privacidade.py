@@ -94,10 +94,20 @@ AUDIO_PERMITIDO = re.compile(
 # aparecendo na saída como "ignorado". Silenciar sem explicar transformaria a
 # régua num carimbo — e o dia em que "Vivo" aparecesse de verdade num arquivo
 # nosso, ninguém saberia.
+#
+# **Esta lista tende a crescer, e isso não é falha.** A régua procura os nomes
+# das pessoas das suas reuniões dentro de 17 mil arquivos de terceiros, e nomes
+# próprios comuns — Eduardo, Ricardo, Carla, Daniel — colidem com autoria de
+# software o tempo todo. O que não pode crescer é a *largura* de cada exceção:
+# ela nomeia um termo e um caminho, e não um diretório inteiro.
 HOMONIMOS: list[tuple[re.Pattern, str, str]] = [
     (re.compile(r"av\.libs[/\\]avformat-"), "Vivo",
      "o demuxer 'Vivo' do ffmpeg — o formato de vídeo da Vivo Software, "
      "dos anos 90. Aparece ao lado de 'vivo' e 'viv' na tabela de formatos."),
+    (re.compile(r"dist-info[/\\]sboms[/\\].*\.cyclonedx\.json$"), "Eduardo",
+     "autoria de dependências no SBOM do hf_xet: 'Cesar Eduardo Barros' e "
+     "'Eduardo Pinho' são quem escreveu dois crates Rust, com e-mail público "
+     "no arquivo. Um SBOM só descreve terceiros — nada nosso pode nascer lá."),
 ]
 
 

@@ -30,6 +30,15 @@ internal sealed class Pedido
 
     /// <summary>Separar quem falou. Ausente equivale a sim.</summary>
     [JsonPropertyName("diarizar")] public bool? Diarizar { get; init; }
+
+    /// <summary>
+    /// Qual pipeline separa os falantes. Ausente usa o padrão do app.
+    /// </summary>
+    /// <remarks>
+    /// Vinha das preferências do projeto e <b>não saía delas</b>: era colhido na
+    /// tela, salvo em disco e ignorado até 20/08/2026. Ver FASE6 §4.6.
+    /// </remarks>
+    [JsonPropertyName("diar_model")] public string? DiarModel { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
 
     /// <summary>Rótulo do falante e o nome dado a ele, para aprender a voz.</summary>
@@ -121,6 +130,17 @@ internal sealed class Resposta
 
     /// <summary>Os pacotes de modelo com o estado de cada um.</summary>
     [JsonPropertyName("catalogo")] public List<PacoteComEstado>? Catalogo { get; init; }
+
+    /// <summary>
+    /// Os pipelines de diarização que existem em disco, pelo nome da pasta.
+    /// </summary>
+    /// <remarks>
+    /// Vai junto do catálogo e não dentro dele: a diarização deixou de ser um
+    /// download na Fase 4, e um cartão de catálogo prometeria "Baixar" e
+    /// "Remover" sobre arquivos que vieram no instalador. O que a tela precisa
+    /// saber daqui é só o que dá para escolher.
+    /// </remarks>
+    [JsonPropertyName("diarizadores")] public List<string>? Diarizadores { get; init; }
 
     /// <summary>A biblioteca de vozes como a tela precisa vê-la.</summary>
     [JsonPropertyName("vozes")] public List<PessoaResumo>? Vozes { get; init; }
@@ -313,6 +333,29 @@ internal sealed class AmostraResumo
     [JsonPropertyName("t1")] public double T1 { get; init; }
     [JsonPropertyName("dispositivo")] public string? Dispositivo { get; init; }
     [JsonPropertyName("quarentena")] public bool Quarentena { get; init; }
+
+    /// <summary>
+    /// A amostra veio de um modelo de voz diferente do que o app usa hoje.
+    /// </summary>
+    /// <remarks>
+    /// Ela não é apagada nem entra em nenhuma comparação — vetores de modelos
+    /// diferentes não se comparam. Precisa aparecer porque, sem isso, a tela
+    /// mostraria cinco amostras de alguém que o app não reconhece, e nada
+    /// explicaria a contradição. Ver <see cref="Vozes.ModeloDe"/>.
+    /// </remarks>
+    [JsonPropertyName("outro_modelo")] public bool OutroModelo { get; init; }
+
+    /// <summary>
+    /// A amostra foi colhida sob regras de inscrição que já não valem.
+    /// </summary>
+    /// <remarks>
+    /// Mesmo tratamento do <see cref="OutroModelo"/> e pelo mesmo motivo: ela
+    /// não entra em conta nenhuma, e precisa aparecer para a tela não mostrar
+    /// amostras de alguém que o app não reconhece sem explicar por quê. O texto
+    /// é diferente porque a causa é diferente — e a diferença importa para quem
+    /// decide se apaga ou espera. Ver <see cref="Vozes.RegrasAtuais"/>.
+    /// </remarks>
+    [JsonPropertyName("regras_antigas")] public bool RegrasAntigas { get; init; }
 
     /// <summary>
     /// O caminho do trecho relativo à pasta de vozes, ou nulo se não houver.
@@ -613,6 +656,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     {
                         Id = p.Id,
                         Catalogo = Catalogo.Listar(ConfiguracoesDoApp.Carregar()),
+                        Diarizadores =
+                            [.. Motores.AoLadoDoExecutavel().ModelosDeDiarizacao()],
                     });
                     break;
 
@@ -997,6 +1042,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     diarizar: p.Diarizar ?? true,
                     corrigirFonetica: cfgDaTranscricao.CorrecaoFonetica,
                     usarHotwords: cfgDaTranscricao.UsarHotwords,
+                    // O projeto manda; sem preferência, o padrão do app. Os dois
+                    // eram guardados e nunca lidos — ver Pedido.DiarModel.
+                    modeloDeDiarizacao: p.DiarModel is { Length: > 0 } doProjeto
+                        ? doProjeto : cfgDaTranscricao.DiarizacaoPadrao,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
@@ -1331,9 +1380,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             return;
         }
 
-        var amostra = await Task.Run(() => new AprendizadoDeVozes(
-            Motores.AoLadoDoExecutavel(), new Vozes())
-            .AprenderAsync(pasta, dados.Segments, falante, nome));
+        // O microfone vai junto, e é lido aqui e não no núcleo: inscrever uma
+        // voz é a decisão que persiste entre reuniões, e um bloco em que o dono
+        // estava falando envenena o perfil em silêncio. LerUma e não Ler — só a
+        // energia do microfone interessa, e a outra faixa seria uma cópia de
+        // centenas de MB para nada. Ver AprendizadoDeVozes.TrechosDe.
+        var amostra = await Task.Run(() =>
+        {
+            string caminhoDoMic = Path.Combine(pasta, "mic.wav");
+            float[]? mic = File.Exists(caminhoDoMic) ? Faixas.LerUma(caminhoDoMic) : null;
+            return new AprendizadoDeVozes(Motores.AoLadoDoExecutavel(), new Vozes())
+                .AprenderAsync(pasta, dados.Segments, falante, nome, mic);
+        });
 
         Responder(new Resposta
         {
@@ -1510,6 +1568,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     T1 = a.Origem.T1,
                     Dispositivo = a.Origem.Dispositivo,
                     Quarentena = a.Quarentena,
+                    OutroModelo = Vozes.ModeloDe(a) != Vozes.ModeloDeVozPadrao,
+                    RegrasAntigas = Vozes.RegrasDe(a) != Vozes.RegrasAtuais,
                     // Conferir que o arquivo existe, e não só que o campo está
                     // preenchido: amostra antiga pode apontar para um recorte
                     // que foi apagado, e a tela precisa desabilitar o play em

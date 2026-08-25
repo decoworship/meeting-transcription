@@ -60,6 +60,56 @@ public sealed class AmostraDeVoz
     /// máquina não distingue; quem ouve o trecho distingue em quatro segundos.
     /// </remarks>
     [JsonPropertyName("quarentena")] public bool Quarentena { get; set; }
+
+    /// <summary>
+    /// O modelo que produziu este vetor.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Um vetor só significa alguma coisa dentro do modelo que o gerou.</b>
+    /// Modelos diferentes produzem espaços vetoriais diferentes, e o cosseno
+    /// entre vetores de dois modelos não dá erro: dá um número plausível e
+    /// errado. O sintoma não aparece na hora — aparece meses depois, como "o app
+    /// chamou a Vanessa de Carla", sem nada no arquivo que explique por quê.
+    /// </para>
+    /// <para>
+    /// <b>Nulo é o modelo de sempre</b>, e não "desconhecido". Toda amostra
+    /// gravada antes de 20/08/2026 saiu do
+    /// <c>wespeaker-voxceleb-resnet34-LM</c>, porque ele nunca foi escolhível —
+    /// isso não é suposição, é a única possibilidade. Ver
+    /// <see cref="Vozes.ModeloDeVozPadrao"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("modelo")] public string? Modelo { get; init; }
+
+    /// <summary>
+    /// Sob quais regras de inscrição esta amostra foi colhida.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Ausente é a geração 1</b>, e não "atual": tudo o que foi aprendido
+    /// até 20/08/2026 passou pelo caminho que a FASE6 §4.2 descreve — o vetor
+    /// usava o intervalo inteiro do segmento, sem nenhuma guarda contra outra
+    /// pessoa <b>dentro</b> dele. Medido: um bloco com 30% de voz de quem não
+    /// era o falante. Não dá para saber quais amostras foram atingidas, e por
+    /// isso a geração inteira é descartada.
+    /// </para>
+    /// <para>
+    /// <b>Por que uma geração e não uma data.</b> A guarda passa a valer no
+    /// build em que ela existe, e ninguém sabe de antemão quando ele será
+    /// instalado — uma data cravada aqui classificaria errado tudo o que fosse
+    /// aprendido entre a decisão e a atualização. A geração viaja com a amostra
+    /// e não depende de relógio nenhum.
+    /// </para>
+    /// <para>
+    /// Descartar é <b>não usar</b>, e não apagar: o arquivo continua lá, a tela
+    /// mostra as amostras apagadas, e "Esquecer" continua sendo de quem lê. A
+    /// regra do risco 4 do PLANO.md §5 é que perfil de voz se reinscreve — e
+    /// reinscrever acontece sozinho, à medida que as pessoas são nomeadas de
+    /// novo.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("regras")] public int? Regras { get; init; }
 }
 
 public sealed class PerfilDeVoz
@@ -120,6 +170,53 @@ public sealed class Vozes
     /// <summary>Fala de menos não vira voz: o vetor sai ruidoso e contamina.</summary>
     public const double SegundosMinimos = 3.0;
 
+    /// <summary>
+    /// O modelo de voz que produziu tudo o que existe hoje.
+    /// </summary>
+    /// <remarks>
+    /// Serve de valor para <see cref="AmostraDeVoz.Modelo"/> quando ele está
+    /// ausente. É o nome dos <b>pesos</b> — o mesmo se eles vierem da pasta ao
+    /// lado do motor ou do HuggingFace, porque são os mesmos bytes e o mesmo
+    /// espaço vetorial.
+    /// </remarks>
+    public const string ModeloDeVozPadrao = "pyannote/wespeaker-voxceleb-resnet34-LM";
+
+    /// <summary>O modelo de uma amostra, com o ausente valendo o de sempre.</summary>
+    public static string ModeloDe(AmostraDeVoz a) =>
+        a.Modelo is { Length: > 0 } m ? m : ModeloDeVozPadrao;
+
+    /// <summary>
+    /// A geração de regras de inscrição que vale hoje.
+    /// </summary>
+    /// <remarks>
+    /// <b>1</b> — até 20/08/2026: o vetor via o intervalo inteiro do segmento e
+    /// não havia guarda contra outra pessoa dentro dele (FASE6 §4.2).<br/>
+    /// <b>2</b> — desde então: a janela do vetor é a mesma do trecho guardado, e
+    /// bloco com o microfone ativo dentro é descartado.
+    /// <para>
+    /// Subir este número descarta a geração anterior e faz o app reaprender as
+    /// vozes. Só se sobe quando <b>não dá para saber</b> quais amostras a regra
+    /// velha estragou — se desse, a resposta seria consertar as atingidas.
+    /// </para>
+    /// </remarks>
+    public const int RegrasAtuais = 2;
+
+    /// <summary>A geração de uma amostra; ausente é a 1.</summary>
+    public static int RegrasDe(AmostraDeVoz a) => a.Regras ?? 1;
+
+    /// <summary>
+    /// Se esta amostra participa de alguma comparação.
+    /// </summary>
+    /// <remarks>
+    /// Três razões para não participar, e as três levam ao mesmo lugar: a
+    /// quarentena (espera julgamento humano), o modelo (vetor de outro espaço) e
+    /// a geração de regras (colhida por um caminho que contaminava). Estão
+    /// juntas aqui para não haver um lugar do código que se lembre de duas e
+    /// esqueça a terceira.
+    /// </remarks>
+    public static bool Conta(AmostraDeVoz a, string modelo) =>
+        !a.Quarentena && RegrasDe(a) == RegrasAtuais && ModeloDe(a) == modelo;
+
     private readonly string _pasta;
     private readonly string _arquivo;
     private BibliotecaDeVozes _dados;
@@ -165,11 +262,20 @@ public sealed class Vozes
             _dados.Pessoas[pessoa] = perfil;
         }
 
-        // Quarentena só faz sentido contra um perfil que já existe; a primeira
-        // amostra de alguém não tem com o que ser comparada.
-        if (perfil.Amostras.Count > 0)
+        // Quarentena só faz sentido contra um perfil que já existe **no mesmo
+        // modelo**; a primeira amostra de alguém não tem com o que ser
+        // comparada, e a primeira amostra num modelo novo também não. Mandar
+        // esta última para quarentena marcaria como suspeita a única voz limpa
+        // que o modelo novo tem.
+        //
+        // A pergunta é feita aqui, e não pelo retorno da Semelhanca: ela devolve
+        // -1 quando não há grupos, e -1 também é um cosseno possível. Confundir
+        // "não dá para dizer" com "não parece nada" leva às duas decisões
+        // opostas.
+        string modeloDela = ModeloDe(amostra);
+        if (perfil.Amostras.Any(a => RegrasDe(a) == RegrasAtuais && ModeloDe(a) == modeloDela))
         {
-            double s = Semelhanca(amostra.Vetor, perfil);
+            double s = Semelhanca(amostra.Vetor, perfil, modeloDela);
             if (s < LimiarDeQuarentena) amostra.Quarentena = true;
         }
 
@@ -179,12 +285,23 @@ public sealed class Vozes
     }
 
     /// <summary>Quem é esta voz, ou <c>null</c> se ninguém conhecido.</summary>
-    public (string Pessoa, double Semelhanca)? Reconhecer(float[] vetor)
+    /// <param name="modelo">
+    /// O modelo que produziu <paramref name="vetor"/>. Só amostras do mesmo
+    /// modelo entram na conta; nulo vale o de sempre.
+    /// </param>
+    /// <remarks>
+    /// Quando o modelo muda, ninguém é reconhecido e todo mundo se reinscreve —
+    /// que é o comportamento certo e o único honesto. A alternativa é comparar
+    /// mesmo assim, e comparar entre modelos não devolve "não sei": devolve um
+    /// nome errado com aparência de certeza.
+    /// </remarks>
+    public (string Pessoa, double Semelhanca)? Reconhecer(float[] vetor, string? modelo = null)
     {
         (string, double)? melhor = null;
+        string qual = modelo is { Length: > 0 } m ? m : ModeloDeVozPadrao;
         foreach (var (nome, perfil) in _dados.Pessoas)
         {
-            double s = Semelhanca(vetor, perfil);
+            double s = Semelhanca(vetor, perfil, qual);
             if (s >= LimiarDeReconhecimento && (melhor is null || s > melhor.Value.Item2))
                 melhor = (nome, s);
         }
@@ -194,16 +311,35 @@ public sealed class Vozes
     /// <summary>
     /// Semelhança com uma pessoa: o melhor dos sub-perfis dela.
     /// </summary>
+    /// <param name="modelo">
+    /// Só amostras deste modelo contam. Nulo vale
+    /// <see cref="ModeloDeVozPadrao"/>.
+    /// </param>
+    /// <returns>
+    /// A semelhança. <b>-1 quando não há grupo nenhum</b> a comparar — mas -1
+    /// também é um cosseno possível, então quem precisa distinguir "não dá para
+    /// dizer" de "não parece nada" pergunta pelas amostras, e não pelo retorno.
+    /// É o que <see cref="Aprender"/> faz.
+    /// </returns>
     /// <remarks>
+    /// <para>
+    /// O modelo é <b>filtro</b> e não mais um critério de agrupamento. Como
+    /// sub-perfil, um grupo de outro modelo continuaria disputando o máximo — e
+    /// bastaria ele ganhar uma vez para o nome errado sair. O que se quer é que
+    /// ele não exista para esta conta.
+    /// </para>
+    /// <para>
     /// Os grupos saem do dispositivo e da faixa, que já vêm de graça no
     /// <c>meta.json</c>. Amostras em quarentena ficam de fora — elas esperam
     /// julgamento, e usá-las para reconhecer seria justamente deixar a
     /// contaminação agir.
+    /// </para>
     /// </remarks>
-    public static double Semelhanca(float[] vetor, PerfilDeVoz perfil)
+    public static double Semelhanca(float[] vetor, PerfilDeVoz perfil, string? modelo = null)
     {
+        string qual = modelo is { Length: > 0 } m ? m : ModeloDeVozPadrao;
         var grupos = perfil.Amostras
-            .Where(a => !a.Quarentena)
+            .Where(a => Conta(a, qual))
             .GroupBy(a => $"{a.Origem.Dispositivo}|{a.Origem.Faixa}");
 
         double melhor = -1;

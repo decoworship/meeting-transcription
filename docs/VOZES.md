@@ -246,3 +246,98 @@ o mesmo nos dois, por isso ele é a única parte disto que vale fazer
 Calibração de tudo (thresholds das três faixas, corte de quarentena,
 limiar de outlier): o gold set da [QUALIDADE.md](QUALIDADE.md) já tem os
 falantes rotulados — a curva falso-aceite × falso-rejeite sai dele.
+
+---
+
+## 8. Cada voz é de um modelo — e só vale dentro dele
+
+Implementado em 20/08/2026, a pedido do dono do produto.
+
+**Um vetor não significa nada fora do modelo que o gerou.** Modelos diferentes
+produzem espaços vetoriais diferentes, e o cosseno entre vetores de dois modelos
+**não dá erro**: dá um número plausível. O sintoma não aparece na hora — aparece
+meses depois, como *"o app chamou a Vanessa de Carla"*, e não há nada no arquivo
+que explique.
+
+Era um risco adormecido enquanto o modelo de voz não era escolhível. A §4.6 da
+[FASE6.md](FASE6.md) ligou o seletor de **pipeline de diarização**, e a distância
+entre "escolher o pipeline" e "escolher o modelo de voz" passou a ser uma linha
+de código — o momento certo de fechar isto é antes, não depois.
+
+### O que existe
+
+- **`AmostraDeVoz.Modelo`** — o nome dos **pesos** que produziram o vetor, não o
+  caminho: local ou do HuggingFace, são os mesmos bytes e o mesmo espaço. Quem
+  carimba é o motor, que passou a devolver `modelo` junto do `vetor`;
+- **`Vozes.Semelhanca` filtra por modelo** em vez de agrupar por ele. Como
+  sub-perfil, um grupo de outro modelo continuaria disputando o máximo, e
+  bastaria ganhar uma vez para o nome errado sair. O que se quer é que ele não
+  exista para aquela conta;
+- **`Reconhecer` recebe o modelo do vetor consultado.** Modelo novo, ninguém
+  reconhecido, todo mundo se reinscreve — que é o comportamento pedido, e o
+  único honesto: a alternativa não devolve "não sei", devolve um nome errado com
+  aparência de certeza;
+- **as duas bibliotecas convivem no mesmo perfil.** Trocar de modelo não apaga
+  nada; a mesma pessoa passa a ter amostras dos dois, e cada uma responde no
+  seu. É o que permite voltar atrás sem ter reinscrito ninguém à toa.
+
+### As três decisões que não são óbvias
+
+**Ausente é o modelo de sempre, e não "desconhecido".** Toda amostra gravada
+antes de 20/08/2026 saiu do `wespeaker-voxceleb-resnet34-LM`, porque ele nunca
+foi escolhível — isso não é suposição, é a única possibilidade. Tratá-las como
+desconhecidas invalidaria a biblioteca inteira num dia em que nada mudou.
+
+**A primeira amostra de um modelo novo não cai em quarentena.** Ela destoa de
+tudo o que existe — porque o que existe é de outro espaço. Marcá-la mandaria
+para a fila de revisão justamente a única voz limpa que o modelo novo tem. A
+pergunta "há com o que comparar?" é feita pelas amostras e não pelo retorno da
+semelhança: ela devolve `-1` quando não há grupos, e `-1` também é um cosseno
+possível.
+
+**Amostra de outro modelo aparece na tela, apagada.** Ela não é apagada do disco
+nem entra em conta nenhuma; se não aparecesse, a tela mostraria cinco amostras
+de alguém que o app não reconhece, sem nada explicando a contradição. Apagada e
+não colorida: não é um alerta esperando ação, é uma coisa inerte — pintá-la de
+amarelo a confundiria com a quarentena, que pede julgamento.
+
+### A geração de regras, e o descarte de 20/08/2026
+
+O mesmo desenho vale para uma segunda pergunta, que não é "de qual modelo" e sim
+**"colhida sob quais regras"**. `AmostraDeVoz.Regras` guarda a geração:
+
+| geração | quando | o que mudou |
+|---|---|---|
+| **1** | até 20/08/2026 | o vetor via o **intervalo inteiro** do segmento, e não havia guarda contra outra pessoa dentro dele |
+| **2** | desde 20/08/2026 | a janela do vetor é a mesma do trecho guardado, e bloco com o microfone ativo dentro é descartado |
+
+A geração 1 foi **descartada por decisão do dono do produto**: 27 pessoas, 48
+amostras. Não dá para saber quais foram atingidas — a contaminação não deixa
+marca no arquivo, e foi medida em um bloco com 30% de voz de quem não era o
+falante ([FASE6.md](FASE6.md) §4.2). Quando não dá para saber quais, a geração
+inteira sai.
+
+**Ausente é a geração 1, então não há migração.** As amostras em disco não têm o
+campo, e é isso que as identifica.
+
+**Geração e não data**, pelo mesmo motivo de sempre: a guarda passa a valer no
+build em que ela existe, e ninguém sabe quando ele será instalado. Uma data
+cravada classificaria errado tudo o que fosse aprendido entre a decisão e a
+atualização.
+
+**Descartar é não usar, não apagar.** O arquivo continua inteiro, a tela mostra
+as amostras apagadas com o motivo, e "Esquecer" continua sendo de quem lê.
+Reinscrever acontece sozinho: quando a pessoa for nomeada na próxima reunião, a
+amostra nova nasce na geração 2.
+
+`Vozes.Conta` reúne as três razões de uma amostra não participar — quarentena,
+modelo, geração. Estão juntas para não haver um lugar do código que se lembre de
+duas e esqueça a terceira.
+
+### O nome está em dois arquivos que não se falam
+
+`Vozes.ModeloDeVozPadrao` em C# e `MODELO_DE_VOZ` em
+`motores/diarizacao/motor.py`. Se eles discordarem, **toda voz já aprendida vira
+"de outro modelo"** e o app deixa de reconhecer quem sempre reconheceu, em
+silêncio. Um teste falha quando divergem — a mesma rede que a marca tem em
+`MarcaTests`, pelo mesmo motivo.

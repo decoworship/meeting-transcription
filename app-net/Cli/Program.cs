@@ -62,6 +62,9 @@ if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
             // A comparação que a FASE6 §5 pede — o mesmo app, no mesmo áudio,
             // com e sem — é esta linha de comando duas vezes.
             arg.ContainsKey("hotwords"),
+            // Comparar dois pipelines de diarização no mesmo áudio, que é o que
+            // a FASE6 §1.5 pede e a tela não faz.
+            arg.GetValueOrDefault("diarizacao"),
             pipelineCts.Token);
     }
     catch (OperationCanceledException)
@@ -81,6 +84,7 @@ if (audio is null)
     Console.Error.WriteLine(
         "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"Acme, Élio\"]\n"
         + "     [--filtrar-silencio] [--hotwords] [--idioma pt] [--saida x.json]\n"
+        + "     [--diarizacao community-1]\n"
         + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
         + "[--cancelar-em <segundos>]");
     return 2;
@@ -114,9 +118,12 @@ using (sidecar)
     try
     {
         relogio.Restart();
+        // Nomeados: o modelo entrou entre o progresso e o token, e passar o
+        // token na posição faria este caminho pedir um pipeline chamado
+        // "System.Threading.CancellationToken".
         var segmentos = await sidecar.DiarizarAsync(audio,
             (pct, texto) => Console.WriteLine($"  [{pct,4:P0}] {texto}"),
-            cancelamento.Token);
+            modelo: arg.GetValueOrDefault("diarizacao"), ct: cancelamento.Token);
 
         Console.WriteLine($"\n{segmentos.Count} segmentos em {relogio.Elapsed.TotalSeconds:F1} s, "
                           + $"{segmentos.Select(x => x.Falante).Distinct().Count()} falantes");

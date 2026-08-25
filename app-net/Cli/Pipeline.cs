@@ -16,7 +16,8 @@ internal static class Pipeline
 {
     public static async Task<int> ExecutarAsync(
         string pasta, string python, string? vocabulario, string? idioma,
-        string? destino, bool filtrarSilencio, bool usarHotwords, CancellationToken ct)
+        string? destino, bool filtrarSilencio, bool usarHotwords,
+        string? modeloDeDiarizacao, CancellationToken ct)
     {
         // No desenvolvimento os motores estão no repositório e o Python é o do
         // ambiente; no app instalado eles vêm numa pasta ao lado do executável.
@@ -35,7 +36,7 @@ internal static class Pipeline
         var resultado = await transcritor.ExecutarAsync(
             pasta, vocabulario, idioma, filtrarSilencio,
             p => Console.Write($"\r  {p.Etapa}: {p.Fracao,6:P0} {p.Texto}          "),
-            usarHotwords: usarHotwords, ct: ct);
+            usarHotwords: usarHotwords, modeloDeDiarizacao: modeloDeDiarizacao, ct: ct);
 
         Console.WriteLine($"\n\n{resultado.Segments.Count} segmentos, "
                           + $"idioma {resultado.Language}, "

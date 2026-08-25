@@ -137,12 +137,19 @@ public sealed class MotorSidecar : IDisposable
     /// O motor recusou a requisição, ou morreu no meio dela. As duas coisas
     /// precisam chegar legíveis à UI sem derrubar o app (critério C da Fase 2).
     /// </exception>
+    /// <param name="modelo">
+    /// O pipeline a usar, pelo nome da pasta em <c>modelos/</c>. Nulo usa o
+    /// padrão do motor.
+    /// </param>
     public async Task<IReadOnlyList<SegmentoDeFalante>> DiarizarAsync(
         string caminhoDoAudio, Action<double, string>? progresso = null,
-        CancellationToken ct = default)
+        string? modelo = null, CancellationToken ct = default)
     {
         var m = await ExecutarAsync(
-            new Requisicao { Id = _proximoId++, Op = "diarizar", Audio = caminhoDoAudio },
+            new Requisicao
+            {
+                Id = _proximoId++, Op = "diarizar", Audio = caminhoDoAudio, Modelo = modelo,
+            },
             progresso, ct);
 
         return (m.Segmentos ?? [])
@@ -207,7 +214,7 @@ public sealed class MotorSidecar : IDisposable
     /// Quem escolhe os trechos é o núcleo: quais representam a pessoa é decisão
     /// de produto, e o motor só sabe transformar áudio em vetor.
     /// </remarks>
-    public async Task<float[]> VozAsync(
+    public async Task<VozExtraida> VozAsync(
         string caminhoDoAudio, IReadOnlyList<(double Inicio, double Fim)> trechos,
         CancellationToken ct = default)
     {
@@ -221,7 +228,9 @@ public sealed class MotorSidecar : IDisposable
             },
             null, ct);
 
-        return m.Vetor ?? throw new MotorException("o motor não devolveu vetor de voz.");
+        return new VozExtraida(
+            m.Vetor ?? throw new MotorException("o motor não devolveu vetor de voz."),
+            m.ModeloDaVoz);
     }
 
     /// <summary>

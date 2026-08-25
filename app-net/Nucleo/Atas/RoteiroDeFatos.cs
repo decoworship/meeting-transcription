@@ -10,7 +10,12 @@ namespace MeetingApp.Nucleo.Atas;
 /// compromisso tem como chave a palavra do prazo ("hoje", "amanhã"), e cobrar
 /// que a ata repita a palavra "hoje" é cobrar coisa nenhuma.
 /// </param>
-public sealed record Fato(string Chave, string Trecho, double Quando, string Tipo = "numero");
+/// <param name="Unidade">
+/// O substantivo que acompanha o número na fala — "registros", "produtos",
+/// "reais". Vazio quando não dá para dizer.
+/// </param>
+public sealed record Fato(string Chave, string Trecho, double Quando, string Tipo = "numero",
+                          string Unidade = "");
 
 /// <summary>
 /// O que a reunião disse de concreto: números, compromissos, nomes, datas.
@@ -43,9 +48,15 @@ public static class RoteiroDeFatos
     /// <c>27.529</c>, <c>R$ 180 mil</c>, <c>95%</c>, <c>2 milhões</c>.
     /// </remarks>
     private static readonly Regex Numeros = new(
-        @"(R\$\s?[\d.,]+(\s*(mil|milh(ão|ões|oes)))?|[\d.,]+\s*(%|por\s?cento)"
-        + @"|\b\d{1,3}(\.\d{3})+([,.]\d+)?\b|\b\d{3,}\b"
-        + @"|\b[\d.,]+\s*(mil|milh(ão|ões|oes))\b)",
+        // A ORDEM importa, e ela custou um defeito. A alternância do regex é
+        // ordenada: com `\b\d{3,}\b` antes da forma com magnitude, "129 mil"
+        // casava como **"129"**, e a palavra seguinte — que o roteiro passou a
+        // ler como unidade — virava "mil". O número saía do roteiro menor do que
+        // foi dito. A magnitude vem antes por isso.
+        @"(R\$\s?[\d.,]+(\s*(mil|milh(ão|ões|oes)))?"
+        + @"|\b[\d.,]+\s*(mil|milh(ão|ões|oes)|bilh(ão|ões|oes))\b"
+        + @"|[\d.,]+\s*(%|por\s?cento)"
+        + @"|\b\d{1,3}(\.\d{3})+([,.]\d+)?\b|\b\d{3,}\b)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
@@ -59,7 +70,44 @@ public static class RoteiroDeFatos
     private static readonly Regex Compromissos = new(
         @"\b(eu\s+)?(te\s+)?(mando|envio|passo|gero|fa(ç|c)o|vejo|confirmo|verifico|olho"
         + @"|dou uma olhada|fico de|vou (mandar|enviar|passar|ver|fazer|confirmar|olhar|verificar)"
-        + @"|pode (deixar|contar)|combinado|fica(mos)? de)\b",
+        + @"|pode (deixar|contar)|combinado|fica(mos)? de"
+        // Acrescentados em 20/08/2026: a comparação com o Notion mostrou que a
+        // ata perdeu "a apresentação para a Carla no dia seguinte" — que era o
+        // **propósito** da reunião — e ficou só com "a próxima reunião será
+        // marcada para amanhã", sem dizer para quem nem para quê. O compromisso
+        // estava dito; o roteiro é que não tinha o verbo. FASE6 §1.6, defeito 3.
+        + @"|apresent(o|a|amos|ar)|mostr(o|a|amos|ar)|marc(o|a|amos|ar)"
+        + @"|agend(o|a|amos|ar)|entreg(o|a|amos|ar)|sub(o|e|imos|ir)"
+        + @"|revis(o|a|amos|ar)|levant(o|a|amos|ar))\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Preocupação dita: dependência, bloqueio, incidente, prazo apertado.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O verificador derruba risco inventado e ninguém fornecia risco real.</b>
+    /// Na reunião medida, a seção <c>riscos</c> saiu <b>vazia</b> — e a reunião
+    /// tinha um: o time de TI do cliente foi orientado a fazer o levantamento em
+    /// vez de receber a base, com um incidente já aberto com prioridade. É risco
+    /// de cronograma, estava na transcrição, e não chegou à ata
+    /// (FASE6 §1.6, defeito 3).
+    /// </para>
+    /// <para>
+    /// A régua da skill é "alguém sinalizou preocupação com prazo, dado,
+    /// capacidade ou dependência externa". Estas são as palavras com que isso é
+    /// dito em reunião — e, como no resto do roteiro, <b>errar para mais é
+    /// barato</b>: o modelo ignora o que não for risco, e o verificador derruba
+    /// o que ele escrever sem eco na fala.
+    /// </para>
+    /// </remarks>
+    private static readonly Regex Riscos = new(
+        @"\b(risco|arriscado|preocup(a|ado|ação|acao)|receio|problema|bloquei(o|ado|ando)"
+        + @"|travad(o|a)|trav(ou|ando)|impedimento|incidente|chamado aberto"
+        + @"|depende d(e|o|a)|dependência|dependencia|na m(ã|a)o d(e|o|a)"
+        + @"|esperando (o|a|pelo|pela)|no aguardo|em aberto"
+        + @"|n(ã|a)o vai dar tempo|prazo apertado|estour(a|ar|ou) o prazo"
+        + @"|corre o risco|se n(ã|a)o|caso contr(á|a)rio)\b",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Prazos ditos de forma relativa, que somem se ninguém fixar.</summary>
@@ -82,6 +130,7 @@ public static class RoteiroDeFatos
     {
         var numeros = new List<Fato>();
         var compromissos = new List<Fato>();
+        var riscos = new List<Fato>();
         var vistos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var s in segmentos)
@@ -93,7 +142,8 @@ public static class RoteiroDeFatos
             {
                 string chave = Normalizar(m.Value);
                 if (chave.Length == 0 || !vistos.Add($"n:{chave}")) continue;
-                numeros.Add(new Fato(m.Value.Trim(), Recorte(texto, m.Index), s.Start));
+                numeros.Add(new Fato(m.Value.Trim(), Recorte(texto, m.Index), s.Start,
+                                     "numero", UnidadeDe(texto, m)));
             }
 
             // Um trecho conta como compromisso quando alguém se compromete E há
@@ -111,9 +161,26 @@ public static class RoteiroDeFatos
                         compromissos.Add(new Fato(prazo.Value, Encurtar(texto), s.Start,
                                               "compromisso"));
             }
+
+            // Risco não precisa de prazo junto: "o TI deles está fazendo o
+            // levantamento" é dependência externa sem data nenhuma, e some da
+            // ata exatamente por parecer conversa.
+            if (Riscos.Match(texto) is { Success: true } risco)
+            {
+                string normalizado = Normalizar(texto);
+                string chave = normalizado[..Math.Min(60, normalizado.Length)];
+                if (vistos.Add($"r:{chave}"))
+                    riscos.Add(new Fato(risco.Value, Encurtar(texto), s.Start, "risco"));
+            }
         }
 
-        return [.. numeros.Take(limite), .. compromissos.Take(limite)];
+        // Metade do teto para os riscos, e não o teto inteiro: eles são a
+        // categoria mais frouxa das três — "problema" e "depende de" aparecem em
+        // conversa o tempo todo —, e o roteiro divide a janela de contexto com a
+        // transcrição, que é a fonte. Errar para mais é barato até o ponto em que
+        // empurra a fala para fora do contexto.
+        return [.. numeros.Take(limite), .. compromissos.Take(limite),
+                .. riscos.Take(limite / 2)];
     }
 
     /// <summary>O roteiro como o prompt o recebe.</summary>
@@ -131,10 +198,29 @@ public static class RoteiroDeFatos
             + "precisam entrar. Não invente nada que não esteja aqui ou na "
             + "transcrição.",
             "",
+            // A unidade vai marcada porque o modelo a reconstrói sozinho quando
+            // ela não está à mão — e reconstrói errado. Medido: "106 produtos
+            // com registros zerados (R$ 129 mil)", onde os 129 mil eram
+            // contagem de registros. Num documento cujo valor é ser citável,
+            // R$ colado num número que não é dinheiro é pior que a omissão.
+            "O que está *entre parênteses e em itálico* é a **unidade dita na "
+            + "reunião**. Use exatamente ela. Se um número não tiver unidade "
+            + "marcada, escreva-o sem unidade nenhuma — nunca acrescente R$, "
+            + "%, \"mil\" ou qualquer medida que não esteja na lista.",
+            "",
         };
 
+        if (fatos.Any(f => f.Tipo == "risco"))
+            linhas.Add("Os itens marcados **[risco]** são preocupações ditas por "
+                       + "alguém — dependência, bloqueio, incidente, prazo. Se "
+                       + "forem da reunião e não conversa solta, eles pertencem à "
+                       + "seção de riscos. **Não invente risco que não esteja "
+                       + "aqui**; o que não foi levantado por ninguém não entra.");
+
         foreach (var f in fatos)
-            linhas.Add($"- [{Relogio(f.Quando)}] **{f.Chave}** — {f.Trecho}");
+            linhas.Add($"- [{Relogio(f.Quando)}] {(f.Tipo == "risco" ? "**[risco]** " : "")}**{f.Chave}**"
+                       + (f.Unidade.Length > 0 ? $" *({f.Unidade})*" : "")
+                       + $" — {f.Trecho}");
 
         return string.Join("\n", linhas);
     }
@@ -163,6 +249,75 @@ public static class RoteiroDeFatos
         }
         return faltando;
     }
+
+    /// <summary>
+    /// O substantivo que vem logo depois do número na fala.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Por que o roteiro precisa disto.</b> Ele entregava o número com o
+    /// trecho em volta, e o modelo recuperava o número; a <b>unidade</b> ele
+    /// reconstruía sozinho, às vezes errado. A ata escreveu "106 produtos com
+    /// registros zerados (R$ 129 mil)" — os 129 mil eram contagem de registros,
+    /// e o resumo do Notion, que não tem verificador nenhum, acertou
+    /// (FASE6 §1.6, defeito 2).
+    /// </para>
+    /// <para>
+    /// <b>Deliberadamente burro.</b> Pula os conectores e pega a primeira
+    /// palavra de conteúdo depois do número: "129 mil registros" → registros;
+    /// "27.529 de produtos" → produtos. Não é análise sintática, e erra em
+    /// frases tortas — mas errar aqui custa uma unidade estranha na lista, que
+    /// o modelo pode ignorar, enquanto <b>não</b> ter a unidade custou um valor
+    /// em reais que não existia.
+    /// </para>
+    /// <para>
+    /// Número com <c>R$</c> ou <c>%</c> já carrega a unidade no próprio texto e
+    /// não recebe outra — marcá-lo com o substantivo seguinte produziria
+    /// "R$ 180 mil *(por)*".
+    /// </para>
+    /// </remarks>
+    private static string UnidadeDe(string texto, Match numero)
+    {
+        if (numero.Value.Contains("R$") || numero.Value.Contains('%')
+            || numero.Value.Contains("cento", StringComparison.OrdinalIgnoreCase))
+            return "";
+
+        string depois = texto[(numero.Index + numero.Length)..];
+
+        // A unidade, quando existe, vem colada ao número na mesma oração. Uma
+        // vírgula ou um ponto no meio já significa que o que vem depois é outra
+        // coisa — sem este corte, "são 27.529 , e a gente conversou sobre X"
+        // devolvia "gente" como unidade.
+        int pontuacao = depois.IndexOfAny([',', ';', '.', '!', '?', ':']);
+        if (pontuacao >= 0) depois = depois[..pontuacao];
+
+        foreach (Match palavra in Regex.Matches(depois, @"[\p{L}]+"))
+        {
+            string p = palavra.Value;
+            if (Conectores.Contains(p)) continue;
+            // Só as primeiras palavras: se a de conteúdo estiver longe, o
+            // número não está sendo medido por ela.
+            if (palavra.Index > 24) return "";
+            return p.ToLowerInvariant();
+        }
+        return "";
+    }
+
+    /// <summary>Palavras que ligam o número ao substantivo, e não são a unidade.</summary>
+    private static readonly HashSet<string> Conectores =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "de", "do", "da", "dos", "das", "em", "no", "na", "nos", "nas",
+            "e", "ou", "que", "com", "a", "o", "os", "as", "ao", "à", "aos",
+            "para", "por", "um", "uma", "uns", "umas", "mais", "menos",
+            "cerca", "aproximadamente", "quase", "só", "apenas", "tem", "são",
+            "é", "foi", "está", "estão", "ficou", "ficaram", "deu", "dá",
+            // A magnitude é parte do número, não a coisa medida. Ela já entra
+            // na chave pelo regex; aqui ela só não pode virar a unidade.
+            "mil", "milhão", "milhões", "milhao", "milhoes", "bilhão", "bilhões",
+            // "a gente" é sujeito, e cai bem no lugar onde a unidade estaria.
+            "gente",
+        };
 
     private static string Normalizar(string t) =>
         string.Concat(t.Where(char.IsLetterOrDigit)).ToLowerInvariant();

@@ -37,6 +37,10 @@ public sealed class VozesTests : IDisposable
         Vetor = vetor,
         CriadaEm = DateTimeOffset.UtcNow.ToString("o"),
         DuracaoS = 4.2,
+        // Como o app as cria hoje. Sem isto elas seriam da geração 1 e não
+        // participariam de comparação nenhuma — que é o comportamento certo,
+        // e não o que estes testes medem.
+        Regras = Vozes.RegrasAtuais,
         Origem = new Origem
         {
             Gravacao = "2026-08-10_11-50-26",

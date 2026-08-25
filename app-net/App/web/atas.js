@@ -8,7 +8,7 @@
 import { pedir } from "/ponte.js";
 import { alerta, campo } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado, cancelar } from "/transcricoes.js";
-import { duracao, quando, tituloDe } from "/app.js";
+import { duracao, quando, tituloDe, abrirGravacao } from "/app.js";
 
 const ETAPAS = {
   modelo: "Carregando o modelo",
@@ -212,6 +212,24 @@ function desenharAta(corpo, markdown, velha, abrir, gravacao) {
     }
   });
   acoes.appendChild(exportar);
+
+  // Ir para a transcrição, do lado de Copiar e Exportar.
+  //
+  // A ata afirma coisas, e a pergunta que ela provoca é sempre a mesma: "onde
+  // foi que isso foi dito?". Até aqui responder custava sair para Reuniões e
+  // achar a reunião na lista — a mesma reunião que já está aberta na tela.
+  //
+  // A revisão é um destino de Reuniões, então o ← de lá volta para a lista de
+  // reuniões, e não para cá. É de propósito: o trilho diz "Reuniões" porque é
+  // onde se está, e acender Atas mentiria sobre onde o voltar leva. Ver
+  // `destino` em app.js.
+  const verTranscricao = document.createElement("button");
+  verTranscricao.className = "aa-btn aa-btn-texto";
+  verTranscricao.type = "button";
+  verTranscricao.textContent = "Ver a transcrição";
+  verTranscricao.title = "Abrir a transcrição desta reunião, com os falantes e o áudio";
+  verTranscricao.addEventListener("click", () => abrirGravacao(gravacao));
+  acoes.appendChild(verTranscricao);
 
   const texto = document.createElement("div");
   texto.className = "ata__texto";

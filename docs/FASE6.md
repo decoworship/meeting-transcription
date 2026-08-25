@@ -161,6 +161,73 @@ relembrar, não uma correção.
 deixar o **modelo** narrar o que ela achou. A lista deduplicada, emitida pelo
 C#, sem prosa em volta, diz a mesma coisa sem poder se contradizer.
 
+> ✅ **Os quatro atacados em 20/08/2026. Três fechados, o quarto pela metade.**
+>
+> **Defeito 1 — o lado da pendência.** `Atas/DonoPelaFala.cs`. O buraco não era
+> a regra, era a **ordem em que as coisas se sabem**: o verificador confere o
+> *dono* e o lado vem do dono, e ele acabara de esvaziar o dono inventado
+> ("Vivo") — de modo que não sobrava nada de onde tirar o lado, e o palpite do
+> modelo ficava de pé. Agora, entre um passo e outro, a transcrição responde:
+> quem diz "eu vou te mandar" é o dono, e o lado dele vem do domínio do e-mail.
+> **Conservador por construção** — exige primeira pessoa, verbo de compromisso e
+> 60% de eco do conteúdo da ação no mesmo trecho; faltando qualquer um, a ação
+> continua sem dono, que é o estado honesto. E a fala citada vai para as
+> observações: a ata é auditável ou não é nada.
+>
+> **Defeito 2 — a unidade.** O roteiro passou a carregar o substantivo que
+> acompanha o número ("129 mil *(registros)*") e o prompt manda usar aquele e
+> nenhum outro. Achado ao escrever o teste: a **ordem da alternância** do regex
+> fazia "129 mil" casar como "129", e a unidade lida virava "mil" — o número
+> saía do roteiro menor do que foi dito, e isso já era assim antes.
+>
+> **Defeito 4 — a seção que se contradizia.** As observações do modelo passaram
+> a ser **descartadas**: a seção é só a medição do verificador. O campo continua
+> no esquema porque tirá-lo faria o modelo espalhar a prosa pelas outras seções.
+> O que se perde é a observação ocasionalmente útil sobre o áudio — aceitável
+> porque não havia como separá-la do inventado, e o inventado tinha a mesma cara
+> de certeza.
+>
+> **Defeito 3 — a omissão: só a metade determinística.** O que faltava não era
+> só o modelo esquecer, era **material que nunca chegava a ele**. O roteiro
+> ganhou uma terceira categoria, `risco` — dependência, bloqueio, incidente,
+> prazo apertado —, que é o que faltava para a seção `riscos` parar de sair
+> vazia numa reunião que tinha um; e os verbos de compromisso passaram a incluir
+> "apresentar", "marcar", "agendar", que é como a apresentação para a Carla foi
+> dita. **O resto continua aberto** e depende das duas passadas da §1.1: nada
+> disto ajuda o modelo a *escolher* melhor o que é relevante.
+>
+> *Régua:* nada disto foi medido contra uma ata nova. A comparação que fecha o
+> item é gerar de novo a ata da mesma reunião e conferir os quatro pontos — é o
+> que a §5 pede, e é a régua que este item sempre teve.
+
+> ## ✅ A régua foi corrida em 25/08/2026
+>
+> A ata da `2026-08-13_14-30-15` foi refeita com o **mesmo modelo** da medição
+> original (Qwen3-4B) e sobre a **mesma transcrição** — só o código mudou, que é
+> o que torna a comparação legível. O estado anterior ficou guardado em
+> `baseline-antes-da-fase6/` dentro da pasta da gravação.
+>
+> | defeito | antes (17/08) | depois (25/08) |
+> |---|---|---|
+> | **2** unidade | *"106 produtos, totalizando **R$ 2.300.000** … em um universo de 129.000 registros"*; 2 ocorrências de `R$` | *"106 produtos, com **129 mil registros zerados**"*; **zero** `R$` na ata inteira |
+> | **3** riscos | seção **vazia**, 1 risco derrubado | **2 riscos**, e o primeiro é o que a análise nomeou: *"o cliente pode realizar levantamento de dados de agosto em tempo real"* |
+> | **4** observações | 4 linhas, **2 delas prosa do modelo** | 3 linhas, **todas do verificador** |
+> | **1** lado | 5 pendências em `nosso` | 4 pendências em `cliente` — **não testável nesta reunião**, ver abaixo |
+>
+> **O defeito 1 não se mede aqui, e a tentativa provou outra coisa.** Esta
+> gravação é anterior à Fase 3 e tem `attendee_emails: null`; sem e-mail o
+> `ConferirLados` sai na primeira linha de propósito, e o `DonoPelaFala` não age
+> porque as ações já vinham com dono. **O lado virou de `nosso` para `cliente`
+> entre duas gerações da mesma ata, mesmo modelo, mesma transcrição** — ou seja,
+> sem e-mail o lado é sorteado pelo modelo. Isso dispara o gatilho da §2.1.
+>
+> *O que ficou em aberto:* a lista de "números que não aparecem nesta ata"
+> cresceu de **8 para 15**. Parte é efeito direto do conserto do regex — antes
+> capturava `180`, agora `180 mil`, e algumas aparecem nas duas formas (`130` e
+> `130 mil`) —, mas não está descartado que a cobertura tenha caído. As seções
+> também mudaram de forma (4 seções e 0 decisões viraram 2 e 3). **Não é melhora
+> nem piora até alguém olhar item a item.**
+
 > **A leitura geral.** O resumo do Notion é mais fácil de ler e mais completo em
 > cobertura de assunto; a ata do app é mais confiável no que afirma e é a única
 > das duas que se pode auditar. **A distância encolheu com o roteiro de fatos e
@@ -227,6 +294,16 @@ lado, de propósito.
 **Tem conserto barato:** o `calendar_event_id` está no `meta.json` das gravações
 antigas, e o evento no Google ainda tem os e-mails. Uma migração que relê os
 eventos e preenche os e-mails que faltam resolveria o histórico inteiro.
+
+> ⚠️ **O gatilho disparou em 25/08/2026**, e com medição. Ver a régua da §1.6: a
+> ata da `2026-08-13_14-30-15` foi gerada duas vezes, com o mesmo modelo e a
+> mesma transcrição, e as pendências saíram **todas em `nosso`** numa e **todas
+> em `cliente`** na outra. Sem `attendee_emails` o lado não é decidido — é
+> sorteado, e não há nada na ata que avise.
+>
+> **Isto agora bloqueia o defeito 1 da §1.6**, que é o mais caro dos quatro: ele
+> só é testável em gravação que tenha e-mail. Enquanto a migração não roda,
+> nenhuma reunião anterior a 14/08/2026 serve de régua para ele.
 
 ### 2.2 Nome e e-mail casados por posição
 
@@ -302,6 +379,25 @@ não toca nada não paga.
 *O que fica de fora, de propósito:* esconder a janela para a bandeja não para o
 áudio. Não foi relatado, e o app é feito para continuar trabalhando escondido —
 mas é o mesmo desenho, e se incomodar o gancho já existe.
+
+### 2.8 Da ata não se chegava à transcrição — ✅ **feito em 20/08/2026**
+
+**Gatilho:** já disparou. Pedido pelo dono do produto no uso normal.
+
+A ata **afirma** coisas, e a pergunta que ela provoca é sempre a mesma: *onde
+foi que isso foi dito?* — ainda mais depois da §1.6, que mediu que a ata erra o
+lado da pendência e a unidade de um número. Conferir custava sair para Reuniões
+e procurar na lista a mesma reunião que já estava aberta na tela.
+
+"Ver a transcrição" entra ao lado de Copiar e Exportar, dentro da ata aberta
+([`atas.js`](../app-net/App/web/atas.js)), e chama o `abrirGravacao` que a lista
+de Reuniões já usava — mesma tela, mesmo caminho, sem estado novo.
+
+**O ← de lá volta para Reuniões, e não para as Atas.** É de propósito: a revisão
+é um destino de Reuniões, o trilho acende Reuniões porque é onde se está, e
+acender Atas mentiria sobre onde o voltar leva (ver `destino` em `app.js`). Uma
+pilha de navegação de verdade resolveria isso, e é mais máquina do que este app
+precisa para duas telas.
 
 ---
 
@@ -611,6 +707,63 @@ tamanho do trecho guardado, e descartar do aprendizado qualquer bloco com
 regra do risco 4 do [PLANO.md](PLANO.md) §5 — **perfil de voz se reinscreve, não
 se conserta** —, e decidir isso é do dono do produto.
 
+> ✅ **O código foi consertado em 20/08/2026. A pendência dos vetores antigos
+> continua aberta, e é decisão do dono do produto.**
+>
+> **As duas coisas que o caminho pedia, feitas em `TrechosDe`:**
+>
+> 1. **o vetor passou a olhar a mesma janela que o trecho guardado** — 4 s,
+>    `SegundosDoTrecho`, que agora nomeia as duas coisas. Era essa diferença que
+>    fazia o defeito ser inauditável: o `.wav` de `trechos/` estava limpo, o
+>    vetor não, e quem conferisse ouvindo o arquivo não achava nada. De quebra,
+>    `Origem.T0/T1` passou a descrever o que o vetor de fato viu;
+> 2. **bloco com o microfone ativo dentro é descartado**, quando o falante não é
+>    o dono. A guarda antiga olhava os *vizinhos* do segmento; esta olha o
+>    *conteúdo* dele, contra o `mic.wav`, que é verdade e não estimativa.
+>
+> **O critério é o piso do `Montagem.RmsMinimoDoDono`, não a margem de
+> dominância.** Para *atribuir* um segmento ao dono é preciso que o microfone
+> vença o sistema; para *descartar* um bloco de inscrição basta que o dono
+> estivesse falando. As duas decisões têm custos diferentes — atribuir errado
+> aparece na revisão, inscrever errado persiste entre reuniões e envenena em
+> silêncio — e sobra fala numa reunião.
+>
+> **Quando não há microfone em mãos a guarda não roda**, e o resultado é o de
+> antes: `TrechosDe` recebe a faixa por parâmetro opcional. O pipeline a passa
+> de graça (já está em memória); a `Ponte`, no caminho de nomear alguém, lê só
+> ela — `Faixas.LerUma`, que existe para não trazer 460 MB da outra faixa para
+> nada.
+>
+> **Efeito colateral do §4.1:** o corte na troca de falante encurtou os
+> segmentos, e blocos longos eram exatamente os que carregavam duas pessoas. Os
+> dois consertos se somam; nenhum substitui o outro.
+>
+> **Decidido pelo dono do produto em 20/08/2026: a geração antiga sai de
+> circulação, e o app reaprende as vozes.**
+>
+> São 27 pessoas e 48 amostras, de 11/08 a 20/08. Nenhuma foi apagada — o
+> descarte é **não usar**: `AmostraDeVoz.Regras` guarda a geração de regras sob
+> a qual a amostra foi colhida, `Vozes.Conta` recusa as que não são da atual, e
+> a tela as mostra apagadas com o motivo ("aprendida antes da guarda de
+> contaminação"). Apagar de verdade continua sendo de quem lê, pelo "Esquecer"
+> que já existe.
+>
+> **Geração e não data.** A guarda passa a valer no build em que ela existe, e
+> não se sabe de antemão quando ele será instalado — uma data cravada
+> classificaria errado tudo o que fosse aprendido entre a decisão e a
+> atualização. A geração viaja com a amostra e não depende de relógio.
+>
+> **Ausente é a geração 1**, então não há migração: as 48 amostras em disco não
+> têm o campo, e é exatamente isso que as identifica.
+>
+> **Reinscrever acontece sozinho** — quando a pessoa for nomeada na próxima
+> reunião, a amostra nova nasce na geração 2 e volta a reconhecer. Até lá o app
+> não reconhece ninguém, que é o preço combinado.
+>
+> *O que fica:* a fila de revisão da §3.3 ficou mais interessante, porque agora
+> a tela tem três estados para explicar — quarentena, modelo antigo e geração
+> antiga — e só o primeiro pede ação.
+
 ### 4.3 O gate do VAD 0,15 continua aberto, e agora se sabe por quê
 
 **Gatilho:** o corpus da §5 trazer `system.wav` com silêncio de verdade.
@@ -626,10 +779,21 @@ fala pouco, que é o padrão de uso comum.
 **Gatilho:** já disparou.
 
 `Transcritor.ExecutarAsync` recebe `filtrarSilencio = false` por default e a
-[`Ponte.cs:907`](../app-net/App/Ponte.cs#L907) não passa o parâmetro. A classe
-inteira — com a justificativa do resultado 6-A, os testes e duas constantes
-calibradas — é código morto no caminho da GUI. **Ligar ou remover; deixar morto
-não é opção**, porque parece uma rede que não existe.
+`Ponte` não passava o parâmetro. A classe inteira — com a justificativa do
+resultado 6-A, os testes e duas constantes calibradas — era código morto no
+caminho da GUI. **Ligar ou remover; deixar morto não é opção**, porque parece
+uma rede que não existe.
+
+> ✅ **Já estava resolvido quando esta carta foi revista, em 20/08/2026.** A
+> chave existe em Ajustes › Transcrição (`filtrar_silencio` no `app.json`,
+> desligada por padrão) e a [`Ponte`](../app-net/App/Ponte.cs) a repassa ao
+> pipeline. Entrou junto com a chave da correção fonética, na 0.2.x, e **a carta
+> não acompanhou** — ficou aqui listada como aberta por duas versões.
+>
+> Vale mais como aviso do que como item: uma lista de revisões que descreve como
+> pendente algo já feito é o começo de uma lista de desejos, e esta carta se
+> defende disso conferindo o código antes de escolher o próximo item, não a
+> memória.
 
 ### 4.5 O `word_timestamps` é calculado e jogado fora
 
@@ -675,6 +839,101 @@ download que ainda por cima falha (ele tem portão). **Quando o seletor passar a
 valer, a entrada volta** — e volta com pesos locais, como o `community-1` tem
 hoje, senão ela reintroduz a dependência de token que a Fase 4 acabou de tirar.
 
+> ✅ **O seletor passou a valer em 20/08/2026. A entrada do 3.1 continua fora, e
+> agora por um motivo só.**
+>
+> **O caminho inteiro:** `diar_model` do projeto (ou `diarizacao_padrao` do app)
+> → `Pedido` → `Transcritor.ExecutarAsync(modeloDeDiarizacao:)` →
+> `MotorSidecar.DiarizarAsync` → campo `modelo` da requisição → a pasta em
+> `motores/diarizacao/modelos`. O motor **recarrega quando o nome muda**: manter
+> o pipeline quente é o que faz a segunda reunião não pagar o carregamento de
+> novo, e sem a recarga comparar dois modelos na mesma sessão devolveria a saída
+> do primeiro nas duas medições — errada, e calada.
+>
+> **A lista do seletor saiu do catálogo e passou a sair do disco**
+> (`Motores.ModelosDeDiarizacao`, mesmo critério do motor: pasta com
+> `config.yaml`). Era o catálogo que a alimentava, e ele perdeu a família
+> `diarizacao` na Fase 4 — de modo que a tela mostrava um seletor com **uma
+> opção morta**. Ler o disco faz a tela e o motor não terem como discordar, e é
+> o que fará um modelo novo aparecer sozinho no dia em que for empacotado.
+>
+> **Três armadilhas fechadas no caminho:**
+>
+> - **o modelo de voz não é escolhível, e é o mesmo motor.** Trocar o pipeline
+>   de diarização é seguro; trocar o de voz invalidaria toda voz já aprendida,
+>   porque vetores de modelos diferentes não são comparáveis — e a comparação
+>   não falha, passa a errar em silêncio. Está escrito no motor, no protocolo e
+>   na `SIDECAR.md`, porque é o tipo de coisa que se descobre tarde;
+> - **a tela de preparo gravava `diar_model: "community-1"` fixo** a cada
+>   transcrição, apagando o que tivesse sido escolhido em Ajustes › Clientes.
+>   Não se notava porque o valor era ignorado adiante de qualquer jeito — ligar
+>   o seletor sem isto teria feito a escolha durar até a primeira transcrição;
+> - **o nome vira caminho**, e vem de um arquivo editável à mão. Nome com
+>   separador ou `..` é recusado antes de tocar o disco.
+>
+> ✅ **Os pesos do 3.1 foram empacotados em 20/08/2026**, por decisão do dono do
+> produto — e o seletor deixou de ter uma opção só.
+>
+> **Ele é MIT, e não CC-BY como o community-1** (conferido no HuggingFace:
+> `speaker-diarization-3.1` e `segmentation-3.0`, os dois MIT, os dois com
+> portão automático). MIT permite redistribuir com o aviso de licença junto, e
+> o `LICENSE` viaja com os pesos.
+>
+> **O `config.yaml` do 3.1 precisou ser reescrito, e essa é a parte que não era
+> óbvia.** O do community-1 já aponta os pesos por `$model/...`, relativo à
+> própria pasta; o do 3.1 aponta para **nomes de repositório**
+> (`pyannote/segmentation-3.0`, `pyannote/wespeaker-voxceleb-resnet34-LM`).
+> Copiá-lo como veio produziria uma pasta que *parece* local e vai à rede na
+> primeira reunião — e a um repositório com portão, que é exatamente o defeito
+> que a Fase 4 tirou do app. O empacotador troca as duas linhas com `sed` sobre
+> o arquivo baixado, para os limiares do clustering continuarem vindo do
+> upstream em vez de uma cópia que envelhece calada, e uma régua nova reprova o
+> pacote se o nome do repositório sobreviver à troca.
+>
+> **31 MB**, de 57 para 88. Só 5,9 MB são peso novo (a segmentação): o embedding
+> do 3.1 é o **mesmo** wespeaker que o motor já usa para as vozes, copiado para
+> dentro da pasta. Cópia e não link — o instalador leva arquivos, e um link
+> simbólico viraria um arquivo de texto com um caminho do WSL na máquina de
+> quem instalou.
+>
+> **O community-1 continua o padrão**: ele vence por 6,7 pontos de DER (Fase 0).
+> O 3.1 existe para poder comparar na máquina de quem usa — e porque um seletor
+> com uma opção só não é um seletor.
+>
+> *O que falta:* **carregar o 3.1 uma vez**. O `pyannote.audio` não está
+> instalável nesta árvore (os motores rodam no Python embarcado do app), então
+> a reescrita do config foi conferida por leitura e por régua, não por execução.
+> Se ela estiver errada, o 3.1 falha ao carregar e o community-1 continua
+> intacto — o padrão não depende do que foi acrescentado.
+>
+> *E fica sem gatilho:* **comparar os dois DERs** só vale quando houver um
+> segundo pipeline em disco. O `Sidecar.exe` ganhou `--diarizacao <nome>` para
+> quando esse dia chegar.
+
+### 4.7 Cada voz aprendida agora é de um modelo — ✅ **feito em 20/08/2026**
+
+**Gatilho:** apontado pelo dono do produto ao ler a §4.6. É o risco que ligar o
+seletor acabou de aproximar.
+
+Um vetor de voz **não significa nada fora do modelo que o gerou**, e comparar
+entre modelos não falha: devolve um número plausível. Enquanto o modelo de voz
+não era escolhível, o risco dormia; a distância entre "escolher o pipeline de
+diarização" e "escolher o modelo de voz" passou a ser uma linha de código, e
+fechar isto **antes** custa um campo — depois custaria uma biblioteca de vozes
+que erra nomes sem ninguém saber por quê.
+
+Cada amostra passou a guardar o modelo que a produziu, e a comparação recusa
+misturar. Modelo novo, ninguém reconhecido, todo mundo se reinscreve — sem
+apagar nada: as duas bibliotecas convivem no mesmo perfil, cada uma respondendo
+no seu espaço.
+
+O desenho, as três decisões que não são óbvias e a rede que prende o nome nos
+dois arquivos que não se falam estão em [VOZES.md](VOZES.md) §8.
+
+**Isto não resolve a pendência da §4.2** — os vetores contaminados são do
+*mesmo* modelo, e nenhuma chave os separa. Continua sendo decisão do dono do
+produto.
+
 ---
 
 ## 5. A tarefa que **não** espera esta fase: comparar com outras fontes
@@ -714,6 +973,40 @@ anotado da Fase 0.
 paralelas, cobrindo os dois padrões de uso — reunião em que o dono fala pouco
 (onde o `system.wav` tem silêncio de verdade, e é o que fecha a §4.3) e reunião
 em que fala muito.
+
+**Onde a régua está em 21/08/2026:** três reuniões — Notion em 13/08, Gemini/Meet
+em 20 e 21/08. A régua está no piso, e o que falta é **diversidade**, não
+contagem: não há par paralelo de daily, de 1:1, nem de reunião longa com fala
+corrida.
+
+**O primeiro resultado que a régua entregou** está em
+[AUDITORIA-ATAS.md §6](AUDITORIA-ATAS.md): com os rótulos de falante do Meet como
+referência, em **duas** reuniões — uma de 7 min com seis pessoas e uma de 32 min
+com três —, **11% e 12% dos nossos segmentos chegam ao prompt da ata com o
+falante errado**. O erro é de **atribuição** (a fala inteira na boca da pessoa
+errada), e não de fronteira: fronteira mal posta responde por 0,6–0,7%, e fusão
+de dois falantes num segmento, por ~2%.
+
+Os dois números baterem entre reuniões tão diferentes é o que dá confiança neles.
+Se um terceiro par confirmar, **melhorar a diarização deixa de ser acabamento e
+vira pré-requisito da ata** — o que é decisão de arquitetura, não de ajuste, e
+muda o custo desta fase.
+
+> ⚠️ A primeira versão daquela seção concluía o contrário — que o modelo acústico
+> estava certo e o problema era a segmentação fina. A conclusão vinha de uma
+> métrica que classificava o erro pela posição da palavra no segmento, e com 38%
+> dos segmentos tendo quatro palavras ou menos, "erro de borda" dava 97% por
+> construção. Fica registrado porque é o tipo de erro de medição que a §5 existe
+> para pegar, e desta vez pegou o meu.
+
+**O que já dá para saber sem esperar por elas** está em
+[AUDITORIA-ATAS.md](AUDITORIA-ATAS.md): a varredura das 28 gravações do acervo
+atrás de contradição interna — o que a ata contradiz nela mesma, ou contradiz o
+`meta.json` da própria pasta. Ela achou 59 itens de ata gerados e descartados em
+silêncio, e uma cegueira do verificador de omissões a toda porcentagem abaixo de
+100%. **Nada daquilo precisou de fonte paralela, e nada daquilo a substitui:** a
+auditoria diz quantas vezes um defeito acontece, e a fonte paralela diz qual lado
+está certo. As decisões de conserto continuam esperando por esta seção.
 
 ---
 

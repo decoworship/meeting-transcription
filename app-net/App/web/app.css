@@ -678,6 +678,12 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 
 .amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
+
+/* Amostra de um modelo de voz que não é mais o do app: ela não é apagada, mas
+ * também não participa de nada. Apagada e não colorida — não é um alerta, é uma
+ * coisa inerte, e pintá-la de amarelo a confundiria com a quarentena, que pede
+ * ação de quem lê. */
+.amostra[data-outro-modelo="true"] { opacity: 0.55; }
 .amostra__proc { color: var(--cor-texto-suave); font-family: var(--fonte-mono); font-size: var(--texto-rotulo); }
 .amostra__acoes { display: flex; gap: var(--espaco-2); }
 
@@ -888,7 +894,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
 .ata__pendencia input { margin-right: var(--espaco-2); }
 
-.ata__acoes { display: flex; justify-content: flex-end; }
+.ata__acoes { display: flex; justify-content: flex-end; flex-wrap: wrap; }
 
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }

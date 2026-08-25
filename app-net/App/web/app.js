@@ -288,6 +288,9 @@ export function botaoApagarGravacao(g) {
  * último uso. O que o usuário faz aqui é conferir, não digitar do zero.
  */
 async function telaDePreparo(g) {
+  // A escolha do projeto, carregada com as preferências e repassada intacta.
+  let modeloDeDiarizacao = null;
+
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
 
@@ -430,6 +433,11 @@ async function telaDePreparo(g) {
     // console sem ninguém ver.
     if (!campoCliente.isConnected) return;
 
+    // Zerado a cada troca de projeto, antes de qualquer saída: sem isto, ir de
+    // um projeto que escolheu um pipeline para um projeto novo levava a escolha
+    // do primeiro junto, e a gravação a carimbava no segundo.
+    modeloDeDiarizacao = null;
+
     if (!prefs) {
       aviso.textContent = "projeto novo — será criado ao transcrever";
       return;
@@ -439,6 +447,10 @@ async function telaDePreparo(g) {
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
     document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
     document.getElementById("vocabulario").value = prefs.initial_prompt ?? "";
+    // Qual pipeline separa os falantes não tem campo nesta tela — escolhe-se em
+    // Ajustes › Clientes, por projeto, e aqui ele só viaja. Guardá-lo é o que
+    // impede as duas gravações abaixo de o substituírem por uma constante.
+    modeloDeDiarizacao = prefs.diar_model ?? null;
   }
 
   /**
@@ -487,7 +499,7 @@ async function telaDePreparo(g) {
           model_size: document.getElementById("modelo").value,
           engine: "faster-whisper",
           diarization: document.getElementById("diarizacao").value === "sim",
-          diar_model: "community-1",
+          diar_model: modeloDeDiarizacao,
           condition_on_previous_text: false,
           initial_prompt: caixaVocab.value.trim(),
         },
@@ -515,7 +527,12 @@ async function telaDePreparo(g) {
   for (const id of ["modelo", "idioma", "diarizacao"])
     document.getElementById(id).addEventListener("change", guardarVocabulario);
 
-  botao.addEventListener("click", () => transcrever(g, botao, painel));
+  // O modelo de diarização vai por parâmetro, e não por variável de módulo:
+  // `transcrever` é irmã de `telaDePreparo`, não aninhada nela, e ler a
+  // variável da outra dava "modeloDeDiarizacao is not defined" no clique de
+  // transcrever — com a tela já montada e tudo o mais funcionando.
+  botao.addEventListener("click",
+                         () => transcrever(g, botao, painel, modeloDeDiarizacao));
 
   // Reencontrar uma transcrição já em curso é o motivo de esta tela existir do
   // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa
@@ -635,7 +652,11 @@ async function abrirResultado(g) {
   }
 }
 
-async function transcrever(g, botao, painel) {
+/**
+ * @param modeloDeDiarizacao o que o projeto escolheu, ou null para o padrão do
+ *   app. Vem de fora porque quem o carrega é a tela de preparo.
+ */
+async function transcrever(g, botao, painel, modeloDeDiarizacao = null) {
   botao.disabled = true;
 
   try {
@@ -654,9 +675,11 @@ async function transcrever(g, botao, painel) {
           model_size: document.getElementById("modelo").value,
           engine: "faster-whisper",
           diarization: diar === "sim",
-          // Guardado como estava para o projeto não perder o campo, mas quem
-          // decide é o motor: o community-1 é o único que existe no sidecar.
-          diar_model: "community-1",
+          // Repassado como veio. Escrever uma constante aqui apagava, a cada
+          // transcrição, o que a pessoa tivesse escolhido em Ajustes › Clientes
+          // — e não se notava, porque o valor era ignorado adiante de qualquer
+          // jeito. Ver FASE6 §4.6.
+          diar_model: modeloDeDiarizacao,
           condition_on_previous_text: false,
           initial_prompt: vocabulario,
         },
@@ -676,6 +699,9 @@ async function transcrever(g, botao, painel) {
       // Sem isto a escolha de separar falantes era colhida na tela, salva nas
       // preferências do projeto e ignorada pelo pipeline.
       diarizar: diar === "sim",
+      // E qual pipeline separa. Sem isto o valor chegava até o disco e parava
+      // ali: o motor pedia o community-1 pelo nome, sempre.
+      diar_model: modeloDeDiarizacao,
       // Guardados com a transcrição: sem isto o cabeçalho do arquivo exportado
       // saía sem dizer de que cliente e projeto era a reunião.
       cliente: document.getElementById("cliente").value.trim(),
