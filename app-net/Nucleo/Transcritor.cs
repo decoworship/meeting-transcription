@@ -1,3 +1,4 @@
+using MeetingApp.Nucleo.Atas;
 using MeetingApp.Sidecar;
 
 namespace MeetingApp.Nucleo;
@@ -283,6 +284,7 @@ public sealed class Transcritor(Motores motores)
         string? modelo = null, string? cliente = null, string? projeto = null,
         bool diarizar = true, bool corrigirFonetica = true,
         bool usarHotwords = false, string? modeloDeDiarizacao = null,
+        bool revisarComModelo = false, CaminhosDoMotorDeAta? motorDeAta = null,
         CancellationToken ct = default)
     {
         // O vocabulário se divide em dois usos que sempre foram tratados como
@@ -463,8 +465,31 @@ public sealed class Transcritor(Motores motores)
         if (corrigirFonetica)
         {
             var entidades = EntidadesConhecidas(pastaDaGravacao, vocabulario, cliente, projeto);
-            var propostas = RevisaoDeTermos.Validar(
-                RevisaoDeTermos.Propor(segmentos.Select(s => s.Text), entidades), entidades);
+            var cruas = new List<Proposta>(
+                RevisaoDeTermos.Propor(segmentos.Select(s => s.Text), entidades));
+
+            // O segundo propositor, quando ligado. Ele nunca substitui o
+            // primeiro: as duas listas se somam e passam pela mesma porta.
+            // Falhar aqui não pode derrubar a transcrição — a revisão é
+            // acabamento, e o texto já está pronto.
+            if (revisarComModelo && motorDeAta is not null && entidades.Count > 0)
+            {
+                try
+                {
+                    progresso?.Invoke(new Progresso("montagem", 0.7, "revisando os termos"));
+                    cruas.AddRange(await PropositorDeModelo.ProporAsync(
+                        new MotorDeAta(motorDeAta), segmentos.Select(s => s.Text),
+                        entidades, ct: ct));
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e)
+                {
+                    Registro.Escrever("pipeline",
+                        $"a revisão pelo modelo falhou e foi ignorada: {e.Message}");
+                }
+            }
+
+            var propostas = RevisaoDeTermos.Validar(cruas, entidades);
 
             if (propostas.Count > 0)
             {

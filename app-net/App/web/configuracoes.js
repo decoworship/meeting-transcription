@@ -804,6 +804,27 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   fonetica.appendChild(comoVer);
   painel.appendChild(fonetica);
 
+  // A revisão pela regra não tem chave: ela roda junto com a correção fonética,
+  // não baixa nada e não usa a placa. O que se liga aqui é o SEGUNDO
+  // propositor — e a chave diz o preço, porque 640 MB é decisão de quem paga.
+  const revisao = bloco("Revisar nomes e siglas com o modelo",
+    "Os nomes do projeto e da agenda já são corrigidos por regra. Ligando isto, "
+    + "o modelo lê a transcrição e acha também o que a regra não alcança — "
+    + "'Cláudio' que era 'Claude', 'sexta' que era 'cesta'. Numa medição com "
+    + "dez erros reais, a regra pegou 3 e o modelo 8.");
+  revisao.classList.add("bloco--chave");
+  revisao.appendChild(chave(config.revisao_com_modelo === true,
+    (v) => gravar({ revisao_com_modelo: v })));
+
+  const preco = document.createElement("p");
+  preco.className = "campo__dica";
+  preco.textContent = "Precisa do modelo de ata baixado (640 MB) e acrescenta "
+    + "cerca de meio minuto por reunião. O modelo só sugere: as trocas passam "
+    + "pela mesma conferência da regra, e cada uma fica marcada com ✎ para você "
+    + "desfazer.";
+  revisao.appendChild(preco);
+  painel.appendChild(revisao);
+
   // ---- os domínios da casa
   //
   // Só os nossos, e não os dos clientes: quem não é da casa é cliente, e essa
