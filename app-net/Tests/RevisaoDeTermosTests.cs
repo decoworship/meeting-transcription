@@ -23,10 +23,6 @@ public sealed class RevisaoDeTermosTests
     [Theory]
     [InlineData("comparado inclusive com o G6CB", "G6CB", "GCCB",
                 "GCCB, Sorocaba, Uberlândia, NextBest")]
-    [InlineData("o pessoal da Algarve tem um problema", "Algarve", "Algar",
-                "Algar, Beegol, Redir")]
-    [InlineData("perguntar pro Cláudio, né", "Cláudio", "Claude",
-                "Claude, Excel, Sorocaba")]
     [InlineData("diferenciar a nível de PDB", "PDB", "PDV",
                 "PDV, NextBest, SKU")]
     [InlineData("o cliente Moevade ainda não marcou", "Moevade", "Monlevade",
@@ -52,6 +48,10 @@ public sealed class RevisaoDeTermosTests
     // trocá-las por regra quebraria qualquer reunião que cite a operadora.
     [InlineData("olhando a agenda do Tim, sabe", "Teams, Google Meet, Algar")]
     [InlineData("nos secrets da Tulsa API", "Tools, secrets, Algar")]
+    // Duas edições em palavra curta: é onde "Edgar" viraria "Algar". Medido no
+    // acervo — ver DistanciaPara. Estas duas o modelo pega; a regra não arrisca.
+    [InlineData("o pessoal da Algarve tem um problema", "Algar, Beegol, Redir")]
+    [InlineData("perguntar pro Cláudio, né", "Claude, Excel, Sorocaba")]
     public void DeixaParaOModelo(string frase, string entidades)
     {
         Assert.Empty(Propor(frase, entidades));
@@ -67,6 +67,26 @@ public sealed class RevisaoDeTermosTests
     public void TextoCertoNaoEhReescrito(string frase, string entidades)
     {
         Assert.Empty(Propor(frase, entidades));
+    }
+
+    [Fact]
+    public void NomeDePessoaNaoViraNomeDeCliente()
+    {
+        // O caso que definiu o corte de distância: "o que o Edgar tinha
+        // indicado", numa reunião cujo cliente é a Algar.
+        Assert.Empty(Propor("o que o Edgar tinha indicado que deve ser feito",
+                            "Algar, Agentes, Beegol"));
+    }
+
+    [Fact]
+    public void NomeVindoDeEmailNaoViraAlvo()
+    {
+        // "Felipeof" e "Emalina" são local-parts que a agenda devolveu como se
+        // fossem nome. Com eles na lista, a regra reescrevia "Felipe" — pessoa
+        // real, dita na reunião — para o lixo da agenda. O filtro está em
+        // Transcritor.EntidadesConhecidas; aqui fica a prova de que, se algum
+        // escapar, uma edição não basta para alcançá-lo.
+        Assert.Empty(Propor("o Felipe vai mandar o arquivo", "Felipeof, Algar"));
     }
 
     [Fact]

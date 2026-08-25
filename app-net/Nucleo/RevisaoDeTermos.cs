@@ -76,14 +76,33 @@ public static class RevisaoDeTermos
     /// Palavra que parece nome próprio ou sigla, que é onde o ASR erra assim.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <b>O recorte é o que torna a regra segura.</b> Palavra minúscula não
     /// entra: <c>sexta</c> por <c>cesta</c> e <c>pooling</c> por <c>polling</c>
     /// ficam de fora, e ficam de propósito — para decidir aquelas é preciso
     /// entender a frase, e é exatamente o que o propositor de modelo faz melhor.
     /// Uma regra que tentasse pegá-las reescreveria português correto.
+    /// </para>
+    /// <para>
+    /// <b>Maiúscula só vale no meio da frase</b>, e essa lição já estava escrita
+    /// no <see cref="CorrecaoFonetica"/> — eu a ignorei, e a primeira versão
+    /// desta classe rodou sobre o acervo propondo <c>Falar→Algar</c>,
+    /// <c>Jogar→Algar</c>, <c>Pegar→Algar</c>, <c>Gente→Agentes</c> e
+    /// <c>Felipe→Felipeof</c>. Início de frase também é maiúsculo, então sem
+    /// esse recorte a regra reescreve verbo comum como se fosse nome de cliente.
+    /// Doze das 37 gravações teriam sido corrompidas.
+    /// </para>
+    /// <para>
+    /// Sigla toda em maiúscula é exceção: <c>PDB</c> no começo da frase continua
+    /// sendo sigla, porque português não começa frase com três maiúsculas.
+    /// </para>
     /// </remarks>
     private static readonly Regex ParecemNome = new(
         @"^(?:\p{Lu}[\p{L}\p{Nd}.'-]*|\p{Lu}[\p{Lu}\p{Nd}]+)$", RegexOptions.Compiled);
+
+    /// <summary>Só maiúsculas e dígitos: sigla, e a posição na frase não importa.</summary>
+    private static readonly Regex Sigla = new(
+        @"^[\p{Lu}\p{Nd}][\p{Lu}\p{Nd}]+$", RegexOptions.Compiled);
 
     /// <summary>
     /// As trocas que a regra sustenta, lidas da transcrição.
@@ -106,6 +125,10 @@ public static class RevisaoDeTermos
         {
             string escrita = m.Value.Trim('.', '\'', '-');
             if (escrita.Length < TamanhoMinimo || !ParecemNome.IsMatch(escrita)) continue;
+
+            // Início de frase é maiúsculo por gramática, não por ser nome. Sem
+            // esta linha a regra reescreve "Falar" como "Algar". Ver ParecemNome.
+            if (!Sigla.IsMatch(escrita) && !MeioDeFrase(texto!, m.Index)) continue;
 
             string chave = Chave(escrita);
             // Já é um termo conhecido: nada a propor, e é o caso comum.
@@ -185,6 +208,13 @@ public static class RevisaoDeTermos
 
     // ─────────────────────────────────────────────────────────── interno
 
+    /// <summary>Há texto antes, e a frase anterior não terminou.</summary>
+    private static bool MeioDeFrase(string texto, int posicao)
+    {
+        string antes = texto[..posicao].TrimEnd();
+        return antes.Length > 0 && !".!?…".Contains(antes[^1]);
+    }
+
     private static List<string> Alvos(IEnumerable<string> entidades) =>
         [.. entidades
             .SelectMany(e => (e ?? "").Split([',', ';', '\n'], StringSplitOptions.TrimEntries
@@ -220,9 +250,24 @@ public static class RevisaoDeTermos
         return empate ? null : melhor;
     }
 
-    /// <summary>Sigla curta tolera uma edição; palavra maior tolera duas.</summary>
+    /// <summary>
+    /// Uma edição até seis letras; duas só em palavra mais longa.
+    /// </summary>
+    /// <remarks>
+    /// <b>Medido sobre as 37 gravações do acervo em 25/08.</b> Com duas edições
+    /// a partir de cinco letras a regra propunha seis trocas: cinco certas
+    /// (<c>Algarve→Algar</c> duas vezes, <c>Algarum→Algar</c>,
+    /// <c>Dalgar→Algar</c>, <c>VIVA→Vivo</c>) e uma errada — <c>Edgar→Algar</c>,
+    /// numa frase que diz "o que o Edgar tinha indicado". Nome de pessoa fica a
+    /// duas edições do nome do cliente, e a regra não tem como saber a
+    /// diferença.
+    ///
+    /// Com uma edição sobram duas propostas em 37 gravações, as duas certas. O
+    /// que se perde — <c>Algarve→Algar</c> — é exatamente o que o propositor de
+    /// modelo acerta, e é essa a divisão de trabalho entre os dois.
+    /// </remarks>
     private static int DistanciaPara(string a, string b) =>
-        Math.Min(a.Length, b.Length) <= 4 ? 1 : DistanciaMaxima;
+        Math.Min(a.Length, b.Length) <= 6 ? 1 : DistanciaMaxima;
 
     /// <summary>Sem acento e sem caixa — a comparação é de letras, não de estilo.</summary>
     private static string Chave(string t)

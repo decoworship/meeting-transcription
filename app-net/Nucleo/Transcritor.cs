@@ -447,8 +447,39 @@ public sealed class Transcritor(Motores motores)
                     // mostrar o que foi trocado e desfazer o que estiver errado.
                     // Antes ela era descartada aqui, e a correção acontecia sem
                     // deixar rastro.
-                    seg.Swaps = [.. trocas.Select(t => new TrocaFeita { De = t.De, Para = t.Para })];
+                    Anotar(seg, trocas);
                 }
+            }
+        }
+
+        // Depois da fonética, e não no lugar dela: as duas pegam coisas
+        // diferentes. A fonética recupera grafia de som parecido ("Jimmy" por
+        // "Dimi"); esta recupera sigla e nome próprio por distância de edição
+        // ("G6CB" por "GCCB"), que é onde a fonética acerta zero — medido nos
+        // dez casos de AuditoriaCorrecaoFonetica. Ver Nucleo/RevisaoDeTermos.cs.
+        //
+        // Rodar depois evita que as duas disputem a mesma palavra: o que a
+        // fonética já consertou vira termo conhecido e esta nem olha.
+        if (corrigirFonetica)
+        {
+            var entidades = EntidadesConhecidas(pastaDaGravacao, vocabulario, cliente, projeto);
+            var propostas = RevisaoDeTermos.Validar(
+                RevisaoDeTermos.Propor(segmentos.Select(s => s.Text), entidades), entidades);
+
+            if (propostas.Count > 0)
+            {
+                int mexidos = 0;
+                foreach (var seg in segmentos)
+                {
+                    var (texto, trocas) = RevisaoDeTermos.Aplicar(seg.Text, propostas);
+                    if (trocas.Count == 0) continue;
+                    seg.Text = texto;
+                    Anotar(seg, trocas);
+                    mexidos++;
+                }
+                Registro.Escrever("pipeline",
+                    $"revisão de termos: {propostas.Count} troca(s) em {mexidos} trecho(s) — "
+                    + string.Join(", ", propostas.Take(6).Select(p => $"{p.De}→{p.Para}")));
             }
         }
 
@@ -495,6 +526,53 @@ public sealed class Transcritor(Motores motores)
 
         progresso?.Invoke(new Progresso("montagem", 1, "pronto"));
         return resultado;
+    }
+
+    /// <summary>Acrescenta trocas ao rastro do trecho, sem apagar as de antes.</summary>
+    /// <remarks>
+    /// Atribuir em vez de acrescentar apagaria o que a correção fonética
+    /// registrou — e o rastro existe justamente para a pessoa poder desfazer.
+    /// </remarks>
+    private static void Anotar(SegmentoFinal seg, IEnumerable<Troca> trocas)
+    {
+        seg.Swaps ??= [];
+        seg.Swaps.AddRange(trocas.Select(t => new TrocaFeita { De = t.De, Para = t.Para }));
+    }
+
+    /// <summary>
+    /// Os termos que esta reunião conhece: vocabulário, cliente, projeto e quem
+    /// a agenda convidou.
+    /// </summary>
+    /// <remarks>
+    /// <b>Os nomes da agenda são de graça e são os que mais aparecem.</b> Numa
+    /// ata medida, o nome do cliente saiu errado no corpo enquanto o cabeçalho,
+    /// três linhas acima, o escrevia certo — porque o cabeçalho lê o meta.json e
+    /// o corpo lia o que o ASR ouviu. Aqui as duas fontes passam a ser a mesma.
+    /// </remarks>
+    private static IReadOnlyList<string> EntidadesConhecidas(
+        string pasta, string? vocabulario, string? cliente, string? projeto)
+    {
+        var (nomes, emails) = ConvidadosDaAgenda.Ler(pasta);
+        var pessoas = Atas.Organizacoes.Classificar(nomes, emails, []);
+
+        // **Nome de uma palavra só não vira alvo.** Quando a agenda não traz o
+        // nome de exibição, sobra o local-part do e-mail — e ele entra na lista
+        // como se fosse gente: "Felipeof", "Emalina", "Tomole",
+        // "Johnmartinez01". Medido em 25/08 sobre as 37 gravações: com eles
+        // dentro, a regra propunha reescrever "Felipe" (pessoa real, dita na
+        // reunião) para "Felipeof" (lixo da agenda), e "Emilia" para "Emalina".
+        //
+        // O corte custa pouco: alvo de uma palavra só quase nunca é o que a
+        // regra precisa, porque ela compara token contra token e nome de
+        // verdade vem com sobrenome. E o que se perde é uma correção; o que se
+        // evita é reescrever o nome certo de alguém.
+        var comNomeDeVerdade = pessoas
+            .Select(p => p.Nome)
+            .Where(n => n.Contains(' '));
+
+        return [.. new[] { vocabulario, cliente, projeto }
+            .Where(x => x is { Length: > 0 })
+            .Concat(comNomeDeVerdade)!];
     }
 
     /// <summary>
