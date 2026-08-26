@@ -295,6 +295,11 @@ lado, de propósito.
 antigas, e o evento no Google ainda tem os e-mails. Uma migração que relê os
 eventos e preenche os e-mails que faltam resolveria o histórico inteiro.
 
+**Medido no acervo em 26/08/2026:** das 44 gravações, **14 não têm
+`attendee_emails`** — e **13 dessas têm `calendar_event_id`**, ou seja, a
+migração recupera todas menos uma. Não existe nada em código que releia o evento
+a partir do id: o `calendar_event_id` só é escrito, nunca lido.
+
 > ⚠️ **O gatilho disparou em 25/08/2026**, e com medição. Ver a régua da §1.6: a
 > ata da `2026-08-13_14-30-15` foi gerada duas vezes, com o mesmo modelo e a
 > mesma transcrição, e as pendências saíram **todas em `nosso`** numa e **todas
@@ -398,6 +403,51 @@ de Reuniões já usava — mesma tela, mesmo caminho, sem estado novo.
 acender Atas mentiria sobre onde o voltar leva (ver `destino` em `app.js`). Uma
 pilha de navegação de verdade resolveria isso, e é mais máquina do que este app
 precisa para duas telas.
+
+### 2.9 A reunião era escolhida pelo app e só se descobria depois — ✅ **feito em 25/08/2026**
+
+**Gatilho:** já disparou. Pedido pelo dono do produto.
+
+O app decidia sozinho qual reunião da agenda rotulava a gravação, pela
+[`EscolhaDeEvento`](../app-net/Agenda/EscolhaDeEvento.cs): a que cobre o instante
+e, empatando, a mais curta. A regra acerta o caso comum e **não tem como acertar
+o ambíguo** — duas reuniões de verdade no mesmo horário, ou a que começa em vinte
+minutos e é a que vai ser gravada. É o mesmo buraco que o A13 da
+[FEATURES.md](FEATURES.md) descreve, e que lá se resolveria pelo `responseStatus`;
+aqui se resolveu perguntando.
+
+Pior que errar: **o erro só aparecia depois**, no `meta.json` e na ata, quando a
+reunião já tinha acabado. A consulta acontece depois que a captura começou —
+regra de ouro do [`ClienteDaAgenda`](../app-net/Agenda/ClienteDaAgenda.cs) —,
+então até o rótulo certo chegava sem ninguém ter pedido nada.
+
+A tela do Gravador ganhou **Reuniões da agenda**: as doze horas seguintes e as
+três anteriores, com a marca de qual delas rotularia a gravação **se ela
+começasse agora**. "Gravar esta" fixa outra, e a fixada vence a busca automática.
+
+**As três horas para trás são a correção de um segundo caso**, apontado pelo dono
+do produto ao ler a primeira versão desta feature: reunião atrasa. A de 14:00–14:30
+em que todos entram às 14:40 **já terminou no papel**, e com o retrospecto de
+quinze minutos da gravação ela sumiria da tela no minuto em que alguém aperta o
+gravar. Pior, isso já era verdade **antes** desta feature e continua sendo no
+caminho automático: sem nada cobrindo o instante, a `Escolher` cai na de início
+mais próximo — às 14:50 a gravação atrasada sairia carimbada com a reunião das
+15:00. A escolha à mão é o conserto; alargar o automático não é, porque
+adivinhar uma reunião encerrada carimba errado sem ninguém pedir.
+
+**O que faz a marca ser verdade, e não decoração.** Ela sai da
+`EscolhaDeEvento.SeGravasseAgora`, que é a mesma `Escolher` da gravação de
+verdade recortada na **mesma janela de ±15 min** — a lista vem de quinze horas, e
+sem o recorte a tela apontaria a reunião das 16h às 14h, prometendo um rótulo
+que o gravador não encontraria. **A lista alarga; a promessa não.** Uma heurística própria da tela criaria duas
+respostas para "qual reunião é esta", e a que aparece não seria a que grava.
+
+**A escolha vale para uma gravação, não para o dia:** o `Parar` a solta, porque
+uma escolha que sobrevivesse rotularia a reunião seguinte com o título da
+anterior, em silêncio — que é a falha que este item existe para tirar do app.
+Fixar durante a gravação também vale (o `meta.json` só é escrito no fim), e é
+quando se percebe que a reunião é outra. Desligar "usar a agenda" solta a
+escolha e esconde o bloco.
 
 ---
 
@@ -518,6 +568,30 @@ dela a montagem, o filtro de silêncio e a escrita também não registram nada �
 só quatro `Registro.Escrever` no `Transcritor`, todos no começo. Um desligamento
 na diarização e um vinte minutos depois, no pós-processamento, deixam
 **exatamente o mesmo log**.
+
+> ⚠️ **Conferido no código em 26/08/2026: este parágrafo envelheceu pela
+> metade, e o que sobrou dele é pior do que era.**
+>
+> São **oito** `Registro.Escrever` no `Transcritor` hoje, e **três correm depois
+> da diarização** — a trilha do dono e os segmentos cortados por troca de
+> falante, que entraram com a §4.5 e a `VozDoDono`. Nenhum foi posto ali para
+> diagnosticar nada, e mesmo assim eles separam dois desligamentos que antes
+> eram indistinguíveis: quem lê *"a faixa do microfone rendeu N trechos do
+> dono"* sabe que a diarização terminou.
+>
+> **O que continua mudo é o fim do pipeline — e ele ficou mais perigoso.** Do
+> `RepartirPorFalante` até o `transcricao.json` não há uma linha, e nesse trecho
+> mora o **reconhecimento de vozes conhecidas**, que sobe o pyannote **de novo**
+> (`AprendizadoDeVozes.ExtrairAsync` → `ScriptDiarizacao`) e **não assina o
+> `AoRegistrar`** — é a única das três cargas de GPU do pipeline que não escreve
+> nada, nem do motor. São **três** cargas de GPU em sequência, e não duas:
+> ASR → diarização → embeddings de voz. A tese térmica desta seção ("não é a
+> carga que mata, é a carga em cima da anterior") tem um degrau a mais do que
+> esta carta supunha, e é o degrau invisível.
+>
+> Consequência prática para os marcos de etapa do item 4 abaixo: eles têm de
+> cobrir **três** cargas, e a mais barata delas é assinar o `AoRegistrar` no
+> `ExtrairAsync`, que é uma linha.
 
 É a mesma lição de 18/08 aplicada à segunda metade do pipeline. E há uma
 reincidência de produto junto: `Registro.Ultimas()` existe e **ninguém a chama**
@@ -766,13 +840,63 @@ se conserta** —, e decidir isso é do dono do produto.
 
 ### 4.3 O gate do VAD 0,15 continua aberto, e agora se sabe por quê
 
-**Gatilho:** o corpus da §5 trazer `system.wav` com silêncio de verdade.
+**Gatilho:** ~~o corpus da §5 trazer `system.wav` com silêncio de verdade~~ —
+**disparou. O corpus já tem, medido em 26/08/2026.** Ver a tabela abaixo.
 
 A varredura sobre esta reunião não separou os limiares (4036–4055 palavras em
 quatro configurações) porque foi feita no `mix.wav`, que tem **0,3% de silêncio
 digital** — somar mic e sistema quase nunca dá zero exato, e isso apaga o
 critério de invenção. O áudio certo é o `system.wav` de reuniões em que o dono
 fala pouco, que é o padrão de uso comum.
+
+#### O acervo varrido: 44 gravações, e só três servem
+
+Medidos os 44 `system.wav` do acervo com o mesmo critério do
+[`sweep_vad.py`](../tools/sweep_vad.py) — quadro de 100 ms com **mais de 99% de
+amostras exatamente zero** conta como silêncio digital:
+
+| gravação | duração | silêncio digital |
+|---|---:|---:|
+| `2026-08-21_11-00-33` | 7,7 min | **16,5%** |
+| `2026-08-10_11-50-26` | 24,6 min | **16,3%** |
+| `2026-08-21_11-08-55` | 21,0 min | **13,0%** |
+| `2026-08-12_14-00-20` | 18,6 min | 3,3% |
+| `2026-08-26_15-00-29` | 31,7 min | 3,1% |
+| `2026-08-20_15-29-34` | 13,0 min | 2,9% |
+| *as outras 38* | — | **0,0% a 2,1%** |
+
+**As três primeiras somam ~8 minutos de silêncio digital verdadeiro**, e é isso
+que o critério de invenção precisa: cada palavra transcrita ali é erro sem
+margem de interpretação. As três têm fala de sobra em volta (46% a 77% dos
+quadros), então servem também como proxy de cobertura — não são gravações
+mortas.
+
+**Por que as outras 38 não servem, e por que isso não é defeito do gravador.**
+Em chamada, a ponta remota manda ruído de sala e conforto o tempo todo: o
+loopback está sempre entregando amostra, e amostra baixinha **não é zero**. O
+zero exato só aparece quando não há nada tocando — chamada que ainda não
+começou, todo mundo mudo do outro lado, ou o buraco que a
+`WasapiTrackCapture` preenche quando o loopback não dispara. Ou seja, o
+`system.wav` "com silêncio de verdade" é **raro por natureza**, e esperar que o
+uso normal produza mais dele é esperar sentado.
+
+#### O que falta para fechar o item
+
+1. rodar o `sweep_vad.py` nas **três** gravações acima, com as quatro
+   configurações do default (`0.35:500`, `0.2:500`, `0.1:300`, `sem-vad`);
+2. ler o trade-off como ele foi desenhado: **palavras em fala** sobe é bom,
+   **palavras em silêncio** sobe é invenção medida. O 0,15 do resultado 6-A
+   ([FASE0-RESULTADOS.md](FASE0-RESULTADOS.md)) ganhou 12 pontos de WER sobre
+   fala concatenada, quase sem silêncio — é justamente o regime oposto ao de uma
+   reunião, e é essa a dúvida que nunca foi resolvida;
+3. o que roda hoje em produção é `threshold=0.35`, `min_silence_duration_ms=500`
+   (`motores/asr/motor.py`), com `hallucination_silence_threshold=2.0` já ligado.
+   **Afrouxar para 0,15 é a proposta em julgamento, não o estado atual.**
+
+*Cuidado com a régua:* três gravações não são um corpus, e duas delas são do
+mesmo dia e provavelmente da mesma série. Se as três derem o mesmo veredito, ele
+vale; se divergirem, o item continua aberto por falta de material, e não por
+falta de medição.
 
 ### 4.4 O `FiltroDeSilencio` nunca roda
 
