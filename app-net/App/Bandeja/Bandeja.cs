@@ -97,6 +97,11 @@ internal sealed class Bandeja : IDisposable
         string status = estado.TextoDeStatus(
             _gravador.DuracaoAtual, _gravador.Faixa("mic")?.NomeDispositivo);
         if (_gravador.Evento is { } ev) status += $"\n{Gravador.Cortar(ev.Titulo, 40)}";
+        // Parado, a reunião escolhida na janela aparece aqui também: a bandeja e
+        // a janela mostrando estados diferentes do mesmo gravador é o erro que o
+        // Aplicacao.cs descreve, e escolher a reunião é estado do gravador.
+        else if (_gravador.Fixado is { } fx)
+            status += $"\nVai gravar: {Gravador.Cortar(fx.Titulo, 40)}";
         // Menu do Win32 não quebra linha: cada linha vira um item desabilitado.
         foreach (string linha in status.Split('\n'))
             raiz.Item(linha, habilitado: false);

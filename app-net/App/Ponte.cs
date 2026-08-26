@@ -72,6 +72,9 @@ internal sealed class Pedido
 
     /// <summary>Liga/desliga, nas opções do gravador.</summary>
     [JsonPropertyName("ligado")] public bool? Ligado { get; init; }
+
+    /// <summary>O id do evento da agenda a fixar; vazio solta a escolha.</summary>
+    [JsonPropertyName("evento")] public string? Evento { get; init; }
 }
 
 internal sealed class Resposta
@@ -165,6 +168,47 @@ internal sealed class Resposta
 
     /// <summary>Saiu versão nova? É o único caminho até quem já instalou.</summary>
     [JsonPropertyName("atualizacao")] public EstadoDaAtualizacao? Atualizacao { get; init; }
+
+    /// <summary>As próximas reuniões da agenda, para escolher qual gravar.</summary>
+    [JsonPropertyName("proximas")] public ProximasReunioes? Proximas { get; init; }
+}
+
+/// <summary>Uma reunião da agenda, como a tela precisa vê-la.</summary>
+/// <remarks>
+/// Só o que a tela desenha: o horário para ordenar e situar, o título para
+/// reconhecer, e a <b>contagem</b> de participantes — a lista inteira de nomes
+/// e e-mails de doze reuniões atravessaria a ponte cinco vezes por dia para
+/// caber num rótulo de duas palavras.
+/// </remarks>
+internal sealed class ReuniaoDaAgenda
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("titulo")] public required string Titulo { get; init; }
+
+    /// <summary>ISO 8601 com fuso, como veio do Google. A tela formata.</summary>
+    [JsonPropertyName("inicio")] public string? Inicio { get; init; }
+    [JsonPropertyName("fim")] public string? Fim { get; init; }
+    [JsonPropertyName("participantes")] public int Participantes { get; init; }
+    [JsonPropertyName("organizador")] public string? Organizador { get; init; }
+}
+
+/// <summary>O que a tela do Gravador mostra do calendário antes de gravar.</summary>
+internal sealed class ProximasReunioes
+{
+    /// <summary>
+    /// O <see cref="MeetingRecorder.Agenda.StatusDaAgenda"/> em minúsculas.
+    /// </summary>
+    /// <remarks>
+    /// A tela precisa dele inteiro, e não de um booleano: agenda nunca conectada
+    /// pede um convite discreto; token morto pede um aviso. Ver o comentário do
+    /// enum, que é onde essa distinção foi paga.
+    /// </remarks>
+    [JsonPropertyName("status")] public required string Status { get; init; }
+    [JsonPropertyName("detalhe")] public string? Detalhe { get; init; }
+    [JsonPropertyName("eventos")] public List<ReuniaoDaAgenda> Eventos { get; init; } = [];
+
+    /// <summary>Qual seria escolhida se a gravação começasse agora.</summary>
+    [JsonPropertyName("pre_definido")] public string? PreDefinido { get; init; }
 }
 
 /// <summary>
@@ -212,6 +256,16 @@ internal sealed class EstadoDoGravador
     /// <summary>A reunião da agenda que está sendo gravada, quando há uma.</summary>
     [JsonPropertyName("titulo")] public string? Titulo { get; init; }
     [JsonPropertyName("participantes")] public List<string>? Participantes { get; init; }
+
+    /// <summary>
+    /// O id da reunião fixada à mão, quando há uma.
+    /// </summary>
+    /// <remarks>
+    /// Vai no estado, e não só na resposta da listagem, porque quem fixa pela
+    /// bandeja ou por outra tela tem de aparecer aqui — o estado é empurrado, a
+    /// listagem só chega quando alguém pede.
+    /// </remarks>
+    [JsonPropertyName("fixado")] public string? Fixado { get; init; }
 
     [JsonPropertyName("notificacoes")] public bool Notificacoes { get; init; }
     [JsonPropertyName("usar_agenda")] public bool UsarAgenda { get; init; }
@@ -407,6 +461,7 @@ internal sealed class GravacaoResumo
 [JsonSerializable(typeof(Diagnostico))]
 [JsonSerializable(typeof(EstadoDoMotorDeAta))]
 [JsonSerializable(typeof(EstadoDaAtualizacao))]
+[JsonSerializable(typeof(ProximasReunioes))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -825,6 +880,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
                     break;
 
+                case "agenda-proximas":
+                    Responder(new Resposta { Id = p.Id, Proximas = await ProximasAsync() });
+                    break;
+
+                case "fixar-evento":
+                    gravador.Fixar(p.Evento);
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
                 case "usar-agenda":
                     gravador.UsarAgenda(p.Ligado ?? true);
                     Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
@@ -903,12 +967,40 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Gravacao = g.Estado.Gravando ? g.PastaAtual : null,
             Titulo = g.Evento?.Titulo,
             Participantes = g.Evento?.NomesDosParticipantes().ToList(),
+            Fixado = g.Fixado?.Id,
             Notificacoes = g.Estado.NotificacoesLigadas,
             UsarAgenda = g.Cfg.UseCalendar,
             AgendaConfigurada = MeetingRecorder.Agenda.ClienteDaAgenda.EstaConfigurado(),
             Conta = MeetingRecorder.Agenda.ClienteDaAgenda.EstaAutorizado()
                 ? MeetingRecorder.Agenda.ClienteDaAgenda.EmailDaConta() : null,
             Faixas = faixas,
+        };
+    }
+
+    /// <summary>
+    /// Pergunta as próximas reuniões ao Google e as traduz para a tela.
+    /// </summary>
+    /// <remarks>
+    /// Nunca lança — o <see cref="MeetingRecorder.Agenda.ClienteDaAgenda"/> já
+    /// converte falha em status, e a tela mostra o motivo no lugar da lista.
+    /// </remarks>
+    private async Task<ProximasReunioes> ProximasAsync()
+    {
+        var r = await gravador.ProximasAsync();
+        return new ProximasReunioes
+        {
+            Status = r.Status.ToString().ToLowerInvariant(),
+            Detalhe = r.Detalhe is { Length: > 0 } ? r.Detalhe : null,
+            PreDefinido = r.PreDefinido,
+            Eventos = [.. r.Eventos.Select(e => new ReuniaoDaAgenda
+            {
+                Id = e.Id,
+                Titulo = e.Titulo,
+                Inicio = e.Inicio?.ToString("yyyy-MM-ddTHH:mm:sszzz"),
+                Fim = e.Fim?.ToString("yyyy-MM-ddTHH:mm:sszzz"),
+                Participantes = e.NomesDosParticipantes().Count,
+                Organizador = e.Organizador,
+            })],
         };
     }
 

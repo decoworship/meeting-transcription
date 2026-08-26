@@ -32,6 +32,21 @@ public sealed record Consulta(Evento? Evento, StatusDaAgenda Status, string Deta
 }
 
 /// <summary>
+/// As próximas reuniões, e qual delas seria gravada agora.
+/// </summary>
+/// <remarks>
+/// <see cref="PreDefinido"/> sai da <see cref="EscolhaDeEvento.SeGravasseAgora"/>,
+/// que é a mesma regra da gravação de verdade, recortada na mesma janela. A tela
+/// não decide isso: se decidisse, passariam a existir duas respostas para "qual
+/// reunião é esta" e a que aparece não seria a que grava.
+/// </remarks>
+public sealed record Proximas(
+    IReadOnlyList<Evento> Eventos,
+    string? PreDefinido,
+    StatusDaAgenda Status,
+    string Detalhe = "");
+
+/// <summary>
 /// Associa uma gravação ao evento do Google Calendar que está acontecendo.
 /// </summary>
 /// <remarks>
@@ -44,6 +59,34 @@ public sealed class ClienteDaAgenda : IDisposable
 {
     /// <summary>Uma reunião raramente começa no minuto exato.</summary>
     public const int JanelaMinutos = 15;
+
+    /// <summary>Quanto do dia a tela mostra adiante.</summary>
+    /// <remarks>
+    /// Doze horas cobre o dia de trabalho inteiro visto de qualquer hora dele, e
+    /// no fim da tarde já mostra a primeira reunião de amanhã — que é a pergunta
+    /// que se faz às 18h. Mais que isso vira agenda, e agenda o Google já tem.
+    /// </remarks>
+    public static readonly TimeSpan Horizonte = TimeSpan.FromHours(12);
+
+    /// <summary>Quanto do passado a tela ainda mostra.</summary>
+    /// <remarks>
+    /// <para>
+    /// Muito mais que a <see cref="JanelaMinutos"/> de propósito. Reunião atrasa:
+    /// a de 14:00 que só arranca às 14:40 já terminou <b>no papel</b>, e com o
+    /// retrospecto de quinze minutos ela sumiria da tela na hora em que alguém
+    /// finalmente aperta o gravar. Três horas cobrem o atraso mais teimoso sem
+    /// listar a daily das 9h às 18h.
+    /// </para>
+    /// <para>
+    /// <b>Isto não afrouxa o rótulo automático.</b> A marca de "seria esta"
+    /// continua saindo da janela de ±15 min — ver
+    /// <see cref="EscolhaDeEvento.SeGravasseAgora"/>. Uma reunião que terminou há
+    /// uma hora entra na lista para <b>ser escolhida à mão</b>, e nunca para ser
+    /// adivinhada: adivinhá-la carimbaria uma gravação com a reunião errada, que
+    /// é a falha que esta tela existe para tirar do app.
+    /// </para>
+    /// </remarks>
+    public static readonly TimeSpan Retrospecto = TimeSpan.FromHours(3);
 
     /// <summary>Somente leitura: o gravador não tem motivo para escrever na agenda.</summary>
     public const string Escopo = "https://www.googleapis.com/auth/calendar.readonly";
@@ -104,10 +147,69 @@ public sealed class ClienteDaAgenda : IDisposable
     public async Task<Consulta> EventoAtualAsync(DateTimeOffset? quando = null,
                                                  CancellationToken ct = default)
     {
+        var agora = quando ?? DateTimeOffset.Now;
+        var margem = TimeSpan.FromMinutes(JanelaMinutos);
+
+        var (candidatos, status, detalhe) = await BuscarAsync(agora - margem, agora + margem, ct);
+        if (candidatos is null) return new Consulta(null, status, detalhe);
+        if (candidatos.Count == 0) return new Consulta(null, StatusDaAgenda.SemEvento);
+
+        var escolhido = EscolhaDeEvento.Escolher(candidatos, agora);
+        return escolhido is null
+            ? new Consulta(null, StatusDaAgenda.SemEvento)
+            : new Consulta(escolhido, StatusDaAgenda.Ok);
+    }
+
+    /// <summary>
+    /// As próximas reuniões, para escolher qual gravar antes de começar.
+    /// </summary>
+    /// <remarks>
+    /// Diferente da <see cref="EventoAtualAsync"/>, esta responde a alguém
+    /// olhando a tela — mas a regra de ouro continua valendo, porque nada aqui
+    /// está no caminho de iniciar uma captura: falhar devolve lista vazia com o
+    /// motivo, e o botão de gravar segue funcionando.
+    /// </remarks>
+    public async Task<Proximas> ProximasAsync(DateTimeOffset? quando = null,
+                                              CancellationToken ct = default)
+    {
+        var agora = quando ?? DateTimeOffset.Now;
+        var margem = TimeSpan.FromMinutes(JanelaMinutos);
+
+        // Olha três horas para trás, e não os quinze minutos da gravação: quem
+        // entra numa reunião atrasada precisa achá-la na tela depois de ela ter
+        // terminado no papel. Ver Retrospecto — e a marca continua sendo ±15 min.
+        // Mais eventos porque o intervalo é quinze vezes maior, e o corte do
+        // Google é por ordem de início: com 20 as reuniões do fim do dia
+        // sumiriam justamente nos dias cheios.
+        var (candidatos, status, detalhe) =
+            await BuscarAsync(agora - Retrospecto, agora + Horizonte, ct, maxResultados: 50);
+        if (candidatos is null) return new Proximas([], null, status, detalhe);
+
+        var ordenados = candidatos
+            .Where(e => e.Inicio is not null)   // dia inteiro não identifica reunião
+            .OrderBy(e => e.Inicio!.Value)
+            .ToList();
+
+        var preDefinido = EscolhaDeEvento.SeGravasseAgora(ordenados, agora, margem);
+        return new Proximas(ordenados, preDefinido?.Id,
+            ordenados.Count == 0 ? StatusDaAgenda.SemEvento : StatusDaAgenda.Ok);
+    }
+
+    /// <summary>
+    /// Os eventos de um intervalo, ou o motivo de não ter vindo nenhum.
+    /// </summary>
+    /// <remarks>
+    /// Lista nula é falha (o <c>status</c> diz qual); lista vazia é agenda vazia.
+    /// Nunca lança, pelo mesmo motivo de sempre: uma gravação em andamento não
+    /// pode ser contaminada por rede.
+    /// </remarks>
+    private async Task<(List<Evento>?, StatusDaAgenda, string)> BuscarAsync(
+        DateTimeOffset de, DateTimeOffset ate, CancellationToken ct, int maxResultados = 20)
+    {
         try
         {
-            if (!EstaConfigurado()) return new Consulta(null, StatusDaAgenda.NaoConfigurado);
-            if (!EstaAutorizado()) return new Consulta(null, StatusDaAgenda.NaoAutorizado);
+            if (!EstaConfigurado()) return (null, StatusDaAgenda.NaoConfigurado, "");
+            if (!EstaAutorizado()) return (null, StatusDaAgenda.NaoAutorizado, "");
 
             string? token;
             try
@@ -116,24 +218,21 @@ public sealed class ClienteDaAgenda : IDisposable
             }
             catch (TokenMortoException e)
             {
-                return new Consulta(null, StatusDaAgenda.TokenExpirado, e.Message);
+                return (null, StatusDaAgenda.TokenExpirado, e.Message);
             }
-            if (token is null) return new Consulta(null, StatusDaAgenda.NaoAutorizado);
-
-            var agora = quando ?? DateTimeOffset.Now;
-            var margem = TimeSpan.FromMinutes(JanelaMinutos);
+            if (token is null) return (null, StatusDaAgenda.NaoAutorizado, "");
 
             string url = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
-                + "?singleEvents=true&orderBy=startTime&maxResults=20"
-                + $"&timeMin={Uri.EscapeDataString(Iso(agora - margem))}"
-                + $"&timeMax={Uri.EscapeDataString(Iso(agora + margem))}";
+                + $"?singleEvents=true&orderBy=startTime&maxResults={maxResultados}"
+                + $"&timeMin={Uri.EscapeDataString(Iso(de))}"
+                + $"&timeMax={Uri.EscapeDataString(Iso(ate))}";
 
             using var req = new HttpRequestMessage(HttpMethod.Get, url);
             req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var resp = await _http.SendAsync(req, ct);
 
             if (!resp.IsSuccessStatusCode)
-                return new Consulta(null, StatusDaAgenda.Erro, $"HTTP {(int)resp.StatusCode}");
+                return (null, StatusDaAgenda.Erro, $"HTTP {(int)resp.StatusCode}");
 
             var dados = JsonSerializer.Deserialize(
                 await resp.Content.ReadAsStringAsync(ct), AgendaJson.Default.RespostaDeEventos);
@@ -143,18 +242,13 @@ public sealed class ClienteDaAgenda : IDisposable
                 .Select(Converter)
                 .ToList();
 
-            if (candidatos.Count == 0) return new Consulta(null, StatusDaAgenda.SemEvento);
-
-            var escolhido = EscolhaDeEvento.Escolher(candidatos, agora);
-            return escolhido is null
-                ? new Consulta(null, StatusDaAgenda.SemEvento)
-                : new Consulta(escolhido, StatusDaAgenda.Ok);
+            return (candidatos, StatusDaAgenda.Ok, "");
         }
         catch (Exception e)
         {
             // Deliberadamente amplo: nenhuma falha de calendário pode contaminar
             // uma gravação em andamento.
-            return new Consulta(null, StatusDaAgenda.Erro, e.Message);
+            return (null, StatusDaAgenda.Erro, e.Message);
         }
     }
 
