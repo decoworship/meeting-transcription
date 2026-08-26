@@ -1,6 +1,6 @@
 {
-  "versao": "0.5.0",
-  "publicada": "2026-08-25",
-  "notas": "A ata passa a dizer quem realmente falou, e não só quem foi convidado. Nomes e responsáveis param de sair pela metade ou como endereço de e-mail, e decisões e pendências param de sumir. A sua fala deixa de ser atribuída a outra pessoa quando você fala por cima de alguém.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.5.0"
+  "versao": "0.6.0",
+  "publicada": "2026-08-26",
+  "notas": "Você escolhe qual reunião está gravando, antes de gravar: a tela do Gravador lista as reuniões da sua agenda e marca qual delas seria usada se você apertasse o gravar agora. Reunião que atrasou e já terminou no papel continua na lista, em vez de sumir junto com a chance de a gravação sair com o nome certo.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.0"
 }
