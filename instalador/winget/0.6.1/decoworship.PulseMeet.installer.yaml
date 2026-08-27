@@ -14,7 +14,7 @@ ReleaseDate: 2026-08-26
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/decoworship/meeting-transcription/releases/download/v0.6.1/MeetingApp-0.6.1-instalador.exe
-    InstallerSha256: CF1F0192BD1B60093AC88F12D61376798365329F360C18F12AF0AEAD3BE2204B
+    InstallerSha256: 3A2243E2D642827F977CF558F8E34049061D2B4936ECABE9068F0ED62224E546
     # O AppId do MeetingApp.iss, com o sufixo _is1 que o Inno acrescenta ao
     # registrar em Programas e Recursos. É por ele que `winget upgrade` sabe
     # que a versão instalada é este pacote. O AppId nunca muda.
