@@ -21,6 +21,14 @@ pessoa. A Fase 5, o acabamento visual sobre o AA Design System, fechou em
 18/08/2026 ([docs/FASE5-HANDOFF.md](docs/FASE5-HANDOFF.md)). **A fase corrente é
 a 6**, qualidade da transcrição ([docs/FASE6.md](docs/FASE6.md)).
 
+**A [Fase 7](docs/FASE7.md) é estudo, não execução**, aberta em 27/08/2026:
+transcrever e separar falantes durante a própria reunião. Ela não manda fazer
+nada — pergunta o que precisaria ser verdade, e o resultado legítimo é "não vale
+a pena", com número. O acervo responde quase tudo offline, alimentando um motor
+de streaming com áudio já gravado. **O argumento mais forte contra ela é a
+gravação**: hoje o desligamento do §3.0 custa uma transcrição, que a retomada
+recupera; ao vivo custaria a reunião.
+
 **O tema mora no `app.json` e é aplicado pelo núcleo**, que reescreve o
 `data-tema` do `index.html` enquanto o serve (`App/Conteudo.cs`). Não é
 JavaScript: a ponte é assíncrona e o tema chegaria depois da primeira pintura.
