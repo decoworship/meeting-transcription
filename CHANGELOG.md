@@ -3,6 +3,51 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.6.1 — 27/08/2026
+
+**Nomes e siglas do projeto param de sair errados na transcrição.** O
+reconhecimento de fala troca nome próprio pela palavra comum que soa parecido — o
+cliente "GCCB" saía "G6CB" no meio da reunião enquanto o cabeçalho da ata, três
+linhas acima, escrevia certo. Agora o app compara o que foi escrito com o que ele
+já sabe (o vocabulário do projeto, o cliente e quem a agenda convidou) e conserta
+o que for claramente a mesma coisa. Cada troca fica marcada com ✎, e um clique
+desfaz.
+
+**E dá para pedir ajuda ao modelo, se você quiser.** Em Ajustes › Transcrição há
+uma chave nova, desligada: com ela, o modelo lê a transcrição e acha também o que
+a regra não alcança — o sistema "Kenan" que saiu "Kina" ou "Kino". Numa medição
+com dez erros reais de reuniões suas, a regra pegou 3 e o modelo 8. Custa o modelo
+de ata baixado e meio minuto por reunião; sem ela, a correção por regra continua.
+
+**A transcrição passa a pegar mais do que foi dito.** O detector de fala estava
+apertado demais e cortava fala baixa. Medido em quatro gravações suas, de 7 a 122
+minutos: o ajuste novo recupera 2 minutos de pausa numa reunião de duas horas, sem
+inventar uma palavra sequer sobre trecho mudo.
+
+**A ata diz quem falou, e não só quem foi convidado.** O cabeçalho listava a lista
+inteira da agenda — numa reunião com onze convidados e seis falantes, cinco pessoas
+que nunca abriram a boca apareciam como participantes. Agora são duas linhas: os
+convidados em cima, quem falou embaixo, na mesma ordem.
+
+**Os nomes param de sair pela metade, e o responsável para de sair como e-mail.**
+Quando a agenda não traz o nome de alguém, o app o deduzia do endereço — e um
+e-mail sem ponto virava uma palavra só. Isso fazia a pessoa aparecer ao mesmo
+tempo como quem não falou e como "falante não identificado". Pior: às vezes o app
+misturava os dois estilos, não reconhecia mais a pessoa e **apagava um responsável
+certo**.
+
+**Decisões e pendências param de sumir.** Duas coisas: seções inteiras eram
+descartadas em silêncio quando o modelo respondia por um caminho diferente do
+esperado — 52 itens perdidos em 5 das suas reuniões —, e decisões reais eram
+rebaixadas para "pontos em aberto" porque a conferência comparava palavra por
+palavra, e a reunião diz "tem que ser casado" enquanto a ata escreve "de forma
+casada". Das 19 rebaixadas nas suas atas, 12 eram legítimas.
+
+**A ata avisa quando um compromisso não virou pendência.** Já havia aviso quando
+um número sumia; agora há também quando some um item de ação. Uma ata sem
+pendência numa reunião que teve nove é pior que uma ata feia — parece completa, e
+ninguém é cobrado de nada.
+
 ## 0.6.0 — 26/08/2026
 
 **Você escolhe qual reunião está gravando, antes de gravar.** O app decidia
