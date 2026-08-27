@@ -62,6 +62,95 @@ public sealed class EscolhaDeEventoTests
     }
 }
 
+/// <summary>
+/// A promessa que a tela do Gravador faz: "se você gravar agora, é esta".
+/// </summary>
+/// <remarks>
+/// O que estes testes guardam é o recorte da janela. A lista das próximas
+/// reuniões vem de doze horas adiante e a gravação só enxerga quinze minutos
+/// para cada lado — sem o recorte, a tela apontaria a reunião das 16h às 14h e
+/// o gravador não acharia nada.
+/// </remarks>
+public sealed class SeGravasseAgoraTests
+{
+    private static readonly DateTimeOffset Agora = new(2026, 8, 25, 14, 0, 0, TimeSpan.Zero);
+    private static readonly TimeSpan Janela = TimeSpan.FromMinutes(ClienteDaAgenda.JanelaMinutos);
+
+    private static Evento Ev(string id, DateTimeOffset? ini, DateTimeOffset? fim) =>
+        new(id, id, ini, fim, [], null);
+
+    [Fact]
+    public void ForaDaJanelaNaoEPrometida()
+    {
+        // A das 16h aparece na lista da tela, e não pode ganhar a marca: às 14h
+        // o gravador não a veria.
+        var tarde = Ev("tarde", Agora.AddHours(2), Agora.AddHours(3));
+        Assert.Null(EscolhaDeEvento.SeGravasseAgora([tarde], Agora, Janela));
+    }
+
+    [Fact]
+    public void DentroDaJanelaVenceAQueComecaLogo()
+    {
+        var logo = Ev("logo", Agora.AddMinutes(10), Agora.AddMinutes(40));
+        var tarde = Ev("tarde", Agora.AddHours(3), Agora.AddHours(4));
+
+        Assert.Equal("logo", EscolhaDeEvento.SeGravasseAgora([tarde, logo], Agora, Janela)!.Id);
+    }
+
+    [Fact]
+    public void AQueEstaCorrendoHaUmaHoraContinuaConcorrendo()
+    {
+        // O recorte é por sobreposição, e não por início: é assim que a API do
+        // Google responde a um intervalo, e uma reunião longa já começada é
+        // exatamente a que se quer gravar ao apertar o botão atrasado.
+        var correndo = Ev("correndo", Agora.AddHours(-1), Agora.AddMinutes(30));
+        Assert.Equal("correndo",
+            EscolhaDeEvento.SeGravasseAgora([correndo], Agora, Janela)!.Id);
+    }
+
+    [Fact]
+    public void AQueAcabouDeTerminarSaiDaPromessa()
+    {
+        var acabou = Ev("acabou", Agora.AddHours(-1), Agora.AddMinutes(-20));
+        Assert.Null(EscolhaDeEvento.SeGravasseAgora([acabou], Agora, Janela));
+    }
+
+    [Fact]
+    public void AQueAtrasouContinuaNaLista_MasNaoNaPromessa()
+    {
+        // Reunião de 14:00–14:30 em que todo mundo entrou às 14:40: às 15:00 ela
+        // já terminou no papel. Precisa estar na tela para ser escolhida à mão —
+        // e não pode ganhar a marca, porque o rótulo automático não a veria.
+        var atrasada = Ev("atrasada", Agora.AddMinutes(-60), Agora.AddMinutes(-30));
+
+        Assert.True(EscolhaDeEvento.NaJanela(atrasada, Agora, ClienteDaAgenda.Retrospecto));
+        Assert.Null(EscolhaDeEvento.SeGravasseAgora([atrasada], Agora, Janela));
+    }
+
+    [Fact]
+    public void ADeDiaInteiroNuncaEntra()
+    {
+        Assert.False(EscolhaDeEvento.NaJanela(Ev("aniversario", null, null), Agora, Janela));
+    }
+
+    [Fact]
+    public void ConcordaComOQueAGravacaoEscolheria()
+    {
+        // A régua que dá sentido ao resto: a marca da tela e o rótulo que o
+        // meta.json recebe têm de sair da mesma decisão. Duas reuniões
+        // sobrepostas é o caso em que uma heurística própria da tela divergiria.
+        var foco = Ev("foco", Agora.AddHours(-2), Agora.AddHours(2));
+        var reuniao = Ev("reuniao", Agora.AddMinutes(-10), Agora.AddMinutes(20));
+        var tarde = Ev("tarde", Agora.AddHours(5), Agora.AddHours(6));
+
+        var naTela = EscolhaDeEvento.SeGravasseAgora([foco, reuniao, tarde], Agora, Janela);
+        // O que a gravação vê é só o que a consulta de ±15 min devolve.
+        var naGravacao = EscolhaDeEvento.Escolher([foco, reuniao], Agora);
+
+        Assert.Equal(naGravacao!.Id, naTela!.Id);
+    }
+}
+
 public sealed class ParticipantesTests
 {
     private static Evento Com(params Participante[] p) =>

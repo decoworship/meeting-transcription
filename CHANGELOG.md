@@ -3,6 +3,31 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.6.0 — 26/08/2026
+
+**Você escolhe qual reunião está gravando, antes de gravar.** O app decidia
+sozinho, e decidia bem no caso fácil: a reunião que está acontecendo agora. No
+caso difícil ele não tinha como acertar — duas reuniões no mesmo horário, ou a
+que começa daqui a vinte minutos e é a que você vai gravar de verdade. E o erro
+não aparecia na hora: aparecia dias depois, na ata, com o título e os
+participantes de outra reunião. A tela do Gravador agora lista as reuniões da
+sua agenda, marca qual delas seria usada se você apertasse o gravar neste
+instante, e deixa você apontar outra com um clique.
+
+**A reunião que atrasou não some mais da tela.** Reunião marcada para 14:00 em
+que todo mundo entra às 14:40 já terminou no papel quando alguém lembra de
+gravar — e ela sumia da lista exatamente aí, junto com a chance de a gravação
+sair com o nome certo. Pior: sem ela por perto, o app pegava a reunião
+*seguinte* como rótulo, porque era a mais próxima que ele enxergava. A lista
+agora guarda as três horas anteriores, e as que já terminaram ficam ali,
+recuadas e ainda escolhíveis.
+
+**A escolha vale para uma gravação, não para o dia.** Ao parar, ela é solta
+sozinha — uma escolha que sobrevivesse carimbaria a próxima reunião com o título
+da anterior, em silêncio, que é o problema que isto veio resolver. Trocar no meio
+da gravação também funciona: é quando se percebe que a reunião é outra, e o
+arquivo com os dados da reunião só é escrito no fim.
+
 ## 0.5.0 — 25/08/2026
 
 **A ata diz quem falou, e não só quem foi convidado.** O cabeçalho listava a

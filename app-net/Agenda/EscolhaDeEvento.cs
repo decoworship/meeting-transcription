@@ -49,4 +49,34 @@ public static class EscolhaDeEvento
 
         return melhorCobrindo ?? melhorProximo;
     }
+
+    /// <summary>
+    /// O que seria escolhido se a gravação começasse neste instante.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Existe para a tela poder <b>prometer</b> um rótulo antes de gravar, e por
+    /// isso ela não pode ter regra própria: a lista das próximas reuniões vem de
+    /// uma janela larga (horas), e a gravação de verdade só enxerga
+    /// <see cref="ClienteDaAgenda.JanelaMinutos"/> minutos para cada lado. Sem
+    /// recortar a janela aqui, a tela apontaria a reunião das 16h às 14h e o
+    /// gravador não acharia nada — a promessa mais cara que uma tela pode fazer.
+    /// </para>
+    /// <para>
+    /// O recorte é por <b>sobreposição</b>, e não por início, porque é assim que
+    /// a API do Google responde a um intervalo: uma reunião que começou há uma
+    /// hora e ainda está correndo volta na consulta e concorre.
+    /// </para>
+    /// </remarks>
+    public static Evento? SeGravasseAgora(IReadOnlyList<Evento> candidatos,
+                                          DateTimeOffset agora, TimeSpan janela) =>
+        Escolher([.. candidatos.Where(e => NaJanela(e, agora, janela))], agora);
+
+    /// <summary>O evento toca o intervalo <c>[agora - janela, agora + janela]</c>.</summary>
+    public static bool NaJanela(Evento e, DateTimeOffset agora, TimeSpan janela)
+    {
+        if (e.Inicio is not { } inicio) return false;   // dia inteiro nunca conta
+        var fim = e.Fim ?? inicio;
+        return inicio <= agora + janela && fim >= agora - janela;
+    }
 }

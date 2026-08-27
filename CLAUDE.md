@@ -44,9 +44,12 @@ retomar o parcial errado devolve o texto de outro modelo em silêncio** — por
 isso modelo, idioma e vocabulário são conferidos, e na dúvida o ASR roda de
 novo.
 
-**O registro ainda tem um buraco**: só há quatro `Registro.Escrever` no
-`Transcritor`, todos antes da diarização. Um desligamento na diarização e um no
-pós-processamento deixam o mesmo log. A 0.4.1 fecha isso — e faz o app ler o
+**O registro ainda tem um buraco, e ele mudou de lugar** (conferido em
+26/08/2026): dos oito `Registro.Escrever` do `Transcritor`, três já correm
+depois da diarização, então ela deixa rastro. O mudo agora é o **fim** do
+pipeline — e é lá que o reconhecimento de vozes sobe o pyannote pela segunda vez
+(`AprendizadoDeVozes.ExtrairAsync`) sem assinar o `AoRegistrar`. São **três**
+cargas de GPU em sequência, e a terceira é invisível. A 0.4.1 fecha isso — e faz o app ler o
 Event Log e amostrar o `nvidia-smi` sozinho, porque pedir isso ao usuário já
 custou duas idas e voltas com respostas erradas.
 
@@ -82,7 +85,7 @@ junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 340 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 463 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB

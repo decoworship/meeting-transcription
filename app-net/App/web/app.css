@@ -838,6 +838,76 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * inventar valores que o microfone não produziu. */
 .medidor > div { height: 100%; width: 0; background: var(--cor-sucesso); }
 
+/* ─────────────────────────────────────────── as próximas reuniões */
+
+/* Título à esquerda, "Atualizar" à direita — o mesmo arranjo do topo da ata. */
+.bloco__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.reunioes { display: grid; gap: var(--espaco-2); }
+
+.reuniao {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+}
+
+/* A escolhida se destaca pela borda e pelo fundo, e não só pela etiqueta: é a
+ * resposta à pergunta "qual vai ser gravada", e ela tem de se ver de relance —
+ * do mesmo jeito que o cartão do modelo em uso. */
+.reuniao[data-escolhida="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+
+/* A que já terminou no papel continua clicável — é a que se procura quando a
+ * reunião atrasou —, mas recuada: sem isso a lista de fim de tarde parece um
+ * histórico, e o que se procura nela é o que ainda vai acontecer. */
+.reuniao[data-terminou="true"] { opacity: .6; }
+.reuniao[data-terminou="true"]:hover, .reuniao[data-terminou="true"]:focus-within { opacity: 1; }
+
+.reuniao__hora {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-rotulo);
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+
+.reuniao__titulo {
+  margin: 2px 0 0;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.reuniao__fatos { margin: 2px 0 0; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+
+.reuniao__marca {
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 8px;
+  border-radius: var(--raio-pilula);
+  background: var(--cor-acao-suave);
+  color: var(--cor-acao);
+}
+
+/* "Seria esta" é palpite do app; "Escolhida" é resposta do usuário. Cores
+ * diferentes porque a diferença entre as duas é a única coisa que este bloco
+ * existe para dizer. */
+.reuniao__marca[data-tipo="automatica"] {
+  background: var(--cor-superficie-2);
+  color: var(--cor-texto-suave);
+}
+
 /* Faixa sem áudio nenhum passados 45 s — o mesmo limiar do ícone amarelo. Uma
  * barra parada e uma barra baixa se parecem demais para deixar sem cor. */
 .medidor[data-morto="true"] { background: var(--cor-erro-bg); box-shadow: inset 0 0 0 1px var(--cor-erro); }

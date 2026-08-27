@@ -53,6 +53,27 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     /// <summary>A reunião da agenda que está sendo gravada, quando há uma.</summary>
     public Evento? Evento { get; private set; }
 
+    /// <summary>
+    /// A reunião que o usuário escolheu na tela, e que vence a busca automática.
+    /// </summary>
+    /// <remarks>
+    /// Existe porque a escolha automática acerta o caso comum e não tem como
+    /// acertar o caso ambíguo: duas reuniões sobrepostas, ou a que começa em
+    /// vinte minutos e é a que vai ser gravada. Fixar é dizer qual, antes de
+    /// começar — e o rótulo errado só se descobre depois, na ata.
+    /// </remarks>
+    public Evento? Fixado { get; private set; }
+
+    /// <summary>
+    /// A última lista mostrada à tela, para <see cref="Fixar"/> resolver o id.
+    /// </summary>
+    /// <remarks>
+    /// Fixar não pode fazer rede: é um clique, e o resultado tem de valer mesmo
+    /// que a agenda caia entre a lista e o clique. O id sozinho não serve — o
+    /// meta.json precisa do evento inteiro, com participantes e e-mails.
+    /// </remarks>
+    private IReadOnlyList<Evento> _ultimasProximas = [];
+
     /// <summary>A pasta desta gravação, ou a da última, ou nulo.</summary>
     public string? PastaAtual { get; private set; }
 
@@ -136,8 +157,11 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             Estado.Iniciou();
             // Depois de Iniciar(), nunca antes: a agenda é chamada de rede e não
             // pode atrasar o começo da captura. Ver ClienteDaAgenda.
-            Evento = null;
-            if (Cfg.UseCalendar) ConsultarAgenda();
+            // A escolhida na tela vence, e nem chega a consultar: já está em
+            // memória, não custa rede, e é uma resposta que o usuário deu
+            // olhando a agenda — melhor informada que qualquer heurística.
+            Evento = Fixado;
+            if (Cfg.UseCalendar && Fixado is null) ConsultarAgenda();
             if (Cfg.StartMuted) AlternarMudo();
             Atualizar();
         }
@@ -200,6 +224,9 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         _consulta?.Cancel();
         var evento = Evento;
         Evento = null;
+        // A escolha vale para uma gravação, não para o dia: deixá-la de pé
+        // rotularia a próxima reunião com o título da anterior, em silêncio.
+        Fixado = null;
 
         var meta = Meta.Montar(DateTimeOffset.Now, system, mic,
             Dispositivo("system"), Dispositivo("mic"),
@@ -260,7 +287,10 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     {
         Cfg.UseCalendar = usar;
         Cfg.Salvar();
-        Atualizar();
+        // Desligar é dizer que o calendário não rotula gravação nenhuma — uma
+        // reunião fixada que sobrevivesse ao desligamento faria exatamente isso,
+        // e a tela onde ela foi escolhida some junto com o ajuste.
+        if (!usar) Fixar(null); else Atualizar();
     }
 
     /// <summary>Abre o navegador uma vez para autorizar. Nunca na thread da UI.</summary>
@@ -281,6 +311,48 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
                 Atualizar();
             });
         });
+    }
+
+    /// <summary>
+    /// As próximas reuniões, para a tela oferecer a escolha. Faz rede.
+    /// </summary>
+    /// <remarks>
+    /// Guarda a lista porque <see cref="Fixar"/> resolve o id contra ela. Fora
+    /// do caminho de <see cref="Iniciar"/>, como tudo que fala com a agenda.
+    /// </remarks>
+    public async Task<Proximas> ProximasAsync(CancellationToken ct = default)
+    {
+        var r = await _agenda.ProximasAsync(ct: ct);
+        _ultimasProximas = r.Eventos;
+        return r;
+    }
+
+    /// <summary>
+    /// Escolhe qual reunião rotula a gravação. Id nulo ou desconhecido solta.
+    /// </summary>
+    /// <remarks>
+    /// Vale durante a gravação também: o <c>meta.json</c> só é escrito ao parar,
+    /// então corrigir o rótulo no meio da reunião ainda chega a tempo — e é
+    /// quando se percebe que a reunião é outra.
+    /// </remarks>
+    public void Fixar(string? id)
+    {
+        Fixado = id is { Length: > 0 }
+            ? _ultimasProximas.FirstOrDefault(e => e.Id == id)
+            : null;
+
+        if (Estado.Gravando)
+        {
+            // Solta a consulta em voo pelo mesmo motivo do Parar: o resultado
+            // dela chegaria depois e por cima de uma escolha explícita.
+            _consulta?.Cancel();
+            Evento = Fixado;
+            // Soltar no meio da gravação devolve o rótulo à agenda em vez de
+            // deixar a gravação sem nenhum: quem soltou disse "não é esta", e
+            // não "esta não tem reunião".
+            if (Fixado is null && Cfg.UseCalendar) ConsultarAgenda();
+        }
+        Atualizar();
     }
 
     // ────────────────────────────────────────────────────────── suporte
@@ -313,6 +385,9 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
                 }
 
                 if (r.Evento is not { } ev) return;
+                // Fixaram enquanto a consulta estava em voo: a resposta do
+                // usuário vale mais que a nossa, e chegou depois.
+                if (Fixado is not null) return;
 
                 Evento = ev;
                 int n = ev.NomesDosParticipantes().Count;
