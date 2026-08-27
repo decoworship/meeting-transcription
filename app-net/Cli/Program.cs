@@ -74,6 +74,7 @@ if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
             // Comparar dois pipelines de diarização no mesmo áudio, que é o que
             // a FASE6 §1.5 pede e a tela não faz.
             arg.GetValueOrDefault("diarizacao"),
+            arg.ContainsKey("revisao-modelo"),
             pipelineCts.Token);
     }
     catch (OperationCanceledException)
@@ -93,7 +94,7 @@ if (audio is null)
     Console.Error.WriteLine(
         "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"Acme, Élio\"]\n"
         + "     [--filtrar-silencio] [--hotwords] [--idioma pt] [--saida x.json]\n"
-        + "     [--diarizacao community-1]\n"
+        + "     [--diarizacao community-1] [--revisao-modelo]\n"
         + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
         + "[--cancelar-em <segundos>]");
     return 2;

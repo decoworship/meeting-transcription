@@ -48,6 +48,7 @@ public static class VerificadorDeAta
         ConferirDecisoes(ata, segmentos, notas);
         ConferirRiscos(ata, segmentos, notas);
         ConferirOmissoes(ata, roteiro, notas);
+        ConferirCompromissos(ata, roteiro, notas);
 
         // ── As observações do modelo NÃO ficam ──────────────────────────────
         //
@@ -315,6 +316,46 @@ public static class VerificadorDeAta
                   + string.Join(", ", mostrar)
                   + (faltando.Count > mostrar.Count ? $" (e mais {faltando.Count - mostrar.Count})" : "")
                   + ". Confira se algum deveria estar aqui.");
+    }
+
+    /// <summary>
+    /// Compromisso dito na reunião que não virou pendência nenhuma.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A rede que faltava, e ela é a mesma dos números.</b> Havia aviso alto
+    /// quando um número sumia da ata e nenhum quando sumia um item de ação —
+    /// sendo que o roteiro já extraía os dois. Medido em 25/08 numa sessão de
+    /// trabalho com nove compromissos ditos em voz alta ("vou montar o slide",
+    /// "eu vou rodar de novo", "vou falar com o Gilberto na segunda"): um
+    /// modelo devolveu <b>zero</b> pendências, e a ata saiu sem um único aviso
+    /// de que faltava algo.
+    /// </para>
+    /// <para>
+    /// Uma ata sem pendência nenhuma numa reunião que teve nove é pior que uma
+    /// ata feia: parece completa, e ninguém é cobrado de nada.
+    /// </para>
+    /// <para>
+    /// <b>Lista, não corrige.</b> Inventar pendência a partir de regex seria o
+    /// erro que o resto deste arquivo existe para impedir.
+    /// </para>
+    /// </remarks>
+    private static void ConferirCompromissos(AtaGerada ata, IReadOnlyList<Fato> roteiro,
+                                             List<string> notas)
+    {
+        if (roteiro.Count == 0) return;
+
+        var fora = RoteiroDeFatos.CompromissosForaDaAta(
+            roteiro, ata.Acoes.Select(a => $"{a.Acao} {a.Prazo}"));
+        if (fora.Count == 0) return;
+
+        var mostrar = fora.Take(5).ToList();
+        notas.Add(
+            $"{fora.Count} compromisso(s) com prazo foram ditos na reunião e não viraram "
+            + "pendência: "
+            + string.Join("; ", mostrar.Select(f => $"\"{Encurtar(f.Trecho, 60)}\""))
+            + (fora.Count > mostrar.Count ? $" (e mais {fora.Count - mostrar.Count})" : "")
+            + ". Confira se algum deveria estar na lista.");
     }
 
     /// <summary>

@@ -251,6 +251,69 @@ public static class RoteiroDeFatos
     }
 
     /// <summary>
+    /// Compromissos ditos na reunião que não viraram pendência nenhuma.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A rede que faltava.</b> O roteiro já extraía compromisso com prazo —
+    /// "eu te mando amanhã" — e os mandava ao modelo, mas a conferência de
+    /// omissão só olhava números: havia um aviso alto quando um número sumia e
+    /// nenhum quando sumia um item de ação. Medido em 25/08 numa sessão de
+    /// trabalho com nove compromissos ditos em voz alta: um modelo devolveu
+    /// <b>zero</b> pendências e a ata saiu sem um único aviso.
+    /// </para>
+    /// <para>
+    /// <b>Compara por eco de conteúdo, e não por texto igual.</b> A pendência é
+    /// a reescrita do compromisso, não a cópia: a fala diz "eu vou rodar de
+    /// novo que aí eu rodo pra esse mês" e a ata escreve "Rodar a aderência do
+    /// mês". O que sobrevive à reescrita são as palavras de conteúdo.
+    /// </para>
+    /// <para>
+    /// <b>Não corrige nada — lista.</b> Como a conferência de números, o que
+    /// ela produz é uma linha em Observações, e quem decide se faltou é quem
+    /// leu a reunião. Inventar pendência a partir de regex seria pior que
+    /// omitir.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<Fato> CompromissosForaDaAta(
+        IReadOnlyList<Fato> roteiro, IEnumerable<string> pendencias)
+    {
+        var ditas = pendencias.Select(p => Conteudo(p).ToHashSet(StringComparer.OrdinalIgnoreCase))
+                              .Where(c => c.Count > 0).ToList();
+
+        var fora = new List<Fato>();
+        foreach (var f in roteiro)
+        {
+            if (f.Tipo != "compromisso") continue;
+
+            var doTrecho = Conteudo(f.Trecho).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (doTrecho.Count == 0) continue;
+
+            // Metade das palavras de conteúdo é o bastante: o trecho traz a
+            // frase inteira ("deixa eu ver aqui como é que eu faço para ter o
+            // máximo de informação a tempo") e a pendência traz só o miolo.
+            bool ecoa = ditas.Any(d => (double)doTrecho.Count(d.Contains) / doTrecho.Count >= 0.4);
+            if (!ecoa) fora.Add(f);
+        }
+        return fora;
+    }
+
+    /// <summary>Palavras de conteúdo, pela mesma régua do verificador.</summary>
+    private static IEnumerable<string> Conteudo(string texto) =>
+        Regex.Matches((texto ?? "").ToLowerInvariant(), @"[\p{L}\p{Nd}]{4,}")
+             .Select(m => m.Value)
+             .Where(p => !Comuns.Contains(p));
+
+    private static readonly HashSet<string> Comuns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "para", "como", "isso", "esse", "essa", "está", "estão", "sobre", "quando",
+        "porque", "então", "também", "ainda", "todos", "todas", "deve", "pode",
+        "fazer", "sendo", "cada", "mais", "menos", "muito", "após", "entre",
+        "aqui", "onde", "qual", "quais", "seja", "gente", "coisa", "aqui",
+        "vamos", "vou", "acho", "assim", "tipo", "cara", "beleza", "certo",
+    };
+
+    /// <summary>
     /// O substantivo que vem logo depois do número na fala.
     /// </summary>
     /// <remarks>
