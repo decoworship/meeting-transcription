@@ -1133,6 +1133,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     modelo: p.Modelo, cliente: cliente, projeto: projeto,
                     diarizar: p.Diarizar ?? true,
                     corrigirFonetica: cfgDaTranscricao.CorrecaoFonetica,
+                    revisarComModelo: cfgDaTranscricao.RevisaoComModelo,
+                    motorDeAta: CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgDaTranscricao.ModeloDeAta),
                     usarHotwords: cfgDaTranscricao.UsarHotwords,
                     // O projeto manda; sem preferência, o padrão do app. Os dois
                     // eram guardados e nunca lidos — ver Pedido.DiarModel.

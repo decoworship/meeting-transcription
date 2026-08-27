@@ -1,6 +1,6 @@
 {
-  "versao": "0.6.0",
-  "publicada": "2026-08-26",
-  "notas": "Você escolhe qual reunião está gravando, antes de gravar: a tela do Gravador lista as reuniões da sua agenda e marca qual delas seria usada se você apertasse o gravar agora. Reunião que atrasou e já terminou no papel continua na lista, em vez de sumir junto com a chance de a gravação sair com o nome certo.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.0"
+  "versao": "0.6.1",
+  "publicada": "2026-08-27",
+  "notas": "Nomes e siglas do projeto param de sair errados na transcrição, e a captação de fala baixa melhorou. A ata diz quem realmente falou, para de perder decisões e pendências, e avisa quando um compromisso dito não virou item de ação.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.1"
 }

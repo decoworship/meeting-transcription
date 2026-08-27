@@ -26,6 +26,15 @@ double? cancelarEm = double.TryParse(arg.GetValueOrDefault("cancelar-em"), out d
 
 // A ata é o terceiro modo, e existe pelo mesmo motivo dos outros dois: provar o
 // caminho antes de existir tela. Ver Cli/GeradorDeAta.cs.
+if (arg.GetValueOrDefault("revisar") is { Length: > 0 } pastaDaRevisao)
+{
+    using var revCts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) => { e.Cancel = true; revCts.Cancel(); };
+    return await RevisaoDeTeste.ExecutarAsync(
+        pastaDaRevisao, arg.GetValueOrDefault("modelo"),
+        arg.ContainsKey("com-modelo"), revCts.Token);
+}
+
 if (arg.GetValueOrDefault("ata") is { Length: > 0 } pastaDaAta)
 {
     using var ataCts = new CancellationTokenSource();
@@ -65,6 +74,7 @@ if (arg.GetValueOrDefault("gravacao") is { } gravacao && gravacao.Length > 0)
             // Comparar dois pipelines de diarização no mesmo áudio, que é o que
             // a FASE6 §1.5 pede e a tela não faz.
             arg.GetValueOrDefault("diarizacao"),
+            arg.ContainsKey("revisao-modelo"),
             pipelineCts.Token);
     }
     catch (OperationCanceledException)
@@ -84,7 +94,7 @@ if (audio is null)
     Console.Error.WriteLine(
         "uso: --gravacao <pasta com mic.wav e system.wav> [--vocabulario \"Acme, Élio\"]\n"
         + "     [--filtrar-silencio] [--hotwords] [--idioma pt] [--saida x.json]\n"
-        + "     [--diarizacao community-1]\n"
+        + "     [--diarizacao community-1] [--revisao-modelo]\n"
         + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
         + "[--cancelar-em <segundos>]");
     return 2;

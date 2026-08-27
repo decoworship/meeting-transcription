@@ -524,7 +524,117 @@ não de ajuste.
 
 ---
 
-## 7. O que esta auditoria **não** consegue ver
+## 7. O VAD, medido por três lados
+
+**Ferramentas:** [`wer_contra_gemini.py`](../tools/wer_contra_gemini.py),
+[`palavras_no_silencio.py`](../tools/palavras_no_silencio.py),
+[`texto_nas_pausas.py`](../tools/texto_nas_pausas.py)
+
+A [FASE6.md](FASE6.md) deixou "reavaliar o VAD" em aberto porque faltava régua.
+Com a transcrição paralela do Meet ela existe pela metade — mede cobertura, não
+alucinação —, e as outras duas ferramentas fecham o resto.
+
+### O que cada lado mede, e por que são três
+
+| | mede | precisa de |
+|---|---|---|
+| divergência contra o Gemini | **cobertura** — o que faltou | transcrição paralela |
+| palavras no silêncio | **invenção sobre ausência de sinal** | nada |
+| texto nas pausas | **invenção sobre ruído de sala** | nada |
+
+A terceira existe por um caso concreto: a gravação de 122 minutos do acervo tem
+**22 minutos de pausa** e **8,6 segundos** de silêncio digital. As pausas são
+ruído baixo, não ausência de sinal, e a segunda medida é cega ali.
+
+### Cobertura: afrouxar ganha, mas o ótimo não replicou
+
+Divergência contra o Gemini, cinco configurações, dois áudios:
+
+| `threshold` | 7 min | **32 min** |
+|---|---|---|
+| 0,35 (padrão) | 27,5% | 29,8% |
+| 0,25 | **26,4%** | 29,6% |
+| 0,15 | 27,4% | **28,6%** |
+| `min_silence` 200 ms | 27,5% | 29,8% |
+| sem VAD | 29,1% | 30,1% |
+
+**As duas reuniões discordam sobre onde está o ótimo.** Na de 7 minutos o 0,25
+ganha e o 0,15 piora; na de 32, o 0,15 é o melhor de todos. A de 32 pesa mais —
+o dono do produto observou que a maioria das reuniões fica entre 25 e 45
+minutos, e a de 7 é caso atípico (logística, seis pessoas, fala picotada).
+
+Três coisas **replicaram** nas duas, e essas valem como decididas:
+
+- **0,35, o padrão de hoje, é a pior configuração com VAD.** Afrouxar melhora;
+- **`min_silence_duration_ms` é parâmetro morto.** 200 e 500 dão resultado
+  idêntico ao dígito, nas duas. Não vale mexer nele nunca;
+- **desligar o VAD é pior que qualquer configuração com VAD.** Contraria o
+  resultado 6 da Fase 0 — e pelo motivo que o próprio `sweep_vad.py` previa: lá
+  a medição foi sobre fala concatenada, quase sem silêncio; em gravação real é
+  no silêncio que o VAD ganha o salário.
+
+### O sinal de alerta, e o que ele custou
+
+Na de 32 minutos o 0,15 ganha **120 palavras que faltavam** e ganha **46
+trocadas**. Transcrever mais áudio marginal recupera fala baixa e também produz
+erro — e é por isso que cobertura sozinha não decide.
+
+Invenção sobre ausência de sinal, na de 7 minutos (24% dela abaixo do piso):
+
+| | palavras no mudo |
+|---|---|
+| 0,35 · 0,25 · 0,15 | **0** |
+| sem VAD | 4 |
+
+**Afrouxar até 0,15 não produziu uma única palavra sobre silêncio.** Só desligar
+o VAD inventou. É a primeira metade da resposta, e ela é favorável a afrouxar.
+
+### As gravações longas, e a decisão
+
+O terceiro lado, nas duas gravações com pausa de verdade. A referência de pausa é
+a transcrição no padrão de hoje:
+
+| 61 min (3 min de pausa) | palavras nas pausas | min de pausa |
+|---|---|---|
+| 0,35 | 0 | 3 |
+| **0,25** | 11 | **2** — encurtou |
+| 0,15 | 15 | 3 — não encurtou |
+| sem VAD | 44 | **4** — aumentou |
+
+| 122 min (22 min de pausa) | palavras, total | nas pausas | min de pausa |
+|---|---|---|---|
+| 0,35 | 12.561 | 0 | 22 |
+| **0,25** | **12.653 (+92)** | 113 | 20 |
+| 0,15 | **12.492 (−69)** | 113 | 20 |
+
+**O discriminador não é a pausa — é o saldo.** Na de 122 minutos os dois
+recuperaram os mesmos 2 minutos de pausa e as mesmas 113 palavras dentro delas.
+Mas o 0,15 ficou 69 palavras **abaixo** do padrão no total: achou texto na pausa
+e perdeu em outro lugar. O 0,25 ficou 92 acima.
+
+**Placar final, quatro gravações:**
+
+| | 7 min | 32 min | 61 min | 122 min |
+|---|---|---|---|---|
+| **0,25** | melhor | 2º, melhor que o padrão | recupera | +92 |
+| 0,15 | pior | melhor | não encurta | −69 |
+
+**0,25 ganha em três de quatro, e é o único que nunca piora.** É o valor que
+entrou no `motores/asr/motor.py`.
+
+### Uma régua que não serviu, e onde
+
+A medida de invenção sobre ausência de sinal deu **zero para todas** as
+configurações na gravação de 61 minutos — não porque estejam boas, mas porque
+aquela gravação tem **0% de silêncio digital**. A limitação estava prevista para
+a de 122 minutos e apareceu também onde eu não esperava.
+
+É o motivo de as três réguas existirem: cada uma é cega em algum lugar, e só o
+cruzamento decide.
+
+---
+
+## 8. O que esta auditoria **não** consegue ver
 
 Registrado para que a lista não seja lida como completa. Tudo abaixo precisa de
 fonte paralela, e é por isso que a §5 da carta continua sendo a régua:
@@ -545,7 +655,7 @@ fonte paralela, e é por isso que a §5 da carta continua sendo a régua:
 
 ---
 
-## 8. Estado do corpus paralelo
+## 9. Estado do corpus paralelo
 
 | data | reunião | fonte paralela | o que ela permitiu decidir |
 |---|---|---|---|
@@ -588,7 +698,7 @@ python tools/comparar_com_gemini.py <pasta-da-gravacao>
 
 ---
 
-## 9. O que o acervo ainda não tem, e é o insumo caro
+## 10. O que o acervo ainda não tem, e é o insumo caro
 
 Fonte paralela responde *"qual dos dois está certo?"*. Não responde *"a ata
 ficou melhor depois do conserto?"* — para isso é preciso um alvo.
@@ -599,7 +709,7 @@ leitura não é repetível. Duas bastam; não vinte.
 
 ---
 
-## 10. Convenção deste documento
+## 11. Convenção deste documento
 
 Nomes de cliente, de pessoas e valores financeiros ficam **fora** — o repositório
 é público. Onde o exemplo precisa da forma da palavra, a forma está anonimizada

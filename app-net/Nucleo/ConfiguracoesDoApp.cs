@@ -68,6 +68,32 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("correcao_fonetica")] public bool CorrecaoFonetica { get; set; } = true;
 
     /// <summary>
+    /// Usar o modelo para achar trocas que a regra não alcança.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Desligada por padrão, e não por desconfiança.</b> A revisão de termos
+    /// acontece de qualquer jeito pela regra determinística
+    /// (<see cref="RevisaoDeTermos"/>), sem download e sem GPU. Esta chave
+    /// acrescenta um segundo propositor, e ele custa 640 MB baixados e uma
+    /// passada a mais na placa — custo que só se justifica para quem sente
+    /// falta dos casos que a regra não pega.
+    /// </para>
+    /// <para>
+    /// <b>O que ela muda, medido em 25/08 sobre dez erros reais:</b> a regra
+    /// acerta 3, o Gemma acerta 8. A diferença são os que precisam de contexto
+    /// — "Cláudio" por "Claude", "sexta" por "cesta" —, que distância de edição
+    /// não alcança porque as duas palavras são português correto.
+    /// </para>
+    /// <para>
+    /// O modelo <b>propõe</b>; quem decide continua sendo a mesma validação
+    /// determinística, e toda troca fica marcada e reversível. Ver
+    /// <see cref="PropositorDeModelo"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("revisao_com_modelo")] public bool RevisaoComModelo { get; set; }
+
+    /// <summary>
     /// Descartar os trechos que o ASR inventou sobre silêncio digital.
     /// </summary>
     /// <remarks>

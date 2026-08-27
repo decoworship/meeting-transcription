@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using MeetingApp.Nucleo;
+using MeetingApp.Nucleo.Atas;
 
 namespace MeetingApp.Cli;
 
@@ -17,7 +18,7 @@ internal static class Pipeline
     public static async Task<int> ExecutarAsync(
         string pasta, string python, string? vocabulario, string? idioma,
         string? destino, bool filtrarSilencio, bool usarHotwords,
-        string? modeloDeDiarizacao, CancellationToken ct)
+        string? modeloDeDiarizacao, bool revisarComModelo, CancellationToken ct)
     {
         // No desenvolvimento os motores estão no repositório e o Python é o do
         // ambiente; no app instalado eles vêm numa pasta ao lado do executável.
@@ -30,13 +31,26 @@ internal static class Pipeline
             return 2;
         }
 
+        // O vínculo e o vocabulário do projeto, que é o que o app manda. Sem
+        // eles a revisão de termos roda sem alvo e este modo mede um pipeline
+        // que o usuário não tem.
+        var vinculo = DadosDaReuniao.Ler(pasta);
+        string? cliente = vinculo.Cliente;
+        string? projeto = vinculo.Projeto;
+        vocabulario ??= new Projetos().Preferencias(cliente ?? "", projeto ?? "")?.InitialPrompt;
+
         var relogio = Stopwatch.StartNew();
         var transcritor = new Transcritor(motores);
 
         var resultado = await transcritor.ExecutarAsync(
             pasta, vocabulario, idioma, filtrarSilencio,
             p => Console.Write($"\r  {p.Etapa}: {p.Fracao,6:P0} {p.Texto}          "),
-            usarHotwords: usarHotwords, modeloDeDiarizacao: modeloDeDiarizacao, ct: ct);
+            cliente: cliente, projeto: projeto,
+            usarHotwords: usarHotwords, modeloDeDiarizacao: modeloDeDiarizacao,
+            revisarComModelo: revisarComModelo,
+            motorDeAta: CaminhosDoMotorDeAta.AoLadoDoExecutavel(
+                ConfiguracoesDoApp.Carregar().ModeloDeAta),
+            ct: ct);
 
         Console.WriteLine($"\n\n{resultado.Segments.Count} segmentos, "
                           + $"idioma {resultado.Language}, "

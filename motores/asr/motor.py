@@ -151,10 +151,36 @@ class Modelo:
             word_timestamps=True,
             hallucination_silence_threshold=2.0,
             vad_filter=True,
+            # threshold: 0,25, e não 0,35 — medido em 27/08/2026 sobre quatro
+            # gravações reais, de 7 a 122 minutos, com três réguas que se
+            # cobrem (docs/AUDITORIA-ATAS.md §7).
+            #
+            #   cobertura, contra a transcrição paralela do Meet: 0,35 é a PIOR
+            #   das configurações com VAD nas duas gravações que têm par;
+            #
+            #   invenção sobre ausência de sinal: zero palavras em 0,25 — só
+            #   desligar o VAD inventou;
+            #
+            #   texto nas pausas longas: na de 122 minutos, 0,25 recuperou 113
+            #   palavras dentro das pausas e ficou +92 no total; o 0,15
+            #   recuperou as MESMAS 113 e ficou -69 no total, ou seja, mexeu em
+            #   outros trechos e saiu no prejuízo.
+            #
+            # 0,15 ganhou na gravação de 32 minutos e perdeu nas outras três.
+            # 0,25 ganha em três de quatro, e é o único que nunca piora.
+            #
+            # **min_silence_duration_ms é parâmetro morto.** 200 e 500 deram
+            # resultado idêntico ao dígito nas duas gravações com referência.
+            # Fica em 500 porque mudá-lo não faz nada.
+            #
+            # **Não desligue o vad_filter.** Foi a pior configuração nas quatro,
+            # e contraria o resultado 6 da FASE0 pelo motivo que o sweep_vad.py
+            # já previa: lá a medição foi sobre fala concatenada, quase sem
+            # silêncio; em gravação real é no silêncio que o VAD ganha o salário.
             vad_parameters=dict(
                 min_silence_duration_ms=500,
                 max_speech_duration_s=25,
-                threshold=0.35,
+                threshold=0.25,
             ),
         )
         # hotwords, não initial_prompt: é reinjetado em toda janela de 30 s, em
