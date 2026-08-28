@@ -291,6 +291,16 @@ async function telaDePreparo(g) {
   // A escolha do projeto, carregada com as preferências e repassada intacta.
   let modeloDeDiarizacao = null;
 
+  // Enquanto isto for falso, nada é gravado no projeto.
+  //
+  // A tela monta com o vocabulário vazio e o motor nos padrões, e só depois
+  // busca o que o projeto guardou. Sem esta trava, o que acontecesse no meio —
+  // um blur na caixa, uma troca de modelo — gravava a tela recém-montada por
+  // cima do projeto: vocabulário zerado, e com ele model_size, language,
+  // diarization e diar_model. Silencioso, e o dono só descobre quando a
+  // transcrição seguinte sai sem os nomes próprios.
+  let prefsProntas = false;
+
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
 
@@ -490,6 +500,7 @@ async function telaDePreparo(g) {
 
     const caixaVocab = document.getElementById("vocabulario");
     if (!caixaVocab) return;
+    if (!prefsProntas) return;
 
     try {
       await pedir("salvar-projeto", {
@@ -510,11 +521,22 @@ async function telaDePreparo(g) {
     }
   }
 
+  /**
+   * Lê as preferências e libera a gravação, aconteça o que acontecer na leitura.
+   *
+   * O `finally` é o que impede a trava de virar um travamento: se o pedido
+   * falhar, a tela continua funcionando como funcionava antes — o pior caso
+   * volta a ser o de hoje, e não uma tela que não guarda mais nada.
+   */
+  async function carregarEliberar() {
+    try { await carregarPreferencias(); } finally { prefsProntas = true; }
+  }
+
   campoCliente.addEventListener("change", () => {
-    atualizarProjetos(); carregarPreferencias(); guardarVinculo();
+    atualizarProjetos(); carregarEliberar(); guardarVinculo();
   });
   campoCliente.addEventListener("input", atualizarProjetos);
-  campoProjeto.addEventListener("change", () => { carregarPreferencias(); guardarVinculo(); });
+  campoProjeto.addEventListener("change", () => { carregarEliberar(); guardarVinculo(); });
   // O blur é a rede: grava de novo quando o campo perde o foco, inclusive nos
   // caminhos em que o change não chega a disparar. Gravar duas vezes o mesmo
   // valor não custa nada — são dois campos num JSON pequeno.
@@ -527,12 +549,34 @@ async function telaDePreparo(g) {
   for (const id of ["modelo", "idioma", "diarizacao"])
     document.getElementById(id).addEventListener("change", guardarVocabulario);
 
+  // As preferências do projeto que já veio vinculado, lidas na montagem.
+  //
+  // **É o conserto do defeito que apagava o vocabulário.** Cliente e projeto
+  // chegam preenchidos de reuniao.json, mas valor posto por código não dispara
+  // `change` — então `carregarPreferencias` nunca corria para quem só abria uma
+  // gravação já vinculada, e a tela ficava mostrando vazio o que o disco tinha
+  // cheio. A primeira interação gravava esse vazio por cima.
+  //
+  // Sem vínculo não há o que ler, e a trava abre na hora: uma gravação nova não
+  // tem projeto a proteger.
+  const preferenciasProntas =
+    vinculo.cliente && vinculo.projeto ? carregarEliberar() : Promise.resolve();
+  if (!vinculo.cliente || !vinculo.projeto) prefsProntas = true;
+
   // O modelo de diarização vai por parâmetro, e não por variável de módulo:
   // `transcrever` é irmã de `telaDePreparo`, não aninhada nela, e ler a
   // variável da outra dava "modeloDeDiarizacao is not defined" no clique de
   // transcrever — com a tela já montada e tudo o mais funcionando.
-  botao.addEventListener("click",
-                         () => transcrever(g, botao, painel, modeloDeDiarizacao));
+  //
+  // O clique espera a leitura pelo mesmo motivo da trava: transcrever grava as
+  // mesmas preferências, e quem clicasse na montagem entraria pela outra porta
+  // do mesmo defeito — com o agravante de mandar o vocabulário vazio ao motor.
+  botao.addEventListener("click", async () => {
+    await preferenciasProntas;
+    transcrever(g, botao, painel, modeloDeDiarizacao);
+  });
+
+  await preferenciasProntas;
 
   // Reencontrar uma transcrição já em curso é o motivo de esta tela existir do
   // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa

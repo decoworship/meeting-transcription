@@ -3,6 +3,21 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.6.2 — 28/08/2026
+
+**O vocabulário do projeto parava de existir quando você abria uma reunião
+antiga.** A tela de transcrição mostrava a caixa de termos vazia mesmo quando o
+projeto tinha uma lista cheia — e a primeira coisa que você mexesse ali gravava
+esse vazio por cima. Não era só o vocabulário: iam junto o modelo, o idioma, a
+escolha de separar falantes e o pipeline de diarização escolhido em Ajustes ›
+Clientes. Trocar o modelo na tela apagava tudo isso, em silêncio.
+
+Agora a tela lê o que o projeto guardou antes de deixar gravar qualquer coisa.
+
+Se algum projeto seu está com o vocabulário vazio e você lembra de tê-lo
+preenchido, foi isto. A lista não tem como ser recuperada — vale conferir os
+projetos que você usa antes da próxima transcrição.
+
 ## 0.6.1 — 27/08/2026
 
 **Nomes e siglas do projeto param de sair errados na transcrição.** O
