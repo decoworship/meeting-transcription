@@ -1,4 +1,73 @@
-# Fase 6 — revisões: carta de execução
+# Fase 6 — revisões: carta de execução — **FECHADA**
+
+> # ⛔ Fechada em 27/08/2026
+>
+> **Esta carta não é mais a lista de trabalho.** O que continua vivo mudou-se
+> para o [BACKLOG.md](BACKLOG.md), organizado por tema; o que morreu está na
+> tabela abaixo, com o motivo. O texto original fica inteiro, abaixo do
+> fechamento, porque é onde a medição e o raciocínio de cada item estão — o
+> backlog carrega a decisão, esta carta carrega a prova.
+>
+> **Por que fechar em vez de continuar.** As outras fases tinham um objetivo
+> cada, e por isso cabiam numa carta. Esta não tinha — era "tudo o que ficou" —,
+> e cresceu para 1167 linhas com o mesmo assunto aparecendo em três lugares.
+> Uma lista em que não se consegue mais responder *o que faço agora* parou de
+> ser lista. **O defeito não foi a execução: foi a forma.** A fase entregou da
+> 0.4.0 à 0.6.1, e quase tudo o que tinha gatilho disparado foi feito.
+>
+> **A decisão que fecha, de 27/08/2026, do dono do produto:** qualidade de
+> transcrição, de diarização e de ata **sai desta lista** — é tratada em outro
+> lugar —, e o que sobra deixa de ser organizado por fase. A prioridade corrente
+> passa a ser **interface e uso**.
+>
+> ## Disposição, seção a seção
+>
+> | § | o que era | destino |
+> |---|---|---|
+> | **1.1** | a omissão do modelo pequeno | **deprecado** — qualidade da ata |
+> | **1.2** | reunião acima de ~2h15 | → [`ATA-4`](BACKLOG.md) |
+> | **1.3** | as seções estruturadas viram prosa | → [`ATA-3`](BACKLOG.md) |
+> | **1.4** | a ata anterior como contexto | → [`ATA-2`](BACKLOG.md) |
+> | **1.5** | comparações que não foram feitas | **deprecado** — qualidade da ata |
+> | **1.6** | o que a comparação com o Notion mostrou | ✅ **feito** — os quatro defeitos em 20/08, a régua corrida em 25/08. **O que sobrou é deprecado**: a lista de números que foi de 8 para 15 nunca foi lida item a item, e ninguém mais vai ler |
+> | **1.7** | o modelo que caberia na placa | **deprecado** — levantamento, nunca medido nesta máquina |
+> | **2.1** | as gravações antigas não sabem de que lado cada um está | → [`GRA-1`](BACKLOG.md), como bug de dado |
+> | **2.2** | nome e e-mail casados por posição | → [`GRA-2`](BACKLOG.md) |
+> | **2.3** | o tempo marcado na nota não leva ao áudio | → [`UI-4`](BACKLOG.md) |
+> | **2.4** | a lista de Atas vai crescer | → [`UI-3`](BACKLOG.md) |
+> | **2.5** | exportar ata só em Markdown | → [`ATA-1`](BACKLOG.md) |
+> | **2.6** | o caminho da ata na ponte não tem teste | → [`DEB-1`](BACKLOG.md) |
+> | **2.7** | o áudio não parava ao sair da reunião | ✅ **feito** em 19/08/2026 |
+> | **2.8** | da ata não se chegava à transcrição | ✅ **feito** em 20/08/2026 |
+> | **2.9** | a reunião era escolhida pelo app | ✅ **feito** em 25/08/2026 |
+> | **3.0** | o desligamento na máquina de outra pessoa | → [`SUP-2`](BACKLOG.md) (bloqueado, aguarda reavaliação) e [`SUP-1`](BACKLOG.md) (os cinco instrumentos da 0.4.1, **nunca entregues**). O mix em blocos → [`SUP-3`](BACKLOG.md) |
+> | **3.1** | motores como pacotes por acelerador | → [`DIST-2`](BACKLOG.md) |
+> | **3.2** | a integração com o Teams | → [`GRA-3`](BACKLOG.md) |
+> | **3.3** | a gestão de vozes | → [`UI-2`](BACKLOG.md) |
+> | **3.4** | Linux e Mac | → [`DIST-4`](BACKLOG.md) |
+> | **4.1** | o `hotwords` colapsa a segmentação | ✅ **feito** em 19/08/2026 |
+> | **4.2** | os vetores aprendem de áudio com mais de uma pessoa | ✅ **feito** em 20/08/2026, código e decisão de geração |
+> | **4.3** | o gate do VAD | ✅ **feito** na 0.6.1 — 0,35 → **0,25**, medido em quatro gravações |
+> | **4.4** | o `FiltroDeSilencio` nunca roda | ✅ **feito** — já estava, e a carta é que não sabia |
+> | **4.5** | o `word_timestamps` é jogado fora | ✅ **feito** em 19/08/2026 |
+> | **4.6** | a escolha do modelo de diarização não chega ao pipeline | ✅ **feito** em 20/08/2026, com os pesos do 3.1 empacotados |
+> | **4.7** | cada voz aprendida é de um modelo | ✅ **feito** em 20/08/2026 |
+> | **5** | comparar com outras fontes (o corpus paralelo) | **deprecado como item de lista.** A prática não custa nada e continua valendo a quem quiser guardar um `gemini.md` na pasta da gravação; ela deixa de ser trabalho pendente |
+> | **6** | o que não entra nesta fase | → [BACKLOG.md](BACKLOG.md) §8 |
+> | **7** | a régua dos gatilhos | → [BACKLOG.md](BACKLOG.md), no preâmbulo. **É a parte desta carta que mais valeu**, e a única que se mantém como regra |
+>
+> **A diarização a 11–12% de rótulo errado** ([AUDITORIA-ATAS.md](AUDITORIA-ATAS.md)
+> §6) sai junto com a qualidade. Ela estava medida contra referência real e a
+> conclusão continua de pé — se um terceiro par confirmar, melhorar a diarização
+> deixa de ser acabamento e vira pré-requisito da ata. **Isso é decisão de
+> arquitetura, e nunca foi item de backlog.**
+>
+> **O que esta fase ensinou sobre a forma, e vale para a próxima:** uma lista de
+> revisões precisa de gatilho *e* de teto. O gatilho ela teve, e ele funcionou —
+> nada sem gatilho foi executado. O teto não: nada impedia a lista de crescer, e
+> o que a matou foi o tamanho, não o conteúdo.
+
+---
 
 Escrita em 14/08/2026, ao fechar a Fase 3, por decisão do dono do produto:
 **lançar primeiro, melhorar depois.** Tudo o que as fases anteriores marcaram

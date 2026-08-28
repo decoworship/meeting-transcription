@@ -14,12 +14,23 @@ O projeto é **doc-driven**. Antes de mexer em qualquer coisa não trivial, leia
 dizem o que se pretendia, e os `*-HANDOFF.md` dizem o que de fato aconteceu e
 por quê. Muito comentário no código aponta para eles.
 
-**As fases 0 a 5 estão concluídas.** O app se instala
+**As fases acabaram em 27/08/2026, e o trabalho vive no
+[docs/BACKLOG.md](docs/BACKLOG.md)** — features e bugs por tema, cada um com id
+estável e com o gatilho que justifica fazê-lo. As cartas de fase continuam sendo
+o registro histórico: é nelas que estão a medição e o raciocínio de cada item, e
+o backlog aponta para elas. **A prioridade corrente é o tema 1, interface e
+uso.**
+
+**As fases 0 a 6 estão concluídas.** O app se instala
 ([docs/FASE4.md](docs/FASE4.md)), grava, transcreve, separa falantes, escreve a
 ata e abre no tema que a pessoa escolheu — e já rodou na máquina de outra
 pessoa. A Fase 5, o acabamento visual sobre o AA Design System, fechou em
-18/08/2026 ([docs/FASE5-HANDOFF.md](docs/FASE5-HANDOFF.md)). **A fase corrente é
-a 6**, qualidade da transcrição ([docs/FASE6.md](docs/FASE6.md)).
+18/08/2026 ([docs/FASE5-HANDOFF.md](docs/FASE5-HANDOFF.md)). A Fase 6 fechou em
+27/08/2026 ([docs/FASE6.md](docs/FASE6.md), no bloco de abertura): ela entregou
+da 0.4.0 à 0.6.1, e o que a matou foi o tamanho, não o conteúdo — uma lista sem
+objetivo e sem teto cresce até não se conseguir mais responder *o que faço
+agora*. **Qualidade de transcrição, de diarização e de ata saiu do backlog** por
+decisão do dono do produto, e é tratada fora dele.
 
 **A [Fase 7](docs/FASE7.md) é estudo, não execução**, aberta em 27/08/2026:
 transcrever e separar falantes durante a própria reunião. Ela não manda fazer
@@ -41,8 +52,11 @@ azul. O `registro.log` da 0.2.1 mostrou que o **ASR termina bem, na GPU**, e que
 o corte vem da **diarização em diante**; isso derrubou as três hipóteses
 anteriores (queda para CPU, VRAM, memória do sistema, driver/TDR). Desligamento
 seco sob carga de GPU é **corte de energia** — térmica ou entrega —, e
-provavelmente não é conserto nosso. Ver [docs/FASE6.md](docs/FASE6.md) §3.0 — é
-o único item daquela carta que não espera gatilho.
+provavelmente não é conserto nosso. É o `SUP-2` do
+[docs/BACKLOG.md](docs/BACKLOG.md), **bloqueado aguardando reavaliação na
+máquina dele** — o relato é da 0.1.0, e de lá para cá mudaram o pipeline, a
+retomada e o registro. A investigação inteira está em
+[docs/FASE6.md](docs/FASE6.md) §3.0.
 
 **O que era nosso, a 0.4.0 consertou:** o app jogava fora um ASR que tinha dado
 certo, porque o `transcricao.json` só era escrito no fim de tudo.
@@ -57,9 +71,13 @@ novo.
 depois da diarização, então ela deixa rastro. O mudo agora é o **fim** do
 pipeline — e é lá que o reconhecimento de vozes sobe o pyannote pela segunda vez
 (`AprendizadoDeVozes.ExtrairAsync`) sem assinar o `AoRegistrar`. São **três**
-cargas de GPU em sequência, e a terceira é invisível. A 0.4.1 fecha isso — e faz o app ler o
-Event Log e amostrar o `nvidia-smi` sozinho, porque pedir isso ao usuário já
-custou duas idas e voltas com respostas erradas.
+cargas de GPU em sequência, e a terceira é invisível. **A 0.4.1 ia fechar isso e
+nunca saiu** — conferido em 27/08/2026, com a versão em 0.6.1: nenhum dos cinco
+instrumentos existe. É o `SUP-1` do [docs/BACKLOG.md](docs/BACKLOG.md), e os dois
+mais baratos são de uma linha cada (assinar o `AoRegistrar` no `ExtrairAsync`, e
+chamar o `Registro.Ultimas()` que ninguém chama). Ele vem **antes** do `SUP-2`:
+pedir a informação ao usuário já custou duas idas e voltas com respostas
+erradas.
 
 **O app se chama PulseMeet desde 19/08/2026**, e o símbolo é o monograma M.
 Nenhum dos dois está fechado, então **a marca é uma constante só**: `Marca.Nome`
@@ -83,17 +101,19 @@ código — mas **o winget faz esse degrau sem que o app aprenda nada**: desde
 o `winget upgrade` ainda não funciona: falta separar os motores do instalador,
 que é o que torna 1,59 GB submissível e um update de 18 MB possível.
 
-**Uma tarefa da Fase 6 já começou:** transcrever as reuniões **em paralelo por
-outras fontes** (Notion, Teams/Meet, o app sem `hotwords`) e guardar as saídas
-junto da gravação. A Fase 6 nasceu de uma comparação dessas e hoje se apoia em
-**uma** reunião; sem corpus ela calibraria um default com *n* = 1.
+**O corpus paralelo deixou de ser tarefa pendente em 27/08/2026**, junto com a
+qualidade. Ele existe — três reuniões com Notion e Gemini/Meet — e é de onde
+saiu quase tudo o que se sabe sobre a transcrição e a diarização
+([docs/AUDITORIA-ATAS.md](docs/AUDITORIA-ATAS.md) §9). Guardar o export como
+`gemini.md` na pasta da gravação continua valendo e não custa nada; só não é
+mais trabalho que alguém deva.
 
 ## Comandos
 
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 463 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 504 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB
