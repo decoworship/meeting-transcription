@@ -1,6 +1,6 @@
 {
-  "versao": "0.6.1",
-  "publicada": "2026-08-27",
-  "notas": "Nomes e siglas do projeto param de sair errados na transcrição, e a captação de fala baixa melhorou. A ata diz quem realmente falou, para de perder decisões e pendências, e avisa quando um compromisso dito não virou item de ação.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.1"
+  "versao": "0.6.2",
+  "publicada": "2026-08-28",
+  "notas": "Conserta um defeito que apagava o vocabulário e as preferências do projeto quando você abria a tela de transcrição de uma reunião já vinculada.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.2"
 }

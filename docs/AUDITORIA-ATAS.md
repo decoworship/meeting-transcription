@@ -709,7 +709,115 @@ leitura não é repetível. Duas bastam; não vinte.
 
 ---
 
-## 11. Convenção deste documento
+## 11. A mesma reunião, três vezes (28/08/2026)
+
+A gravação `2026-08-27_15-28-37` — 48min27s, sete convidados, três falantes,
+com Gemini em paralelo — foi transcrita três vezes com a 0.6.1, mudando uma
+coisa de cada vez. É a única medição do acervo em que o mesmo áudio passou pelo
+pipeline com configurações diferentes.
+
+| | vocabulário | skill da ata | trocas |
+|---|---|---|---|
+| A | vazio | `daily` | 0 |
+| B | 9 termos | `trabalho` | 4 — uma **errada** |
+| C | 23 termos | `trabalho` | 6 — **todas certas** |
+
+### 11.1 O vocabulário protege tanto quanto corrige
+
+Na rodada B a regra propôs `API → KPI`, num trecho onde a palavra certa era
+`API` ("um mockup da nossa API", aos 09:03). `API` e `KPI` estão a uma edição, e
+as duas são siglas de três letras: a porta que barra `São → SAS` deixa passar
+sigla trocada por sigla.
+
+**O conserto não foi mexer na regra: foi pôr `API` no vocabulário.** A `Propor`
+nunca propõe troca para termo que já é entidade conhecida, e na rodada C a
+troca errada desapareceu sem que nada no código mudasse.
+
+Isto é o inverso do que se espera de um vocabulário, e é a metade que não é
+óbvia: **omitir uma palavra comum custa mais caro que incluí-la.** A regra
+prática que sai daqui é *sigla curta entra acompanhada das vizinhas* — `KPI`,
+`API` e `APP` estão todas a uma edição umas das outras, e foi `KPI` estar
+sozinha que a fez comer `API`.
+
+As seis trocas da rodada C, todas conferidas contra o Gemini: `Clod → Cloud`
+(×2), `Cesar → César`, `Prado → Prada`, `QPIs → KPI`, `QPI → KPI`.
+
+### 11.2 Hotword não salva o que está longe demais
+
+`Beegol`, o nome da própria casa, sai como **"Beagle"** oito vezes, e chega à
+ata. O vocabulário vai ao motor como `hotwords`, reinjetado a cada janela de
+30 s — e **na rodada B, com `Beegol` na lista, o ASR escreveu "Beagle" as oito
+vezes assim mesmo**. (Na rodada C o termo tinha saído da lista, então ela não
+testa isto; quem testa é a B.)
+
+A regra a jusante também não alcança: `beagle` → `beegol` são três edições, e o
+teto para palavra de até seis letras é uma — o corte que existe para impedir
+`Edgar → Algar`.
+
+**As duas redes que temos falharam no mesmo caso**, e sobra o propositor de
+modelo, cujo teto é 3. É o mesmo perfil do `Kina → Kenan` que o Gemma acertou
+em 25/08. Deixou de ser hipótese: é um erro medido, recorrente, numa reunião
+real, que só ele alcança.
+
+### 11.3 O pipeline é determinístico — e não há piso de ruído
+
+As rodadas B e C deram diarização **idêntica**: 96,6% de acerto por palavra, os
+mesmos 120 segmentos com rótulo errado, os mesmos exemplos. Com a mesma entrada,
+o pipeline não varia.
+
+A rodada A deu 97,3%, e isso foi lido na hora como variação entre execuções —
+**errado, e a leitura está retratada aqui.** O `mix.wav` foi reescrito às 17:02
+de 27/08, depois de A ter rodado às 16:39: A e B mediram entradas diferentes.
+**Não existe piso de ruído de 0,7 ponto**, e diferenças menores que isso são
+reais.
+
+### 11.4 A ata varia de conteúdo entre rodadas, com o mesmo texto
+
+B e C partiram da mesma transcrição, com a mesma skill. B desenvolveu
+*linguagem/persona* e *fluxo de atendimento* como decisões técnicas, com
+raciocínio, e deixou o custo do S3 como descoberta. **C fez o contrário**:
+desenvolveu o S3 e rebaixou as outras duas a linha rasa, sem *Por quê* nem
+*Alternativas descartadas*.
+
+Nenhuma das duas está errada, e é a omissão do modelo pequeno da
+[FASE6](FASE6.md) §1.1 vista de um ângulo novo: não é que ele deixe de fora o
+mesmo pedaço sempre — é que ele desenvolve **um subconjunto**, e o subconjunto
+muda. Uma ata só não deixa isso aparecer.
+
+### 11.5 Reclassificar a skill valeu mais que qualquer ajuste
+
+A rodada A usou `daily` porque o título da reunião diz "Daily". A reunião durou
+48 minutos e produziu quatro decisões — e a skill `daily` **não tem seção de
+decisões**, dizendo apenas "se algo realmente foi decidido, acrescente uma seção
+curta".
+
+O modelo obedeceu: escreveu uma **seção de texto** chamada "Decisões" em vez de
+preencher o campo do esquema, e o `SecaoDobrada` teve que resgatá-la. O aviso
+"a seção Decisões veio como texto" não era acidente de formato — era **o modelo
+obedecendo à skill errada**.
+
+Trocada para `trabalho` (o que a própria `daily` manda fazer nesse caso), o
+aviso desapareceu nas duas rodadas seguintes, e apareceram *Por quê*,
+*Alternativas descartadas* e *Implicações*.
+
+### 11.6 O que continua aberto nesta gravação
+
+- **`Decisões técnicas` × `Decisões` duplicam.** A skill `trabalho` tem seção de
+  decisões no texto, e o `AtaGerada` tem o campo `decisoes`. Nenhum sabe do
+  outro, e o modelo preenche os dois. Na rodada C ficou pior: uma decisão com
+  raciocínio na seção, quatro sem raciocínio na lista, e a primeira repetida
+  palavra por palavra. O mesmo vale para `sprint`;
+- **um falante fantasma.** Onze segmentos rotulados `Unknown`, dezesseis
+  palavras no total, todos cacos ("Tudo certo", "Ah, bom", "então") — e o
+  cabeçalho da ata anuncia "**+1** falante não identificado", que é afirmação
+  falsa para quem lê. Um agrupamento de dezesseis palavras devia ser absorvido,
+  não anunciado;
+- **o aviso de compromisso é falso positivo aqui.** O trecho é alguém narrando o
+  que um terceiro disse ("ele já falou, meu, vou fazer o pull request"). A
+  heurística erra para o lado de reportar demais e pede conferência, então está
+  se comportando como projetada — mas é um em 48 minutos.
+
+## 12. Convenção deste documento
 
 Nomes de cliente, de pessoas e valores financeiros ficam **fora** — o repositório
 é público. Onde o exemplo precisa da forma da palavra, a forma está anonimizada
