@@ -984,7 +984,186 @@ conveniência e vira requisito** de qualquer desenho que costure por bloco.
 
 ---
 
-## 12. Como reproduzir
+---
+
+## 12. O vocabulário sem hotwords — T1.5
+
+Medido em 03/09/2026. Ferramenta:
+[`tools/medir_vocabulario_moss.py`](../tools/medir_vocabulario_moss.py).
+
+**Por que é de bloqueio.** O app injeta o vocabulário do projeto como `hotwords`
+no faster-whisper, e a [FASE6.md](FASE6.md) §4.1 mostra que é isso que salva nome
+próprio e sigla — o caso "Dimi/Jimmy" que originou o projeto inteiro.
+
+### 12.1 Nenhum runtime ggml expõe o hotword do MOSS
+
+```
+transcribe.cpp        Model.supports("initial_prompt") → False para o MOSS
+moss-transcribe.cpp   o prompt está embutido no GGUF como metadado,
+                      sem flag de sobrescrita nem API
+```
+
+Adotar o MOSS por esse caminho **perde o mecanismo**. Não é configuração: é
+ausência. (O caminho PyTorch tem a feature, mas não escala — §7.2.)
+
+### 12.2 Mas o que decide é se ele acerta sem o mecanismo
+
+Desenho do [`benchmark_vocab.py`](../tools/benchmark_vocab.py), cuja lição vale
+repetir: *"sem os braços 'sem prompt' não dá para separar 'o motor já acertaria
+sozinho' de 'o mecanismo funcionou'"*. Três colunas — app **com** hotwords, MOSS
+**sem**, e o Gemini como referência independente. Sobre os 19 termos que o Gemini
+confirma terem sido ditos, em 3 gravações:
+
+```
+                      na forma canônica     ouvido de algum jeito
+app (com hotwords)    16/19   84,2%         18/19   94,7%
+MOSS (sem hotword)    11/19   57,9%         15/19   78,9%
+```
+
+**As duas colunas medem coisas diferentes, e a distinção decide o que fazer:**
+
+* **"canônico"** é escrever o termo como o cliente o escreve — é o que a ata
+  mostra;
+* **"ouvido"** é escrever de algum jeito. O MOSS escreveu `next best` onde o
+  cliente escreve `nextbest`, e `lifecycle` onde ele escreve `life cycle`. O
+  termo foi ouvido certo; só não está na forma canônica.
+
+A distância entre as duas colunas é **exatamente o trabalho da
+`RevisaoDeTermos`**, que já existe no pipeline e roda depois do ASR. O que falta
+na coluna "ouvido" é outra coisa: `Cloud`, `versionamento` e `must-have` **não
+aparecem de forma nenhuma** na saída do MOSS, e o app com hotwords pegou os três.
+Palavra não transcrita não volta por pós-processamento.
+
+### 12.3 Veredito
+
+O vocabulário **é bloqueio, mas menor do que a contagem exata sugeria**: a
+distância real é de **15,8 pontos** (94,7% contra 78,9%), não os 26,4 da forma
+canônica.
+
+Há uma saída que não depende do runtime: **estender a `RevisaoDeTermos` para
+colar variantes de grafia** fecharia boa parte do buraco sem tocar no MOSS. Os
+termos genuinamente perdidos continuariam perdidos.
+
+> **Amostra pequena.** São 3 gravações e 19 termos. O sinal é claro — o app com
+> hotwords ganha — mas a magnitude tem incerteza grande, e não comporta a casa
+> decimal que os números acima carregam.
+
+---
+
+---
+
+## 13. As faixas separadas — T1.6, reprovada
+
+Medido em 03/09/2026. Ferramenta:
+[`tools/medir_faixas_separadas.py`](../tools/medir_faixas_separadas.py).
+
+**A ideia**, do dono do produto: rodar o MOSS uma vez em cada faixa em vez de no
+mix. No `mic.wav` há uma pessoa só e sabe-se qual; no `system.wav` sobra um
+falante a menos para separar; e fala sobreposta deixaria de se perder.
+
+**A sobreposição existe e é genuína.** Dos segmentos do microfone que o app
+atribui a outra pessoa, **94,9% trazem fala diferente** (sobreposição real) e só
+5,1% repetem a fala do outro (vazamento).
+
+**Mas não melhora o resultado.** Três gravações (a quarta quebrou):
+
+```
+gravação    TEXTO app        MOSS mix         MOSS faixas      FALANTE app/mix/faixas
+ 7,7 min   24,6%/77,2%     23,7%/79,8%      25,3%/80,4%        95,0% / 94,2% / 94,0%
+14,6 min   23,1%/80,4%     24,4%/81,7%      22,1%/83,2%        97,9% / 99,8% / 99,7%
+32,1 min   31,7%/70,3%     27,7%/76,3%      29,3%/76,0%        92,6% / 98,5% / 99,1%
+```
+
+Ganha em 1 de 3 no texto, empate técnico no falante (+0,6 / −0,2 / −0,1). A
+sobreposição recuperada — 37 palavras numa gravação de 7,7 min — é pequena demais
+para mover as métricas.
+
+**E custa três coisas:**
+
+* 15% a 25% mais tempo de GPU;
+* **alucinação em chinês** na faixa muda: 17,5% dos segmentos numa gravação, 0%
+  no mix. O modelo, sem sinal, completa o prompt padrão do GGUF
+  (`你好，我是你的助手`). O `mic.wav` é silêncio em **43,7%** dos blocos do acervo,
+  contra **0,2%** do mix;
+* **uma quebra dura**: `OutputTruncated` abortou a rodada na gravação de 48,5
+  min, o que nunca aconteceu no mix.
+
+**Veredito: o mix fica.** O portão de RMS que o defeito exigiu vale de qualquer
+forma, porque existe 1 bloco mudo em 579 no mix também.
+
+---
+
+## 14. A ata a partir do MOSS — T3
+
+Medido em 03/09/2026 com o **Gemma 4 E4B nos dois braços** — o modelo que o
+`app.json` desta máquina usa, não o `qwen3-4b` que é o padrão do código.
+Ferramenta: [`tools/comparar_atas_moss.py`](../tools/comparar_atas_moss.py).
+
+Mesmo prompt, mesmo motor, mesmos parâmetros: **só a transcrição de entrada
+muda.**
+
+### 14.1 A estrutura da transcrição, medida pelo auditor
+
+```
+gravação            segmentos   ≤4 palavras   quebra no meio   lacunas VAD/h
+32,1 min · app           702         49%           17%             15,0
+32,1 min · MOSS          400         25%            0%              1,9
+14,6 min · app           358         49%            7%              0
+14,6 min · MOSS          173         17%            0%              0
+48,5 min · app          1290         55%           14%              1,2
+48,5 min · MOSS          546         17%            4%              1,2
+```
+
+**Metade dos segmentos, um terço dos ultracurtos, e quebra no meio da frase de
+17% para zero.** Fragmentação e quebra de frase são exatamente os defeitos que
+essa régua foi construída para achar.
+
+### 14.2 O único achado de PERDA foi do app
+
+```
+2026-08-20_15-59-20__app   2 porcentagens ditas, ausentes da ata
+                           e cegas para o verificador: 10%, 2%
+```
+
+Nenhum no braço do MOSS.
+
+### 14.3 O que este teste não alcançou
+
+A auditoria **estrutural** da ata — seção descartada em silêncio, item duplicado
+— lê `ata.json`, que sai do `RedatorDeAta` em C#. As ferramentas de medição
+geram só o markdown cru. **A estrutura da ata do MOSS continua sem auditoria**, e
+só o RC fecha isso.
+
+---
+
+## 15. O comparativo visual — T8
+
+Ferramenta: [`tools/comparar_lado_a_lado.py`](../tools/comparar_lado_a_lado.py).
+Escolhe a janela de 90 s com **mais troca de falante** de cada gravação — onde os
+dois pipelines mais divergem.
+
+```
+Coca-Cola, 25,5–27,0 min    app 45 segmentos    MOSS 20
+Algar,     35,0–36,5 min    app 59 segmentos    MOSS 17
+```
+
+O app pica a fala em pedaços de duas ou três palavras; o MOSS entrega frases
+inteiras com pontuação. No mesmo trecho aparece o custo: `desgais` por "disguise"
+e `perif` por "uplift" — termos que o app, com hotwords, acerta.
+
+**Os dois defeitos têm naturezas diferentes, e é isso que decide.** Fragmentação
+e quebra de frase são **estruturais**: nenhum pós-processamento as desfaz, porque
+a informação de onde a frase começa já se perdeu. Vocabulário é **lexical**, e a
+`RevisaoDeTermos` conserta parte dele.
+
+> **Os nomes não são vantagem do app.** No comparativo o app mostra nomes e o
+> MOSS mostra `P1, P2, P3` — mas os nomes vêm do banco de vozes, que roda
+> **depois** da diarização, e a saída do MOSS medida aqui parou antes dessa
+> etapa. Num produto real os dois seriam nomeados igual.
+
+---
+
+## 16. Como reproduzir
 
 
 ```bash
@@ -1018,6 +1197,16 @@ uv run python tools/medir_costura.py --limiares 0.45,0.55,0.65,0.75
 
 # o LLM respondendo sobre a reunião (usa o llama.cpp do app, via cmd.exe)
 uv run python tools/medir_llm_ao_vivo.py --cortes 10,30,60,90
+
+# o vocabulário sem hotwords (só CPU, lê as varreduras já feitas)
+uv run python tools/medir_vocabulario_moss.py
+
+# as faixas separadas, a ata e o comparativo visual
+~/.cache/pulsemeet-medicoes/venv-moss/bin/python tools/medir_faixas_separadas.py \
+    --varredura ~/.cache/pulsemeet-medicoes/varredura-faixas
+uv run python tools/comparar_atas_moss.py
+uv run python tools/auditar_atas.py --pasta ~/.cache/pulsemeet-medicoes/atas
+uv run python tools/comparar_lado_a_lado.py --saida comparativo.md
 
 # a régua que decide, uma vez por gravação
 uv run python tools/wer_contra_gemini.py \
