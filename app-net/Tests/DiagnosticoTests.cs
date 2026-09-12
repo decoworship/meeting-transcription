@@ -87,6 +87,25 @@ public sealed class DiagnosticoTests
     }
 
     [Fact]
+    public void OBlocoDizDeOndeOBinarioRodou()
+    {
+        // **Este projeto tem duas instalações de propósito**, e o publicar.sh não
+        // mexe na versão: as duas se identificam como a mesma. Em 09/09/2026 o
+        // dono do produto publicou um conserto, reabriu o app, colou o bloco e
+        // perguntou se estava na versão nova — e o bloco não tinha como
+        // responder. Ele estava no binário antigo, e a resposta só saiu
+        // perguntando ao Windows qual processo estava vivo.
+        //
+        // Um bloco de diagnóstico que não diz QUAL binário o produziu manda quem
+        // lê diagnosticar a máquina errada.
+        string texto = Exemplo().ComoTexto();
+
+        Assert.Contains("executável:", texto);
+        Assert.Contains(Exemplo().Executavel, texto);
+        Assert.False(string.IsNullOrWhiteSpace(Exemplo().Executavel));
+    }
+
+    [Fact]
     public void OTextoCabeNumaMensagemENaoTemLinhaVazia()
     {
         // Ele é colado num chat. Um bloco que rola por vinte linhas não é colado;
