@@ -11,7 +11,7 @@
 // sim.
 
 import { pedir } from "/ponte.js";
-import { alerta, campo } from "/pecas.js";
+import { alerta, campo, confirmar, avisar, perguntarTexto } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
 function tamanho(bytes) {
@@ -407,7 +407,7 @@ function abaGravador(gravador, aoMexer) {
   avisos.appendChild(nota);
 
   const agenda = bloco("Google Calendar",
-    "Identifica a reunião que está sendo gravada e usa os participantes como "
+    "Identifica a reunião que está sendo gravada e usa os convidados como "
     + "vocabulário na transcrição.");
 
   if (!gravador.agenda_configurada) {
@@ -541,8 +541,9 @@ function cartaoDeModelo(item) {
 
   botao.addEventListener("click", async () => {
     if (estado === "instalado") {
-      if (!confirm(`Remover ${pacote.nome} do disco? `
-                   + `São ${tamanho(bytes_em_disco)} que voltam a ser baixados se precisar.`))
+      if (!await confirmar(
+            `São ${tamanho(bytes_em_disco)} que voltam a ser baixados se precisar.`,
+            { titulo: `Remover ${pacote.nome} do disco?`, ok: "Remover" }))
         return;
       botao.disabled = true;
       andamento.textContent = "removendo…";
@@ -711,6 +712,36 @@ function abaModelos(catalogo, config, gravar) {
     b.appendChild(escolha);
 
     for (const i of itens) b.appendChild(cartaoDeModelo(i));
+    painel.appendChild(b);
+  }
+
+  // O motor opcional da Fase 7. Bloco próprio, e não mais uma volta do laço
+  // acima, porque **não há o que escolher**: a família tem um GGUF só, e um
+  // seletor de uma opção é ruído. É a mesma forma do bloco da diarização logo
+  // abaixo — informa, e não oferece.
+  //
+  // Ele precisa existir mesmo estando a chave que o liga fora desta tela: sem
+  // cartão, o modelo não teria como ser baixado, e o motor subiria sem ele. Um
+  // teste guarda esse par — ver CatalogoTests.TodoPacoteTemIdUnicoEFamiliaConhecida.
+  const doMoss = catalogo.filter((i) => i.pacote.familia === "moss");
+  if (doMoss.length > 0) {
+    const b = bloco("Transcrição em uma passada (opcional)",
+      "Um modelo que transcreve e separa os falantes ao mesmo tempo. "
+      + "Baixe-o antes de escolhê-lo como motor de transcrição; enquanto não "
+      + "for escolhido, nada muda.");
+    for (const i of doMoss) b.appendChild(cartaoDeModelo(i));
+    painel.appendChild(b);
+  }
+
+  // O modelo da legenda ao vivo. Mesma forma e mesma razão do bloco acima: sem
+  // cartão o modelo não teria como ser baixado, e o motor subiria sem ele.
+  const daLegenda = catalogo.filter((i) => i.pacote.familia === "legenda");
+  if (daLegenda.length > 0) {
+    const b = bloco("Legenda ao vivo (opcional)",
+      "O modelo que faz o texto aparecer quase no instante da fala. "
+      + "Baixe-o antes de ligar a legenda em Ajustes › Transcrição; enquanto "
+      + "não for baixado, a chave não tem efeito.");
+    for (const i of daLegenda) b.appendChild(cartaoDeModelo(i));
     painel.appendChild(b);
   }
 
@@ -895,6 +926,82 @@ function abaTranscricao(config, gravar, diarizadores = []) {
     (v) => gravar({ usar_hotwords: v })), porQueImporta);
   painel.appendChild(hot);
 
+  // ---- qual motor produz texto e falante
+  //
+  // A escolha existia só no app.json até 09/09/2026, e quem quisesse comparar os
+  // dois motores tinha de fechar o app e editar um arquivo à mão. A gravação
+  // fica salva, então dá para transcrever a mesma reunião nos dois e comparar —
+  // e é essa comparação que a chave existe para permitir.
+  const motor = bloco("Motor de transcrição",
+    "O de sempre são dois modelos: um escreve o texto, outro separa quem falou, "
+    + "e o app cruza os dois pelo tempo. O MOSS faz as duas coisas numa passada.");
+  const escolhaDoMotor = campo("Usar", "select",
+    { opcoes: ["O de sempre (dois modelos)", "MOSS (uma passada)"] });
+  const selMotor = escolhaDoMotor.querySelector("select");
+  selMotor.options[0].value = "classico";
+  selMotor.options[1].value = "moss";
+  selMotor.value = config.motor_de_transcricao === "moss" ? "moss" : "classico";
+  selMotor.addEventListener("change", async (e) => {
+    await gravar({ motor_de_transcricao: e.target.value });
+    recarregar();
+  });
+  const oQueMuda = document.createElement("p");
+  oQueMuda.className = "campo__dica";
+  oQueMuda.textContent = "Com o MOSS o vocabulário funciona diferente: ele não "
+    + "aceita a lista de termos enquanto transcreve, então os nomes e siglas do "
+    + "projeto só são corrigidos depois, na revisão. Termo que ele não ouviu não "
+    + "volta. Ele precisa do modelo baixado em Ajustes › Modelos.";
+  motor.append(escolhaDoMotor, oQueMuda);
+  painel.appendChild(motor);
+
+  // ---- a prévia durante a própria reunião
+  //
+  // Nasce desligada, e continua desligada por padrão: enquanto o SUP-2 estiver
+  // aberto — a máquina do segundo usuário desliga sozinha sob carga de GPU —
+  // ligar isto lá custaria a reunião, e não uma transcrição que a retomada
+  // devolve. Quem liga aceita a troca na própria máquina.
+  const previa = bloco("Ver a transcrição durante a reunião");
+  previa.classList.add("bloco--chave");
+  const oQueE = document.createElement("p");
+  oQueE.className = "bloco__texto";
+  oQueE.textContent = "Enquanto você grava, o que já foi dito aparece no "
+    + "Gravador em forma de conversa — a sua fala de um lado, a dos outros do "
+    + "outro. Não é legenda: uma frase dita no minuto 10 aparece entre o 12 e o "
+    + "13, porque o bloco de 3 minutos precisa fechar antes de ser transcrito.";
+  const oQueCustaAoVivo = document.createElement("p");
+  oQueCustaAoVivo.className = "campo__dica";
+  oQueCustaAoVivo.textContent = "Ocupa cerca de um décimo da placa durante a "
+    + "reunião, e usa o motor escolhido acima — os dois servem. Aparece o texto "
+    + "e o que é seu, separado pelo lado da tela; quem é cada um dos outros só "
+    + "na transcrição do fim, que roda normalmente quando a reunião acaba.";
+  previa.append(oQueE, chave(config.transcricao_ao_vivo === true,
+    (v) => gravar({ transcricao_ao_vivo: v })), oQueCustaAoVivo);
+  painel.appendChild(previa);
+
+  // ---- a legenda ao vivo
+  //
+  // Nasce desligada, como tudo o que roda durante a gravação enquanto o SUP-2
+  // estiver aberto. E **não convive com a prévia em blocos**: medido em
+  // 11/09/2026, as duas juntas derrubam a legenda de 2,46x para 0,45x na 2060 —
+  // abaixo do tempo real, com a fila crescendo sem parar. O núcleo recusa, e
+  // este texto é para a pessoa não descobrir isso pelo sintoma.
+  const legenda = bloco("Legenda ao vivo");
+  legenda.classList.add("bloco--chave");
+  const oQueELegenda = document.createElement("p");
+  oQueELegenda.className = "bloco__texto";
+  oQueELegenda.textContent = "O texto aparece quase no instante da fala, e não "
+    + "a cada 3 minutos. Ele mostra o que foi dito e separa a sua fala da dos "
+    + "outros pelo lado da tela — quem é cada um continua vindo na transcrição "
+    + "do fim.";
+  const oQueCustaLegenda = document.createElement("p");
+  oQueCustaLegenda.className = "campo__dica";
+  oQueCustaLegenda.textContent = "Ocupa cerca de um terço da placa durante a "
+    + "reunião, e não funciona junto com a prévia em blocos acima — as duas não "
+    + "cabem. Ligando esta, a de cima fica desligada.";
+  legenda.append(oQueELegenda, chave(config.legenda_ao_vivo === true,
+    (v) => gravar({ legenda_ao_vivo: v })), oQueCustaLegenda);
+  painel.appendChild(legenda);
+
   // ---- qual modelo separa os falantes
   //
   // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este
@@ -1020,12 +1127,13 @@ function botaoRenomear(oQue, atual, aoConfirmar) {
   b.textContent = "Renomear";
   b.addEventListener("click", async (e) => {
     e.stopPropagation();
-    const novo = prompt(`Novo nome do ${oQue}:`, atual);
-    if (!novo || novo.trim() === atual) return;
+    const novo = await perguntarTexto(`Novo nome do ${oQue}`, atual,
+                                     { titulo: `Renomear ${oQue}` });
+    if (!novo || novo === atual) return;
     try {
-      await aoConfirmar(novo.trim());
+      await aoConfirmar(novo);
     } catch (err) {
-      alert(`não renomeou: ${err.message}`);
+      await avisar(err.message, { titulo: "Não deu para renomear" });
       return;
     }
     recarregar();
@@ -1046,11 +1154,11 @@ function botaoApagar(pergunta, aoConfirmar) {
   b.textContent = "Apagar";
   b.addEventListener("click", async (e) => {
     e.stopPropagation();
-    if (!confirm(pergunta)) return;
+    if (!await confirmar(pergunta, { titulo: "Apagar", ok: "Apagar" })) return;
     try {
       await aoConfirmar();
     } catch (err) {
-      alert(`não apagou: ${err.message}`);
+      await avisar(err.message, { titulo: "Não deu para apagar" });
       return;
     }
     recarregar();
@@ -1348,16 +1456,76 @@ function linhaDeAmostra(pessoa, a, aoMudar) {
   esquecer.className = "aa-btn aa-btn-texto";
   esquecer.type = "button";
   esquecer.textContent = "Esquecer";
-  esquecer.addEventListener("click", () => {
+  esquecer.addEventListener("click", async () => {
     // Apagar amostra é irreversível e some com trabalho de reuniões passadas.
     // Um clique distraído não pode bastar.
-    if (confirm(`Esquecer esta amostra de ${pessoa}?`))
+    if (await confirmar("A voz aprendida nesta amostra deixa de ser reconhecida "
+                        + "nas próximas reuniões.",
+                        { titulo: `Esquecer esta amostra de ${pessoa}?`,
+                          ok: "Esquecer" }))
       aoMudar("esquecer-voz", pessoa, a.indice);
   });
   acoes.appendChild(esquecer);
 
   linha.append(tocar, proc, acoes);
   return linha;
+}
+
+/**
+ * Pergunta com qual pessoa juntar, numa caixa do app.
+ *
+ * Um <select> e não um campo de texto: o destino tem de ser alguém que já
+ * existe, e digitar o nome de novo é exatamente o gesto que criou o problema —
+ * uma segunda grafia. Devolve o nome escolhido, ou nulo se desistiu.
+ */
+function escolherPessoa(de, outras) {
+  return new Promise((resolver) => {
+    const dialogo = document.createElement("dialog");
+    dialogo.className = "modal";
+
+    const corpo = document.createElement("div");
+    corpo.className = "modal__corpo";
+
+    const h = document.createElement("h2");
+    h.className = "modal__titulo";
+    h.textContent = `Juntar "${de}" com quem?`;
+
+    const escolha = campo("Manter o nome", "select", { opcoes: outras });
+    const sel = escolha.querySelector("select");
+
+    const acoes = document.createElement("div");
+    acoes.className = "modal__acoes";
+
+    const nao = document.createElement("button");
+    nao.className = "aa-btn aa-btn-secundario";
+    nao.type = "button";
+    nao.textContent = "Cancelar";
+    nao.addEventListener("click", () => dialogo.close(""));
+
+    const sim = document.createElement("button");
+    sim.className = "aa-btn aa-btn-primario";
+    sim.type = "button";
+    sim.textContent = "Continuar";
+    sim.addEventListener("click", () => dialogo.close("sim"));
+
+    acoes.append(nao, sim);
+    corpo.append(h, escolha, acoes);
+    dialogo.appendChild(corpo);
+
+    dialogo.addEventListener("close", () => {
+      const v = dialogo.returnValue === "sim" ? sel.value : null;
+      dialogo.remove();
+      resolver(v);
+    }, { once: true });
+    dialogo.addEventListener("click", (e) => {
+      if (e.target === dialogo) dialogo.close("");
+    });
+
+    document.body.appendChild(dialogo);
+    dialogo.returnValue = "";
+    dialogo.showModal();
+    sel.focus();
+  });
 }
 
 function abaVozes(vozes, aoMudar) {
@@ -1386,20 +1554,61 @@ function abaVozes(vozes, aoMudar) {
   }
 
   for (const p of vozes) {
-    const pessoa = document.createElement("div");
+    // **Uma pessoa por vez, dobrada.** Quarenta amostras de cinco pessoas são
+    // duzentas linhas, e achar a que se quer conferir vira rolagem. O <details>
+    // nativo faz isso sem estado nosso, sem JavaScript de abre-e-fecha, e já
+    // vem com teclado e leitor de tela funcionando.
+    const pessoa = document.createElement("details");
     pessoa.className = "pessoa";
 
-    const topo = document.createElement("div");
+    const topo = document.createElement("summary");
     topo.className = "pessoa__topo";
-    const h = document.createElement("p");
+    const h = document.createElement("span");
     h.className = "pessoa__nome";
     h.textContent = p.nome;
     const quantas = document.createElement("span");
     quantas.className = "campo__dica";
     const n = p.amostras.length;
-    quantas.textContent = `${n} ${n === 1 ? "amostra" : "amostras"}`;
+    const emQuar = p.amostras.filter((a) => a.quarentena).length;
+    quantas.textContent = `${n} ${n === 1 ? "amostra" : "amostras"}`
+      + (emQuar ? ` · ${emQuar} aguardando revisão` : "");
     topo.append(h, quantas);
     pessoa.appendChild(topo);
+
+    // **Aberta quando há o que revisar.** O que pede atenção não pode estar
+    // escondido atrás de um clique: quem abre esta tela por causa do aviso lá
+    // em cima precisa ver a amostra sem procurá-la.
+    pessoa.open = emQuar > 0;
+
+    // Juntar dois perfis. O nome é digitado à mão uma vez por reunião, e
+    // ninguém digita igual sempre — "Andre Yuri" e "André Yuri" viram duas
+    // pessoas, e o reconhecimento passa a comparar contra dois centróides
+    // fracos em vez de um forte. Ver Nucleo/Vozes.Juntar.
+    const outras = vozes.map((o) => o.nome).filter((nome) => nome !== p.nome);
+    if (outras.length > 0) {
+      const juntar = document.createElement("button");
+      juntar.className = "aa-btn aa-btn-texto pessoa__juntar";
+      juntar.type = "button";
+      juntar.textContent = "Juntar com…";
+      juntar.addEventListener("click", async (e) => {
+        // Sem isto o clique fecharia o <details> junto — o botão vive dentro
+        // do <summary>, e o navegador trata qualquer clique nele como o gesto
+        // de dobrar.
+        e.preventDefault();
+        e.stopPropagation();
+
+        const alvo = await escolherPessoa(p.nome, outras);
+        if (!alvo) return;
+        if (!await confirmar(
+              `As ${n} ${n === 1 ? "amostra" : "amostras"} de "${p.nome}" passam `
+              + `para "${alvo}", e "${p.nome}" deixa de existir. `
+              + "As gravações e os trechos de áudio não são tocados.",
+              { titulo: `Juntar "${p.nome}" com "${alvo}"?`, ok: "Juntar" })) return;
+
+        aoMudar("juntar-vozes", p.nome, undefined, alvo);
+      });
+      topo.appendChild(juntar);
+    }
 
     for (const a of p.amostras)
       pessoa.appendChild(linhaDeAmostra(p.nome, a, aoMudar));
@@ -1487,8 +1696,11 @@ export async function telaDeAjustes(ctx, aba = "geral") {
     }
   }
 
-  async function mexerNaVoz(op, pessoa, indice) {
-    const r = await pedir(op, { pessoa, indice });
+  async function mexerNaVoz(op, pessoa, indice, nome) {
+    // `nome` só o "juntar-vozes" usa: é a pessoa de DESTINO. As outras três ops
+    // ignoram o campo, como o contrato do sidecar manda (docs/SIDECAR.md: campo
+    // desconhecido é ignorado pelos dois lados).
+    const r = await pedir(op, { pessoa, indice, nome });
     vozes = r.vozes;
     desenharPainel();
   }

@@ -20,6 +20,7 @@
 import { pedir, assinar } from "/ponte.js";
 import { alerta } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
+import { painelAoVivo } from "/aovivo.js";
 
 /** "00:12:34" — aqui o tempo é para cronometrar, ao contrário da lista. */
 function relogio(segundos) {
@@ -229,13 +230,30 @@ export async function telaDoGravador(ctx) {
     linhas: 6,
   });
 
-  raiz.append(cartao, reuniao, proximas, notas.raiz, blocoDisp, blocoPasta);
+  // **A prévia, e ela mora aqui e não num destino novo.** É a tela que já está
+  // aberta durante a reunião, que já mostra os medidores e já sabe qual reunião
+  // da agenda está sendo gravada. Um quinto destino no trilho seria um lugar a
+  // mais para procurar durante a única hora em que não se pode procurar nada.
+  // Ver docs/FASE7-FRONTEND.md §6.1.
+  //
+  // Duas colunas enquanto grava — controle e notas à esquerda, o que já foi dito
+  // à direita, com rolagens separadas (decisão D1). Parada a gravação, volta a
+  // ser uma coluna, e é o CSS que faz isso pelo data-atributo.
+  const previa = painelAoVivo();
+  raiz.dataset.aovivo = String(estado.gravando);
+  raiz.append(cartao, reuniao, proximas, notas.raiz, blocoDisp, blocoPasta, previa.raiz);
   tela.replaceChildren(raiz);
 
   // ─────────────────────────────────────────────────────── desenho
 
   function aplicar(g) {
     estado = g;
+
+    // **A única coisa que a prévia faz dentro do aplicar()**, que roda 5×/s: um
+    // atributo. Desenhar a lista aqui seria reconstruí-la cinco vezes por
+    // segundo — o erro que o §7 do documento marca como o a não cometer. Quem
+    // desenha trecho é o evento `aovivo`, uma vez por bloco.
+    raiz.dataset.aovivo = String(g.gravando);
 
     ponto.dataset.cor = g.cor;
     tempo.textContent = g.gravando ? relogio(g.duracao_s) : "Parado";
@@ -286,10 +304,16 @@ export async function telaDoGravador(ctx) {
     reuniao.hidden = !temReuniao;
     if (temReuniao) {
       tituloReuniao.textContent = g.titulo;
+      // "convidados" e não "participantes", pela mesma razão escrita no
+      // app.js: a lista vem do convite da agenda, e ela diz quem foi CHAMADO,
+      // não quem apareceu. Numa reunião de seis convidados em que três entram,
+      // "6 participantes" é falso na tela do app que está gravando a reunião —
+      // e é justamente essa lista que vira vocabulário da transcrição.
       const nomes = g.participantes ?? [];
       participantes.textContent = nomes.length
-        ? `${nomes.length} participantes: ${nomes.join(", ")}`
-        : "Sem participantes na agenda.";
+        ? `${nomes.length} ${nomes.length === 1 ? "convidado" : "convidados"}: `
+          + nomes.join(", ")
+        : "Sem convidados na agenda.";
     }
 
     // Só quando a escolha muda: pode vir daqui, da bandeja, ou de o Parar ter
@@ -470,7 +494,14 @@ export async function telaDoGravador(ctx) {
     // A tela saiu do DOM (o usuário mudou de destino): parar de desenhar e
     // largar a assinatura. Sem isto, um medidor de uma tela fechada continuaria
     // escrevendo em nós órfãos até o app fechar.
-    if (!raiz.isConnected) { cancelar(); clearInterval(relogioDaAgenda); return; }
+    if (!raiz.isConnected) {
+      cancelar();
+      clearInterval(relogioDaAgenda);
+      // A prévia também: ela segura um IntersectionObserver, que sobreviveria à
+      // tela e ficaria observando um nó órfão até o app fechar.
+      previa.encerrar();
+      return;
+    }
     aplicar(evento.gravador);
   });
 

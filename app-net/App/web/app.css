@@ -15,6 +15,53 @@
  * exatamente o defeito das abas em 12/08. */
 :root { --altura-da-barra: 4.75rem; }
 
+/* A cor do falante, legível como TEXTO nos dois temas.
+ *
+ * Eram cinco hexadecimais fixos no pecas.js, escurecidos à mão para o tema
+ * claro e nunca revistos quando o escuro chegou: no escuro cinco dos seis
+ * nomes ficavam entre 2,77:1 e 3,68:1, abaixo do AA de 4,5:1 — ou seja, o seu
+ * nome era legível e o de todo mundo não. E a paleta ciclava na sexta pessoa,
+ * enquanto cinco gravações do acervo têm 9 falantes ou mais.
+ *
+ * Os matizes vêm da --dados-* do design system, a única paleta categórica que
+ * ele tem, reordenados para afastar os três pares de matiz vizinho (com quatro
+ * falantes a separação mínima sobe de 0,055 para 0,082) e escurecidos em OKLCH
+ * no tema claro — matiz e croma preservados, só a luminosidade desce. A
+ * --dados-* é paleta de PREENCHIMENTO e reprova como texto sobre areia: o ocre
+ * fica em 2,19:1.
+ *
+ * Os dezesseis valores passam AA (4,5:1) nos quatro fundos em que o nome
+ * aparece — --cor-fundo, o --cor-superficie-2 do :hover, o --cor-acao-suave do
+ * trecho tocando e o --cor-superficie das etiquetas de filtro. O pior caso é o
+ * --falante-6 no claro sobre o hover, em 4,58:1.
+ *
+ * Ver docs/FASE7-FRONTEND.md §12.3. Quem mexer aqui mexe também na PALETA de
+ * pecas.js — PaletaDeFalanteTests confere que os dois não divergem em silêncio.
+ *
+ * A forma dos blocos copia a do assets/ds/colors_and_type.css: [data-tema="escuro"]
+ * explícito, e [data-tema="auto"] DENTRO do @media. Trocar isso faz o tema
+ * automático parar de funcionar sem erro nenhum. */
+:root {
+  --falante-1: #3D6189;  --falante-2: #865B00;
+  --falante-3: #4C6B4A;  --falante-4: #755A79;
+  --falante-5: #875844;  --falante-6: #4A6875;
+  --falante-7: #96512D;  --falante-8: #566949;
+}
+[data-tema="escuro"] {
+  --falante-1: #6E9AC8;  --falante-2: #E0BB68;
+  --falante-3: #8AB185;  --falante-4: #B292B6;
+  --falante-5: #C4917A;  --falante-6: #82A5B4;
+  --falante-7: #DB9A72;  --falante-8: #93A883;
+}
+@media (prefers-color-scheme: dark) {
+  [data-tema="auto"] {
+    --falante-1: #6E9AC8;  --falante-2: #E0BB68;
+    --falante-3: #8AB185;  --falante-4: #B292B6;
+    --falante-5: #C4917A;  --falante-6: #82A5B4;
+    --falante-7: #DB9A72;  --falante-8: #93A883;
+  }
+}
+
 body {
   margin: 0;
   background: var(--cor-fundo);
@@ -427,6 +474,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   line-height: 1.7;
 }
 
+/* O gatilho da próxima leva da lista (lista-de-trechos.js). 1px e não 0: um
+ * elemento sem altura nenhuma tem interseção mal definida entre navegadores, e
+ * o modo de falha é a lista parar de crescer sem dizer nada. */
+.lista__sentinela { height: 1px; }
+
 /* Cada trecho é uma linha só: tempo, quem falou, o que disse. É a forma que o
  * app antigo usa e que o usuário lê rápido — trocar por cartões separaria o
  * texto de quem fala e dobraria a altura a percorrer. */
@@ -518,6 +570,177 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .modal__corpo { padding: var(--espaco-5); display: grid; gap: var(--espaco-4); }
 .modal__titulo { margin: 0; font-family: var(--fonte-display); font-size: var(--texto-titulo-m); }
 .modal__acoes { display: flex; gap: var(--espaco-3); justify-content: flex-end; }
+
+/* O corpo de uma caixa de confirmação. Um <p> por parágrafo, porque as
+ * mensagens que vieram dos confirm() nativos separam "o que vai acontecer" de
+ * "o que não volta" — e é a segunda linha que faz alguém parar. */
+.modal__texto { margin: 0; color: var(--cor-texto-suave); line-height: 1.6; }
+
+/* A região de anúncio: existe para o leitor de tela e para mais ninguém.
+ *
+ * Escondida do olho sem sair do fluxo de acessibilidade — `display: none` e
+ * `visibility: hidden` tiram o elemento também da árvore que o leitor lê, e aí
+ * a região deixa de anunciar. Daí o recorte de 1px, que é o jeito que funciona
+ * nos dois lados. */
+.anuncio {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* O título da barra recebe o foco a cada troca de tela (ver cabecalho() em
+ * app.js). Sem isto o anel de foco aparece em volta do <h1>, que é ruído: o
+ * foco aqui é para ser ouvido, não visto. O :focus-visible dos elementos que
+ * se alcançam por Tab continua intacto, porque este é tabindex="-1". */
+.barra__titulo:focus { outline: none; }
+
+/* A pessoa no painel de vozes é um <details>: cinco pessoas com quarenta
+ * amostras eram duzentas linhas de rolagem para conferir uma. */
+.pessoa__topo { display: flex; align-items: baseline; gap: var(--espaco-2); cursor: pointer; }
+.pessoa__topo::marker { color: var(--cor-texto-suave); }
+.pessoa__juntar { margin-left: auto; }
+/* Sem o anel padrão do summary, que emoldura a linha inteira; o :focus-visible
+ * abaixo devolve o sinal para quem navega por teclado. */
+.pessoa__topo:focus { outline: none; }
+.pessoa__topo:focus-visible { outline: 2px solid var(--cor-acao); outline-offset: 2px; }
+
+/* ─────────────────────────────────────────── a prévia ao vivo
+ *
+ * Duas colunas ENQUANTO GRAVA, uma coluna parado — é a decisão D1 da
+ * docs/FASE7-FRONTEND.md. Quem manda é o data-aovivo que o gravador.js escreve,
+ * e não uma classe trocada por JavaScript: assim o layout acompanha o estado do
+ * gravador sem ninguém redesenhar nada. */
+.painel[data-aovivo="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+  gap: var(--espaco-4);
+}
+/* **Tudo o que não é a prévia fica na coluna 1**, e sem esta linha o layout
+ * quebra de um jeito que parece sobreposição: o `grid-row: 1 / -1` abaixo **não
+ * atravessa linhas implícitas** — sem `grid-template-rows`, o `-1` resolve para
+ * o fim da grade explícita, que tem uma linha só. A prévia ficava só na linha 1,
+ * e os outros blocos, em posicionamento automático, fluíam pelas DUAS colunas:
+ * a agenda ia parar na direita, debaixo da legenda. Visto em uso em 10/09/2026. */
+.painel[data-aovivo="true"] > *:not(.aovivo) { grid-column: 1; }
+
+/* A prévia ocupa a coluna da direita inteira; o resto empilha na esquerda. */
+.painel[data-aovivo="true"] > .aovivo {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  position: sticky;
+  top: var(--espaco-4);
+}
+/* Parado não há prévia que valha: some, e a tela volta a ser a de sempre. */
+.painel[data-aovivo="false"] > .aovivo { display: none; }
+
+/* Numa janela estreita, duas colunas de 400 px não cabem — e é a tela do app
+ * que está gravando, então ela nunca pode ficar apertada. Volta a empilhar. */
+@media (max-width: 1100px) {
+  .painel[data-aovivo="true"] { display: block; }
+  .painel[data-aovivo="true"] > .aovivo { position: static; }
+}
+
+.aovivo__topo { margin-bottom: var(--espaco-3); }
+.aovivo__dica { margin: var(--espaco-1) 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+
+/* A coluna rola sozinha: é o que permite reler o que foi dito há dez minutos
+ * sem perder o fim, e o que o "voltar ao vivo" devolve. */
+.aovivo__corpo { max-height: 60vh; overflow-y: auto; }
+
+.aovivo__voltar { margin-top: var(--espaco-2); width: 100%; }
+
+/* O separador que nomeia o bloco e o estado dele (decisão D4). Hachura e texto
+ * acinzentado dizem "isto ainda pode mudar" sem precisar de legenda. */
+.aovivo__bloco {
+  margin: var(--espaco-3) 0 var(--espaco-1);
+  padding: var(--espaco-1) var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  border-top: 1px solid var(--cor-borda);
+}
+.aovivo__bloco[data-estado="provisorio"] {
+  background: repeating-linear-gradient(
+    135deg, transparent, transparent 6px,
+    var(--cor-superficie-2) 6px, var(--cor-superficie-2) 12px);
+}
+.aovivo__bloco[data-estado="mudo"] { font-style: italic; }
+
+/* O trecho da prévia é o mesmo da revisão, sem o que só faz sentido depois:
+ * não se toca áudio de uma reunião que ainda está acontecendo, e não se edita
+ * um texto que a passada final vai substituir. */
+/* ── a prévia em formato de conversa ───────────────────────────────────────
+ *
+ * **A sua fala à direita, a dos outros à esquerda, e nenhum nome.** Decidido em
+ * 10/09/2026: ao vivo o app não sabe quem falou — a costura por bloco divide 8
+ * pessoas em 15 identidades (FASE7-RESULTADOS §11.2) — mas sabe, com certeza e
+ * de graça, o que veio pela faixa do microfone. O lado da tela diz exatamente
+ * isso e nada mais.
+ *
+ * O lado **substitui** a coluna de nome em vez de conviver com ela: numa coluna
+ * estreita ao lado do gravador, aquelas 8rem de rótulo eram o que faltava ao
+ * texto. */
+.aovivo__corpo { display: flex; flex-direction: column; gap: var(--espaco-2); }
+
+.fala {
+  max-width: 78%;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-medio, 12px);
+  background: var(--cor-superficie-2);
+}
+/* À direita, e com a cor da ação — a mesma que o app já usa para "você" em
+ * todo lugar, então o lado e a cor dizem a mesma coisa duas vezes. */
+.fala[data-dono="true"] {
+  align-self: flex-end;
+  background: var(--cor-acao-suave);
+}
+.fala[data-dono="false"] { align-self: flex-start; }
+
+.fala__texto { margin: 0; }
+/* O tempo é para reler o que foi dito há dez minutos, não para consultar a cada
+ * linha: fica pequeno, apagado, e alinhado ao lado a que a fala pertence. */
+.fala__tempo {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  font-variant-numeric: tabular-nums;
+}
+.fala[data-dono="true"] .fala__tempo { text-align: right; }
+
+/* O separador de bloco atravessa a conversa inteira: ele fala do bloco, não de
+ * uma fala. */
+.aovivo__bloco { align-self: stretch; }
+
+/* **O que o motor ainda pode reescrever.** A legenda firma o texto aos poucos:
+ * o que já firmou é balão normal, o que é hipótese fica aqui — apagado e em
+ * itálico. Sem essa distinção a tela treme e quem lê não entende por quê.
+ * Ver docs/FASE7-ROTA.md §4, passo R4. */
+/* O rascunho da legenda na tela de preparo: fechado por padrão, e rolando
+ * dentro de si — ele informa a decisão, não domina a tela. */
+.legenda-gravada { margin-bottom: var(--espaco-4); }
+.legenda-gravada summary { cursor: pointer; }
+.legenda-gravada__corpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  max-height: 40vh;
+  overflow-y: auto;
+  margin-top: var(--espaco-3);
+}
+
+.fala--volatil {
+  opacity: 0.55;
+  font-style: italic;
+  border: 1px dashed var(--cor-borda);
+  background: none;
+}
 
 /* ───────────────────────────────────────────────────── falantes */
 

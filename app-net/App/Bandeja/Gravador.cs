@@ -111,6 +111,44 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
 
     // ─────────────────────────────────────────────────────────── ações
 
+    /// <summary>
+    /// Avisado quando uma gravação começa, e quando ela termina.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Existe porque gravar tem TRÊS portas</b>, e pendurar-se numa delas é
+    /// pendurar-se em nenhuma: o botão da janela (<c>Ponte</c>, op
+    /// <c>gravar</c>), o clique no ícone da bandeja e o item do menu dela — os
+    /// dois últimos pelo <see cref="AoClicar"/>. Em 09/09/2026 a prévia ao vivo
+    /// nasceu presa só à primeira, e o dono do produto gravou duas reuniões pela
+    /// bandeja: ela nunca soube que a reunião tinha começado, e não deixou nem
+    /// uma linha no registro dizendo por quê.
+    /// </para>
+    /// <para>
+    /// Quem sabe que a gravação começou é <b>o gravador</b>, e é dele que o aviso
+    /// tem de sair. Uma porta nova amanhã passa a ser coberta sem ninguém
+    /// lembrar disto.
+    /// </para>
+    /// <para>
+    /// <b>O gravador não sabe o que os assinantes fazem, e não pode morrer por
+    /// causa deles.</b> Uma exceção num assinante é engolida: o pior que pode
+    /// acontecer a quem escuta é não acontecer, e nada disso vale uma reunião.
+    /// </para>
+    /// </remarks>
+    public event Action<string>? AoComecar;
+
+    /// <inheritdoc cref="AoComecar"/>
+    public event Action? AoTerminar;
+
+    private void Avisar(Action? quem)
+    {
+        try { quem?.Invoke(); }
+        catch (Exception e)
+        {
+            MeetingApp.Nucleo.Registro.Escrever("gravador", $"assinante falhou: {e.Message}");
+        }
+    }
+
     public void Iniciar()
     {
         if (Estado.Gravando) return;
@@ -164,6 +202,11 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             if (Cfg.UseCalendar && Fixado is null) ConsultarAgenda();
             if (Cfg.StartMuted) AlternarMudo();
             Atualizar();
+
+            // No fim, e só se chegou até aqui: quem escuta recebe uma gravação
+            // que já existe em disco, com as faixas abertas. Ver AoComecar.
+            if (PastaAtual is { Length: > 0 } pasta)
+                Avisar(() => AoComecar?.Invoke(pasta));
         }
         catch (Exception e)
         {
@@ -214,6 +257,11 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     public void Parar()
     {
         if (!Estado.Gravando) return;
+
+        // Antes de fechar as faixas: quem lê o áudio enquanto ele é gravado
+        // precisa parar primeiro, senão tenta ler um arquivo que acabou de
+        // fechar e polui o registro com falhas que não são falhas.
+        Avisar(() => AoTerminar?.Invoke());
 
         foreach (var c in _capturas) c.Parar();
 

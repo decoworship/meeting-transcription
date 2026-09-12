@@ -3,7 +3,8 @@ import { telaDeRevisao, abrirPainel } from "/revisao.js";
 import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
-         campoComSugestoes, preencherSugestoes } from "/pecas.js";
+         campoComSugestoes, preencherSugestoes, confirmar, avisar,
+         anunciar } from "/pecas.js";
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
@@ -50,9 +51,36 @@ export const tituloDe = (g) => g.titulo || quando(g.nome);
  */
 function cabecalho(t, sub, comVoltar) {
   pararAudio();
+  const mudou = titulo.textContent !== t;
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;
+
+  // **O foco vai para o título, e é a metade do FE-3 que faltava.** Trocar o
+  // <h1> não é trocar de tela para quem navega por teclado ou lê por leitor de
+  // tela: o foco continuava no botão do trilho, e clicar em "Atas" não produzia
+  // sinal nenhum de que a página tinha mudado. Ver docs/FASE7-FRONTEND.md §F-3.
+  //
+  // Só quando o título muda de verdade: o cabeçalho é reescrito também para
+  // trocar o subtítulo — "carregando a transcrição…" vira o nome do projeto —,
+  // e mover o foco a cada um desses seria pior que não mover.
+  if (!mudou) return;
+
+  // Quem está digitando não perde o cursor. Acontece de verdade: o aviso de
+  // versão e o fim de uma transcrição reescrevem o cabeçalho, e a pessoa pode
+  // estar no meio das notas.
+  const foco = document.activeElement;
+  if (foco && foco.matches?.("input, textarea, select, [contenteditable]")) return;
+
+  // -1 e não 0: o título entra na ordem de leitura, mas não vira mais uma parada
+  // de Tab para quem só navega.
+  titulo.tabIndex = -1;
+  titulo.focus({ preventScroll: true });
+
+  // E o anúncio diz o ESTADO, nunca o conteúdo: o nome da tela, não o que ela
+  // tem dentro. A regra vale desde já e é o que impede o painel ao vivo de um
+  // dia ler a reunião inteira em voz alta, por cima da reunião (§9).
+  anunciar(sub ? `${t} — ${sub}` : t);
 }
 
 /**
@@ -260,16 +288,16 @@ export function botaoApagarGravacao(g) {
   b.type = "button";
   b.textContent = "Apagar gravação";
   b.addEventListener("click", async () => {
-    if (!confirm(
-      `Apagar "${tituloDe(g)}"?\n\n`
-      + "Isto apaga o áudio, os metadados e a transcrição desta reunião. "
-      + "O áudio original não pode ser recuperado.")) return;
+    if (!await confirmar(
+      "Isto apaga o áudio, os metadados e a transcrição desta reunião.\n"
+      + "O áudio original não pode ser recuperado.",
+      { titulo: `Apagar "${tituloDe(g)}"?`, ok: "Apagar" })) return;
 
     b.disabled = true;
     try {
       await pedir("apagar-gravacao", { gravacao: g.caminho });
     } catch (e) {
-      alert(`não apagou: ${e.message}`);
+      await avisar(e.message, { titulo: "Não deu para apagar" });
       b.disabled = false;
       return;
     }
@@ -307,9 +335,51 @@ async function telaDePreparo(g) {
   // O vínculo vem junto: cliente e projeto escolhidos antes sobrevivem a sair
   // da tela, porque moram em reuniao.json na pasta da gravação e não dentro da
   // transcrição — que, na tela de preparo, ainda não existe.
-  const [{ clientes }, vinculo] = await Promise.all([
+  const [{ clientes }, vinculo, leg] = await Promise.all([
     pedir("clientes"), pedir("reuniao", { gravacao: g.caminho }),
+    // O que a legenda ao vivo deixou, se ela estava ligada. **Não é
+    // transcrição** — é para conferir se o que foi dito está lá antes de
+    // gastar a placa com a passada inteira.
+    pedir("legenda-gravada", { gravacao: g.caminho }).catch(() => ({})),
   ]);
+
+  // ---- o que a legenda ouviu, quando ouviu
+  //
+  // Vem antes de tudo porque é o que responde a pergunta desta tela: vale
+  // transcrever? Quem leu e viu que está lá decide com informação; quem não
+  // tinha legenda ligada não vê nada, e a tela é a de sempre.
+  const turnos = leg?.legenda_gravada;
+  if (turnos?.length) {
+    const b = document.createElement("details");
+    b.className = "bloco legenda-gravada";
+    const t = document.createElement("summary");
+    t.className = "bloco__titulo";
+    const palavras = turnos.reduce((n, x) => n + x.texto.trim().split(/\s+/).length, 0);
+    t.textContent = `O que a legenda ouviu — ${palavras} palavras`;
+    b.appendChild(t);
+
+    const aviso = document.createElement("p");
+    aviso.className = "campo__dica";
+    aviso.textContent = "Rascunho do que foi dito durante a reunião. A "
+      + "transcrição abaixo é outra coisa: ela roda com o modelo inteiro, "
+      + "separa quem falou e é a que fica.";
+    b.appendChild(aviso);
+
+    const corpo = document.createElement("div");
+    corpo.className = "transcricao legenda-gravada__corpo";
+    for (const x of turnos) {
+      const fala = document.createElement("div");
+      fala.className = "fala";
+      fala.dataset.dono = String(x.dono);
+      const p = document.createElement("p");
+      p.className = "fala__texto";
+      p.textContent = x.texto.trim();
+      fala.appendChild(p);
+      corpo.appendChild(fala);
+    }
+    b.appendChild(corpo);
+    tela.appendChild(b);
+  }
 
   const forma = document.createElement("div");
   forma.className = "secao";

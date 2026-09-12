@@ -93,6 +93,21 @@ internal sealed class Resposta
     [JsonPropertyName("fracao")] public double? Fracao { get; init; }
     [JsonPropertyName("texto")] public string? Texto { get; init; }
 
+    /// <summary>Um bloco da prévia ao vivo. Só no evento <c>id: 0</c>.</summary>
+    [JsonPropertyName("aovivo")] public BlocoDaPrevia? AoVivo { get; init; }
+
+    /// <summary>Um pedaço da legenda ao vivo. Só no evento <c>id: 0</c>.</summary>
+    [JsonPropertyName("legenda")] public PedacoDaLegendaJson? Legenda { get; init; }
+
+    /// <summary>O que a legenda deixou numa gravação já encerrada.</summary>
+    [JsonPropertyName("legenda_gravada")] public List<TurnoJson>? LegendaGravada { get; init; }
+
+    /// <summary>O que impede a prévia, ou nulo quando ela pode acontecer.</summary>
+    [JsonPropertyName("aovivo_impedimento")] public string? AoVivoImpedimento { get; init; }
+
+    /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
+    [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
+
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
     [JsonPropertyName("transcricao")] public string? Transcricao { get; init; }
@@ -448,9 +463,64 @@ internal sealed class GravacaoResumo
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
 }
 
+/// <summary>Uma fala da legenda gravada, como a tela a recebe.</summary>
+internal sealed class TurnoJson
+{
+    [JsonPropertyName("dono")] public required bool Dono { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+}
+
+/// <summary>Um pedaço da legenda ao vivo, como a tela o recebe.</summary>
+/// <remarks>
+/// <b>Só o que firmou agora</b> — ver <c>Nucleo/LegendaAoVivo.cs</c>. Mandar o
+/// acumulado a cada parcial seria O(n²) ao longo da reunião.
+/// </remarks>
+internal sealed class PedacoDaLegendaJson
+{
+    [JsonPropertyName("novo")] public required string Novo { get; init; }
+    [JsonPropertyName("tentativo")] public required string Tentativo { get; init; }
+    [JsonPropertyName("dono")] public required bool Dono { get; init; }
+}
+
+/// <summary>Um bloco de 3 minutos da prévia, como a tela o recebe.</summary>
+/// <remarks>
+/// <b>Chega inteiro e uma vez.</b> Nada de trecho a trecho: o produto é de
+/// blocos de três minutos, e fingir granularidade menor é fingir tempo real.
+/// Ver docs/FASE7-FRONTEND.md §8.
+/// </remarks>
+internal sealed class BlocoDaPrevia
+{
+    [JsonPropertyName("n")] public int Numero { get; init; }
+    [JsonPropertyName("inicio_s")] public double InicioS { get; init; }
+    [JsonPropertyName("fim_s")] public double FimS { get; init; }
+
+    /// <summary><c>"provisorio"</c> ou <c>"mudo"</c>.</summary>
+    [JsonPropertyName("estado")] public required string Estado { get; init; }
+
+    [JsonPropertyName("trechos")] public required List<TrechoDaPrevia> Trechos { get; init; }
+}
+
+/// <summary>Um trecho da prévia.</summary>
+/// <remarks>
+/// O <c>speaker</c> é o rótulo <b>local ao bloco</b> (<c>b3_S1</c>) ou
+/// <c>You</c>, que vem da faixa do microfone e é certeza. A tela nunca mostra
+/// nome de pessoa aqui: a costura só acontece na passada final, e um nome que
+/// troca sozinho é pior que "Falante 2" (docs/FASE7-RESULTADOS.md §5.3).
+/// </remarks>
+internal sealed class TrechoDaPrevia
+{
+    [JsonPropertyName("start")] public double Start { get; init; }
+    [JsonPropertyName("end")] public double End { get; init; }
+    [JsonPropertyName("text")] public required string Text { get; init; }
+    [JsonPropertyName("speaker")] public string? Speaker { get; init; }
+}
+
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 [JsonSerializable(typeof(Pedido))]
 [JsonSerializable(typeof(Resposta))]
+[JsonSerializable(typeof(BlocoDaPrevia))]
+[JsonSerializable(typeof(PedacoDaLegendaJson))]
+[JsonSerializable(typeof(List<TurnoJson>))]
 [JsonSerializable(typeof(PacoteComEstado))]
 [JsonSerializable(typeof(EstadoDoGravador))]
 [JsonSerializable(typeof(EstadoDasTranscricoes))]
@@ -498,6 +568,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// página troca de tela e o pipeline não pode saber disso (FASE3.md §2).
     /// </summary>
     private readonly RegistroDeTranscricoes _transcricoes = new();
+
+    /// <summary>
+    /// A prévia da reunião em curso, quando ligada. Nula o resto do tempo.
+    /// </summary>
+    /// <remarks>
+    /// Uma por gravação, criada no <c>gravar</c> e descartada no
+    /// <c>parar-gravacao</c>. Ela não é dona de nada que a gravação precise: se
+    /// morrer, some da tela e o áudio continua sendo escrito.
+    /// </remarks>
+    private SessaoAoVivo? _aoVivo;
+    private LegendaAoVivo? _legenda;
 
     public async Task AtenderAsync(string mensagem)
     {
@@ -780,6 +861,14 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
                     break;
 
+                case "juntar-vozes":
+                    // Duas grafias do mesmo nome viram dois perfis, e dois
+                    // perfis reconhecem pior que um: o centroide de cada um é
+                    // mais fraco. Ver Vozes.Juntar.
+                    new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "");
+                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    break;
+
                 case "salvar-config":
                     p.Config?.Salvar();
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
@@ -803,6 +892,20 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "transcricao":
                     Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
+                    break;
+
+                // O que a legenda ao vivo deixou para ler. **Não é transcrição**
+                // e não entra no lugar dela: serve para conferir, antes de
+                // gastar a placa, se o que foi dito está lá.
+                case "legenda-gravada":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        LegendaGravada = p.Gravacao is { Length: > 0 } g
+                            ? LegendaAoVivo.Ler(g)?.Turnos.Select(t => new TurnoJson
+                            { Dono = t.Dono, Texto = t.Texto }).ToList()
+                            : null,
+                    });
                     break;
 
                 // Não espera o pipeline: responde "aceita" na hora, e o
@@ -840,6 +943,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "gravar":
+                    // A prévia NÃO é ligada aqui: quem avisa é o próprio
+                    // gravador, pelo AoComecar. Gravar tem três portas — este
+                    // botão, o ícone da bandeja e o menu dela — e pendurar-se
+                    // numa delas é pendurar-se em nenhuma. Ver Gravador.AoComecar.
                     gravador.Iniciar();
                     Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
                     break;
@@ -847,6 +954,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 case "parar-gravacao":
                     gravador.Parar();
                     Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "aovivo":
+                    // A tela pergunta ao montar, e recebe DUAS coisas: o motivo,
+                    // quando a prévia não pode acontecer, e o que já aconteceu —
+                    // porque o Gravador pode ser aberto no minuto 20, e os blocos
+                    // de antes já passaram pelo canal de eventos.
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        AoVivoImpedimento = ConfiguracoesDoApp.Carregar() is { TranscricaoAoVivo: true } cfgv
+                            ? SessaoAoVivo.OQueImpede(Motores.AoLadoDoExecutavel(), cfgv)
+                            : "a prévia ao vivo está desligada em Ajustes › Transcrição.",
+                        AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
+                    });
                     break;
 
                 case "mutar":
@@ -1068,6 +1190,124 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         Terminou = t.Terminou,
         Erro = t.Erro,
         Cancelada = t.Cancelada,
+    };
+
+    /// <summary>
+    /// Liga a prévia desta gravação, quando a chave permite.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nunca lança.</b> Ela é acionada no mesmo caminho que acabou de iniciar
+    /// uma gravação: uma exceção aqui derrubaria o pedido e deixaria o usuário
+    /// sem saber se está gravando. O pior desfecho aceitável é a prévia não
+    /// acontecer — e ela ser um extra é exatamente o que permite tratá-la assim.
+    /// </remarks>
+    /// <summary>
+    /// Passa a escutar o gravador. Chamado uma vez, na subida.
+    /// </summary>
+    /// <remarks>
+    /// Assinar o gravador e não interceptar o botão: as três portas de gravar
+    /// convergem nele, e uma quarta amanhã não exigiria lembrar deste arquivo.
+    /// </remarks>
+    public void AcompanharOGravador(Bandeja.Gravador gravador)
+    {
+        gravador.AoComecar += ComecarAPrevia;
+        gravador.AoTerminar += EncerrarAPrevia;
+    }
+
+    private void ComecarAPrevia(string pasta)
+    {
+        try
+        {
+            _aoVivo?.Dispose();
+            _aoVivo = null;
+
+            var cfg = ConfiguracoesDoApp.Carregar();
+            if (!cfg.TranscricaoAoVivo) return;
+
+            var motores = Motores.AoLadoDoExecutavel();
+            if (SessaoAoVivo.OQueImpede(motores, cfg) is { } impede)
+            {
+                Registro.Escrever("aovivo", $"prévia não ligou: {impede}");
+                return;
+            }
+
+            // **Uma das duas, nunca as duas.** Com o bloco do MOSS junto a
+            // legenda cai de 2,46x para 0,45x na 2060 — abaixo do tempo real.
+            // O OQueImpede da legenda recusa, e aqui a ordem torna a recusa
+            // desnecessária: a legenda tem precedência quando ligada.
+            if (cfg.LegendaAoVivo
+                && LegendaAoVivo.OQueImpede(motores, cfg) is null)
+            {
+                _legenda = new LegendaAoVivo(pasta, motores, Motores.Ambiente(),
+                                             EmpurrarLegenda);
+                _legenda.Comecar();
+                return;
+            }
+
+            _aoVivo = new SessaoAoVivo(pasta, motores, Motores.Ambiente(),
+                                       EmpurrarBlocoAoVivo,
+                                       cfg.MotorDeTranscricao, cfg.ModeloPadrao);
+            _aoVivo.Comecar();
+        }
+        catch (Exception e)
+        {
+            Registro.Escrever("aovivo", $"prévia não ligou: {e.Message}");
+            _aoVivo = null;
+        }
+    }
+
+    /// <summary>Descarta a prévia. Nunca lança, pela mesma razão.</summary>
+    private void EncerrarAPrevia()
+    {
+        try { _legenda?.Dispose(); }
+        catch (ObjectDisposedException) { }
+        _legenda = null;
+
+        try { _aoVivo?.Dispose(); }
+        catch (Exception) { /* a gravação não pode parar por causa da prévia */ }
+        _aoVivo = null;
+    }
+
+    /// <summary>
+    /// Empurra um bloco da prévia ao vivo à página.
+    /// </summary>
+    /// <remarks>
+    /// <b>Incremental por construção</b>, e isso é decisão de contrato e não
+    /// otimização: os outros dois eventos empurrados — nível de áudio e registro
+    /// de transcrições — mandam o estado inteiro a cada vez, e está certo, porque
+    /// os dois cabem em centenas de bytes. <b>Uma transcrição não é pequena.</b>
+    /// Mandar o transcrito inteiro a cada bloco é O(n²) ao longo da reunião, com
+    /// o JSON.parse na thread que desenha — na tela do app que está gravando.
+    /// Aqui vai só o bloco que chegou. Ver docs/FASE7-FRONTEND.md §F-12.
+    /// </remarks>
+    private void EmpurrarBlocoAoVivo(BlocoAoVivo b) =>
+        Responder(new Resposta { Id = 0, Tipo = "aovivo", AoVivo = Resumir(b) });
+
+    /// <summary>Empurra um pedaço da legenda. Mesmo canal do bloco, outro campo.</summary>
+    private void EmpurrarLegenda(PedacoDaLegenda p) =>
+        Responder(new Resposta
+        {
+            Id = 0, Tipo = "aovivo",
+            Legenda = new PedacoDaLegendaJson
+            {
+                Novo = p.Novo, Tentativo = p.Tentativo, Dono = p.Dono,
+            },
+        });
+
+    /// <summary>Um bloco, como a tela o recebe. O mesmo no evento e na pergunta.</summary>
+    private static BlocoDaPrevia Resumir(BlocoAoVivo b) => new()
+    {
+        Numero = b.Numero,
+        InicioS = b.InicioS,
+        FimS = b.FimS,
+        Estado = b.Estado,
+        Trechos = [.. b.Trechos.Select(t => new TrechoDaPrevia
+        {
+            Start = t.Start,
+            End = t.End,
+            Text = t.Text,
+            Speaker = t.Speaker,
+        })],
     };
 
     /// <summary>Empurra o registro à página, sem ela ter pedido.</summary>
@@ -1464,7 +1704,12 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             string caminhoDoMic = Path.Combine(pasta, "mic.wav");
             float[]? mic = File.Exists(caminhoDoMic) ? Faixas.LerUma(caminhoDoMic) : null;
             return new AprendizadoDeVozes(Motores.AoLadoDoExecutavel(), new Vozes())
-                .AprenderAsync(pasta, dados.Segments, falante, nome, mic);
+                // O motor vai junto: nomear um falante de uma transcrição do
+                // MOSS grava um vetor de identidade COSTURADA, e a costura pode
+                // ter fundido duas pessoas (docs/FASE7-RESULTADOS.md §11.4). A
+                // origem não impede a inscrição — permite desfazê-la em bloco.
+                .AprenderAsync(pasta, dados.Segments, falante, nome, mic,
+                               motor: dados.Engine);
         });
 
         Responder(new Resposta
@@ -1566,9 +1811,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             await motor.BaixarAsync(
                 pacote.Repositorio,
-                // Na família "ata" o destino é o arquivo, e não a pasta de
-                // cache: quem o abre é o llama.cpp, por caminho.
-                pacote.Familia == "ata"
+                // **Onde o GGUF avulso cai, e o erro que isto já cometeu.** Nas
+                // famílias de arquivo único o destino é o ARQUIVO, e não a pasta
+                // de cache: quem o abre é o llama.cpp (ata) ou o transcribe.cpp
+                // (moss), os dois por caminho.
+                //
+                // Esta linha dizia `Familia == "ata"` e ficou para trás quando a
+                // família "moss" chegou, em 04/09/2026. O download funcionou —
+                // 0,70 GB, íntegros — e gravou o modelo NO LUGAR da pasta:
+                // `motores/moss/modelos` virou um arquivo de 700 MB, o motor
+                // procurou `modelos/MOSS-...gguf`, não achou, e a tela continuou
+                // dizendo "ausente" sobre um download que deu certo.
+                //
+                // O `Catalogo.EhArquivoAvulso` é o lugar único dessa pergunta;
+                // repeti-la aqui foi o que permitiu as duas discordarem.
+                Catalogo.EhArquivoAvulso(pacote)
                     ? Catalogo.ArquivoDoPacote(pacote) : Catalogo.PastaDoPacote(pacote),
                 pacote.TamanhoEsperadoBytes,
                 (pct, texto) =>
