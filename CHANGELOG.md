@@ -3,6 +3,195 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc6 — 12/09/2026
+
+**A legenda fica para ler depois.** Encerrada a reunião, o que ela ouviu aparece
+na tela de transcrever, num bloco que você abre — dá para conferir se o que foi
+dito está lá antes de decidir gastar a placa com a passada inteira.
+
+**É rascunho, e a tela diz isso.** O texto vem do modelo rápido, sem separação de
+falantes; a transcrição continua sendo outra coisa, e é a que fica. Ela roda
+normalmente, com o modelo inteiro, quando você mandar.
+
+**Ele é escrito a cada fala, não no fim.** Se a máquina desligar no meio da
+reunião, o que já foi dito continua lá.
+
+## 0.7.0-rc5 — 12/09/2026
+
+**A legenda ao vivo chegou.** Enquanto você grava, o texto aparece quase no
+instante da fala — não a cada três minutos. Ele entra na mesma conversa da
+prévia: a sua fala de um lado, a dos outros do outro.
+
+**O que ainda pode mudar aparece diferente.** O motor firma o texto aos poucos, e
+o que ele ainda pode reescrever fica apagado e em itálico, com borda tracejada.
+Quando firma, vira texto normal. Sem isso a tela pareceria trocar palavra
+sozinha.
+
+**A legenda e a prévia em blocos não ligam juntas, e o app diz por quê.** As duas
+não cabem na mesma placa: medindo numa reunião real, a legenda sozinha acompanha
+a fala com folga e, com a prévia em blocos junto, passa a atrasar sem parar.
+Ligando a legenda, a de cima fica desligada.
+
+**Ela nasce desligada**, em Ajustes › Transcrição, como tudo o que roda durante a
+gravação.
+
+## 0.7.0-rc4 — 10/09/2026
+
+**A transcrição durante a reunião finalmente aparece.** Ela existia desde a rc2,
+ligava certo e transcrevia certo — e a tela ficava em branco de qualquer jeito,
+inclusive a dica dos três primeiros minutos. Eram dois defeitos em sequência, um
+escondendo o outro, e nenhum dava erro visível.
+
+**Ela agora tem forma de conversa: a sua fala de um lado, a dos outros do
+outro.** Antes ela dizia "Falante 1", "Falante 4" — e isso era uma afirmação que
+o app não tinha como sustentar ao vivo, porque quem separa as pessoas só enxerga
+três minutos por vez e acaba inventando gente demais. O que ele sabe com certeza
+é o que passou pelo seu microfone, e agora é só isso que ele afirma. Quem é cada
+um dos outros continua vindo na transcrição do fim, que vê a reunião inteira.
+De quebra, sem a coluna de nome sobra largura para o texto.
+
+**E ela funciona com os dois motores.** Antes exigia o MOSS, porque precisava do
+falante junto; sem falante, o motor de sempre serve igual. Quem nunca baixou o
+MOSS pode ligar a prévia do mesmo jeito.
+
+**O Gravador voltou a ter duas colunas de verdade.** A agenda e os outros
+blocos escorregavam para debaixo da transcrição.
+
+**O app passou a anotar em que etapa estava quando parou.** Se a máquina
+desligar no meio de uma transcrição, o próximo início diz qual etapa estava
+rodando — no registro e no bloco de diagnóstico. É para o computador que desliga
+sozinho durante a transcrição: até agora, descobrir onde ele caía dependia de
+perguntar.
+
+## 0.7.0-rc3 — 09/09/2026
+
+**"6 participantes" virou "6 convidados", no Gravador e nos Ajustes.** A lista
+vem do convite da agenda: ela diz quem foi **chamado**, não quem apareceu. Numa
+reunião de seis convidados em que três entram, o número antigo era simplesmente
+falso — e na tela do app que está gravando a reunião. A palavra certa já estava
+em uso em dois outros lugares; estes dois ficaram para trás.
+
+**A prévia ao vivo agora começa de verdade.** No rc2 ela nunca ligava: a prévia
+se prendia ao botão de gravar da janela, e gravar tem três portas — o botão, o
+ícone da bandeja e o menu dela. Quem começava pela bandeja gravava a reunião
+inteira com o painel vazio, sem erro nenhum na tela. Agora ela se prende ao
+gravador em si, e não à porta por onde se entrou.
+
+**E não fica mais vazia se você chegar no meio.** Abrir o Gravador no minuto 20
+mostrava um painel em branco até o bloco seguinte fechar, porque os blocos de
+antes já tinham passado. Eles ficam guardados e aparecem de uma vez.
+
+**Dá para juntar duas vozes que são a mesma pessoa.** "André Yuri" e "Andre
+Yuri" viravam dois perfis, e cada um reconhecia pior do que um só reconheceria —
+quanto mais a pessoa era nomeada, pior ficava. Em Ajustes › Vozes, cada pessoa
+tem agora um "Juntar com…" que move as amostras para o outro perfil, sem perder
+nenhuma e sem perder de onde vieram. O destino se escolhe numa lista de quem já
+existe, e não digitando: digitar de novo é justamente o gesto que criou a segunda
+grafia.
+
+**Cada voz abre e fecha.** Quem tem muitas amostras rolava a página inteira para
+chegar na pessoa seguinte. Agora cada uma é uma linha com "N amostras · M
+aguardando revisão", e só abre se você clicar — ou sozinha, quando há algo
+esperando revisão.
+
+## 0.7.0-rc2 — 09/09/2026
+
+> Ainda um candidato. O `versao.json` continua intocado: ninguém recebe aviso
+> de atualização por causa dele.
+
+**Dá para ver a transcrição durante a própria reunião.** Enquanto você grava, o
+que já foi dito aparece no Gravador, ao lado dos controles. **Não é legenda**: são
+blocos de 3 minutos, então uma frase dita no minuto 10 aparece entre o 12 e o 13
+— o bloco precisa fechar antes de ser transcrito. A tela diz isso em vez de
+esconder.
+
+O texto é **provisório** e não substitui nada: quando a reunião acaba, a
+transcrição roda como sempre rodou. Cada bloco vem marcado com o horário e o
+estado, os últimos minutos ficam para a passada final, e a lista rola sozinha até
+você rolar para trás — aí aparece um "voltar ao vivo".
+
+Nasce **desligada**, em Ajustes › Transcrição. Ocupa cerca de um décimo da placa
+e hoje só funciona com o motor MOSS.
+
+**A escolha do motor saiu do arquivo e virou tela.** Ajustes › Transcrição tem
+agora um seletor entre "o de sempre (dois modelos)" e "MOSS (uma passada)" — não
+é mais preciso fechar o app e editar o `app.json` à mão.
+
+**Sua própria voz voltou a ser reconhecida com o MOSS.** Havia um defeito: a
+faixa do microfone identificava você corretamente e o resultado era descartado,
+porque o mecanismo que dava a você a preferência dependia de uma informação que o
+motor novo não fornece. Você aparecia como um participante qualquer.
+
+**O modelo do MOSS baixa no lugar certo.** O download funcionava e gravava o
+arquivo por cima da pasta onde ele deveria ficar, então a tela seguia dizendo
+"ausente" sobre 0,70 GB que estavam no disco.
+
+**Some a caixa "Entry Point Not Found" do Windows.** Uma biblioteca que este app
+nunca usou vinha junto dos motores e não casava com a versão do PyTorch; o
+carregador do Windows abria um diálogo que travava a transcrição até alguém
+clicar em OK.
+
+**O bloco de diagnóstico diz de onde o app rodou.** Uma linha nova, `executável:`
+— sem ela não havia como saber qual das instalações produziu o bloco.
+
+## 0.7.0-rc1 — 04/09/2026
+
+> **É um candidato, não uma versão.** Serve para testar, e o `versao.json` não
+> foi mexido de propósito: ninguém que tem o app instalado recebe aviso de
+> atualização por causa dele.
+
+**Um segundo motor de transcrição, e ele é opcional.** O de sempre são dois
+modelos — um escreve o texto, outro separa quem falou, e o app cruza os dois pelo
+tempo. O novo faz as duas coisas de uma vez, e nas suas gravações ele saiu na
+frente nos dois quesitos. Ele **não é o padrão** e nada muda até você escolhê-lo.
+
+Para experimentar, em dois passos:
+
+1. Ajustes › Modelos, bloco "Transcrição em uma passada", botão Baixar — são
+   0,70 GB, e ele não vem dentro do instalador de propósito;
+2. feche o app e acrescente `"motor_de_transcricao": "moss"` ao arquivo
+   `C:\Users\<você>\.meeting-transcription\app.json`.
+
+Ainda não há chave na tela para isso — ela vem depois. A gravação fica salva,
+então dá para transcrever a mesma reunião nos dois motores e comparar; voltar
+atrás é trocar a palavra para `"classico"`.
+
+**O que muda quando ele está ligado, e vale saber antes:** o vocabulário do
+projeto funciona diferente. O motor novo não aceita a lista de termos na entrada
+— isso não existe nele —, então os nomes e siglas só são corrigidos depois, na
+revisão. Termo que ele não ouviu não volta.
+
+**A transcrição não é jogada fora se a máquina cair no meio.** O texto já era
+salvo assim que existia; agora ele também guarda **com qual motor** foi feito, e
+transcrever de novo com o outro motor refaz o trabalho em vez de reaproveitar o
+texto errado em silêncio.
+
+**A revisão para de engasgar nas reuniões grandes.** Cada letra digitada na busca
+redesenhava a transcrição inteira — na sua reunião de duas horas, são 2.058
+trechos refeitos por tecla. Agora ela desenha o que cabe na tela e o resto chega
+conforme você rola.
+
+**As cores dos falantes passam a ser legíveis no tema escuro.** Cinco das seis
+eram fixas e não acompanhavam o tema — só o seu nome ficava legível, e o de todo
+mundo não. São oito cores novas, feitas para os dois temas, e o ciclo só recomeça
+na nona pessoa em vez de na sexta.
+
+**As caixas de "tem certeza?" passam a ser do app.** Eram do Edge, com o título do
+executável e fora do desenho do app — e, pior, elas travavam o laço de mensagens
+que a bandeja usa. As três que destroem trabalho (apagar gravação, transcrever de
+novo, desfazer correções) agora dizem o que se perde antes de perguntar.
+
+**Trocar de tela passa a existir para quem usa teclado ou leitor de tela.** O foco
+segue o título, e a troca é anunciada.
+
+**Termos escritos com o espaço no lugar errado são consertados.** "next best"
+vira "NextBest" e "lifecycle" vira "life cycle" quando é assim que o seu
+vocabulário escreve. Vale para os dois motores.
+
+**O bloco de diagnóstico de Ajustes › Sobre passa a levar o registro junto.** As
+últimas linhas do log vão dentro dele, então relatar um problema deixa de exigir
+uma segunda ida atrás do arquivo.
+
 ## 0.6.2 — 28/08/2026
 
 **O vocabulário do projeto parava de existir quando você abria uma reunião
