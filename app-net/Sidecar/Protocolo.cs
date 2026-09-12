@@ -42,6 +42,38 @@ public sealed record Palavra(double Inicio, double Fim, string Texto);
 public sealed record SegmentoDeTexto(double Inicio, double Fim, string Texto,
                                      IReadOnlyList<Palavra>? Palavras = null);
 
+/// <summary>
+/// Um trecho que já vem com texto <b>e</b> falante — o que só o MOSS devolve.
+/// </summary>
+/// <param name="Falante">
+/// O rótulo cru do modelo (<c>S0</c>, <c>S1</c>), e ele é <b>local ao bloco</b>:
+/// o <c>S1</c> de um bloco não é o <c>S1</c> do vizinho. Quem transforma isso em
+/// identidade é o núcleo, por vetor de voz — ver
+/// <c>Nucleo/CosturaDeFalantes.cs</c>.
+/// </param>
+/// <remarks>
+/// Não é o <see cref="SegmentoDeTexto"/> com um campo a mais de propósito: os
+/// dois têm ciclos de vida diferentes. O do ASR carrega <c>Palavras</c>, que
+/// existem para cortar o segmento na troca de falante; este não tem o que
+/// cortar, porque a troca de falante já veio decidida pelo modelo.
+/// </remarks>
+public sealed record SegmentoDitoPorAlguem(double Inicio, double Fim, string Texto,
+                                           string Falante);
+
+/// <summary>O que o motor MOSS devolve por bloco.</summary>
+/// <param name="Dispositivo">"cuda" ou "cpu" — o que o motor <b>de fato</b> usou.</param>
+/// <param name="MotivoDaCpu">Quando caiu para CPU, por quê. Nulo quando rodou na placa.</param>
+/// <remarks>
+/// Sem idioma: o MOSS não o detecta nem o aceita — o build GGUF declara
+/// <c>('en','zh')</c> e recusa <c>pt</c>, embora transcreva português
+/// corretamente quando ninguém pede idioma nenhum. O que o app grava como
+/// idioma, nesse caminho, é o que foi <b>pedido</b>, e nulo quando ninguém
+/// pediu. Ver <c>motores/moss/motor.py</c>.
+/// </remarks>
+public sealed record TranscricaoComFalantes(
+    IReadOnlyList<SegmentoDitoPorAlguem> Segmentos, double Duracao,
+    string? Dispositivo = null, string? MotivoDaCpu = null);
+
 /// <summary>O que o motor de ASR devolve por gravação.</summary>
 /// <param name="Dispositivo">
 /// "cuda" ou "cpu" — o que o motor <b>de fato</b> usou.
@@ -87,9 +119,20 @@ internal sealed class Mensagem
     [JsonPropertyName("pct")] public double? Pct { get; init; }
     [JsonPropertyName("texto")] public string? Texto { get; init; }
 
+    // "progresso" da legenda ao vivo (motores/legenda/motor.py)
+    //
+    // **Dois textos, e a diferença é o produto.** `firme` é o que o
+    // LocalAgreement já decidiu e não muda mais; `tentativo` é a hipótese
+    // corrente, que se reescreve. Mostrar os dois com o mesmo peso faria a tela
+    // tremer — ver docs/FASE7-ROTA.md §4, passo R4.
+    [JsonPropertyName("firme")] public string? Firme { get; init; }
+    [JsonPropertyName("tentativo")] public string? Tentativo { get; init; }
+    [JsonPropertyName("ate_ms")] public long? AteMs { get; init; }
+
     // "resultado"
     [JsonPropertyName("segmentos")] public List<SegmentoJson>? Segmentos { get; init; }
     [JsonPropertyName("idioma")] public string? Idioma { get; init; }
+
     [JsonPropertyName("duracao")] public double? Duracao { get; init; }
 
     /// <summary>"cuda" ou "cpu": onde o motor rodou de verdade.</summary>
@@ -169,6 +212,16 @@ internal sealed class Requisicao
     [JsonPropertyName("repositorio")] public string? Repositorio { get; init; }
 
     /// <summary>
+    /// Um quadro de áudio da legenda ao vivo: int16 little-endian em base64.
+    /// </summary>
+    /// <remarks>
+    /// <b>Int16 e não float32</b>, pela metade do tamanho no canal — 200 ms são
+    /// 6,4 KB crus contra 12,8 —, e porque é a precisão que o WAV do gravador
+    /// já tem. Converter para float é trabalho do motor, que já o faz.
+    /// </remarks>
+    [JsonPropertyName("pcm")] public string? Pcm { get; init; }
+
+    /// <summary>
     /// A pasta do cache e o tamanho esperado, só para o motor medir o andamento.
     /// </summary>
     /// <remarks>
@@ -197,6 +250,26 @@ internal sealed class Requisicao
     [JsonPropertyName("vocabulario")] public string? Vocabulario { get; init; }
 
     [JsonPropertyName("idioma")] public string? Idioma { get; init; }
+
+    /// <summary>
+    /// A janela do áudio a processar, em segundos. Só o motor MOSS olha.
+    /// </summary>
+    /// <remarks>
+    /// <b>Por que uma janela e não um arquivo por bloco.</b> O MOSS roda em
+    /// blocos de 3 minutos porque a passada inteira não escala nesta placa
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §7.2), e quem corta é o núcleo, que já
+    /// tem as faixas em memória. Mandar cada bloco como arquivo próprio
+    /// escreveria 20 WAVs temporários numa reunião de uma hora; mandar a janela
+    /// sobre o mix que já existe não escreve nenhum, e o PCM que chega ao
+    /// modelo é o mesmo que o <c>tools/medir_moss.py</c> mediu.
+    /// </remarks>
+    [JsonPropertyName("inicio")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Inicio { get; init; }
+
+    [JsonPropertyName("fim")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? Fim { get; init; }
 
     /// <summary>Intervalos de fala, para a operação de extrair voz.</summary>
     [JsonPropertyName("trechos")] public List<TrechoJson>? Trechos { get; init; }

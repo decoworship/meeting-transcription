@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <None Include="motor_de_teste.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="motor_moss_de_teste.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

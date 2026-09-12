@@ -115,6 +115,27 @@ public sealed class Pendencia
     [JsonPropertyName("model")] public string? Model { get; init; }
     [JsonPropertyName("language")] public string? Language { get; init; }
     [JsonPropertyName("vocabulary")] public string? Vocabulary { get; init; }
+
+    /// <summary>
+    /// Qual motor produziu este texto: <c>"classico"</c> ou <c>"moss"</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o campo que impede o defeito da 0.4.0 de voltar com outra roupa.</b>
+    /// O parcial é conferido por modelo, idioma e vocabulário, e um parcial do
+    /// MOSS bate nos três — ele não usa nenhum deles. Sem esta marca, um texto
+    /// do MOSS seria retomado numa rodada clássica, que <b>pularia o ASR</b> e
+    /// devolveria o texto de um motor rotulado como sendo do outro, em silêncio,
+    /// que é exatamente o modo de falha que a retomada existe para não ter.
+    /// </para>
+    /// <para>
+    /// <b>Ausente é o clássico.</b> Todo parcial escrito antes de 03/09/2026
+    /// saiu do pipeline de dois motores, porque não havia outro — recusá-los
+    /// jogaria fora um ASR que deu certo por uma chave que ninguém tinha como
+    /// escrever.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("engine")] public string? Engine { get; init; }
 }
 
 /// <summary>O resultado que a UI consome e o histórico persiste.</summary>
@@ -145,14 +166,36 @@ public sealed class ResultadoDaTranscricao
     /// pronto.
     /// </summary>
     /// <remarks>
-    /// <b>Omitido quando nulo</b>, e é o único campo desta classe que se omite:
-    /// um arquivo completo precisa sair byte a byte como saía antes de a
+    /// <b>Omitido quando nulo</b>, como o <see cref="Engine"/> e pela mesma
+    /// razão: um arquivo completo precisa sair byte a byte como saía antes de a
     /// retomada existir, porque é assim que a paridade com o <c>history/</c> do
     /// Python se mede. Ver <see cref="Pendencia"/>.
     /// </remarks>
     [JsonPropertyName("pending")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Pendencia? Pending { get; set; }
+
+    /// <summary>
+    /// Qual motor produziu este arquivo; <c>null</c> é o clássico.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Omitido quando nulo, e nulo no caminho de sempre</b> — é o que
+    /// preserva a regra do <see cref="Pending"/>: uma transcrição clássica sai
+    /// byte a byte como saía antes, que é como a paridade com o <c>history/</c>
+    /// do Python se mede. Só o caminho do MOSS acrescenta a linha, e um campo a
+    /// mais é o que os dois lados sabem ignorar (docs/SIDECAR.md).
+    /// </para>
+    /// <para>
+    /// Serve a quem lê o arquivo depois e precisa saber o que tem na mão. O
+    /// primeiro caso é <b>nomear um falante</b>: o rótulo do MOSS é identidade
+    /// costurada, e inscrever uma voz a partir dele carimba a origem na amostra
+    /// (<see cref="AmostraDeVoz.Motor"/>).
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("engine")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Engine { get; set; }
 
     public string ParaJson() =>
         JsonSerializer.Serialize(this, TranscricaoJson.Default.ResultadoDaTranscricao);

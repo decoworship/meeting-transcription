@@ -81,9 +81,44 @@ public sealed class Faixas
         return Math.Sqrt(soma / (b - a));
     }
 
-    private static float[] LerWav(string caminho)
+    /// <summary>
+    /// Uma janela de uma faixa, em segundos — inclusive de um arquivo que ainda
+    /// está sendo gravado.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o que torna a prévia ao vivo possível sem tocar no gravador.</b> O
+    /// <see cref="Ler"/> carrega a faixa inteira; a cada 3 minutos de uma reunião
+    /// de uma hora isso releria 115 MB por faixa, vinte vezes. Aqui o cursor
+    /// pula direto para o trecho pedido.
+    /// </para>
+    /// <para>
+    /// Devolve <b>o que existe</b>: pedir uma janela que ainda não foi gravada
+    /// devolve menos amostras que o pedido, ou nenhuma. Quem chama decide se
+    /// isso é cedo demais — e é, porque um bloco incompleto não deve ir ao
+    /// motor.
+    /// </para>
+    /// </remarks>
+    public static float[] LerJanela(string caminho, double de, double ate) =>
+        LerWav(caminho, de, ate);
+
+    /// <param name="de">Segundo inicial, ou 0 para o começo.</param>
+    /// <param name="ate">Segundo final, ou -1 para ler até o fim do que existe.</param>
+    private static float[] LerWav(string caminho, double de = 0, double ate = -1)
     {
-        using var fluxo = File.OpenRead(caminho);
+        // **FileShare.ReadWrite, e é isto que permite ler durante a gravação.**
+        // O CrashSafeWavWriter mantém o arquivo aberto com FileAccess.Write e
+        // FileShare.Read — ele deixa outros lerem. Mas o File.OpenRead pede
+        // FileShare.Read, que quer dizer "eu NÃO permito que escrevam", e o
+        // Windows recusa a abertura porque já existe um handle de escrita.
+        // Medido em 09/09/2026, na máquina do dono: File.OpenRead falha, e
+        // FileShare.ReadWrite abre e lê.
+        //
+        // Para um arquivo fechado não muda nada: o modo só afrouxa o que ESTE
+        // leitor permite aos outros, e nunca o que ele mesmo faz — ele continua
+        // abrindo somente para leitura.
+        using var fluxo = new FileStream(caminho, FileMode.Open, FileAccess.Read,
+                                         FileShare.ReadWrite);
         using var leitor = new BinaryReader(fluxo);
 
         if (new string(leitor.ReadChars(4)) != "RIFF")
@@ -121,8 +156,24 @@ public sealed class Faixas
                         + $"veio {taxa} Hz {canais}ch {bits} bits.");
 
                 // O bloco pode declarar mais do que existe: um kill -9 durante a
-                // gravação deixa exatamente isso, e é para ser recuperável.
+                // gravação deixa exatamente isso, e é para ser recuperável. E é
+                // o MESMO caso de um arquivo que ainda está crescendo — o header
+                // é reescrito a cada 10 s com os tamanhos daquele instante.
                 int disponivel = (int)Math.Min(tamanho, fluxo.Length - fluxo.Position);
+
+                // A janela pedida, recortada ao que existe. Sem janela (de=0,
+                // ate=-1) isto devolve o arquivo inteiro, como sempre devolveu.
+                long pulaBytes = Math.Max(0, (long)(de * TaxaDeAmostragem)) * 2;
+                if (pulaBytes >= disponivel) return [];
+                fluxo.Position += pulaBytes;
+                disponivel -= (int)pulaBytes;
+
+                if (ate >= 0)
+                {
+                    long querBytes = Math.Max(0, (long)((ate - de) * TaxaDeAmostragem)) * 2;
+                    disponivel = (int)Math.Min(disponivel, querBytes);
+                }
+
                 var amostras = new float[disponivel / 2];
                 for (int i = 0; i < amostras.Length; i++)
                     amostras[i] = leitor.ReadInt16() / 32768f;

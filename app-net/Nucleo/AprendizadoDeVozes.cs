@@ -140,10 +140,14 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     /// A faixa do microfone, para a guarda de contaminação. Quem não a passa
     /// inscreve sem ela — ver <see cref="TrechosDe"/>.
     /// </param>
+    /// <param name="motor">
+    /// Qual motor produziu a transcrição de onde este falante saiu. Ausente é o
+    /// clássico — ver <see cref="AmostraDeVoz.Motor"/>.
+    /// </param>
     public async Task<AmostraDeVoz?> AprenderAsync(
         string pastaDaGravacao, IReadOnlyList<SegmentoFinal> segmentos,
         string falante, string nome, float[]? mic = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? motor = null)
     {
         var trechos = TrechosDe(segmentos, falante, mic);
         double total = trechos.Sum(t => t.Duracao);
@@ -179,6 +183,12 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
             // esta amostra das que vieram do caminho sem guarda de
             // contaminação. Ver Vozes.RegrasAtuais.
             Regras = Vozes.RegrasAtuais,
+            // E de qual motor veio o falante que alguém acabou de nomear. O
+            // rótulo do MOSS é uma identidade COSTURADA por vetor de voz, e a
+            // costura divide gente demais e pode fundir (§11.4): um vetor
+            // inscrito a partir de uma fusão atravessa para todas as reuniões
+            // seguintes, e retranscrever não desfaz. Ver AmostraDeVoz.Motor.
+            Motor = Vozes.MotorAceitoNaAmostra(motor),
             CriadaEm = DateTimeOffset.UtcNow.ToString("o"),
             DuracaoS = Math.Round(soma, 2),
             Trecho = RecortarTrecho(audio, usados[0], gravacao, nome),
@@ -241,6 +251,15 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     {
         using var motor = await MotorSidecar.IniciarAsync(
             motores.Python, [motores.ScriptDiarizacao], ct, Motores.Ambiente());
+
+        // **A terceira carga de GPU, e até 04/09/2026 ela era invisível.** O
+        // pipeline sobe o pyannote duas vezes — a diarização e este método —, e
+        // só a primeira assinava o AoRegistrar. O registro terminava antes do
+        // fim do pipeline, que é exatamente onde a máquina do segundo usuário
+        // desliga (docs/FASE6.md §3.0): o log dizia que a diarização acabou bem
+        // e depois se calava, e ninguém tinha como saber se o corte veio daqui.
+        // Uma linha, e é metade do SUP-1 do docs/BACKLOG.md.
+        motor.AoRegistrar += l => Registro.Escrever("vozes", l);
 
         return await motor.VozAsync(audio,
             [.. trechos.Select(t => (t.Inicio, t.Fim))], ct);

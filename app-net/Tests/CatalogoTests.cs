@@ -129,12 +129,17 @@ public sealed class CatalogoTests
         Assert.Equal(Catalogo.Pacotes.Count,
                      Catalogo.Pacotes.Select(p => p.Id).Distinct().Count());
 
-        // "ata" entrou na Fase 3, e "diarizacao" saiu na Fase 4 — os pesos
+        // "ata" entrou na Fase 3, "diarizacao" saiu na Fase 4 — os pesos
         // passaram a viajar dentro do instalador, e o catálogo é sobre o que se
-        // baixa. A lista é fechada de propósito: a tela agrupa por família, e
-        // uma família nova sem bloco na tela some sem avisar.
+        // baixa — e "moss" entrou na Fase 7, com o GGUF que fica de fora do
+        // instalador porque o .iss exclui `*.gguf`.
+        //
+        // A lista é fechada de propósito: a tela agrupa por família, e uma
+        // família nova sem bloco na tela some sem avisar. **Esta linha só cresce
+        // junto com o `configuracoes.js`** — foi ela que exigiu o bloco
+        // "Transcrição em uma passada" quando a família "moss" chegou.
         Assert.All(Catalogo.Pacotes, p =>
-            Assert.Contains(p.Familia, new[] { "asr", "ata" }));
+            Assert.Contains(p.Familia, new[] { "asr", "ata", "moss", "legenda" }));
     }
 
     [Fact]

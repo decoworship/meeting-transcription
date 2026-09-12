@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace MeetingApp.Sidecar;
 
@@ -208,6 +209,49 @@ public sealed class MotorSidecar : IDisposable
     }
 
     /// <summary>
+    /// Texto e falante numa passada só — a operação do motor MOSS.
+    /// </summary>
+    /// <param name="inicio">
+    /// Começo e fim da janela dentro do arquivo, em segundos. Nulos processam o
+    /// arquivo inteiro, que é a forma documentada no <c>docs/SIDECAR.md</c>.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <b>Uma janela, e não um arquivo por bloco.</b> O MOSS roda em blocos de 3
+    /// minutos porque a passada inteira não escala na placa desta máquina — foi
+    /// interrompida depois de 1h36 numa gravação de 32 min
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §7.2). Quem corta é o núcleo, que já tem
+    /// as faixas em memória; cortar aqui escreveria 20 WAVs temporários numa
+    /// reunião de uma hora.
+    /// </para>
+    /// <para>
+    /// <b>Os rótulos saem crus e locais ao bloco.</b> O <c>S1</c> de um bloco
+    /// não é o <c>S1</c> do vizinho, e este método não tem como saber — quem
+    /// costura é <c>Nucleo/CosturaDeFalantes.cs</c>, por vetor de voz.
+    /// </para>
+    /// </remarks>
+    public async Task<TranscricaoComFalantes> TranscreverESepararAsync(
+        string caminhoDoAudio, double? inicio = null, double? fim = null,
+        Action<double, string>? progresso = null, CancellationToken ct = default)
+    {
+        var m = await ExecutarAsync(
+            new Requisicao
+            {
+                Id = _proximoId++,
+                Op = "transcrever_e_separar",
+                Audio = caminhoDoAudio,
+                Inicio = inicio,
+                Fim = fim,
+            },
+            progresso, ct);
+
+        return new TranscricaoComFalantes(
+            (m.Segmentos ?? []).Select(s => new SegmentoDitoPorAlguem(
+                s.Inicio, s.Fim, s.Texto ?? "", s.Falante ?? "")).ToList(),
+            m.Duracao ?? 0, m.Dispositivo, m.Motivo);
+    }
+
+    /// <summary>
     /// O vetor que identifica a voz de quem fala nos trechos indicados.
     /// </summary>
     /// <remarks>
@@ -265,6 +309,117 @@ public sealed class MotorSidecar : IDisposable
     }
 
     /// <summary>Envia uma requisição e devolve a mensagem de resultado dela.</summary>
+    /// <summary>Um pedaço de legenda, como o motor o emite.</summary>
+    /// <param name="Firme">
+    /// O que o LocalAgreement já fechou e não se reescreve mais.
+    /// </param>
+    /// <param name="Tentativo">A hipótese corrente, volátil.</param>
+    /// <param name="AteMs">Até onde do áudio o texto firme chega.</param>
+    public sealed record ParcialDaLegenda(string Firme, string Tentativo, long AteMs);
+
+    /// <summary>
+    /// Abre uma sessão de legenda e a alimenta até o canal fechar.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É a única operação deste motor que escreve enquanto lê.</b> O resto do
+    /// protocolo é pedido e resposta; aqui a requisição fica aberta, os quadros
+    /// de áudio sobem em linhas soltas e os parciais descem como
+    /// <c>progresso</c> — que, pela regra de sempre, não encerra o pedido.
+    /// </para>
+    /// <para>
+    /// <b>As escritas são serializadas por um semáforo</b>, e não por acaso: a
+    /// tarefa que envia áudio e a que responde ao cancelamento usariam o mesmo
+    /// <c>StandardInput</c>, e duas linhas entrelaçadas viram JSON inválido —
+    /// o mesmo sintoma que a regra do descritor duplicado existe para evitar,
+    /// só que na outra direção.
+    /// </para>
+    /// <para>
+    /// <b>Fechar o canal encerra com graça</b>, e o motor devolve o texto firme
+    /// inteiro. Cancelar mata o processo, como em toda operação deste tipo.
+    /// </para>
+    /// </remarks>
+    public async Task<string> LegendarAsync(
+        ChannelReader<float[]> audio, Action<ParcialDaLegenda> aoParcial,
+        string? idioma, CancellationToken ct)
+    {
+        int id = _proximoId++;
+        var escrita = new SemaphoreSlim(1, 1);
+
+        async Task MandarAsync(Requisicao r)
+        {
+            await escrita.WaitAsync(ct);
+            try { await EnviarAsync(r, ct); }
+            finally { escrita.Release(); }
+        }
+
+        await MandarAsync(new Requisicao { Id = id, Op = "legendar", Idioma = idioma });
+
+        var alimentar = Task.Run(async () =>
+        {
+            await foreach (var quadro in audio.ReadAllAsync(ct))
+                await MandarAsync(new Requisicao
+                {
+                    Id = id, Op = "audio", Pcm = ParaBase64(quadro),
+                });
+            await MandarAsync(new Requisicao { Id = id, Op = "encerrar" });
+        }, ct);
+
+        try
+        {
+            while (true)
+            {
+                using var registroDeMorte = ct.Register(() => Matar(_processo));
+
+                var m = await LerMensagemAsync(_processo, ct);
+                if (m is null)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    throw new MotorException($"o motor '{Nome}' morreu durante a legenda.");
+                }
+                if (m.Id is not null && m.Id != id) continue;
+
+                switch (m.Tipo)
+                {
+                    case "progresso":
+                        if (m.Firme is not null || m.Tentativo is not null)
+                            aoParcial(new ParcialDaLegenda(
+                                m.Firme ?? "", m.Tentativo ?? "", m.AteMs ?? 0));
+                        break;
+                    case "resultado":
+                        return m.Texto ?? "";
+                    case "erro":
+                        throw new MotorException(m.MensagemDeErro ?? "erro sem mensagem.");
+                }
+            }
+        }
+        finally
+        {
+            // A tarefa de alimentar pode estar presa no canal; deixá-la morrer
+            // sozinha vazaria uma escrita num pipe que já fechou.
+            try { await alimentar; } catch (Exception) { }
+            escrita.Dispose();
+        }
+    }
+
+    /// <summary>float32 em [-1,1] → int16 little-endian em base64.</summary>
+    /// <remarks>
+    /// A conversão mora aqui e não no motor porque é aqui que se sabe de onde o
+    /// áudio veio: o <c>Faixas.Mix</c> já normalizou o pico, então recortar em
+    /// ±1 é rede de segurança e não política.
+    /// </remarks>
+    private static string ParaBase64(float[] quadro)
+    {
+        var bytes = new byte[quadro.Length * 2];
+        for (int i = 0; i < quadro.Length; i++)
+        {
+            short v = (short)Math.Clamp(quadro[i] * 32767f, short.MinValue, short.MaxValue);
+            bytes[i * 2] = (byte)(v & 0xFF);
+            bytes[i * 2 + 1] = (byte)((v >> 8) & 0xFF);
+        }
+        return Convert.ToBase64String(bytes);
+    }
+
     private async Task<Mensagem> ExecutarAsync(
         Requisicao requisicao, Action<double, string>? progresso, CancellationToken ct)
     {

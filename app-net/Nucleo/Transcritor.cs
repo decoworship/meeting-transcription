@@ -17,6 +17,27 @@ public readonly record struct Progresso(string Etapa, double Fracao, string Text
 public sealed record Motores(string Python, string ScriptAsr, string ScriptDiarizacao,
                              string ScriptModelos)
 {
+    /// <summary>
+    /// O motor que faz texto <b>e</b> falante numa passada só.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Fora da lista posicional, e vazio por padrão</b>, porque ele é o único
+    /// motor opcional: quem não ligou a chave <c>motor_de_transcricao</c> nunca
+    /// o vê, e uma instalação sem ele transcreve normalmente. Um quinto
+    /// parâmetro obrigatório obrigaria todo lugar que monta os motores a ter
+    /// opinião sobre um caminho que a maioria deles não usa.
+    /// </para>
+    /// <para>
+    /// Vazio é "esta instalação não tem o MOSS", e é o que
+    /// <see cref="OQueFaltaParaMoss"/> reporta.
+    /// </para>
+    /// </remarks>
+    public string ScriptMoss { get; init; } = "";
+
+    /// <summary>O motor da legenda ao vivo, opcional como o do MOSS.</summary>
+    public string ScriptLegenda { get; init; } = "";
+
     /// <summary>O arranjo esperado do app instalado: <c>motores/</c> ao lado do .exe.</summary>
     public static Motores AoLadoDoExecutavel()
     {
@@ -25,7 +46,11 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             Path.Combine(raiz, "python", "python.exe"),
             Path.Combine(raiz, "asr", "motor.py"),
             Path.Combine(raiz, "diarizacao", "motor.py"),
-            Path.Combine(raiz, "modelos", "motor.py"));
+            Path.Combine(raiz, "modelos", "motor.py"))
+        {
+            ScriptMoss = Path.Combine(raiz, "moss", "motor.py"),
+            ScriptLegenda = Path.Combine(raiz, "legenda", "motor.py"),
+        };
     }
 
     /// <summary>
@@ -181,6 +206,38 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             return $"o motor de diarização não está em {ScriptDiarizacao}";
         return null;
     }
+
+    /// <summary>
+    /// O mesmo, para o caminho do MOSS — separado porque ele é opcional.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O MOSS não pode entrar no <see cref="OQueFalta"/></b>, e a razão é o
+    /// que ele quebraria: aquele método é a porta de toda transcrição, e pôr ali
+    /// um arquivo que só existe para quem ligou a chave faria o app inteiro
+    /// recusar-se a transcrever numa instalação onde nada está errado. A escolha
+    /// é por transcrição (<c>motor_de_transcricao</c>), então a conferência
+    /// também é.
+    /// </para>
+    /// <para>
+    /// <b>Só o script, e não o Python.</b> O <see cref="OQueFalta"/> já respondeu
+    /// por ele antes de qualquer transcrição começar, e repetir a pergunta aqui
+    /// só criaria um segundo lugar para ela ser respondida diferente.
+    /// </para>
+    /// </remarks>
+    /// <summary>O que impede a legenda ao vivo, ou <c>null</c>.</summary>
+    public string? OQueFaltaParaLegenda() =>
+        ScriptLegenda.Length == 0 || !File.Exists(ScriptLegenda)
+            ? $"o motor de legenda não está em {ScriptLegenda} — esta instalação não o tem"
+            : null;
+
+    public string? OQueFaltaParaMoss()
+    {
+        if (ScriptMoss.Length == 0 || !File.Exists(ScriptMoss))
+            return $"o motor MOSS não está em {ScriptMoss} — esta instalação não o tem, "
+                 + "e a transcrição volta ao motor clássico em Ajustes › Transcrição";
+        return null;
+    }
 }
 
 /// <summary>
@@ -278,6 +335,34 @@ public sealed class Transcritor(Motores motores)
     /// <b>Desligado por padrão desde 19/08/2026</b>, e o vocabulário continua
     /// servindo à correção fonética de qualquer jeito. Ver FASE6 §4.1.
     /// </param>
+    /// <param name="motorDeTranscricao">
+    /// <c>"classico"</c> — o pipeline de dois motores de sempre — ou
+    /// <c>"moss"</c>, que faz texto e falante numa passada. Nulo é o clássico.
+    /// <para>
+    /// <b>A bifurcação é só entre o <see cref="Faixas.Ler"/> e o
+    /// <see cref="VozDoDono.Trilha"/>, e isso não é conveniência de
+    /// implementação.</b> É o que preserva as peças que as medições provaram
+    /// necessárias: a <see cref="CorrecaoFonetica"/> e a
+    /// <see cref="RevisaoDeTermos"/> são o que recupera a parte "de grafia" do
+    /// vocabulário que o MOSS perde — ele não tem <c>hotwords</c>, e nenhum
+    /// runtime ggml expõe um (docs/FASE7-RESULTADOS.md §12) —, e a
+    /// <see cref="VozDoDono"/> é o que dá o dono de graça pela faixa do
+    /// microfone, que o MOSS não sabe fazer porque só vê o mix.
+    /// </para>
+    /// <para>
+    /// A régua desta fase é a suíte: com a chave em <c>"classico"</c> o caminho
+    /// executado é o de antes, e os testes passam sem alteração nenhuma. Se
+    /// algum precisar mudar, a bifurcação vazou para baixo.
+    /// </para>
+    /// </param>
+    /// <remarks>
+    /// O <c>try/finally</c> existe pelo marcador de etapa: sair por exceção
+    /// **tratada** é o app sabendo que falhou, e aí o marcador tem de ir embora
+    /// — quem o deixasse para trás faria o próximo início relatar um
+    /// desligamento que não houve. O marcador só sobrevive ao que não passa por
+    /// aqui: corte de energia, e o processo morto de fora.
+    /// Ver <see cref="MarcaDeEtapa"/>.
+    /// </remarks>
     public async Task<ResultadoDaTranscricao> ExecutarAsync(
         string pastaDaGravacao, string? vocabulario = null, string? idioma = null,
         bool filtrarSilencio = false, Action<Progresso>? progresso = null,
@@ -285,8 +370,33 @@ public sealed class Transcritor(Motores motores)
         bool diarizar = true, bool corrigirFonetica = true,
         bool usarHotwords = false, string? modeloDeDiarizacao = null,
         bool revisarComModelo = false, CaminhosDoMotorDeAta? motorDeAta = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? motorDeTranscricao = null)
     {
+        try
+        {
+            return await ExecutarInternoAsync(
+                pastaDaGravacao, vocabulario, idioma, filtrarSilencio, progresso,
+                modelo, cliente, projeto, diarizar, corrigirFonetica, usarHotwords,
+                modeloDeDiarizacao, revisarComModelo, motorDeAta, ct, motorDeTranscricao);
+        }
+        finally
+        {
+            MarcaDeEtapa.Terminar();
+        }
+    }
+
+    private async Task<ResultadoDaTranscricao> ExecutarInternoAsync(
+        string pastaDaGravacao, string? vocabulario, string? idioma,
+        bool filtrarSilencio, Action<Progresso>? progresso,
+        string? modelo, string? cliente, string? projeto,
+        bool diarizar, bool corrigirFonetica,
+        bool usarHotwords, string? modeloDeDiarizacao,
+        bool revisarComModelo, CaminhosDoMotorDeAta? motorDeAta,
+        CancellationToken ct, string? motorDeTranscricao)
+    {
+        string motorEscolhido = ConfiguracoesDoApp.MotorAceito(
+            motorDeTranscricao ?? ConfiguracoesDoApp.Carregar().MotorDeTranscricao);
+        bool comMoss = motorEscolhido == Vozes.MotorMoss;
         // O vocabulário se divide em dois usos que sempre foram tratados como
         // um: enviesar o ASR (hotwords) e corrigir a grafia depois
         // (CorrecaoFonetica). A Fase 0 mediu que os dois recuperam nomes na
@@ -327,9 +437,26 @@ public sealed class Transcritor(Motores motores)
         var ambiente = Motores.Ambiente();
 
         Registro.Escrever("pipeline",
-            $"transcrever {Path.GetFileName(pastaDaGravacao)} · modelo {escolhido} · "
+            $"transcrever {Path.GetFileName(pastaDaGravacao)} · motor {motorEscolhido} · "
+            + $"modelo {escolhido} · "
             + $"diarizar={diarizar} ({modeloDeDiarizacao ?? "padrão"}) · "
             + $"hotwords={usarHotwords}");
+
+        // O marcador de etapa, e a marca órfã que ele encontrou. Uma órfã prova
+        // que a transcrição anterior não terminou — e diz em qual etapa —, que é
+        // a pergunta que o SUP-2 fez duas vezes sem conseguir resposta.
+        // Ver Nucleo/MarcaDeEtapa.cs.
+        if (MarcaDeEtapa.Comecar(Path.GetFileName(pastaDaGravacao), motorEscolhido,
+                                 escolhido) is { } orfa)
+            Registro.Escrever("pipeline", MarcaDeEtapa.Descrever(orfa));
+
+        // **A etapa se anota sozinha.** Envolver o progresso aqui, num lugar só,
+        // em vez de chamar MarcaDeEtapa.Etapa nos dez pontos que já invocam o
+        // Progresso: dez chamadas divergem, e a que divergir é a que ninguém
+        // olha. O Etapa() ignora repetição, então a cadência do progresso não
+        // vira cadência de escrita em disco.
+        var doChamador = progresso;
+        progresso = p => { MarcaDeEtapa.Etapa(p.Etapa); doChamador?.Invoke(p); };
 
         // O texto que já existe em disco, quando existe. Ver Retomada.
         // `vocabularioDoAsr` e não `vocabulario`: com o hotwords desligado o
@@ -337,7 +464,8 @@ public sealed class Transcritor(Motores motores)
         // uma vírgula mexida no vocabulário custaria uma transcrição inteira à
         // toa. Ligar ou desligar a chave, esse sim, invalida o parcial — porque
         // aí o texto sai mesmo diferente.
-        var jaFeito = Retomada.Ler(pastaDaGravacao, escolhido, idioma, vocabularioDoAsr);
+        var jaFeito = Retomada.Ler(pastaDaGravacao, escolhido, idioma, vocabularioDoAsr,
+                                   motorEscolhido);
 
         // As faixas são lidas nos dois caminhos: mesmo retomando, AtribuirDono
         // precisa delas para dizer o que é do microfone.
@@ -349,6 +477,11 @@ public sealed class Transcritor(Motores motores)
         string? idiomaDetectado;
         double duracaoDoAudio;
 
+        // O que a bifurcação produz: no caminho clássico ela fica vazia e os
+        // falantes vêm do pyannote adiante; no caminho do MOSS ela já chega
+        // pronta, porque o modelo carimbou falante junto com o texto.
+        IReadOnlyList<SegmentoDeFalante> diarizacao = [];
+
         if (jaFeito is not null)
         {
             Registro.Escrever("pipeline",
@@ -359,6 +492,43 @@ public sealed class Transcritor(Motores motores)
             segmentos = jaFeito.Segmentos;
             idiomaDetectado = jaFeito.Idioma;
             duracaoDoAudio = jaFeito.Duracao ?? 0;
+        }
+        else if (comMoss)
+        {
+            // ─────────────────────── o caminho do MOSS ───────────────────────
+            //
+            // Texto e falante numa passada, em blocos de 3 minutos. Substitui as
+            // DUAS etapas do clássico — o RodarAsrAsync e a chamada ao pyannote
+            // — e nada abaixo da bifurcação muda. Ver docs/FASE7-BACKEND.md.
+            var doMoss = await MossEmBlocos.TranscreverAsync(
+                pastaDaGravacao, faixas, motores, ambiente,
+                ConfiguracoesDoApp.Carregar().PermitirCpu, progresso, ct);
+
+            segmentos = doMoss.Segmentos;
+            duracaoDoAudio = doMoss.Duracao;
+            // **O idioma é o que foi PEDIDO, não o detectado.** O MOSS não
+            // detecta idioma e recusa recebê-lo: o build GGUF declara
+            // ('en','zh') e nega 'pt', embora transcreva português corretamente
+            // quando ninguém pede nada (docs/FASE7-RESULTADOS.md §12.1).
+            // Inventar "pt" aqui seria gravar como fato uma coisa não medida.
+            idiomaDetectado = idioma;
+
+            // **Sem AtribuirDono aqui, ao contrário do caminho clássico**, e a
+            // diferença é o que torna a retomada possível. Lá o segmento chega
+            // sem falante e marcar o dono não custa nada; aqui o `Speaker`
+            // carrega o rótulo local do bloco (`b3_S1`), e sobrescrevê-lo com
+            // "You" apagaria justamente o que a costura precisa ler. O dono
+            // entra adiante, pelo VozDoDono, que é de onde ele sempre veio.
+            Retomada.Escrever(pastaDaGravacao, new ResultadoDaTranscricao
+            {
+                Language = idiomaDetectado,
+                Duration = duracaoDoAudio,
+                Client = cliente,
+                Project = projeto,
+                Date = DataDaReuniao(pastaDaGravacao),
+                Segments = segmentos,
+                Engine = motorEscolhido,
+            }, escolhido, idioma, vocabularioDoAsr, motorEscolhido);
         }
         else
         {
@@ -379,13 +549,56 @@ public sealed class Transcritor(Motores motores)
                 Project = projeto,
                 Date = DataDaReuniao(pastaDaGravacao),
                 Segments = segmentos,
-            }, escolhido, idioma, vocabularioDoAsr);
+            }, escolhido, idioma, vocabularioDoAsr, motorEscolhido);
         }
+        // **A costura é, no caminho do MOSS, o que a diarização é no clássico:**
+        // a etapa que o parcial deixa pendente. Por isso ela vive aqui e não
+        // dentro do ramo acima — uma retomada precisa refazê-la, exatamente como
+        // uma retomada clássica refaz o pyannote. Os rótulos do MOSS são locais
+        // ao bloco, e transformá-los em identidade é trabalho de vetor de voz.
+        if (comMoss && diarizar)
+        {
+            progresso?.Invoke(new Progresso(
+                "diarizacao", 0, "juntando os falantes entre os blocos"));
 
+            // Um motor quente para a costura inteira: são dezenas de rótulos, e
+            // subir o pyannote por rótulo pagaria a carga do modelo dezenas de
+            // vezes. É o mesmo modelo de voz do banco — carregar um próprio aqui
+            // criaria um segundo espaço vetorial dentro do mesmo app.
+            using var voz = await MotorSidecar.IniciarAsync(
+                motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
+            voz.AoRegistrar += l => Registro.Escrever("costura", l);
+
+            // O mix, e não o system.wav: o MOSS ouviu a conversa inteira, o dono
+            // incluído, e os carimbos que ele devolveu são da linha do tempo do
+            // mix. Pedir o vetor sobre outra faixa alinharia o trecho errado.
+            string caminhoDoMix = Path.Combine(pastaDaGravacao, "mix.wav");
+            if (!File.Exists(caminhoDoMix)) faixas.EscreverMix(caminhoDoMix);
+
+            var costura = await CosturaDeFalantes.CosturarAsync(segmentos,
+                async (trechos, c) =>
+                {
+                    try
+                    {
+                        return (await voz.VozAsync(caminhoDoMix, trechos, c)).Vetor;
+                    }
+                    catch (MotorException)
+                    {
+                        // Sem vetor, a costura trata o rótulo como gente nova —
+                        // o erro barato, que quem lê conserta juntando duas
+                        // linhas. Ver Nucleo/CosturaDeFalantes.cs.
+                        return null;
+                    }
+                }, ct);
+
+            diarizacao = costura.Falantes;
+            Registro.Escrever("costura",
+                $"{costura.RotulosLocais} rótulos locais → {costura.Identidades} "
+                + $"identidades ({costura.SemVoz} sem fala limpa para ancorar)");
+        }
         // A diarização roda só no system.wav: o que o microfone captou já se sabe
         // de quem é, e dar o mix ao pyannote o faria tentar separar você de você.
-        IReadOnlyList<SegmentoDeFalante> diarizacao = [];
-        if (diarizar)
+        else if (diarizar && !comMoss)
         {
             using var diar = await MotorSidecar.IniciarAsync(
                 motores.Python, [motores.ScriptDiarizacao], ct, ambiente);
@@ -468,6 +681,15 @@ public sealed class Transcritor(Motores motores)
             var cruas = new List<Proposta>(
                 RevisaoDeTermos.Propor(segmentos.Select(s => s.Text), entidades));
 
+            // A grafia entra junto, e não no lugar: as duas pegam coisas
+            // diferentes. A de cima recupera o termo que o motor ouviu errado
+            // ("G6CB" por "GCCB"); esta recupera o que ele ouviu certo e
+            // escreveu com o espaço no lugar errado ("next best" por
+            // "NextBest"). É o que fecha boa parte da distância medida no §12
+            // da docs/FASE7-RESULTADOS.md, e vale para os dois motores.
+            cruas.AddRange(
+                RevisaoDeTermos.ProporGrafia(segmentos.Select(s => s.Text), entidades));
+
             // O segundo propositor, quando ligado. Ele nunca substitui o
             // primeiro: as duas listas se somam e passam pela mesma porta.
             // Falhar aqui não pode derrubar a transcrição — a revisão é
@@ -514,7 +736,28 @@ public sealed class Transcritor(Motores motores)
         // microfone, ou com vazamento de alto-falante — o teste por segmento é
         // o comportamento de antes de 21/08/2026, que rodou em campo. Quando ela
         // existe, o AtribuirFalantes já resolveu, e isto não muda nada.
-        if (trilhaDoDono.Count == 0) Montagem.AtribuirDono(segmentos, faixas);
+        //
+        // **No caminho do MOSS ela deixa de ser rede e vira a regra**, e isso é
+        // consequência de uma coisa só: ele não carimba palavra. O desenho de
+        // 21/08 dá a vitória ao dono por CORTE — o VozDoDono.Juntar põe os
+        // trechos dele por cima sem recortar, e quem resolve a sobreposição é o
+        // RepartirPorFalante, cortando o segmento na fronteira. Sem palavras não
+        // há corte, e aí o AtribuirFalantes soma sobreposição sobre o segmento
+        // inteiro: o intervalo da costura cobre 100% dele e o do dono cobre uma
+        // fração, então a costura vence sempre e o dono não aparece nunca.
+        //
+        // Medido em 09/09/2026, na primeira transcrição de verdade com o MOSS:
+        // a faixa do microfone rendeu 9 trechos do dono e a saída teve **zero**
+        // trechos "You" — o dono saiu como mais um participante nomeado pelo
+        // banco de vozes. Ver docs/FASE7-BACKEND.md, o princípio do §"o que
+        // preserva as peças que as medições provaram necessárias".
+        //
+        // O que se perde aceitando isto: um segmento em que o dono e outra
+        // pessoa falam junto passa a ser do dono por inteiro, em vez de cortado
+        // na fronteira. O que se ganha é o dono existir. Enquanto o MOSS não
+        // devolver palavras, essa é a troca — e ela é a favor de saber, porque
+        // a faixa do microfone não estima: ela sabe.
+        if (trilhaDoDono.Count == 0 || comMoss) Montagem.AtribuirDono(segmentos, faixas);
 
         // Quem já foi nomeado antes chega nomeado. Roda depois de tudo porque
         // precisa dos falantes montados, e nunca derruba a transcrição: não
@@ -544,6 +787,9 @@ public sealed class Transcritor(Motores motores)
             Project = projeto,
             Date = DataDaReuniao(pastaDaGravacao),
             Segments = segmentos,
+            // Nulo no caminho clássico, e é o que mantém o arquivo saindo byte a
+            // byte como sempre saiu. Ver ResultadoDaTranscricao.Engine.
+            Engine = comMoss ? motorEscolhido : null,
         };
 
         await File.WriteAllTextAsync(
