@@ -134,7 +134,17 @@ versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
 # OFICIAL. Rodar o publicar.sh e voltar aqui reprova de novo, com a mesma
 # mensagem, o que manda quem lê rodá-lo uma terceira vez. As duas saídas que
 # funcionam estão na mensagem.
-for m in asr diarizacao modelos; do
+#
+# **O `moss` entra nesta lista, e é o único que pode faltar.** Ele é opcional —
+# quem não liga a chave `motor_de_transcricao` nunca o vê —, então a ausência não
+# reprova o instalador; o que reprova é ele estar lá **velho**, que é o defeito
+# que esta régua inteira existe para pegar.
+for m in asr diarizacao modelos moss; do
+  if [[ "$m" == "moss" && ! -f "$MOTORES/moss/motor.py" ]]; then
+    echo "    AVISO: sem motores/moss — o instalador sai sem o motor MOSS, e a" >&2
+    echo "           chave 'motor de transcrição' não terá o que escolher." >&2
+    continue
+  fi
   [[ -f "$MOTORES/$m/motor.py" ]] || reprovar "falta motores/$m/motor.py"
   if ! diff -q "$RAIZ/motores/$m/motor.py" "$MOTORES/$m/motor.py" >/dev/null; then
     reprovar "motores/$m/motor.py do repositório difere do que está em $MOTORES.
@@ -145,6 +155,30 @@ for m in asr diarizacao modelos; do
         2. copie o motor.py à mão para $MOTORES."
   fi
 done
+# **O torchcodec não pode viajar, e esta régua está aqui e não só no
+# empacotador.** Ele vem como dependência do pyannote, nunca é usado por este app
+# — o motor de diarização entrega `{waveform, sample_rate}` e nunca um caminho —,
+# e as DLLs dele não casam com o torch do índice do PyTorch. O sintoma é uma
+# **caixa modal do Windows** ("Entry Point Not Found: torch_get_const_data_ptr")
+# que trava o python.exe até alguém clicar em OK.
+#
+# **Por que a régua precisa estar AQUI.** Em 09/09/2026 ela existia só no
+# tools/empacotar_motores.sh, que monta a pasta. Mas quem produz o que o usuário
+# instala é este script, e ele aceita `--motores` de qualquer pasta — inclusive
+# uma montada por uma versão ANTERIOR do empacotador, que foi exatamente o que
+# aconteceu: o instalador saiu com o torchcodec dentro, reescreveu os motores da
+# máquina do dono do produto e trouxe a caixa de volta, depois de eu ter dito que
+# ela não voltaria.
+#
+# A régua pertence a quem produz o artefato, e não só a quem monta o insumo.
+if compgen -G "$MOTORES/python/Lib/site-packages/torchcodec*" >/dev/null; then
+  reprovar "o torchcodec está em $MOTORES e não pode viajar.
+      Ele abre uma caixa modal do Windows que trava o python.exe, e não é usado.
+      Conserto: rm -rf \"$MOTORES\"/python/Lib/site-packages/torchcodec*
+      (o tools/empacotar_motores.sh já não o inclui desde 09/09/2026)."
+fi
+echo "    torchcodec: fora"
+
 # O motor de ata NÃO viaja mais (1,1 GB, docs/FASE4.md §5): o app o baixa da
 # release oficial do llama.cpp quando fizer falta. Aqui a régua se inverte —
 # conferir que ele está EXCLUÍDO, porque um Excludes com erro de digitação o
@@ -198,6 +232,17 @@ FINAL="$SAIDA/MeetingApp-$VERSAO-instalador.exe"
 
 # A última régua, e é sobre o artefato inteiro: um instalador pequeno demais não
 # tem os motores dentro, e um grande demais tem um .gguf que escapou do Excludes.
+#
+# **A expectativa mudou em 04/09/2026**, e vale escrita: eram 1,59 GB, e o
+# `transcribe.cpp` do motor MOSS acrescenta ~200 MB de nativo ao Python
+# embarcado — passa a ~1,79 GB. O GGUF do MOSS (0,70 GB) **não** entra aqui: ele
+# é pacote do Catalogo, baixado sob demanda, justamente porque o `Excludes` do
+# .iss descartaria o arquivo em silêncio. Ver docs/FASE7-BACKEND.md A1.
+#
+# Os limites não mudaram porque não precisavam: o de baixo pergunta "os motores
+# estão aí?" e o de cima, "escapou um .gguf?" — e 0,70 GB a mais ainda cabe entre
+# os dois. Se um dia o instalador chegar perto de 4 GB por crescimento legítimo,
+# o conserto é o DIST-1 do backlog (separar os motores), não afrouxar a régua.
 tam=$(stat -c%s "$FINAL")
 (( tam > 1000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — pequeno demais para conter os motores."
 (( tam < 4000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — grande demais; um .gguf escapou do Excludes."
