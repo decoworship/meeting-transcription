@@ -62,3 +62,16 @@ recorder-net/**/obj/
 # .NET (Fase 2)
 app-net/**/bin/
 app-net/**/obj/
+
+# Pesos de modelo (Fase 7)
+#
+# Os GGUF dos motores opcionais moram ao lado do sidecar que os abre, e **nunca
+# no git**: são pacotes do Nucleo/Catalogo.cs, baixados por Ajustes › Modelos, e
+# o instalador também os exclui (o `.iss` exclui `*.gguf`). Durante o
+# desenvolvimento esta pasta costuma ser um link para o cache de medição.
+motores/*/modelos/
+
+# O ONNX do vetor de voz é DERIVADO: o tools/medir_vetor_onnx.py o exporta do
+# modelo do pyannote na primeira execução. Versioná-lo poria 25 MB no histórico
+# para guardar algo que um comando reproduz.
+tools/_wespeaker_resnet34.onnx

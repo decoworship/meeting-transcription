@@ -4,9 +4,10 @@ Desenho do item 3 da Fase 3 — a ata gerada por LLM local. Escrito em 14/08/202
 antes de escrever código, porque três perguntas do dono do produto mudavam o
 desenho inteiro e duas delas se respondem medindo.
 
-> **Medido na máquina do usuário em 14/08/2026** (RTX 2060 de 6 GB, Qwen3-4B
-> Instruct Q4_K_M, llama.cpp b10427), com as gravações reais dela. Os números
-> estão no §8, e três coisas que este documento supunha mudaram:
+> **Medido na máquina do usuário em 14/08/2026** (RTX 2060 de 6 GB, **Qwen3-4B
+> Instruct Q4_K_M** — ver a ressalva logo abaixo —, llama.cpp b10427), com as
+> gravações reais dela. Os números estão no §8, e três coisas que este documento
+> supunha mudaram:
 >
 > - **a reunião de 2 h cabe numa passada só** — 42.822 tokens em contexto de
 >   49k, com o KV em q4_0. O caminho de blocos do §7 **sai da v1**;
@@ -17,9 +18,24 @@ desenho inteiro e duas delas se respondem medindo.
 > - **o modelo carrega em 5 s e a VRAM pode ficar ocupada** (decisão do dono do
 >   produto: gravar não disputa GPU). O keep-alive volta à mesa — ver §2.
 
+> **O motor de hoje não é o motor medido — conferido em 04/09/2026.** Todo número
+> deste documento saiu do **Qwen3-4B-Instruct-2507 Q4_K_M**, que era o único que
+> existia em 14/08. Desde então o catálogo cresceu, e o `app.json` desta máquina
+> usa o **`gemma-4-e4b-q4km.gguf`**. Os dois continuam sendo escolha da tela
+> (Ajustes › Atas), e o padrão de uma instalação nova continua sendo o Qwen3-4B
+> (`ConfiguracoesDoApp.ModeloDeAta`).
+>
+> **Isto está escrito porque já custou uma medição.** Quem lê este documento e
+> vai medir o motor de ata mede o Qwen3-4B, e depois compara com uma ata que o
+> app escreveu com outro modelo — aconteceu na Fase 7. Os números do §8 valem
+> como **registro do que foi medido**, não como descrição do que está rodando; o
+> que o app usa se lê no `app.json`, e o que ele oferece, no
+> `Nucleo/Catalogo.cs`.
+
 A carta da fase está em [FASE3.md](FASE3.md) §4; o que **este** documento decide
 é como o motor é feito por dentro. As skills que ele executa estão em
-`transcrição para atas/` na raiz do repositório.
+`assets/atas/` — **e não mais num `.skill` zipado**, que é onde a
+`tools/medir_motor_de_ata.py` continuava procurando até 04/09/2026.
 
 ---
 

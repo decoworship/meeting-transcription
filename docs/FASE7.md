@@ -3,6 +3,12 @@
 Aberta em 27/08/2026, a pedido do dono do produto, depois de ele ver a
 demonstração da NVIDIA de transcrição com fala sobreposta.
 
+> **Esta carta é registro histórico, e quatro das suas seis posições estão
+> erradas** — a medição as derrubou entre 28/08 e 03/09, e o catálogo do que
+> mudou está na [FASE7-FRONTEND.md](FASE7-FRONTEND.md) §1.1. Quem ler daqui e
+> decidir, decide errado em três pontos. **Comece pela
+> [FASE7-ROTA.md](FASE7-ROTA.md).**
+
 **Esta carta não manda fazer nada.** As cartas de fase anteriores descrevem o
 que vai ser feito; a [FASE6.md](FASE6.md) lista o que pode ser feito, com
 gatilho. Esta faz uma pergunta e define **o que precisaria ser verdade para a
