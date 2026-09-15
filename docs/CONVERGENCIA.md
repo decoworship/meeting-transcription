@@ -168,9 +168,10 @@ pode:**
 
 | # | corte | ganho | risco |
 |---|---|---:|---|
+| **C0** | **o MOSS inteiro** — GGUF, sidecar, `MossEmBlocos`, a costura | **0,67 GB** | baixo — **nada nasce ligado nele**, e a decisão já está tomada (abaixo) |
 | **C1** | os dois GGUF de ata que perderam | **~5,2 GB** | nenhum — não estão em uso |
 | **C2** | deduplicar as DLLs de CUDA | **~1,4 GB** | baixo, mas **empírico**: só se responde em máquina Windows com placa |
-| **C3** | o `faster-whisper` + `ctranslate2` + modelos, se o MOSS/Nemotron ganharem | ~123 MB + os modelos | **médio** — é o motor de todo mundo hoje |
+| **C3** | o `faster-whisper` + `ctranslate2` + modelos, se o Nemotron ganhar | ~123 MB + os modelos | **médio** — é o motor de todo mundo hoje, e o `C0` tirou metade da premissa deste degrau |
 | **C4** | o pipeline de diarização do pyannote, se a costura ganhar | parte dos 88 MB | médio |
 | **C5** | **o torch inteiro**, se o `S1` passar | **~4,8 GB** | **alto** — é o §2, e o banco de vozes depende dele |
 | **C6** | um ggml só para llama.cpp e transcribe.cpp | resto da duplicação | alto — é recompilar |
@@ -182,6 +183,61 @@ para o winget.
 **A régua de saída de cada degrau é a mesma:** os testes passam sem alteração, e
 a régua do eixo correspondente não piora sobre o acervo. Se um teste precisar
 mudar, o corte pegou osso.
+
+### O MOSS é o primeiro a sair — decidido em 15/09/2026
+
+**Quem decidiu foi o dono do produto, depois de ver a legenda funcionando em
+reunião de verdade.** A tabela acima tinha sido escrita supondo o contrário — o
+`C3` esperava o MOSS *ganhar* e o `faster-whisper` sair. Duas reuniões com
+legenda na tela trocaram a pergunta: não é mais *qual motor de bloco é melhor*, e
+sim **para que serve um motor de bloco**.
+
+**O nicho dele ficou espremido dos dois lados:**
+
+- **por cima**, a legenda ao vivo faz o "durante a reunião" melhor — quadro de
+  200 ms contra 3 minutos de espera, e ela acompanhou o relógio em duas reuniões
+  reais na 2060 (1,007× e 1,005×, `registro.log` de 15/09/2026);
+- **por baixo**, a passada final continua sendo a verdade, e é ela que tem
+  hotword, `RevisaoDeTermos` e o dono de graça pela faixa do microfone;
+- **e os dois não rodam juntos.** Legenda + MOSS mede 0,45×, abaixo do tempo
+  real ([FASE7-ROTA.md](FASE7-ROTA.md) §4). Ligar o MOSS *é* desligar a legenda,
+  e o núcleo recusa em vez de atrasar em silêncio.
+
+**O que já estava medido e pesa contra ele** — nada disto é novidade deste dia,
+só mudou de peso:
+
+- **ele não tem hotword, e não é configuração: é ausência.** Nenhum runtime ggml
+  expõe o `initial_prompt` do MOSS ([FASE7-RESULTADOS.md](FASE7-RESULTADOS.md)
+  §12.1). Sobre os 19 termos que o Gemini confirma terem sido ditos, o app com
+  hotwords escreve 16/19 na forma canônica e o MOSS 11/19 — e `Cloud`,
+  `versionamento` e `must-have` **não aparecem de forma nenhuma** na saída dele
+  (§12.2). Palavra não transcrita não volta por pós-processamento;
+- **os rótulos dele são locais ao bloco.** Quem os transforma em pessoa é a
+  `Nucleo/CosturaDeFalantes.cs`: ela custa ~1 ponto de acerto (§11.1), e na
+  gravação de 2 h divide **8 pessoas em 15 identidades** no limiar de 0,55
+  (§11.2).
+
+**O que se está abrindo mão, e convém dizer em voz alta:** o MOSS ganha do
+pipeline atual no texto em 3 das 4 gravações **e** no falante (§7.4), fazendo os
+dois numa passada só e 2,6× mais rápido (§7.3). Cortá-lo é escolher **hotword e
+a passada final** em vez de **texto cru melhor em bloco**.
+
+**O que reabriria a decisão**, e é por isso que o `C0` ainda espera a Fase B:
+
+1. **um runtime ggml passar a expor o `initial_prompt`** — some o argumento
+   principal;
+2. **a legenda se mostrar insuficiente como camada 1 no uso diário.** Se o texto
+   ao vivo não for legível o bastante para decidir sobre a passada final, o bloco
+   de 3 min volta a ter função;
+3. **a `CosturaDeFalantes` achar outro consumidor.** Hoje ela existe só para o
+   MOSS e **sai junto** — é o único ativo medido que morre neste corte.
+
+**O que o corte rende:** os 0,67 GB do GGUF, o `motores/moss/motor.py`, a
+`Nucleo/MossEmBlocos.cs`, a `Nucleo/CosturaDeFalantes.cs` e a bifurcação do
+`Transcritor` — a chave `motor_de_transcricao` volta a ter um valor só, e o
+`TRA-2` do [BACKLOG.md](BACKLOG.md) deixa de precisar de um terceiro rótulo.
+**O `transcribe_cpp_native_cu12` fica**, com seus 301 MB: é o runtime da legenda,
+e sempre foi compartilhado.
 
 ---
 
