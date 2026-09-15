@@ -60,6 +60,36 @@ public sealed class Diagnostico
     /// <summary>O que está escolhido hoje: ASR, diarização e ata.</summary>
     [JsonPropertyName("escolhidos")] public required List<string> Escolhidos { get; init; }
 
+    /// <summary>
+    /// De onde o executável que produziu este bloco está rodando.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Porque este projeto tem duas instalações de propósito</b>, e elas se
+    /// identificam com a mesma versão. A oficial é a que o instalador produz; a
+    /// de trabalho, em <c>C:\Users\…\MeetingApp</c>, é onde o
+    /// <c>tools/publicar.sh</c> põe o binário novo com junções para os motores
+    /// oficiais — 18 MB em vez de 4,3 GB. O <c>publicar.sh</c> não mexe na
+    /// versão, então as duas dizem <c>0.7.0-rc1</c>.
+    /// </para>
+    /// <para>
+    /// <b>Medido em 09/09/2026, e é a razão de este campo existir:</b> o dono do
+    /// produto publicou um conserto, reabriu o app, colou o bloco e perguntou se
+    /// estava na versão nova. <b>O bloco não tinha como responder</b> — e ele
+    /// estava no binário antigo. A resposta só saiu perguntando ao Windows qual
+    /// processo estava vivo, que é o oposto do que este bloco existe para
+    /// evitar.
+    /// </para>
+    /// <para>
+    /// <see cref="Environment.ProcessPath"/> e não o
+    /// <see cref="AppContext.BaseDirectory"/>: num app de arquivo único o
+    /// segundo aponta para a pasta temporária de extração, que não diz nada a
+    /// quem lê.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("executavel")]
+    public string Executavel => Environment.ProcessPath ?? "(não sei)";
+
     [JsonPropertyName("pasta_das_gravacoes")] public required string PastaDasGravacoes { get; init; }
 
     /// <summary>Espaço livre no disco das gravações, em GB. -1 quando não deu para ler.</summary>
@@ -74,6 +104,54 @@ public sealed class Diagnostico
     /// dia o texto colado e a tela discordassem.
     /// </remarks>
     [JsonPropertyName("texto")] public string Texto => ComoTexto();
+
+    /// <summary>
+    /// As últimas linhas do registro, dentro do bloco que se cola.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A outra metade do <c>SUP-1</c>.</b> O <see cref="Registro.Ultimas"/>
+    /// existe desde a 0.4.0 e <b>ninguém o chamava</b> — só um teste. O bloco de
+    /// diagnóstico terminava dando o <i>caminho</i> do log e pedindo que a
+    /// pessoa o abrisse, e pedir a informação ao usuário já custou duas idas e
+    /// voltas com respostas erradas na investigação do desligamento
+    /// (docs/FASE6.md §3.0). Quem cola o bloco agora cola junto o que o app
+    /// estava fazendo.
+    /// </para>
+    /// <para>
+    /// <b>Vinte e cinco linhas, e não as sessenta do padrão.</b> O destino é uma
+    /// mensagem de chat, e o que interessa é o fim — as três cargas de GPU em
+    /// sequência cabem aí. O arquivo continua no caminho que o
+    /// <see cref="ComoTexto"/> imprime, para quando não bastar.
+    /// </para>
+    /// <para>
+    /// <b>Campo próprio, e fora do <see cref="ComoTexto"/>.</b> Aquele bloco é
+    /// colado num chat, e um teste crava que ele cabe em doze linhas e não tem
+    /// linha vazia — pela razão certa: um bloco que rola vinte linhas é resumido
+    /// pela pessoa, e aí perde o campo que importava. As duas informações têm
+    /// destinos diferentes: a foto se cola, o filme se anexa.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("registro_recente")]
+    public string RegistroRecente => Registro.Ultimas(25);
+
+    /// <summary>A transcrição anterior que não terminou, se houve uma.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Vem preenchido pelo <see cref="Coletar"/>, e não lido aqui</b>, de
+    /// propósito: o <see cref="ComoTexto"/> imprime este campo, e um bloco de
+    /// diagnóstico que lê o disco a cada chamada faria o teste dele depender de
+    /// haver ou não um marcador na máquina de quem roda a suíte.
+    /// </para>
+    /// <para>
+    /// <b>Este é o campo que o <c>SUP-2</c> pediu duas vezes e não recebeu.</b>
+    /// Ele diz, numa linha, que a transcrição anterior não acabou e em que etapa
+    /// ela parou — e é por isso que ele é a exceção que entra no bloco colável,
+    /// em vez de ficar só no JSON. Ver <see cref="MarcaDeEtapa"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("nao_terminou")]
+    public string? NaoTerminou { get; init; }
 
     /// <summary>
     /// A versão publicada, sem os metadados que o SDK pendura atrás de <c>+</c>.
@@ -179,6 +257,7 @@ public sealed class Diagnostico
             Escolhidos = [config.ModeloPadrao, config.DiarizacaoPadrao, config.ModeloDeAta],
             PastaDasGravacoes = pastaDasGravacoes,
             DiscoLivreGb = LivreEmGb(pastaDasGravacoes),
+            NaoTerminou = MarcaDeEtapa.Ler() is { } m ? MarcaDeEtapa.Descrever(m) : null,
         };
     }
 
@@ -205,6 +284,13 @@ public sealed class Diagnostico
         b.Append("modelos instalados: ")
          .Append(Modelos.Count > 0 ? string.Join(", ", Modelos) : "nenhum").Append('\n');
         b.Append("em uso: ").Append(string.Join(", ", Escolhidos)).Append('\n');
+        // De onde este binário rodou, junto dos outros caminhos. Ver Executavel.
+        b.Append("executável: ").Append(Executavel).Append('\n');
+        // A linha só existe quando há o que dizer, e quando existe ela é a mais
+        // importante do bloco: uma transcrição que não terminou é o sintoma do
+        // SUP-2. Fora isso o bloco é o de sempre, com nove linhas.
+        if (NaoTerminou is { Length: > 0 })
+            b.Append("ATENÇÃO: ").Append(NaoTerminou).Append('\n');
         // O caminho do log fecha o bloco de propósito: é o que a pessoa abre
         // quando a foto não basta — e a foto não bastou em 18/08/2026.
         b.Append("registro: ").Append(Registro.Caminho).Append('\n');

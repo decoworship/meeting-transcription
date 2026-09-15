@@ -7,7 +7,11 @@ namespace MeetingApp.Nucleo;
 /// <summary>Uma troca proposta, antes de alguém decidir se ela vale.</summary>
 /// <param name="De">Como está escrito na transcrição.</param>
 /// <param name="Para">O termo conhecido que se propõe no lugar.</param>
-/// <param name="Fonte">Quem propôs — <c>"regra"</c> ou <c>"modelo"</c>.</param>
+/// <param name="Fonte">
+/// Quem propôs — <c>"regra"</c>, <c>"grafia"</c> ou <c>"modelo"</c>. A
+/// <c>"grafia"</c> é a variante de espaço e hífen do §12 da
+/// <c>docs/FASE7-RESULTADOS.md</c>, e é a única que não muda letra nenhuma.
+/// </param>
 public sealed record Proposta(string De, string Para, string Fonte);
 
 /// <summary>
@@ -39,6 +43,27 @@ public sealed record Proposta(string De, string Para, string Fonte);
 /// contra 3 do Qwen3.5 —, e passa pela mesma <see cref="Validar"/> antes de
 /// virar troca. O modelo é fonte a mais, nunca caminho paralelo: quem decide o
 /// que entra no texto é sempre esta classe.
+/// </para>
+/// <para>
+/// <b>E há um terceiro caso, que não é distância nem som: a grafia.</b> Medido
+/// em 03/09/2026 (<c>docs/FASE7-RESULTADOS.md</c> §12, com o
+/// <c>tools/medir_vocabulario_moss.py</c>): parte do vocabulário que se dá por
+/// perdido não está perdido — está escrito com o espaço no lugar errado.
+/// O MOSS escreve <c>next best</c> onde o projeto escreve <c>NextBest</c>, e
+/// <c>lifecycle</c> onde o projeto escreve <c>life cycle</c>. Contando a forma
+/// canônica, a distância entre o app com <c>hotwords</c> e o MOSS sem eles era
+/// de 26,4 pontos; contando o termo como dito, é de <b>15,8</b> — a diferença
+/// são as variantes de grafia. <see cref="PropostaDeGrafia"/> é o que as cola.
+/// </para>
+/// <para>
+/// <b>Ela é segura por construção, e por isso não usa o recorte de nome
+/// próprio.</b> A regra de distância pode trocar letra, e é por isso que ela só
+/// olha palavra com maiúscula no meio da frase — sem esse corte ela reescreveria
+/// <c>Falar</c> como <c>Algar</c>. A regra de grafia exige as <b>mesmas letras,
+/// na mesma ordem</b>: ela não consegue produzir uma palavra que não seja, letra
+/// por letra, um termo que alguém digitou no vocabulário. <c>next best</c> é
+/// minúsculo e entra; <c>sexta</c> nunca vira <c>cesta</c> por este caminho,
+/// porque as letras são outras.
 /// </para>
 /// <para>
 /// <b>Nada é silencioso.</b> Toda troca aplicada vira <see cref="TrocaFeita"/>
@@ -92,6 +117,26 @@ public static class RevisaoDeTermos
     /// (<see cref="DistanciaPara"/>).
     /// </remarks>
     public const int TamanhoMinimo = 3;
+
+    /// <summary>Até quantas palavras vizinhas podem ser coladas num termo só.</summary>
+    /// <remarks>
+    /// Quatro cobre o que existe no vocabulário deste projeto —
+    /// <c>next best action</c> é o mais longo — e não custa nada: o casamento é
+    /// por chave exata, então uma janela maior não afrouxa a regra, só varre
+    /// mais.
+    /// </remarks>
+    public const int MaximoDePalavrasColadas = 4;
+
+    /// <summary>
+    /// Palavra de uma letra não entra numa colagem.
+    /// </summary>
+    /// <remarks>
+    /// Em português a palavra de uma letra é artigo ou preposição, e colá-la à
+    /// seguinte é o único jeito de esta regra inventar um termo: <c>a PI</c>
+    /// viraria <c>API</c> num projeto que tenha <c>API</c> no vocabulário, e a
+    /// frase "isso vai para a PI do cliente" é português correto.
+    /// </remarks>
+    private const int MinimoDaParte = 2;
 
     /// <summary>
     /// Palavra que parece nome próprio ou sigla, que é onde o ASR erra assim.
@@ -163,6 +208,108 @@ public static class RevisaoDeTermos
     }
 
     /// <summary>
+    /// As variantes de espaço e hífen: mesmas letras, separador no lugar errado.
+    /// </summary>
+    /// <param name="entidades">As mesmas de <see cref="Propor"/>.</param>
+    /// <remarks>
+    /// <para>
+    /// <b>Ela pega o que a regra de distância nunca poderia pegar</b>, porque
+    /// para ela as duas formas <b>já são a mesma palavra</b>: a
+    /// <see cref="Chave"/> descarta separador e acento, então
+    /// <c>next best</c> e <c>NextBest</c> têm a mesma chave. É por isso que o
+    /// <see cref="Propor"/> passa por elas sem ver nada — o termo consta como
+    /// conhecido, e está mesmo, só não na forma que o cliente escreve.
+    /// </para>
+    /// <para>
+    /// <b>Nos dois sentidos.</b> Colar (<c>next best</c> → <c>NextBest</c>) e
+    /// separar (<c>lifecycle</c> → <c>life cycle</c>) são o mesmo caso visto de
+    /// dois lados, e o MOSS produziu os dois no acervo
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §12.2). Quem manda é sempre o
+    /// vocabulário: a forma canônica é a que a pessoa digitou.
+    /// </para>
+    /// <para>
+    /// <b>Um dos dois lados tem de ter separador</b>, e este é o corte que
+    /// mantém a regra estreita. Sem ele, <c>cloud</c> viraria <c>Cloud</c> em
+    /// toda frase de um projeto que tenha <c>Cloud</c> no vocabulário — trocar
+    /// maiúscula não é o defeito que foi medido, e reescrever palavra comum é
+    /// como esta classe já errou uma vez (ver <see cref="ParecemNome"/>).
+    /// </para>
+    /// <para>
+    /// <b>Ela ajuda os dois motores</b>, e não só o MOSS: o faster-whisper com
+    /// <c>hotwords</c> também escreve o termo separado quando ouve a pausa.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<Proposta> ProporGrafia(
+        IEnumerable<string> textos, IEnumerable<string> entidades)
+    {
+        var alvos = Alvos(entidades);
+        if (alvos.Count == 0) return [];
+
+        // Chave → forma canônica. Só entram alvos com letra ou dígito bastante;
+        // o piso é o mesmo do resto da classe.
+        var porChave = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string a in alvos)
+            if (Chave(a).Length >= TamanhoMinimo) porChave.TryAdd(Chave(a), a);
+        if (porChave.Count == 0) return [];
+
+        var vistas = new Dictionary<string, Proposta>(StringComparer.Ordinal);
+
+        foreach (string bruto in textos)
+        {
+            string texto = bruto ?? "";
+            var palavras = Regex.Matches(texto, @"[\p{L}\p{Nd}][\p{L}\p{Nd}.']*")
+                                .Cast<Match>().ToList();
+
+            for (int i = 0; i < palavras.Count; i++)
+            for (int n = 1; n <= MaximoDePalavrasColadas && i + n <= palavras.Count; n++)
+            {
+                // A janela só cresce enquanto o que separa as palavras for
+                // espaço ou hífen. Vírgula, ponto e parêntese são fronteira de
+                // sentido: colar através deles inventaria termo de pedaços de
+                // duas orações.
+                if (n > 1 && !SoEspacoOuHifen(
+                        texto, palavras[i + n - 2].Index + palavras[i + n - 2].Length,
+                        palavras[i + n - 1].Index))
+                    break;
+
+                var primeira = palavras[i];
+                var ultima = palavras[i + n - 1];
+                if (n > 1 && palavras.Skip(i).Take(n)
+                        .Any(m => m.Value.Trim('.', '\'').Length < MinimoDaParte))
+                    continue;
+
+                int fim = ultima.Index + ultima.Length;
+                string escrita = texto[primeira.Index..fim].Trim('.', '\'');
+                string chave = Chave(escrita);
+                if (chave.Length < TamanhoMinimo) continue;
+                if (!porChave.TryGetValue(chave, out string? canonico)) continue;
+                if (string.Equals(escrita, canonico, StringComparison.Ordinal)) continue;
+
+                // O corte que mantém a regra estreita: um dos dois lados tem de
+                // trazer separador. Ver as observações do método.
+                if (!TemSeparador(escrita) && !TemSeparador(canonico)) continue;
+
+                vistas.TryAdd(escrita, new Proposta(escrita, canonico, "grafia"));
+            }
+        }
+
+        return [.. vistas.Values];
+    }
+
+    /// <summary>Entre o fim de uma palavra e o começo da outra só há espaço ou hífen.</summary>
+    private static bool SoEspacoOuHifen(string texto, int de, int ate)
+    {
+        if (ate <= de) return false;
+        for (int i = de; i < ate; i++)
+            if (texto[i] is not (' ' or '-' or '\u00a0')) return false;
+        return true;
+    }
+
+    /// <summary>A forma escrita carrega espaço ou hífen entre as letras.</summary>
+    private static bool TemSeparador(string t) =>
+        t.Any(c => c is ' ' or '-' or '\u00a0');
+
+    /// <summary>
     /// A porta pela qual toda proposta passa, venha da regra ou do modelo.
     /// </summary>
     /// <remarks>
@@ -192,6 +339,21 @@ public static class RevisaoDeTermos
             string de = (p.De ?? "").Trim();
             string para = (p.Para ?? "").Trim();
             if (de.Length < TamanhoMinimo || para.Length == 0) continue;
+
+            // **A grafia entra por outra porta, e tem de entrar.** As duas
+            // formas têm a mesma chave por definição — é isso que ela conserta
+            // —, então as três guardas de baixo a matariam: a de identidade
+            // primeiro, e a de "expandir nome não é corrigir" logo depois. O que
+            // resta é o que importa: o alvo continua tendo de ser entidade
+            // conhecida, e a troca continua sendo registrada e desfazível.
+            if (p.Fonte == "grafia")
+            {
+                if (!porChave.TryGetValue(Chave(para), out string? daGrafia)) continue;
+                if (string.Equals(de, daGrafia, StringComparison.Ordinal)) continue;
+                boas.Add(p with { Para = daGrafia });
+                continue;
+            }
+
             if (Chave(de) == Chave(para)) continue;                  // identidade
             if (!porChave.TryGetValue(Chave(para), out string? canonico)) continue;
 

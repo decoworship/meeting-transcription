@@ -30,21 +30,38 @@ import subprocess
 import sys
 import threading
 import time
-import zipfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-SKILL_ZIP = REPO / "transcrição para atas" / "transcricao-para-ata.skill"
-GRAVACOES = Path("/mnt/c/Users/andre/Documents/MeetingRecordings")
+
+#: A skill, em arquivos soltos.
+#:
+#: **Ela já foi um .skill zipado**, e esta ferramenta ficou apontando para o zip
+#: depois que ele virou pasta — de modo que ela não rodava mais, e a falha era um
+#: ``FileNotFoundError`` que não dizia que a culpa era do caminho. É a mesma
+#: pasta que o app embute como recurso (``Nucleo/Atas/ModelosDeAta.cs``), e ela é
+#: fonte única: medir contra outra cópia mediria outro prompt.
+SKILL = REPO / "assets" / "atas"
+
+#: O acervo.
+#:
+#: **O Documents virou OneDrive**, e o caminho antigo — ``Documents/MeetingRecordings``
+#: — deixou de existir. As outras ferramentas de ``tools/`` já apontam para cá;
+#: esta ficou para trás porque ninguém a rodou desde então.
+GRAVACOES = Path("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings")
 BASE = Path("/mnt/c/Users/andre/ata-teste")
 
 TIPOS = ["cliente-update", "sprint", "trabalho", "kickoff", "resultados", "daily"]
 
 
 def _da_skill(nome: str) -> str:
-    """Lê um arquivo de dentro do .skill, que é a fonte única."""
-    with zipfile.ZipFile(SKILL_ZIP) as z:
-        return z.read(f"transcricao-para-ata/{nome}").decode("utf-8")
+    """Lê um arquivo da skill, que é a fonte única."""
+    caminho = SKILL / nome
+    if not caminho.is_file():
+        raise SystemExit(
+            f"não achei {caminho}.\n"
+            "A skill mora em assets/atas/ desde que deixou de ser um .skill zipado.")
+    return caminho.read_text(encoding="utf-8")
 
 
 def regras_comuns() -> str:
@@ -86,7 +103,9 @@ def prompt_da_reuniao(pasta: Path, tipo: str) -> tuple[str, dict]:
               "# Estrutura desta ata\n",
               f"O tipo desta reunião já foi definido: **{tipo}**. "
               "Use exatamente a estrutura abaixo.\n",
-              _da_skill(f"references/{tipo}.md"),
+              # Sem "references/": na pasta os seis tipos ficam ao lado do
+              # SKILL.md, e era assim que o zip os agrupava.
+              _da_skill(f"{tipo}.md"),
               "\n---\n", "# Dados da reunião\n", "\n".join(contexto)]
 
     if notas.strip():

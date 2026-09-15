@@ -234,6 +234,74 @@ roda na máquina de outra pessoa precisa deixar rastro**. O bloco de diagnóstic
 da Fase 4 dá a *foto* — versão, placa, modelos. A pergunta que faltou responder
 era outra: **o que o app fez**.
 
+### TRA-2 · Motores em paralelo, medidos no uso real — `feature` · `aberto`
+
+**A estratégia, decidida pelo dono do produto em 11/09/2026:** motor novo entra
+**ao lado** do que existe, nunca no lugar; a comparação que decide é o **uso
+diário**, não a bancada; e o que deixar de ser usado **se desliga**. Iteração
+conservadora.
+
+**Por que isto e não trocar o padrão.** O `large-v3` tem 70 gravações de
+histórico nesta máquina. Trocar o padrão muda a transcrição de todo mundo de uma
+vez, e a bancada mede quatro gravações — as únicas com gabarito. O uso real mede
+todas, com o áudio de verdade e o julgamento de quem estava na reunião.
+
+**O que já existe e serve:**
+
+* o `transcricao.json` **já grava o campo `engine`** — dá para saber depois qual
+  motor produziu cada transcrição. Nulo é `classico`, por convenção escrita;
+* a `Nucleo/Retomada.cs` já confere o motor antes de reaproveitar parcial;
+* a `Nucleo/Vozes.cs` já carimba a origem do vetor de voz por motor;
+* o seletor em Ajustes › Transcrição já existe, e desde 10/09 governa também a
+  prévia ao vivo.
+
+**O que trava, e é o primeiro passo:** `ConfiguracoesDoApp.MotorAceito` e
+`Vozes.MotorAceitoNaAmostra` são **binários** — tudo o que não é `"moss"` vira
+`"classico"`. Um terceiro motor entraria **em silêncio** como clássico, gravaria
+`engine: "classico"` no arquivo, e contaminaria justamente a medição que esta
+estratégia depende. Precisa virar lista, com o desconhecido caindo no padrão
+**e deixando rastro no registro**.
+
+**Desligar tem de ser barato**, e hoje quase é: o GGUF de cada motor é pacote do
+`Nucleo/Catalogo.cs` e se apaga por Ajustes › Modelos. O que falta é a tela dizer
+**quanto cada um está sendo usado** — sem isso, "o que não está sendo usado" é
+memória de alguém.
+
+### TRA-1 · A prévia ao vivo é jogada fora — `feature` · `aberto`
+
+**Gatilho: já dói, e foi relatado em uso em 11/09/2026.** O dono do produto
+gravou uma reunião com a prévia ligada, pediu a transcrição ao encerrar, e
+esperou o pipeline inteiro — **o app tinha acabado de transcrever aquela reunião
+inteira e descartou tudo**.
+
+Hoje o `Nucleo/SessaoAoVivo.cs` diz, no próprio comentário, que *"a prévia é
+descartável: ela não vira o `transcricao.json` e não substitui nada"*. Isso veio
+da regra do §7 da [FASE7.md](FASE7.md), que existia contra o defeito da 0.4.0 —
+um parcial de um motor voltando rotulado como de outro, em silêncio.
+
+**A medição já derrubou a regra, e ninguém aplicou a consequência.** A
+[FASE7-RESULTADOS.md](FASE7-RESULTADOS.md) §4 é explícita: o texto por blocos
+empata com o da passada inteira, e *"não é mais a mesma situação do defeito de
+0.4.0 — lá o parcial era de outro modelo, aqui é do mesmo modelo com os mesmos
+parâmetros"*. **Vale só para o texto**: a diarização por bloco tem 4% de erro
+contra a inteira, e continua tendo que rodar do começo.
+
+**O desenho:**
+
+```
+encerrar  →  o texto dos blocos já está em disco, menos o rabo de ≤3 min
+          →  transcrever só o que falta + diarizar a gravação inteira
+          →  a ata começa numa fração do tempo de hoje
+```
+
+**A máquina já existe inteira.** O `Nucleo/Retomada.cs` grava parcial marcado com
+o que falta, e confere **modelo, idioma, vocabulário e motor** antes de
+reaproveitar — na dúvida, roda o ASR de novo. Falta a prévia escrever nela.
+
+**Duas coisas para não esquecer:** o último bloco nunca é processado ao vivo, e
+trocar de motor entre a reunião e a transcrição faz a `Retomada` recusar o
+parcial — corretamente.
+
 ### SUP-1 · O app não sabe dizer o que aconteceu — `feature` · `aberto`
 
 Prometido para a 0.4.1 e **nunca entregue** — conferido no código em
@@ -243,11 +311,11 @@ Prometido para a 0.4.1 e **nunca entregue** — conferido no código em
 |---|---|
 | assinar o `AoRegistrar` em `AprendizadoDeVozes.ExtrairAsync` | **não existe** — é a única das **três** cargas de GPU do pipeline que não escreve uma linha, nem do motor |
 | `Registro.Ultimas()` no bloco de diagnóstico | existe e **ninguém a chama** fora do teste ([Registro.cs:69](../app-net/Nucleo/Registro.cs#L69)) |
-| marcador de transcrição em andamento, apagado ao terminar | **não existe** — um marcador órfão no próximo início prova que a máquina caiu, e em qual etapa |
+| marcador de transcrição em andamento, apagado ao terminar | ✅ **existe desde 10/09/2026** — `Nucleo/MarcaDeEtapa.cs`, escrito com `WriteThrough` a cada etapa e apagado no `finally` do `ExecutarAsync`. A órfã entra no log e no **bloco colável** do diagnóstico |
 | ler o Event Log (`6008`, `Kernel-Power 41`, `BugCheck 1001`, `Kernel-Boot 27`) | **não existe** — nenhum `EventLogReader` na árvore |
 | amostrar o `nvidia-smi` a cada ~15 s durante a transcrição | **não existe** — [Diagnostico.cs](../app-net/Nucleo/Diagnostico.cs) faz uma chamada só, com *"não chame em laço"* escrito nela |
 
-**Os dois primeiros são de uma linha cada, e valem mais que os outros três**: é
+**Três dos cinco existem.** Os dois primeiros eram de uma linha cada, e valem mais que os outros dois: é
 o registro que separa um desligamento na diarização de um desligamento vinte
 minutos depois. Os dois últimos são Windows-only e usam reflexão — cuidado com o
 `PublishTrimmed` e com os testes `net8.0` portáteis.
@@ -292,6 +360,62 @@ trocado de graça. E é isto que torna 1,59 GB submissível e um update de 18 MB
 possível — sem ele, o `winget upgrade` não funciona.
 Ver [ATUALIZACAO.md](ATUALIZACAO.md) e
 [instalador/winget/LEIAME.md](../instalador/winget/LEIAME.md).
+
+> **Ficou mais urgente em 04/09/2026, e há 900 MB de gordura identificada.** O
+> motor MOSS levou o instalador de 1,59 GB para **2,31 GB** — quase o dobro do
+> que a [FASE7-BACKEND.md](FASE7-BACKEND.md) A1 estimava (~200 MB). O excedente
+> **não é o motor**: é o `transcribe-cpp-native-cu12` trazendo os wheels
+> `nvidia-cublas-cu12`, `nvidia-cuda-nvrtc-cu12` e `nvidia-cuda-runtime-cu12` —
+> **927 MB de bibliotecas de CUDA que o `torch/lib` já traz**. Medido: o torch
+> 2.6.0+cu124 empacota `cublas64_12.dll`, `cublasLt64_12.dll`, `cudart64_12.dll`
+> e `nvrtc64_120_0.dll`; os wheels trazem os mesmos, na 12.9.
+>
+> **Não foi cortado, e o motivo é honesto:** saber se o `transcribe.cpp` aceita
+> as DLLs do torch em vez das dele é pergunta empírica, e só se responde numa
+> máquina Windows com placa. Cortar às cegas trocaria 900 MB por um motor que
+> não carrega. Fica escrito com número, que é o que faltava para decidir.
+
+> **Medido de novo em 10/09/2026, e a duplicação é maior do que 927 MB.** A
+> instalação inteira tem **17 GB** em `motores/`, e os mesmos arquivos de CUDA
+> aparecem em **três** lugares — `torch/lib`, os wheels `nvidia/*` e o
+> `ata/bin` do llama.cpp, que este item não olhava:
+>
+> ```
+> cublasLt64_12.dll  3x      ggml-cuda.dll   2x
+> cublas64_12.dll    3x      nvrtc64_120_0.dll  2x
+> ```
+>
+> **São 1,44 GB de bytes idênticos.** E há mais 5,24 GB em dois GGUF de ata que
+> ficaram das comparações e não estão em uso. O plano de corte, com a ordem por
+> risco e a régua de cada degrau, está na
+> [CONVERGENCIA.md](CONVERGENCIA.md) §3 — e o corte grande não é este: é o
+> `torch`, 4,8 GB, preso por uma operação só (§2 de lá).
+
+### DIST-5 · Varredura de modelos, recorrente — `feature` · `aberto`
+
+**Gatilho: 30/09/2026**, e depois a cada mês. Definido pelo dono do produto em
+10/09/2026.
+
+**Por que ele existe.** A varredura de 10/09 achou, numa tarde, duas coisas que
+não estavam no radar de uma semana antes: o **`Qwen3-ASR` com GGUF oficial do
+`ggml-org`** — que pode apagar o `transcribe.cpp` inteiro do instalador, já que
+o llama.cpp está embarcado — e o **`Voxtral Mini 4B Realtime`** da Mistral,
+Apache 2.0 e com português declarado. Nenhum dos dois foi procurado; os dois
+apareceram porque alguém olhou.
+
+**A régua, e ela é curta.** Um candidato só interessa se passar nos quatro:
+
+1. **declara português** (ou transcreve bem sem declarar, como o MOSS);
+2. **roda em ggml ou ONNX** — não há NeMo nem vLLM dentro de um Python
+   embarcado de 4,3 GB que precisa **encolher**;
+3. **cabe na 2060 de 6 GB** compartilhada com o Meet, com a folga intermitente
+   medida na [CONVERGENCIA.md](CONVERGENCIA.md) §5;
+4. **muda alguma decisão nossa.** Modelo melhor que não troca nada é notícia,
+   não tarefa.
+
+**A saída são linhas escritas**, uma por candidato, com licença, tamanho,
+línguas e runtime — e nada mais. Ver o `R0` da [FASE7-ROTA.md](FASE7-ROTA.md), que
+é a mesma varredura na primeira execução.
 
 ### DIST-2 · Motores como pacotes por acelerador — `feature` · `espera`
 
@@ -347,4 +471,7 @@ Para a lista não virar depósito de novo:
   economiza isso e prende 2,5 GB que a próxima transcrição vai querer. Só faz
   sentido se gerar várias atas em sequência virar rotina;
 - **o tempo real** — é estudo, tem carta própria e não manda fazer nada
-  ([FASE7.md](FASE7.md)).
+  ([FASE7.md](FASE7.md)). A fila dos testes dela e a definição dos três produtos
+  estão na [FASE7-FILA.md](FASE7-FILA.md); o que **saiu** do estudo e virou
+  código é o motor MOSS opcional ([FASE7-BACKEND.md](FASE7-BACKEND.md)), que é
+  transcrição depois da reunião como sempre foi — não ao vivo.

@@ -32,19 +32,18 @@ window.chrome.webview.addEventListener("message", (evento) => {
   // mensagem sem `tipo`, que é a final. É o que permite uma operação de
   // minutos reportar andamento sem um segundo canal.
   if (resposta.tipo === "progresso") {
+    // E é também o sinal de vida em que o prazo se apoia: enquanto chega
+    // andamento, o núcleo está trabalhando, e o relógio recomeça do zero.
+    pendente.rearmar();
     pendente.aoProgredir?.(resposta);
     return;
   }
 
-  pendentes.delete(resposta.id);
+  pendente.encerrar();
   if (resposta.erro) pendente.rejeitar(new Error(resposta.erro));
   else pendente.resolver(resposta);
 });
 
-/**
- * Envia um pedido ao núcleo e espera a resposta.
- * @param aoProgredir chamado a cada aviso de andamento, quando houver.
- */
 /**
  * Ouve os eventos que o núcleo empurra.
  *
@@ -58,10 +57,71 @@ export function assinar(tipo, fn) {
   return () => assinantes.get(tipo)?.delete(fn);
 }
 
-export function pedir(op, campos = {}, aoProgredir = null) {
+/**
+ * Envia um pedido ao núcleo e espera a resposta.
+ *
+ * @param aoProgredir chamado a cada aviso de andamento, quando houver.
+ * @param opcoes `{ prazoMs, sinal }` — ver abaixo.
+ *
+ * <b>O prazo não é ligado por padrão, e isso é a decisão, não o esquecimento.</b>
+ * Um prazo cego mataria as operações que existem: `escolher-pasta` fica aberta
+ * enquanto o usuário procura a pasta no diálogo do Windows, `aprender-voz` sobe
+ * o pyannote pela segunda vez, e `diagnostico` roda um processo filho. Nenhuma
+ * delas reporta andamento, e nenhuma delas está quebrada por demorar. Quem
+ * chama é quem sabe quanto a sua operação pode demorar; a ponte não tem como
+ * saber, e chutar aqui transforma um pedido lento num erro inventado.
+ *
+ * <b>Quando há prazo, ele conta silêncio e não tempo total</b> — cada
+ * `progresso` rearma o relógio. É o que permite pôr prazo num download de
+ * 641 MB sem que o tamanho do arquivo entre na conta: o que se está vigiando é
+ * o núcleo parar de falar, que é o defeito real (uma tela em "gerando…" para
+ * sempre, sem erro e sem saída), e não a operação ser demorada.
+ *
+ * <b>Cancelar é abandonar, e só.</b> O `sinal` (um AbortSignal) faz esta página
+ * parar de esperar e devolve uma rejeição; ele <b>não</b> manda o núcleo parar,
+ * porque não há op para isso no protocolo — quem quer que o trabalho pare de
+ * verdade usa a op própria, como o `cancelar-transcricao`. Uma resposta que
+ * chegue depois cai no `if (!pendente) return` lá em cima, que é o mesmo
+ * caminho de sempre.
+ */
+export function pedir(op, campos = {}, aoProgredir = null, opcoes = {}) {
+  const { prazoMs = 0, sinal = null } = opcoes;
   const id = proximoId++;
+
   return new Promise((resolver, rejeitar) => {
-    pendentes.set(id, { resolver, rejeitar, aoProgredir });
+    let relogio = null;
+    const aoAbortar = () => {
+      encerrar();
+      rejeitar(new Error("cancelado"));
+    };
+
+    // Tudo o que precisa ser desfeito num lugar só: sem isto, um pedido que
+    // responde deixa para trás um setTimeout e um ouvinte de abort presos ao
+    // sinal — que costuma viver mais que o pedido, porque é da tela.
+    const encerrar = () => {
+      pendentes.delete(id);
+      clearTimeout(relogio);
+      sinal?.removeEventListener("abort", aoAbortar);
+    };
+
+    const rearmar = () => {
+      if (!prazoMs) return;
+      clearTimeout(relogio);
+      relogio = setTimeout(() => {
+        encerrar();
+        rejeitar(new Error(`o núcleo não respondeu a "${op}"`));
+      }, prazoMs);
+    };
+
+    const pendente = { resolver, rejeitar, aoProgredir, rearmar, encerrar };
+    pendentes.set(id, pendente);
+
+    // O sinal já abortado é caso normal — a tela pode ter saído entre montar o
+    // pedido e mandá-lo —, e nele nada chega a ser postado.
+    if (sinal?.aborted) return aoAbortar();
+    sinal?.addEventListener("abort", aoAbortar, { once: true });
+
+    rearmar();
     window.chrome.webview.postMessage(JSON.stringify({ id, op, ...campos }));
   });
 }

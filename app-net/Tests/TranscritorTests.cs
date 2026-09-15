@@ -13,6 +13,7 @@ namespace MeetingApp.Tests;
 /// critério C da Fase 2 aplicado à causa mais provável de falha na máquina de
 /// quem instala: os motores não estão lá.
 /// </remarks>
+[Collection("marcador de etapa")]
 public sealed class TranscritorTests : IDisposable
 {
     private readonly string _pasta =

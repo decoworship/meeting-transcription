@@ -83,6 +83,34 @@ public sealed class AmostraDeVoz
     [JsonPropertyName("modelo")] public string? Modelo { get; init; }
 
     /// <summary>
+    /// Com qual motor de transcrição a identidade desta amostra foi formada.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nulo é <see cref="Vozes.MotorClassico"/></b>, e não "desconhecido":
+    /// toda amostra gravada antes de 03/09/2026 saiu do pipeline de dois motores,
+    /// porque não havia outro. Ver <see cref="Vozes.MotorDe"/>.
+    /// </para>
+    /// <para>
+    /// <b>Por que isto vale ser guardado.</b> Transcrever com o MOSS não
+    /// contamina o banco — o pipeline só chama o <c>ReconhecerAsync</c>, que lê e
+    /// não escreve. Mas <b>nomear</b> um falante olhando para uma transcrição do
+    /// MOSS grava um vetor que atravessa para todas as reuniões seguintes, e
+    /// retranscrever não desfaz. E o falante do MOSS é uma identidade
+    /// <b>costurada</b>: se a <see cref="CosturaDeFalantes"/> fundiu duas
+    /// pessoas, o vetor sai com as duas dentro, e o erro só aparece meses depois
+    /// como "o app chamou a Vanessa de Carla".
+    /// </para>
+    /// <para>
+    /// A origem não impede nada — ela permite <b>desfazer em bloco</b> se um dos
+    /// caminhos se mostrar ruim. É a mesma lição do <see cref="Regras"/>: quando
+    /// não se sabe quais amostras a regra velha estragou, o que salva é poder
+    /// separar a geração inteira. É barato agora e caro depois.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("motor")] public string? Motor { get; init; }
+
+    /// <summary>
     /// Sob quais regras de inscrição esta amostra foi colhida.
     /// </summary>
     /// <remarks>
@@ -156,13 +184,56 @@ public sealed class Vozes
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-transcription", "vozes");
 
-    /// <summary>Acima disto, é a mesma pessoa.</summary>
+    /// <summary>
+    /// Acima disto, é a mesma pessoa — <b>entre</b> reuniões.
+    /// </summary>
     /// <remarks>
-    /// O limiar do app Python, mantido como ponto de partida: mexer nele sem
-    /// medir contra um conjunto de vozes reais seria trocar um número mal
-    /// justificado por outro.
+    /// <para>
+    /// O limiar do app Python, mantido: ele governa o <b>banco de vozes</b>, que
+    /// é o caso difícil. Outro dia, outro fone, outra sala, e do outro lado uma
+    /// biblioteca com dezenas de pessoas — errar aqui grava o nome de alguém na
+    /// fala de outra pessoa, e a transcrição sai plausível e errada.
+    /// </para>
+    /// <para>
+    /// <b>Ele não é o mesmo problema do
+    /// <see cref="LimiarDeCosturaNaReuniao"/>, e por isso não é o mesmo
+    /// número.</b> Até 03/09/2026 havia um limiar só para os dois usos, e a
+    /// Fase 7 mediu duas vezes, independentemente, que 0,70 é apertado demais
+    /// <b>dentro</b> da mesma reunião: o T3.1 achou 0,60 para nomear cedo, com
+    /// 33 pontos de cobertura a mais e nenhum erro novo, e a costura achou 0,55
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §8.2, §8.3 e §11.3). A conclusão que os
+    /// dados sustentam é um limiar mais frouxo para o caso fácil — <b>não</b> a
+    /// troca desta constante, que ninguém mediu contra o banco.
+    /// </para>
     /// </remarks>
     public const double LimiarDeReconhecimento = 0.70;
+
+    /// <summary>
+    /// Acima disto, é a mesma pessoa — <b>dentro</b> da mesma reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O caso fácil, e é isso que justifica o número mais baixo: o alvo e a
+    /// amostra vêm do mesmo áudio, gravado no mesmo minuto, com as mesmas
+    /// condições acústicas, e o conjunto de candidatos são as poucas pessoas
+    /// daquela sala. É o limiar que a <see cref="CosturaDeFalantes"/> usa para
+    /// decidir se o falante deste bloco é alguém que já falou.
+    /// </para>
+    /// <para>
+    /// <b>0,55, medido em 03/09/2026 sobre seis gravações do acervo</b>
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §11.2). O que o limiar regula aqui
+    /// <b>não é o acerto</b> — ele é quase insensível — <b>é quanta gente o app
+    /// inventa</b>: em 0,75 a costura conclui que há 44 falantes onde há 8, e a
+    /// métrica de acerto não enxerga isso porque dividir custa menos que fundir.
+    /// Em 0,45 ela começa a fundir demais, e a gravação de 41 min perde 4
+    /// pontos. 0,55 fica no máximo, ou junto dele, nas seis.
+    /// </para>
+    /// <para>
+    /// Baixá-lo sem medir troca um erro que a pessoa conserta juntando duas
+    /// linhas por um que ela não tem como perceber.
+    /// </para>
+    /// </remarks>
+    public const double LimiarDeCosturaNaReuniao = 0.55;
 
     /// <summary>Abaixo disto, a amostra vai para revisão em vez de entrar direto.</summary>
     public const double LimiarDeQuarentena = 0.35;
@@ -184,6 +255,41 @@ public sealed class Vozes
     /// <summary>O modelo de uma amostra, com o ausente valendo o de sempre.</summary>
     public static string ModeloDe(AmostraDeVoz a) =>
         a.Modelo is { Length: > 0 } m ? m : ModeloDeVozPadrao;
+
+    /// <summary>O pipeline de dois motores: faster-whisper + pyannote.</summary>
+    /// <remarks>
+    /// O mesmo texto que a chave <c>motor_de_transcricao</c> do
+    /// <c>app.json</c> guarda — <see cref="ConfiguracoesDoApp.MotorDeTranscricao"/>.
+    /// Ter as duas pontas escrevendo a mesma palavra por conta própria é como
+    /// uma delas fica para trás.
+    /// </remarks>
+    public const string MotorClassico = "classico";
+
+    /// <summary>O MOSS: texto e falante numa passada só.</summary>
+    public const string MotorMoss = "moss";
+
+    /// <summary>O motor de uma amostra; ausente é o clássico.</summary>
+    /// <remarks>
+    /// Ausente não é "desconhecido": antes de 03/09/2026 não havia outro motor,
+    /// então a resposta é certa, não suposta. Ver <see cref="AmostraDeVoz.Motor"/>.
+    /// </remarks>
+    public static string MotorDe(AmostraDeVoz a) =>
+        a.Motor is { Length: > 0 } m ? m : MotorClassico;
+
+    /// <summary>
+    /// O que se carimba numa amostra nova: <c>null</c> para o clássico.
+    /// </summary>
+    /// <remarks>
+    /// Nulo e não <c>"classico"</c> de propósito. O campo existe para poder
+    /// <b>desfazer em bloco</b> o que veio de um caminho novo, e escrevê-lo em
+    /// toda amostra faria o arquivo de vozes de todo mundo mudar numa
+    /// atualização em que nada mudou. Quem lê já sabe que ausente é o clássico
+    /// (<see cref="MotorDe"/>), porque antes de 03/09/2026 não havia outro.
+    /// </remarks>
+    public static string? MotorAceitoNaAmostra(string? motor) =>
+        string.Equals(motor?.Trim(), MotorMoss, StringComparison.OrdinalIgnoreCase)
+            ? MotorMoss
+            : null;
 
     /// <summary>
     /// A geração de regras de inscrição que vale hoje.
@@ -437,6 +543,62 @@ public sealed class Vozes
 
         Gravar();
         return true;
+    }
+
+    /// <summary>
+    /// Junta duas pessoas numa só — as amostras de <paramref name="de"/> passam
+    /// para <paramref name="para"/>, e <paramref name="de"/> deixa de existir.
+    /// </summary>
+    /// <returns>Quantas amostras mudaram de dono; 0 quando não havia o que juntar.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>Por que isto precisa existir.</b> O nome de uma pessoa é digitado à
+    /// mão, uma vez por reunião, e ninguém digita igual todas as vezes: "Andre
+    /// Yuri" e "André Yuri", "Diego" e "Diego Lacerda". Cada grafia vira um
+    /// perfil separado, e o reconhecimento passa a comparar contra dois
+    /// centróides mais fracos em vez de um forte — quanto mais a pessoa é
+    /// nomeada, pior ela é reconhecida. Sem uma forma de juntar, a única saída
+    /// era esquecer um dos dois e perder as amostras.
+    /// </para>
+    /// <para>
+    /// <b>Junta, e não copia.</b> As amostras carregam <see cref="Origem"/>,
+    /// <see cref="AmostraDeVoz.Modelo"/> e <see cref="AmostraDeVoz.Motor"/>, e
+    /// todos seguem intactos: é isso que mantém a auditoria possível depois — em
+    /// particular a de desfazer em bloco o que veio de um motor novo.
+    /// </para>
+    /// <para>
+    /// <b>Não confere se são a mesma voz, de propósito.</b> Quem manda aqui é a
+    /// pessoa olhando a tela, que sabe quem é quem melhor que qualquer limiar; o
+    /// app já tem o número da semelhança para <i>sugerir</i>, e sugerir é o
+    /// <c>VOZ-1</c> do backlog. Decidir por ela seria fundir duas pessoas de voz
+    /// parecida sem que ninguém tivesse pedido, que é o erro caro.
+    /// </para>
+    /// </remarks>
+    public int Juntar(string de, string para)
+    {
+        de = (de ?? "").Trim();
+        para = (para ?? "").Trim();
+
+        if (de.Length == 0 || para.Length == 0) return 0;
+        if (string.Equals(de, para, StringComparison.Ordinal)) return 0;
+        if (!_dados.Pessoas.TryGetValue(de, out var origem)) return 0;
+
+        if (!_dados.Pessoas.TryGetValue(para, out var destino))
+        {
+            // Juntar numa pessoa que ainda não existe é renomear — e renomear é
+            // exatamente o que resolve o caso de ter digitado o nome torto uma
+            // única vez.
+            destino = new PerfilDeVoz();
+            _dados.Pessoas[para] = destino;
+        }
+
+        int quantas = origem.Amostras.Count;
+        destino.Amostras.AddRange(origem.Amostras);
+        _dados.Pessoas.Remove(de);
+
+        Gravar();
+        Registro.Escrever("vozes", $"'{de}' juntado a '{para}' — {quantas} amostra(s)");
+        return quantas;
     }
 
     public string CaminhoDoTrecho(string relativo) => Path.Combine(_pasta, relativo);

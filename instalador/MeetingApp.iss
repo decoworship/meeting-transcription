@@ -60,7 +60,16 @@ AppId={{8B6F3A21-4C5E-4E17-9A2D-1F0B7C4E9D33}
 AppName={#Marca}
 AppVersion={#Versao}
 AppVerName={#Marca} {#Versao}
-VersionInfoVersion={#Versao}
+; **O VersionInfoVersion só aceita número**, e é por isso que ele não é o
+; {#Versao} direto: num candidato a versão — 0.7.0-rc1 — o Inno reprova com
+; "Value of [Setup] section directive VersionInfoVersion is invalid" e aborta a
+; compilação. Este campo é o do recurso de versão do Windows (o que aparece em
+; Propriedades do arquivo), e lá versão é sempre x.y.z.w.
+;
+; O que a pessoa lê continua sendo o {#Versao} inteiro, com o sufixo: ele está
+; no AppVersion e no AppVerName logo acima. Só o número entra aqui.
+#define VersaoNumerica Copy(Versao, 1, Pos("-", Versao + "-") - 1)
+VersionInfoVersion={#VersaoNumerica}
 AppPublisher=decoworship
 DefaultDirName={localappdata}\Programs\MeetingApp
 DefaultGroupName={#Marca}

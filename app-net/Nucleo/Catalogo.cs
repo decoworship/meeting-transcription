@@ -200,6 +200,26 @@ public static class Catalogo
             Nota = "61 s por ata e nenhuma falha em 10 rodadas, contra 122 s do padrão. "
                  + "Mas são 5 GB: numa placa de 6 GB fica apertado.",
         },
+        // **O "E2B" é de parâmetros efetivos, não de tamanho em disco.** A
+        // família Gemma 4 é aninhada: o E2B ativa ~2 B por token, mas o
+        // checkpoint carrega o conjunto inteiro — daí 3,11 GB de arquivo, e não
+        // os ~1,3 GB que a contagem efetiva sugere. Conferido no repositório em
+        // 10/09/2026, depois de uma fonte secundária dar o número errado.
+        new PacoteDeModelo
+        {
+            Id = "gemma-4-e2b",
+            Nome = "Gemma 4 E2B",
+            Familia = "ata",
+            Descricao = "Mesma família do E4B, 1,9 GB menor. Para placa apertada.",
+            Repositorio = "unsloth/gemma-4-E2B-it-GGUF",
+            Arquivo = "gemma-4-E2B-it-Q4_K_M.gguf",
+            NomeLocal = "gemma-4-e2b-q4km.gguf",
+            TamanhoEsperadoBytes = 3_110_000_000,
+            TamanhoMedido = false,
+            Nota = "Ainda não medido aqui. Escolhido por ficar na família que acerta "
+                 + "8 dos 10 nomes próprios contra 3 do Qwen3.5 — mas 3,1 GB ainda "
+                 + "não cabem junto com a prévia ao vivo numa placa de 6 GB.",
+        },
         new PacoteDeModelo
         {
             Id = "qwen3.5-4b",
@@ -226,6 +246,53 @@ public static class Catalogo
             TamanhoEsperadoBytes = 1_100_000_000,
             TamanhoMedido = false,
             Nota = "Ainda não medido aqui — o 4B é o que passou no critério de qualidade.",
+        },
+        // ── O motor opcional da Fase 7 ──────────────────────────────────────
+        //
+        // **Ele não viaja no instalador, e isso não é economia de banda.** O
+        // `instalador/MeetingApp.iss` exclui `*.gguf` por decisão registrada, e
+        // o `montar_instalador.sh` tem uma régua que reprova o artefato se um
+        // escapar: um GGUF posto em `motores/moss/modelos` seria descartado em
+        // silêncio, e o motor subiria sem modelo na máquina de quem instalou.
+        //
+        // O que viaja é o `transcribe.cpp` — ~200 MB de nativo, dentro do Python
+        // embarcado (tools/empacotar_motores.sh). O modelo entra por aqui, como
+        // os de ata: quem liga a chave `motor_de_transcricao` baixa 0,70 GB uma
+        // vez; quem não liga não paga nada.
+        // O motor da legenda ao vivo. Mesmo arranjo do MOSS: o GGUF não viaja
+        // no instalador (o `.iss` exclui `*.gguf`) e se baixa por Ajustes ›
+        // Modelos. Quem não liga a legenda não paga nada.
+        new PacoteDeModelo
+        {
+            Id = "nemotron-asr-streaming",
+            Nome = "Nemotron ASR Streaming",
+            Familia = "legenda",
+            Descricao = "A legenda ao vivo: texto quase no instante da fala.",
+            Repositorio = "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+            Arquivo = "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+            NomeLocal = "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+            TamanhoEsperadoBytes = 750_000_000,
+            TamanhoMedido = false,
+            Nota = "Medido em 60 min contínuos na RTX 2060: 2,46x o tempo real com o "
+                 + "Meet aberto, e 0,11 s entre a fala e o texto firmar. "
+                 + "Não separa falantes — só a sua voz da dos outros.",
+        },
+        new PacoteDeModelo
+        {
+            Id = "moss-transcribe-diarize",
+            Nome = "MOSS Transcribe-Diarize",
+            Familia = "moss",
+            Descricao = "Transcreve e separa falantes numa passada só. "
+                      + "Ganhou do motor de sempre no texto e no falante.",
+            Repositorio = "handy-computer/moss-transcribe-diarize-gguf",
+            Arquivo = "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+            NomeLocal = "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
+            // Medido no HuggingFace em 04/09/2026, e não estimado.
+            TamanhoEsperadoBytes = 700_313_760,
+            TamanhoMedido = true,
+            Nota = "Não usa o vocabulário como o motor de sempre: nenhum runtime "
+                 + "ggml expõe o hotword dele, então os termos do projeto só são "
+                 + "corrigidos depois, na revisão. Ver docs/FASE7-RESULTADOS.md §12.",
         },
         // ── A família "diarizacao" saiu do catálogo na Fase 4 ───────────────
         //
@@ -287,10 +354,61 @@ public static class Catalogo
     /// repositório ficam como estão — <c>faster-whisper-large-v3</c> continua
     /// com um hífen em cada junta.
     /// </remarks>
-    public static string PastaDoPacote(PacoteDeModelo pacote) =>
-        pacote.Familia == "ata"
-            ? PastaDosModelosDeAta()
-            : Path.Combine(PastaDoCache(), "models--" + pacote.Repositorio.Replace("/", "--"));
+    public static string PastaDoPacote(PacoteDeModelo pacote) => pacote.Familia switch
+    {
+        "ata" => PastaDosModelosDeAta(),
+        "moss" => PastaDosModelosDoMoss(),
+        "legenda" => PastaDosModelosDaLegenda(),
+        _ => Path.Combine(PastaDoCache(), "models--" + pacote.Repositorio.Replace("/", "--")),
+    };
+
+    /// <summary>
+    /// As famílias em que o pacote é <b>um arquivo</b>, e não uma pasta de cache.
+    /// </summary>
+    /// <remarks>
+    /// O <c>huggingface_hub</c> guarda repositório inteiro numa pasta de blobs e
+    /// links; um GGUF avulso não passa por ali — ele é baixado por nome e aberto
+    /// por caminho, porque quem o abre (llama.cpp, transcribe.cpp) não conhece o
+    /// cache. Onde a distinção importa é na medição do que está em disco: somar
+    /// a pasta contaria os vizinhos junto.
+    /// </remarks>
+    /// <remarks>
+    /// <para>
+    /// <b>Esta lista cresce junto com a do <c>PastaDoPacote</c>, e esquecê-la
+    /// custou um download de 750 MB.</b> A família <c>legenda</c> entrou em
+    /// 12/09/2026 e ficou de fora daqui: o pacote passou a ser tratado como
+    /// repositório, e o GGUF foi escrito **no caminho da pasta** — sobrou um
+    /// arquivo chamado <c>modelos</c> com 751 MB, e o botão "Baixar" voltou
+    /// como se nada tivesse acontecido, porque o catálogo procurava
+    /// <c>modelos/…gguf</c>.
+    /// </para>
+    /// <para>
+    /// O modo de falha é o pior possível: o download <b>funciona</b>, demora, e
+    /// termina sem efeito visível. Um teste guarda o par — ver
+    /// <c>CatalogoTests</c>.
+    /// </para>
+    /// </remarks>
+    public static bool EhArquivoAvulso(PacoteDeModelo pacote) =>
+        pacote.Familia is "ata" or "moss" or "legenda";
+
+    /// <summary>Ao lado do sidecar da legenda, que é quem abre o arquivo.</summary>
+    /// <remarks>
+    /// Mesmo arranjo do MOSS: o <c>motores/legenda/motor.py</c> procura o GGUF
+    /// em <c>modelos/</c> ao lado dele, e o <c>.iss</c> exclui <c>*.gguf</c> do
+    /// instalador — quem não liga a legenda não baixa nada.
+    /// </remarks>
+    public static string PastaDosModelosDaLegenda() =>
+        Path.Combine(AppContext.BaseDirectory, "motores", "legenda", "modelos");
+
+    /// <summary>Ao lado do sidecar do MOSS, que é quem abre o arquivo.</summary>
+    /// <remarks>
+    /// O <c>motores/moss/motor.py</c> procura o GGUF em <c>modelos/</c> ao lado
+    /// de si mesmo, e cai no HuggingFace quando não acha — o caminho de quem
+    /// desenvolve. Os dois lugares estão escritos nos dois arquivos de
+    /// propósito, como o dos modelos de diarização.
+    /// </remarks>
+    public static string PastaDosModelosDoMoss() =>
+        Path.Combine(AppContext.BaseDirectory, "motores", "moss", "modelos");
 
     /// <summary>Ao lado do llama-server, que é quem abre o arquivo.</summary>
     public static string PastaDosModelosDeAta() =>
@@ -300,7 +418,7 @@ public static class Catalogo
 
     /// <summary>O caminho final do arquivo de um pacote de ata.</summary>
     public static string ArquivoDoPacote(PacoteDeModelo pacote) =>
-        Path.Combine(PastaDosModelosDeAta(), pacote.NomeLocal ?? pacote.Arquivo ?? pacote.Id);
+        Path.Combine(PastaDoPacote(pacote), pacote.NomeLocal ?? pacote.Arquivo ?? pacote.Id);
 
     /// <summary>Os pacotes com o estado de cada um nesta máquina.</summary>
     /// <param name="config">Para marcar quais estão em uso hoje.</param>
@@ -311,7 +429,7 @@ public static class Catalogo
         {
             // Na família "ata" o pacote é um arquivo, e não uma pasta de cache:
             // medir a pasta contaria os outros modelos de ata junto.
-            long bytes = pacote.Familia == "ata"
+            long bytes = EhArquivoAvulso(pacote)
                 ? (File.Exists(ArquivoDoPacote(pacote))
                     ? new FileInfo(ArquivoDoPacote(pacote)).Length : 0)
                 : TamanhoEmDisco(PastaDoPacote(pacote));
@@ -331,6 +449,10 @@ public static class Catalogo
                 EmUso = pacote.Familia switch
                 {
                     "ata" => pacote.NomeLocal == config.ModeloDeAta,
+                    // Não há o que escolher dentro da família: ou a chave está
+                    // no MOSS e o único GGUF dele está em uso, ou não está.
+                    "moss" => ConfiguracoesDoApp.MotorAceito(config.MotorDeTranscricao)
+                              == Vozes.MotorMoss,
                     // "asr" e o que vier depois: o id é o que o motor recebe.
                     _ => pacote.Id == config.ModeloPadrao,
                 },
@@ -389,7 +511,7 @@ public static class Catalogo
     {
         try
         {
-            string destino = pacote.Familia == "ata" ? PastaDosModelosDeAta() : PastaDoCache();
+            string destino = EhArquivoAvulso(pacote) ? PastaDoPacote(pacote) : PastaDoCache();
             // A pasta pode ainda não existir numa instalação nova; o que importa
             // é o volume, e ele existe.
             string? raiz = Path.GetPathRoot(Path.GetFullPath(destino));

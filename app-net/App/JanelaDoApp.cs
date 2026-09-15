@@ -160,6 +160,10 @@ internal sealed class JanelaDoApp : IDisposable
         // só pode ser chamado na thread da UI, e o pipeline responde de uma
         // thread de trabalho — daí o salto de volta pelo laço de mensagens.
         _ponte = new Ponte(_pastaDasGravacoes, NaUi, _gravador, _avisar);
+        // A prévia ao vivo escuta o GRAVADOR, e não o botão: gravar tem três
+        // portas — este botão, o ícone da bandeja e o menu dela — e a primeira
+        // versão só cobria uma. Ver Gravador.AoComecar.
+        _ponte.AcompanharOGravador(_gravador);
         _web.WebMessageReceived += (_, e) =>
         {
             string pedido = e.TryGetWebMessageAsString();

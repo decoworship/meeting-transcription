@@ -12,8 +12,9 @@
 
 import { pedir } from "/ponte.js";
 import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
-         campoComSugestoes, preencherSugestoes } from "/pecas.js";
+         campoComSugestoes, preencherSugestoes, confirmar } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
+import { listaDeTrechos } from "/lista-de-trechos.js";
 
 let estado = null;
 let aguardando = null;
@@ -89,9 +90,18 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   // fora: quem monta esta tela não pode depender de a moldura fazê-lo.
   pararAudio();
 
+  // A lista da tela anterior larga o observador dela antes de o estado ser
+  // trocado. Depois seria tarde: `estado` é substituído inteiro logo abaixo, e a
+  // referência para a lista velha se perderia com o observador ainda ligado num
+  // corpo que já saiu do DOM.
+  estado?.lista?.encerrar();
+
   estado = {
     gravacao,
     dados,
+    // Os falantes na ordem de aparição, recalculados uma vez por redesenho.
+    // Ver desenharTrechos.
+    ordem: [],
     // Nomes aplicados sobre os rótulos crus. Ficam à parte dos segmentos para
     // renomear em massa ser trocar uma entrada, e não percorrer 387 trechos.
     nomes: new Map(),
@@ -120,7 +130,10 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   busca.placeholder = "Buscar na transcrição…";
   busca.addEventListener("input", () => {
     estado.busca = busca.value.trim();
-    redesenhar();
+    // **Só os trechos.** Os botões de filtro não dependem do que se digita — eles
+    // saem dos falantes e das correções —, e refazê-los a cada letra derrubava o
+    // foco de quem navegava por Tab entre eles. Ver docs/FASE7-FRONTEND.md §F-2.
+    desenharTrechos();
   });
 
   const filtros = document.createElement("div");
@@ -175,10 +188,12 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
     refazer.className = "aa-btn aa-btn-texto";
     refazer.type = "button";
     refazer.textContent = "Transcrever de novo";
-    refazer.addEventListener("click", () => {
+    refazer.addEventListener("click", async () => {
       // Confirmação porque o custo é assimétrico: refazer descarta a revisão
       // inteira e reprocessa o áudio, e o clique distraído não avisa antes.
-      if (confirm("Isto descarta os nomes e as correções desta reunião. Continuar?"))
+      if (await confirmar("Isto descarta os nomes e as correções desta reunião.",
+                          { titulo: "Transcrever de novo?",
+                            ok: "Transcrever de novo" }))
         aoRefazer();
     });
     perigo.appendChild(refazer);
@@ -203,6 +218,15 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   tela.replaceChildren(raiz);
 
   estado.filtros = filtros;
+
+  // A lista é criada uma vez por tela e vive no estado: recriá-la a cada
+  // redesenho jogaria fora o observador e a posição da rolagem, que é metade do
+  // que ela existe para preservar. A anterior já foi encerrada lá em cima.
+  estado.lista = listaDeTrechos(
+    corpo,
+    (seg, indice) => linhaDoTrecho(seg, indice),
+    () => alerta("Nenhum trecho corresponde ao filtro.", "atencao"));
+
   redesenhar();
 }
 
@@ -219,12 +243,16 @@ function ordemDosFalantes(segmentos) {
 const nomeDe = (cru) => estado.nomes.get(cru) ?? cru;
 
 function redesenhar() {
+  // A ordem dos falantes uma vez, e não uma por consumidor. Ela é O(n·m) — um
+  // `includes` num vetor por segmento — e era recalculada três vezes por
+  // redesenho: aqui, no desenho dos filtros e no de cada trecho.
+  estado.ordem = ordemDosFalantes(estado.dados.segments);
   desenharFiltros();
   desenharTrechos();
 }
 
 function desenharFiltros() {
-  const falantes = ordemDosFalantes(estado.dados.segments);
+  const falantes = estado.ordem;
   estado.filtros.replaceChildren();
 
   // O filtro das correções vem primeiro e só aparece quando houve alguma. É o
@@ -275,71 +303,91 @@ function tempo(s) {
   return `${String(m).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+/**
+ * Passa à lista o que o filtro deixou passar.
+ *
+ * **Ela não desenha nada** — quem desenha é a `lista-de-trechos.js`, e só as
+ * linhas que cabem na tela. Antes daqui, esta função construía os 2.058 trechos
+ * da maior reunião do acervo a cada tecla digitada na busca.
+ *
+ * O índice original viaja junto do segmento: a tela edita, toca e desfaz troca
+ * **por índice**, e renumerar a cada filtro faria "editar o trecho 12" apontar
+ * para outro trecho a cada busca.
+ */
 function desenharTrechos() {
-  const corpo = document.getElementById("corpo-transcricao");
-  const falantes = ordemDosFalantes(estado.dados.segments);
-  corpo.replaceChildren();
-
   const alvo = estado.busca.toLowerCase();
 
-  estado.dados.segments.forEach((seg, indice) => {
-    const cru = seg.speaker ?? "Unknown";
+  // A busca chama esta função direto, sem passar pelo redesenhar. Digitar não
+  // muda quem falou na reunião, então a ordem que já está calculada serve — e é
+  // por isso que ela é garantida aqui em vez de recalculada.
+  if (estado.ordem.length === 0)
+    estado.ordem = ordemDosFalantes(estado.dados.segments);
+
+  const visiveis = [];
+  estado.dados.segments.forEach((item, indice) => {
+    const cru = item.speaker ?? "Unknown";
     if (estado.escondidos.has(cru)) return;
-    if (alvo && !seg.text.toLowerCase().includes(alvo)) return;
-    if (estado.soCorrigidos && !seg.swaps?.length) return;
-
-    const linha = document.createElement("div");
-    linha.className = "trecho";
-    linha.dataset.indice = String(indice);
-
-    const t = document.createElement("span");
-    t.className = "trecho__tempo";
-    t.textContent = tempo(seg.start);
-
-    const quem = document.createElement("span");
-    quem.className = "trecho__falante";
-    quem.style.color = corDoFalante(cru, falantes.indexOf(cru));
-    quem.textContent = nomeDe(cru);
-
-    const texto = document.createElement("p");
-    texto.className = "trecho__texto";
-    marcar(texto, seg.text.trim(), alvo);
-
-    // A correção fonética é um palpite, e palpite tem que poder ser conferido.
-    // Sem esta marca o texto parece ter saído assim do modelo, e uma troca
-    // errada — palavra comum virando nome do vocabulário — passa despercebida.
-    if (seg.swaps?.length) {
-      const marca = document.createElement("button");
-      marca.className = "troca";
-      marca.type = "button";
-      marca.textContent = "✎";
-      marca.title = seg.swaps.map((s) => `"${s.from}" → "${s.to}"`).join("\n")
-        + "\n\nCorreção pelo vocabulário do projeto. Clique para desfazer.";
-      marca.setAttribute("aria-label", "Ver as correções deste trecho");
-      marca.addEventListener("click", (e) => {
-        e.stopPropagation();        // não tocar o áudio ao clicar na marca
-        desfazerTrocas(indice);
-      });
-      texto.appendChild(marca);
-    }
-
-    linha.append(t, quem, texto);
-
-    // Clique simples ouve daqui; duplo clique edita. É a divisão do app
-    // antigo, e a que faz sentido: conferir o falante é o gesto frequente,
-    // corrigir o texto é o raro.
-    linha.addEventListener("click", () => {
-      for (const o of corpo.querySelectorAll("[data-tocando]"))
-        o.removeAttribute("data-tocando");
-      linha.dataset.tocando = "true";
-      ouvirA(seg.start);
-    });
-    linha.addEventListener("dblclick", () => editar(indice));
-    corpo.appendChild(linha);
+    if (alvo && !item.text.toLowerCase().includes(alvo)) return;
+    if (estado.soCorrigidos && !item.swaps?.length) return;
+    visiveis.push({ item, indice });
   });
 
-  if (corpo.children.length === 0)
-    corpo.appendChild(alerta("Nenhum trecho corresponde ao filtro.", "atencao"));
+  estado.lista.definir(visiveis);
+}
+
+/** Uma linha da transcrição. Chamada só quando a linha entra na tela. */
+function linhaDoTrecho(seg, indice) {
+  const corpo = document.getElementById("corpo-transcricao");
+  const cru = seg.speaker ?? "Unknown";
+
+  const linha = document.createElement("div");
+  linha.className = "trecho";
+  linha.dataset.indice = String(indice);
+
+  const t = document.createElement("span");
+  t.className = "trecho__tempo";
+  t.textContent = tempo(seg.start);
+
+  const quem = document.createElement("span");
+  quem.className = "trecho__falante";
+  quem.style.color = corDoFalante(cru, estado.ordem.indexOf(cru));
+  quem.textContent = nomeDe(cru);
+
+  const texto = document.createElement("p");
+  texto.className = "trecho__texto";
+  marcar(texto, seg.text.trim(), estado.busca.toLowerCase());
+
+  // A correção fonética é um palpite, e palpite tem que poder ser conferido.
+  // Sem esta marca o texto parece ter saído assim do modelo, e uma troca
+  // errada — palavra comum virando nome do vocabulário — passa despercebida.
+  if (seg.swaps?.length) {
+    const marca = document.createElement("button");
+    marca.className = "troca";
+    marca.type = "button";
+    marca.textContent = "✎";
+    marca.title = seg.swaps.map((s) => `"${s.from}" → "${s.to}"`).join("\n")
+      + "\n\nCorreção pelo vocabulário do projeto. Clique para desfazer.";
+    marca.setAttribute("aria-label", "Ver as correções deste trecho");
+    marca.addEventListener("click", (e) => {
+      e.stopPropagation();        // não tocar o áudio ao clicar na marca
+      desfazerTrocas(indice);
+    });
+    texto.appendChild(marca);
+  }
+
+  linha.append(t, quem, texto);
+
+  // Clique simples ouve daqui; duplo clique edita. É a divisão do app
+  // antigo, e a que faz sentido: conferir o falante é o gesto frequente,
+  // corrigir o texto é o raro.
+  linha.addEventListener("click", () => {
+    for (const o of corpo.querySelectorAll("[data-tocando]"))
+      o.removeAttribute("data-tocando");
+    linha.dataset.tocando = "true";
+    ouvirA(seg.start);
+  });
+  linha.addEventListener("dblclick", () => editar(indice));
+  return linha;
 }
 
 /**
@@ -350,12 +398,13 @@ function desenharTrechos() {
  * um original guardado apagaria essa edição. Reverter só as palavras deixa o
  * resto como está.
  */
-function desfazerTrocas(indice) {
+async function desfazerTrocas(indice) {
   const seg = estado.dados.segments[indice];
   if (!seg.swaps?.length) return;
 
   const lista = seg.swaps.map((s) => `"${s.to}" volta a ser "${s.from}"`).join("\n");
-  if (!confirm(`Desfazer a correção deste trecho?\n\n${lista}`)) return;
+  if (!await confirmar(lista, { titulo: "Desfazer a correção deste trecho?",
+                                ok: "Desfazer" })) return;
 
   for (const s of seg.swaps) {
     // Só palavra inteira: sem isto, desfazer "Dimi"→"Dimitri" estragaria

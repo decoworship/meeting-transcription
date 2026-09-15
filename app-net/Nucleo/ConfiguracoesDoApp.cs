@@ -56,6 +56,90 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("diarizacao_padrao")] public string DiarizacaoPadrao { get; set; } = "community-1";
 
     /// <summary>
+    /// Qual motor produz texto e falante: <c>"classico"</c> ou <c>"moss"</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O padrão é o clássico, e ele não se troca sozinho.</b> O
+    /// <c>"classico"</c> é o pipeline de dois motores que roda desde a Fase 2 —
+    /// faster-whisper para o texto, pyannote para o falante, cruzados por
+    /// sobreposição temporal. O <c>"moss"</c> é o
+    /// <c>MOSS-Transcribe-Diarize</c>, que faz os dois numa passada, e que a
+    /// Fase 7 mediu ganhando no texto e no falante
+    /// (<c>docs/FASE7-RESULTADOS.md</c> §7.4).
+    /// </para>
+    /// <para>
+    /// <b>Ganhar na régua não é motivo para virar padrão</b>, e a chave existe
+    /// justamente para isso: a gravação fica salva, então dá para transcrever a
+    /// mesma reunião nos dois motores e comparar, e voltar atrás a qualquer
+    /// momento. O que ainda não foi medido: a estrutura da ata saída do MOSS
+    /// (<c>docs/FASE7-BACKEND.md</c> D2) e o que ele faz com a gravação
+    /// enquanto disputa a placa (D1).
+    /// </para>
+    /// <para>
+    /// <b>O vocabulário funciona diferente nos dois</b>, e quem trocar precisa
+    /// saber: nenhum runtime ggml expõe o <c>hotwords</c> do MOSS — não é
+    /// configuração, é ausência (§12.1) —, então nele o vocabulário só age
+    /// depois, pela <see cref="CorrecaoFonetica"/> e pela
+    /// <c>RevisaoDeTermos</c>. Termo que o modelo não ouviu não volta por
+    /// pós-processamento.
+    /// </para>
+    /// <para>
+    /// Valor desconhecido cai no clássico, e não levanta erro: esta chave é
+    /// editável à mão num arquivo, e um <c>app.json</c> com um typo não pode
+    /// impedir alguém de transcrever.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("motor_de_transcricao")]
+    public string MotorDeTranscricao { get; set; } = Vozes.MotorClassico;
+
+    /// <summary>
+    /// Mostrar a transcrição na tela durante a própria reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nasce desligada, e não é distração de segurança.</b> Enquanto o
+    /// <c>SUP-2</c> do <c>docs/BACKLOG.md</c> estiver aberto — a máquina do
+    /// segundo usuário desliga sozinha sob carga de GPU — ligar qualquer coisa
+    /// ao vivo naquela máquina custaria a reunião, e não uma transcrição que a
+    /// retomada devolve. Quem liga está aceitando a troca na própria máquina.
+    /// </para>
+    /// <para>
+    /// <b>Não é tempo real.</b> São blocos de 3 minutos: uma frase dita no
+    /// minuto 10 aparece entre o 12 e o 13. A tela chama isto de "consciência da
+    /// reunião" de propósito — a palavra "tempo real" promete três segundos.
+    /// </para>
+    /// <para>
+    /// Hoje só funciona com o <see cref="MotorDeTranscricao"/> em <c>"moss"</c>:
+    /// ele devolve texto e falante numa passada, a ~10× o tempo real. Ver
+    /// <see cref="SessaoAoVivo.OQueImpede"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("transcricao_ao_vivo")] public bool TranscricaoAoVivo { get; set; }
+
+    /// <summary>
+    /// A legenda ao vivo — texto sub-segundo durante a reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada</b>, como tudo o que roda durante a gravação: o
+    /// <c>SUP-2</c> segue aberto, e ao vivo um desligamento custa a reunião, não
+    /// uma transcrição. **E ela não convive com a
+    /// <see cref="TranscricaoAoVivo"/>** — as duas juntas derrubam a legenda de
+    /// 2,46x para 0,45x na 2060 (docs/FASE7-ROTA.md §4).
+    /// </remarks>
+    [JsonPropertyName("legenda_ao_vivo")] public bool LegendaAoVivo { get; set; }
+
+    /// <summary>A chave conferida contra os dois valores que existem.</summary>
+    /// <remarks>
+    /// Portão único, como o <see cref="TemaAceito"/>: quem lê a chave lê por
+    /// aqui, e o que sai daqui é uma das duas constantes deste repositório.
+    /// </remarks>
+    public static string MotorAceito(string? motor) =>
+        string.Equals(motor?.Trim(), Vozes.MotorMoss, StringComparison.OrdinalIgnoreCase)
+            ? Vozes.MotorMoss
+            : Vozes.MotorClassico;
+
+    /// <summary>
     /// Corrigir a grafia dos termos do projeto no texto transcrito.
     /// </summary>
     /// <remarks>

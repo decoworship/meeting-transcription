@@ -129,12 +129,48 @@ public sealed class CatalogoTests
         Assert.Equal(Catalogo.Pacotes.Count,
                      Catalogo.Pacotes.Select(p => p.Id).Distinct().Count());
 
-        // "ata" entrou na Fase 3, e "diarizacao" saiu na Fase 4 — os pesos
+        // "ata" entrou na Fase 3, "diarizacao" saiu na Fase 4 — os pesos
         // passaram a viajar dentro do instalador, e o catálogo é sobre o que se
-        // baixa. A lista é fechada de propósito: a tela agrupa por família, e
-        // uma família nova sem bloco na tela some sem avisar.
+        // baixa — e "moss" entrou na Fase 7, com o GGUF que fica de fora do
+        // instalador porque o .iss exclui `*.gguf`.
+        //
+        // A lista é fechada de propósito: a tela agrupa por família, e uma
+        // família nova sem bloco na tela some sem avisar. **Esta linha só cresce
+        // junto com o `configuracoes.js`** — foi ela que exigiu o bloco
+        // "Transcrição em uma passada" quando a família "moss" chegou.
         Assert.All(Catalogo.Pacotes, p =>
-            Assert.Contains(p.Familia, new[] { "asr", "ata" }));
+            Assert.Contains(p.Familia, new[] { "asr", "ata", "moss", "legenda" }));
+    }
+
+    /// <summary>
+    /// Todo pacote de arquivo único é reconhecido como tal — nas DUAS listas.
+    /// </summary>
+    /// <remarks>
+    /// <b>Este teste existe por um defeito entregue em 12/09/2026.</b> A família
+    /// <c>legenda</c> ganhou caso no <c>PastaDoPacote</c> e ficou de fora do
+    /// <c>EhArquivoAvulso</c>. Resultado: o download dos 750 MB **completou**,
+    /// escreveu o GGUF no caminho da pasta em vez de dentro dela, e o botão
+    /// "Baixar" voltou — porque o catálogo procurava o arquivo num lugar onde
+    /// havia um arquivo com o nome da pasta.
+    /// <para>
+    /// A régua é: <b>quem tem pasta própria é arquivo avulso</b>. As duas listas
+    /// dizem a mesma coisa por caminhos diferentes, e discordar delas é um
+    /// download que funciona e não serve para nada.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void QuemTemPastaPropriaEArquivoAvulso()
+    {
+        foreach (var p in Catalogo.Pacotes)
+        {
+            // Um pacote com pasta própria é aquele cujo destino NÃO está no
+            // cache do huggingface_hub — é o sinal de que alguém o abre por
+            // caminho, e não pelo cache.
+            bool temPastaPropria = !Catalogo.PastaDoPacote(p)
+                .StartsWith(Catalogo.PastaDoCache(), StringComparison.Ordinal);
+
+            Assert.Equal(temPastaPropria, Catalogo.EhArquivoAvulso(p));
+        }
     }
 
     [Fact]

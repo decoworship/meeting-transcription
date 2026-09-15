@@ -40,7 +40,8 @@ public sealed record Retomada(List<SegmentoFinal> Segmentos, string? Idioma, dou
     /// tem como perceber.
     /// </remarks>
     public static Retomada? Ler(string pastaDaGravacao, string modelo,
-                                string? idioma, string? vocabulario)
+                                string? idioma, string? vocabulario,
+                                string? motor = null)
     {
         try
         {
@@ -61,6 +62,13 @@ public sealed record Retomada(List<SegmentoFinal> Segmentos, string? Idioma, dou
             if (lido.Pending is not { } falta) return null;               // já está pronto
             if (!falta.Steps.Contains(Diarizacao)) return null;
             if (lido.Segments.Count == 0) return null;
+
+            // **O motor primeiro.** Os três de baixo decidem a saída do ASR
+            // clássico e o MOSS não usa nenhum deles — um parcial dele bateria
+            // nos três e seria reaproveitado numa rodada clássica, que pularia o
+            // ASR e devolveria o texto do outro motor em silêncio. Ver
+            // Pendencia.Engine.
+            if (!Igual(MotorOuClassico(falta.Engine), MotorOuClassico(motor))) return null;
 
             // Os três que decidem a saída do ASR. Ver Pendencia.
             if (!Igual(falta.Model, modelo)) return null;
@@ -86,7 +94,8 @@ public sealed record Retomada(List<SegmentoFinal> Segmentos, string? Idioma, dou
     /// rede nenhuma. Mesma regra do <see cref="Registro"/>.
     /// </remarks>
     public static void Escrever(string pastaDaGravacao, ResultadoDaTranscricao parcial,
-                                string modelo, string? idioma, string? vocabulario)
+                                string modelo, string? idioma, string? vocabulario,
+                                string? motor = null)
     {
         try
         {
@@ -96,6 +105,7 @@ public sealed record Retomada(List<SegmentoFinal> Segmentos, string? Idioma, dou
                 Model = modelo,
                 Language = idioma,
                 Vocabulary = vocabulario,
+                Engine = MotorOuClassico(motor),
             };
             File.WriteAllText(
                 Path.Combine(pastaDaGravacao, "transcricao.json"), parcial.ParaJson());
@@ -138,6 +148,15 @@ public sealed record Retomada(List<SegmentoFinal> Segmentos, string? Idioma, dou
             return false;
         }
     }
+
+    /// <summary>O motor de um parcial; ausente e vazio são o clássico.</summary>
+    /// <remarks>
+    /// Escrito de um lado e lido do outro pela mesma função, de propósito: se o
+    /// <c>Escrever</c> omitisse a marca e o <c>Ler</c> a exigisse, todo parcial
+    /// seria recusado e a retomada deixaria de existir sem que nada falhasse.
+    /// </remarks>
+    private static string MotorOuClassico(string? motor) =>
+        string.IsNullOrWhiteSpace(motor) ? Vozes.MotorClassico : motor.Trim();
 
     /// <summary>Nulo e vazio são a mesma coisa aqui: "não foi pedido".</summary>
     private static bool Igual(string? a, string? b) =>

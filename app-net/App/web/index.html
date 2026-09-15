@@ -139,6 +139,16 @@
   <div class="gaveta__corpo" id="corpo-exportar"></div>
 </aside>
 
+<!-- O que quem lê por leitor de tela ouve quando algo acontece sozinho.
+     Mora aqui, no HTML, e não é criada por JavaScript: um aria-live só é lido
+     quando MUDA, e uma região que nasce junto com o texto dela nunca mudou —
+     é o modo clássico de escrever a região e não anunciar nada.
+     Fica fora do .app de propósito: o inert que a gaveta modal põe no fundo
+     não pode alcançá-la.
+     Regra do que entra: estado, nunca conteúdo (docs/FASE7-FRONTEND.md §9).
+     Quem escreve nela é o anunciar() de pecas.js. -->
+<p class="anuncio" id="anuncio" role="status" aria-live="polite" aria-atomic="true"></p>
+
 <!-- O áudio da gravação aberta. Fica fora das telas porque continuar tocando
      ao abrir uma gaveta é o comportamento certo. -->
 <audio id="audio" preload="none"></audio>
