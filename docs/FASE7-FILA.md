@@ -54,7 +54,7 @@ original** da carta: *o pipeline de hoje, cortado em blocos, entrega texto pior?
 
 | id | a pergunta | como se responde | estado |
 |---|---|---|---|
-| **T2.1** | perguntar ao LLM sobre a reunião em curso | `tools/medir_llm_ao_vivo.py` | ✅ **cabe até ~60 min** de reunião ([§10](FASE7-RESULTADOS.md)) |
+| **T2.1** | perguntar ao LLM sobre a reunião em curso | `tools/medir_llm_ao_vivo.py` | ✅ **cabe até ~60 min** de reunião ([§10](FASE7-RESULTADOS.md)) — **reaberto em 15/09/2026** com quatro competidores e a régua de contexto ([CONVERGENCIA](CONVERGENCIA.md) §5) |
 
 ### Rodada 3 — o falante com nome cedo
 
