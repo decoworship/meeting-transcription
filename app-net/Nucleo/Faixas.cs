@@ -102,9 +102,37 @@ public sealed class Faixas
     public static float[] LerJanela(string caminho, double de, double ate) =>
         LerWav(caminho, de, ate);
 
+    /// <summary>
+    /// A janela de um WAV que está sendo gravado <b>agora</b>, pelo tamanho real
+    /// do arquivo e não pelo que o header declara.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Existe por causa da legenda ao vivo, e o motivo é uma armadilha.</b> O
+    /// <c>CrashSafeWavWriter</c> escreve as amostras continuamente mas só
+    /// reescreve o header a cada 10 s. O <see cref="LerJanela"/> respeita o
+    /// tamanho declarado — que é o certo para recuperar uma gravação
+    /// interrompida —, e por isso devolve <b>vazio durante os primeiros 10
+    /// segundos</b> de qualquer gravação, e depois entrega em degraus de 10 s.
+    /// </para>
+    /// <para>
+    /// Para uma legenda com 0,11 s de atraso isso é fatal duas vezes: ela
+    /// encerrava na largada por ler vazio, e mesmo depois leria em rajadas.
+    /// Aqui os bytes que existem em disco são lidos, porque eles <b>são</b>
+    /// áudio — só o header ainda não sabe.
+    /// </para>
+    /// <para>
+    /// <b>Não use isto para ler gravação encerrada.</b> Lá o header é a verdade,
+    /// e confiar no tamanho do arquivo leria lixo de um bloco seguinte.
+    /// </para>
+    /// </remarks>
+    public static float[] LerJanelaViva(string caminho, double de, double ate) =>
+        LerWav(caminho, de, ate, confiarNoArquivo: true);
+
     /// <param name="de">Segundo inicial, ou 0 para o começo.</param>
     /// <param name="ate">Segundo final, ou -1 para ler até o fim do que existe.</param>
-    private static float[] LerWav(string caminho, double de = 0, double ate = -1)
+    private static float[] LerWav(string caminho, double de = 0, double ate = -1,
+                                  bool confiarNoArquivo = false)
     {
         // **FileShare.ReadWrite, e é isto que permite ler durante a gravação.**
         // O CrashSafeWavWriter mantém o arquivo aberto com FileAccess.Write e
@@ -159,7 +187,11 @@ public sealed class Faixas
                 // gravação deixa exatamente isso, e é para ser recuperável. E é
                 // o MESMO caso de um arquivo que ainda está crescendo — o header
                 // é reescrito a cada 10 s com os tamanhos daquele instante.
-                int disponivel = (int)Math.Min(tamanho, fluxo.Length - fluxo.Position);
+                // Quem manda: o header (verdade para arquivo fechado) ou o
+                // tamanho real (verdade para arquivo crescendo). Ver LerJanelaViva.
+                int disponivel = confiarNoArquivo
+                    ? (int)(fluxo.Length - fluxo.Position)
+                    : (int)Math.Min(tamanho, fluxo.Length - fluxo.Position);
 
                 // A janela pedida, recortada ao que existe. Sem janela (de=0,
                 // ate=-1) isto devolve o arquivo inteiro, como sempre devolveu.

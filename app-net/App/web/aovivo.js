@@ -39,11 +39,11 @@ export function painelAoVivo() {
   titulo.className = "bloco__titulo";
   titulo.textContent = "O que já foi dito";
 
-  // **O atraso, dito de frente.** É a única defesa contra a pessoa achar que o
-  // app travou nos primeiros três minutos, em que não há nada para mostrar.
+  // **O atraso, dito de frente — e o modo certo.** A dica ficava cravada em
+  // "blocos de 3 minutos" e mentia quando a legenda era o que rodava. Ela nasce
+  // vazia e o núcleo diz qual é o modo; até lá não se afirma nada.
   const dica = document.createElement("p");
   dica.className = "aovivo__dica";
-  dica.textContent = "Em blocos de 3 minutos — o texto aparece depois que cada bloco fecha.";
 
   topo.append(titulo, dica);
 
@@ -151,6 +151,11 @@ export function painelAoVivo() {
   //    eventos. O núcleo os guarda justamente para esta volta.
   pedir("aovivo").then((r) => {
     if (!raiz.isConnected) return;
+    dica.textContent = r.aovivo_modo === "legenda"
+      ? "O texto aparece conforme a fala, e o que ainda pode mudar fica em cinza."
+      : r.aovivo_modo === "bloco"
+        ? "Em blocos de 3 minutos — o texto aparece depois que cada bloco fecha."
+        : "";
     if (r.aovivo_impedimento)
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);

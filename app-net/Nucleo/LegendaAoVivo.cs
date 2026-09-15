@@ -223,25 +223,46 @@ public sealed class LegendaAoVivo : IDisposable
     {
         try
         {
+            // **A posição se conta em AMOSTRAS, não em segundos.** Endereçar
+            // amostra com double custou o defeito mais caro desta feature: o
+            // quadro voltava com 3199 amostras onde a conta pedia 3200 — erro
+            // de arredondamento —, o laço recusava o quadro curto e pedia o
+            // mesmo pedaço para sempre. A legenda congelava no terceiro quadro,
+            // sem erro em lugar nenhum.
+            long lidas = 0;
+            int porQuadro = (int)(QuadroS * Faixas.TaxaDeAmostragem);
+
             while (!ct.IsCancellationRequested)
             {
-                double de = Quadros * QuadroS, ate = de + QuadroS;
+                double de = lidas / (double)Faixas.TaxaDeAmostragem;
+                double ate = (lidas + porQuadro) / (double)Faixas.TaxaDeAmostragem;
 
-                if (!File.Exists(sistema)) break;
-                if (SegundosEmDisco(sistema) < ate + FolgaS)
+                if (PrecisaEsperar(File.Exists(sistema), SegundosEmDisco(sistema), ate))
                 {
-                    // Ainda não há áudio: esperar um quadro. **Sem relógio de
-                    // parede** — quem manda é o que existe em disco, e um
-                    // relógio adiantado leria silêncio como se fosse fala.
+                    // **Sem relógio de parede** — quem manda é o que existe em
+                    // disco, e um relógio adiantado leria silêncio como fala.
                     await Task.Delay(TimeSpan.FromSeconds(QuadroS), ct);
                     continue;
                 }
 
-                var janela = new Faixas(Faixas.LerJanela(mic, de, ate),
-                                        Faixas.LerJanela(sistema, de, ate));
+                // **Viva**, e não a leitura de sempre: o header do WAV só é
+                // reescrito a cada 10 s, e a leitura que o respeita devolveria
+                // vazio na largada e depois entregaria em degraus de 10 s.
+                var janela = new Faixas(Faixas.LerJanelaViva(mic, de, ate),
+                                        Faixas.LerJanelaViva(sistema, de, ate));
                 var quadro = janela.Mix();
-                if (quadro.Length == 0) break;
 
+                // **Nada lido é "espere"; qualquer coisa lida serve.** Exigir o
+                // quadro exato foi o que travou o laço: o motor não se importa
+                // com um quadro de 3199 amostras, e avançar pelo que de fato
+                // veio torna o arredondamento inofensivo por construção.
+                if (quadro.Length == 0)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(QuadroS), ct);
+                    continue;
+                }
+
+                lidas += quadro.Length;
                 await canal.WriteAsync(quadro, ct);
                 Quadros++;
             }
@@ -354,6 +375,23 @@ public sealed class LegendaAoVivo : IDisposable
         catch (UnauthorizedAccessException) { return null; }
         catch (JsonException) { return null; }
     }
+
+    /// <summary>
+    /// Esperar mais, ou já dá para ler o quadro que termina em <paramref name="ate"/>?
+    /// </summary>
+    /// <remarks>
+    /// <b>Função separada porque a resposta errada é invisível.</b> Ela devolvia
+    /// "acabou" onde devia devolver "espere": a legenda começa no mesmo instante
+    /// que a gravação, o <c>CrashSafeWavWriter</c> ainda não criou o WAV, e a
+    /// sessão encerrava com <b>0 quadros no mesmo segundo</b> em que o modelo
+    /// terminava de carregar na GPU. Nada no log apontava para a causa.
+    /// <para>
+    /// <b>Arquivo que não existe é "espere", nunca "acabou".</b> Quem termina o
+    /// laço é o cancelamento, que vem de parar a gravação.
+    /// </para>
+    /// </remarks>
+    public static bool PrecisaEsperar(bool existe, double segundosEmDisco, double ate) =>
+        !existe || segundosEmDisco < ate + FolgaS;
 
     /// <summary>Quanto áudio o WAV tem, pelo tamanho do arquivo.</summary>
     private static double SegundosEmDisco(string caminho)

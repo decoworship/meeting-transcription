@@ -372,8 +372,24 @@ public static class Catalogo
     /// cache. Onde a distinção importa é na medição do que está em disco: somar
     /// a pasta contaria os vizinhos junto.
     /// </remarks>
+    /// <remarks>
+    /// <para>
+    /// <b>Esta lista cresce junto com a do <c>PastaDoPacote</c>, e esquecê-la
+    /// custou um download de 750 MB.</b> A família <c>legenda</c> entrou em
+    /// 12/09/2026 e ficou de fora daqui: o pacote passou a ser tratado como
+    /// repositório, e o GGUF foi escrito **no caminho da pasta** — sobrou um
+    /// arquivo chamado <c>modelos</c> com 751 MB, e o botão "Baixar" voltou
+    /// como se nada tivesse acontecido, porque o catálogo procurava
+    /// <c>modelos/…gguf</c>.
+    /// </para>
+    /// <para>
+    /// O modo de falha é o pior possível: o download <b>funciona</b>, demora, e
+    /// termina sem efeito visível. Um teste guarda o par — ver
+    /// <c>CatalogoTests</c>.
+    /// </para>
+    /// </remarks>
     public static bool EhArquivoAvulso(PacoteDeModelo pacote) =>
-        pacote.Familia is "ata" or "moss";
+        pacote.Familia is "ata" or "moss" or "legenda";
 
     /// <summary>Ao lado do sidecar da legenda, que é quem abre o arquivo.</summary>
     /// <remarks>

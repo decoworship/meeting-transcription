@@ -974,8 +974,16 @@ function abaTranscricao(config, gravar, diarizadores = []) {
     + "reunião, e usa o motor escolhido acima — os dois servem. Aparece o texto "
     + "e o que é seu, separado pelo lado da tela; quem é cada um dos outros só "
     + "na transcrição do fim, que roda normalmente quando a reunião acaba.";
-  previa.append(oQueE, chave(config.transcricao_ao_vivo === true,
-    (v) => gravar({ transcricao_ao_vivo: v })), oQueCustaAoVivo);
+  // **Ligar uma desliga a outra, de verdade.** O texto abaixo prometia isso e o
+  // código não fazia: as duas ficavam ligadas no app.json, o núcleo recusava a
+  // legenda (ela não cabe junto na placa) e o bloco ganhava — sem nada na tela
+  // dizendo por quê. Uma promessa de interface que o código não cumpre é pior
+  // que não prometer.
+  previa.append(oQueE, chave(config.transcricao_ao_vivo === true, async (v) => {
+    await gravar(v ? { transcricao_ao_vivo: true, legenda_ao_vivo: false }
+                   : { transcricao_ao_vivo: false });
+    recarregar();
+  }), oQueCustaAoVivo);
   painel.appendChild(previa);
 
   // ---- a legenda ao vivo
@@ -998,8 +1006,11 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   oQueCustaLegenda.textContent = "Ocupa cerca de um terço da placa durante a "
     + "reunião, e não funciona junto com a prévia em blocos acima — as duas não "
     + "cabem. Ligando esta, a de cima fica desligada.";
-  legenda.append(oQueELegenda, chave(config.legenda_ao_vivo === true,
-    (v) => gravar({ legenda_ao_vivo: v })), oQueCustaLegenda);
+  legenda.append(oQueELegenda, chave(config.legenda_ao_vivo === true, async (v) => {
+    await gravar(v ? { legenda_ao_vivo: true, transcricao_ao_vivo: false }
+                   : { legenda_ao_vivo: false });
+    recarregar();
+  }), oQueCustaLegenda);
   painel.appendChild(legenda);
 
   // ---- qual modelo separa os falantes

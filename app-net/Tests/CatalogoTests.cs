@@ -142,6 +142,37 @@ public sealed class CatalogoTests
             Assert.Contains(p.Familia, new[] { "asr", "ata", "moss", "legenda" }));
     }
 
+    /// <summary>
+    /// Todo pacote de arquivo único é reconhecido como tal — nas DUAS listas.
+    /// </summary>
+    /// <remarks>
+    /// <b>Este teste existe por um defeito entregue em 12/09/2026.</b> A família
+    /// <c>legenda</c> ganhou caso no <c>PastaDoPacote</c> e ficou de fora do
+    /// <c>EhArquivoAvulso</c>. Resultado: o download dos 750 MB **completou**,
+    /// escreveu o GGUF no caminho da pasta em vez de dentro dela, e o botão
+    /// "Baixar" voltou — porque o catálogo procurava o arquivo num lugar onde
+    /// havia um arquivo com o nome da pasta.
+    /// <para>
+    /// A régua é: <b>quem tem pasta própria é arquivo avulso</b>. As duas listas
+    /// dizem a mesma coisa por caminhos diferentes, e discordar delas é um
+    /// download que funciona e não serve para nada.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void QuemTemPastaPropriaEArquivoAvulso()
+    {
+        foreach (var p in Catalogo.Pacotes)
+        {
+            // Um pacote com pasta própria é aquele cujo destino NÃO está no
+            // cache do huggingface_hub — é o sinal de que alguém o abre por
+            // caminho, e não pelo cache.
+            bool temPastaPropria = !Catalogo.PastaDoPacote(p)
+                .StartsWith(Catalogo.PastaDoCache(), StringComparison.Ordinal);
+
+            Assert.Equal(temPastaPropria, Catalogo.EhArquivoAvulso(p));
+        }
+    }
+
     [Fact]
     public void ADiarizacaoNaoEstaMaisNoCatalogo()
     {

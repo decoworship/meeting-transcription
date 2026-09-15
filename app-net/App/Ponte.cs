@@ -105,6 +105,9 @@ internal sealed class Resposta
     /// <summary>O que impede a prévia, ou nulo quando ela pode acontecer.</summary>
     [JsonPropertyName("aovivo_impedimento")] public string? AoVivoImpedimento { get; init; }
 
+    /// <summary>Qual dos dois modos ao vivo está ligado: legenda, bloco ou nada.</summary>
+    [JsonPropertyName("aovivo_modo")] public string? AoVivoModo { get; init; }
+
     /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
     [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
 
@@ -961,12 +964,24 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     // quando a prévia não pode acontecer, e o que já aconteceu —
                     // porque o Gravador pode ser aberto no minuto 20, e os blocos
                     // de antes já passaram pelo canal de eventos.
+                    // **E o modo**, porque a tela não pode adivinhá-lo. A dica
+                    // do painel estava cravada em "blocos de 3 minutos" e mentia
+                    // quando a legenda era o que rodava — visto em uso em
+                    // 14/09/2026, com a legenda desligada e a tela prometendo
+                    // blocos que também não vinham.
+                    var cfgAv = ConfiguracoesDoApp.Carregar();
+                    var motoresAv = Motores.AoLadoDoExecutavel();
                     Responder(new Resposta
                     {
                         Id = p.Id,
-                        AoVivoImpedimento = ConfiguracoesDoApp.Carregar() is { TranscricaoAoVivo: true } cfgv
-                            ? SessaoAoVivo.OQueImpede(Motores.AoLadoDoExecutavel(), cfgv)
-                            : "a prévia ao vivo está desligada em Ajustes › Transcrição.",
+                        AoVivoModo = cfgAv.LegendaAoVivo ? "legenda"
+                                   : cfgAv.TranscricaoAoVivo ? "bloco" : "nada",
+                        AoVivoImpedimento = cfgAv.LegendaAoVivo
+                            ? LegendaAoVivo.OQueImpede(motoresAv, cfgAv)
+                            : cfgAv.TranscricaoAoVivo
+                                ? SessaoAoVivo.OQueImpede(motoresAv, cfgAv)
+                                : "nem a legenda nem a prévia em blocos estão ligadas "
+                                  + "em Ajustes › Transcrição.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
                     });
                     break;
@@ -1222,25 +1237,33 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             _aoVivo = null;
 
             var cfg = ConfiguracoesDoApp.Carregar();
-            if (!cfg.TranscricaoAoVivo) return;
-
             var motores = Motores.AoLadoDoExecutavel();
-            if (SessaoAoVivo.OQueImpede(motores, cfg) is { } impede)
-            {
-                Registro.Escrever("aovivo", $"prévia não ligou: {impede}");
-                return;
-            }
 
-            // **Uma das duas, nunca as duas.** Com o bloco do MOSS junto a
-            // legenda cai de 2,46x para 0,45x na 2060 — abaixo do tempo real.
-            // O OQueImpede da legenda recusa, e aqui a ordem torna a recusa
-            // desnecessária: a legenda tem precedência quando ligada.
-            if (cfg.LegendaAoVivo
-                && LegendaAoVivo.OQueImpede(motores, cfg) is null)
+            // **A legenda primeiro, e com guarda própria.** Ela ficou uma semana
+            // sem ligar porque o `if (!cfg.TranscricaoAoVivo) return;` — que é
+            // do caminho dos blocos — vinha antes dela: com a prévia em blocos
+            // desligada, o método saía na segunda linha e a legenda nunca era
+            // tentada. Cada modo tem a sua condição, e nenhuma delas fala pelo
+            // outro.
+            if (cfg.LegendaAoVivo)
             {
+                if (LegendaAoVivo.OQueImpede(motores, cfg) is { } porque)
+                {
+                    Registro.Escrever("legenda", $"legenda não ligou: {porque}");
+                    return;
+                }
+
                 _legenda = new LegendaAoVivo(pasta, motores, Motores.Ambiente(),
                                              EmpurrarLegenda);
                 _legenda.Comecar();
+                return;
+            }
+
+            if (!cfg.TranscricaoAoVivo) return;
+
+            if (SessaoAoVivo.OQueImpede(motores, cfg) is { } impede)
+            {
+                Registro.Escrever("aovivo", $"prévia não ligou: {impede}");
                 return;
             }
 

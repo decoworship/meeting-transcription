@@ -167,4 +167,147 @@ public sealed class LegendaAoVivoTests
         }
         finally { Directory.Delete(pasta, true); }
     }
+
+    /// <summary>
+    /// Com a legenda ligada e o bloco desligado, **nada impede a legenda**.
+    /// </summary>
+    /// <remarks>
+    /// <b>Este é o caso que ficou uma semana quebrado, e a suíte não pegava.</b>
+    /// Os testes cobriam as peças — a chave, o impedimento, o caminho do motor —
+    /// e nenhum descrevia a combinação que o usuário de fato usa: legenda ligada,
+    /// blocos desligados.
+    /// <para>
+    /// O defeito não estava aqui, estava na ordem das guardas do
+    /// <c>Ponte.ComecarAPrevia</c>: o <c>if (!cfg.TranscricaoAoVivo) return;</c>,
+    /// que é do caminho dos blocos, vinha antes da legenda e fazia o método sair
+    /// na segunda linha. Este teste crava a **configuração** que tem de
+    /// funcionar; a ordem das guardas é o que a faz valer.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void LegendaLigadaEBlocoDesligadoNaoTemImpedimentoDeConfiguracao()
+    {
+        var cfg = new ConfiguracoesDoApp { LegendaAoVivo = true, TranscricaoAoVivo = false };
+
+        string? impede = LegendaAoVivo.OQueImpede(SemMotores(), cfg);
+
+        // O que sobra é a queixa da instalação — estes caminhos não existem.
+        // O que NÃO pode aparecer é queixa de chave ou de placa: nesta
+        // combinação, a configuração está certa.
+        Assert.DoesNotContain("desligada", impede ?? "");
+        Assert.DoesNotContain("não cabem juntas", impede ?? "");
+    }
+
+    /// <summary>
+    /// A prévia em blocos desligada **não** é motivo para a legenda não rodar.
+    /// </summary>
+    [Fact]
+    public void OImpedimentoDaLegendaNaoFalaDaPreviaEmBlocos()
+    {
+        var ligada = new ConfiguracoesDoApp { LegendaAoVivo = true, TranscricaoAoVivo = false };
+        var comAsDuas = new ConfiguracoesDoApp { LegendaAoVivo = true, TranscricaoAoVivo = true };
+
+        // Só a combinação impossível reclama da placa.
+        Assert.Contains("não cabem juntas",
+                        LegendaAoVivo.OQueImpede(SemMotores(), comAsDuas)!);
+        Assert.DoesNotContain("não cabem juntas",
+                              LegendaAoVivo.OQueImpede(SemMotores(), ligada) ?? "");
+    }
+
+    /// <summary>
+    /// Arquivo que ainda não existe é "espere", nunca "acabou".
+    /// </summary>
+    /// <remarks>
+    /// <b>O defeito que este teste crava custou quatro RCs.</b> A legenda começa
+    /// no mesmo instante que a gravação, e o <c>CrashSafeWavWriter</c> ainda não
+    /// criou o WAV: o laço lia a ausência como fim e encerrava com <b>0 quadros
+    /// no mesmo segundo</b> em que o modelo terminava de carregar na GPU. A
+    /// prévia em blocos nunca sofreu disso porque espera três minutos antes de
+    /// ler pela primeira vez.
+    /// </remarks>
+    [Fact]
+    public void SemArquivoAindaSeEspera()
+    {
+        // O caso do defeito: gravação recém-começada, WAV ainda não criado.
+        Assert.True(LegendaAoVivo.PrecisaEsperar(existe: false, segundosEmDisco: 0, ate: 0.2));
+
+        // Existe, mas ainda não tem áudio suficiente para o quadro pedido.
+        Assert.True(LegendaAoVivo.PrecisaEsperar(true, segundosEmDisco: 0.3, ate: 0.2));
+
+        // Tem o quadro e a folga: pode ler.
+        Assert.False(LegendaAoVivo.PrecisaEsperar(
+            true, segundosEmDisco: 0.2 + LegendaAoVivo.FolgaS + 0.01, ate: 0.2));
+    }
+
+    /// <summary>A folga entra na conta, e não é enfeite.</summary>
+    /// <remarks>
+    /// Ler antes de o gravador ter escrito o quadro inteiro devolveria áudio
+    /// curto, e o motor transcreveria menos do que foi dito.
+    /// </remarks>
+    [Fact]
+    public void AFolgaEExigidaAlemDoQuadro()
+    {
+        // Exatamente o quadro, sem a folga: ainda espera.
+        Assert.True(LegendaAoVivo.PrecisaEsperar(true, segundosEmDisco: 0.2, ate: 0.2));
+    }
+
+    /// <summary>
+    /// O WAV cujo header ainda diz zero é lido pelos bytes que existem.
+    /// </summary>
+    /// <remarks>
+    /// <b>Este é o defeito que deixou a legenda cinco RCs sem funcionar.</b> O
+    /// <c>CrashSafeWavWriter</c> escreve as amostras continuamente e só reescreve
+    /// o header a cada 10 s. O <c>LerJanela</c> respeita o tamanho declarado — o
+    /// que é correto para recuperar gravação interrompida — e devolvia
+    /// <b>vazio nos primeiros 10 segundos</b>; o laço lia isso como fim e
+    /// encerrava com 0 quadros.
+    /// <para>
+    /// Mesmo depois dos 10 s o problema continuaria: a leitura viria em degraus
+    /// de 10 s, e uma legenda de 0,11 s de atraso viraria uma de 10 s.
+    /// </para>
+    /// <para>
+    /// O teste monta exatamente esse arquivo: header declarando <b>zero</b>
+    /// amostras, com dois segundos de áudio depois dele.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void WavComHeaderAtrasadoELidoPelosBytesQueExistem()
+    {
+        string caminho = Path.Combine(Path.GetTempPath(),
+                                      Path.GetRandomFileName() + ".wav");
+        try
+        {
+            EscreverWavComHeaderMentindo(caminho, segundos: 2);
+
+            // A leitura de sempre respeita o header: não vê nada.
+            Assert.Empty(Faixas.LerJanela(caminho, 0, 0.2));
+
+            // A leitura viva vê os bytes — e é o que a legenda usa.
+            var vivo = Faixas.LerJanelaViva(caminho, 0, 0.2);
+            Assert.Equal((int)(0.2 * Faixas.TaxaDeAmostragem), vivo.Length);
+        }
+        finally { File.Delete(caminho); }
+    }
+
+    /// <summary>Um WAV com header declarando 0 e amostras de verdade depois.</summary>
+    private static void EscreverWavComHeaderMentindo(string caminho, int segundos)
+    {
+        int amostras = segundos * Faixas.TaxaDeAmostragem;
+        using var f = new FileStream(caminho, FileMode.Create);
+        using var w = new BinaryWriter(f);
+        w.Write("RIFF".ToCharArray());
+        w.Write(36);                       // tamanho mentindo, como na gravação
+        w.Write("WAVE".ToCharArray());
+        w.Write("fmt ".ToCharArray());
+        w.Write(16);
+        w.Write((short)1);
+        w.Write((short)1);
+        w.Write(Faixas.TaxaDeAmostragem);
+        w.Write(Faixas.TaxaDeAmostragem * 2);
+        w.Write((short)2);
+        w.Write((short)16);
+        w.Write("data".ToCharArray());
+        w.Write(0);                        // **zero**: o header ainda não sabe
+        for (int i = 0; i < amostras; i++) w.Write((short)(i % 1000));
+    }
 }
