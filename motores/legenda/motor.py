@@ -66,6 +66,22 @@ REPO_GGUF = "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf"
 #: tela saber que o motor está vivo durante um silêncio longo, sem inundá-la.
 SINAL_DE_VIDA = 25
 
+#: Quantos segundos de áudio sem **nada** firmar antes de considerar o fluxo
+#: travado e recomeçá-lo.
+#:
+#: **O número tem origem e o defeito que ele cura é medido.** Em 15/09/2026 uma
+#: reunião de 46 minutos saiu inteira em cinza: o ``stable_prefix`` não
+#: confirmou na partida e **nunca mais confirmou** — 22 minutos reproduzidos com
+#: zero commits e o prefixo tentativo crescendo até 14.408 caracteres
+#: (``tools/reproduzir_legenda.py``). Fluxos novos sobre o **mesmo áudio**, em
+#: outros minutos, firmam em 2,2 a 12,4 s. Ou seja: **é falha de partida, e ela
+#: é permanente** — quem não firma cedo não firma mais.
+#:
+#: 45 s é ~4x o pior tempo de partida sadio observado. Alto de propósito: o
+#: recomeço é **sem perda** (o ``finalize()`` devolve tudo antes), mas custa o
+#: contexto do modelo, e reiniciar um fluxo sadio pioraria a transcrição.
+SEGUNDOS_SEM_FIRMAR = 45
+
 
 def _enviar(**campos) -> None:
     _protocolo.write(json.dumps(campos, ensure_ascii=False) + "\n")
@@ -88,6 +104,15 @@ class Legendador:
     def __init__(self) -> None:
         self._modelo = None
         self._sessao = None
+        self._opcoes: dict = {}
+        #: O firme dos fluxos já fechados. O fluxo corrente conta a partir do
+        #: zero, e quem soma é o :meth:`firme` — o núcleo espera um prefixo que
+        #: **só cresce**, e um recomeço quebraria essa promessa sem isto.
+        self._firme_de_antes = ""
+        self._sem_firmar = 0          # amostras desde o último commit
+        self._ms_de_antes = 0         # áudio dos fluxos fechados, em ms
+        self._ms_do_fluxo = 0
+        self.recomecos = 0
         self.dispositivo = "?"
         self.motivo: str | None = None
 
@@ -134,24 +159,73 @@ class Legendador:
         kw = {"commit_policy": "stable_prefix", "timestamps": "none"}
         if idioma:
             kw["language"] = idioma
+        self._opcoes = kw
         self._sessao = self._modelo.session().stream(**kw)
+        self._firme_de_antes = ""
+        self._sem_firmar = 0
+        self._ms_de_antes = self._ms_do_fluxo = 0
+        self.recomecos = 0
         _enviar(id=id_req, tipo="progresso", pct=1.0, texto="pronto",
                 dispositivo=self.dispositivo, motivo=self.motivo)
 
     def alimentar(self, pcm) -> object:
-        return self._sessao.feed(pcm)
+        u = self._sessao.feed(pcm)
+        self._ms_do_fluxo += int(len(pcm) * 1000 / 16000)
+        if getattr(u, "committed_changed", False):
+            self._sem_firmar = 0
+        else:
+            self._sem_firmar += len(pcm)
+        return u
+
+    def firme(self) -> str:
+        """O prefixo firme de sempre, atravessando os recomeços."""
+        return self._firme_de_antes + self._sessao.text().committed
+
+    def ate_ms(self, u) -> int:
+        """Onde o firme chegou, em ms **desde o começo da reunião**."""
+        return self._ms_de_antes + int(getattr(u, "audio_committed_ms", 0))
+
+    def travou(self) -> bool:
+        return self._sem_firmar >= SEGUNDOS_SEM_FIRMAR * 16000
+
+    def destravar(self) -> None:
+        """Fecha o fluxo travado guardando o que ele tinha, e recomeça limpo.
+
+        **Sem perda de texto.** O ``finalize()`` solta o prefixo tentativo
+        inteiro como firme — foi assim que os 14.428 caracteres da reunião de
+        15/09/2026 apareceram. O que se perde é o **contexto** do modelo, e é por
+        isso que o gatilho é alto.
+        """
+        try:
+            self._sessao.finalize()
+            self._firme_de_antes += self._sessao.text().committed
+        except Exception as e:
+            _log(f"o finalize do recomeço falhou: {e!r}")
+        try:
+            self._sessao.reset()
+        except Exception:
+            pass
+
+        self._sessao = self._modelo.session().stream(**self._opcoes)
+        self._ms_de_antes += self._ms_do_fluxo
+        self._ms_do_fluxo = 0
+        self._sem_firmar = 0
+        self.recomecos += 1
+        _log(f"fluxo travado: {SEGUNDOS_SEM_FIRMAR}s sem firmar, recomeçado "
+             f"(recomeço #{self.recomecos}, {len(self._firme_de_antes)} chars salvos)")
 
     def encerrar(self):
         if self._sessao is None:
             return ""
         final = self._sessao.finalize()          # noqa: F841 — fecha o prefixo
         texto = self._sessao.text()
+        tudo = self._firme_de_antes + texto.committed
         try:
             self._sessao.reset()
         except Exception:
             pass
         self._sessao = None
-        return texto.committed
+        return tudo
 
 
 def _pcm_de(b64: str):
@@ -196,6 +270,16 @@ def main() -> int:
                 amostras += len(pcm)
                 quadros += 1
                 u = L.alimentar(pcm)
+
+                # **O fluxo que não firma nunca mais firma sozinho.** Ver o
+                # SEGUNDOS_SEM_FIRMAR: recomeçar é o único jeito de sair, e
+                # perder o texto não é uma opção — daí o finalize antes.
+                if L.travou():
+                    L.destravar()
+                    _enviar(id=aberto, tipo="progresso", firme=L.firme(),
+                            tentativo="", ate_ms=L.ate_ms(u), recomecou=True)
+                    continue
+
                 # **Só quando muda, mais um sinal de vida.** Mandar a cada quadro
                 # seria cinco mensagens por segundo para a tela redesenhar; não
                 # mandar nunca faria um silêncio longo parecer travamento.
@@ -204,14 +288,15 @@ def main() -> int:
                         or quadros % SINAL_DE_VIDA == 0):
                     txt = L._sessao.text()
                     _enviar(id=aberto, tipo="progresso",
-                            firme=txt.committed, tentativo=txt.tentative,
-                            ate_ms=int(getattr(u, "audio_committed_ms", 0)))
+                            firme=L.firme(), tentativo=txt.tentative,
+                            ate_ms=L.ate_ms(u))
 
             elif op == "encerrar":
                 texto = L.encerrar()
                 d = time.perf_counter() - t0
                 _log(f"legenda encerrada: {quadros} quadros, "
-                     f"{amostras/16000:.0f}s de áudio em {d:.0f}s")
+                     f"{amostras/16000:.0f}s de áudio em {d:.0f}s, "
+                     f"{L.recomecos} recomeço(s)")
                 _enviar(id=id_req, tipo="resultado", texto=texto,
                         duracao=amostras / 16000.0, dispositivo=L.dispositivo)
                 aberto = None

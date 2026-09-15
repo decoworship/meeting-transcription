@@ -1282,9 +1282,23 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// <summary>Descarta a prévia. Nunca lança, pela mesma razão.</summary>
     private void EncerrarAPrevia()
     {
-        try { _legenda?.Dispose(); }
-        catch (ObjectDisposedException) { }
-        _legenda = null;
+        // **Fecha com graça, e em segundo plano.** O `finalize()` do motor é
+        // quem devolve o texto quando nada firmou durante a reunião, e esperá-lo
+        // aqui seguraria quem acabou de parar a gravação. O arquivo cai na pasta
+        // um instante depois, que é cedo o bastante: ninguém lê a legenda
+        // gravada antes de a tela de transcrever abrir.
+        if (_legenda is { } legenda)
+        {
+            _legenda = null;
+            _ = Task.Run(async () =>
+            {
+                try { await legenda.EncerrarAsync(TimeSpan.FromSeconds(30)); }
+                catch (Exception e)
+                {
+                    Registro.Escrever("legenda", $"encerramento: {e.Message}");
+                }
+            });
+        }
 
         try { _aoVivo?.Dispose(); }
         catch (Exception) { /* a gravação não pode parar por causa da prévia */ }

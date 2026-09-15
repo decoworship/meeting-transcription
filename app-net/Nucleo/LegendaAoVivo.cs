@@ -106,6 +106,23 @@ public sealed class LegendaAoVivo : IDisposable
     private readonly Action<PedacoDaLegenda> _aoPedaco;
     private readonly string? _idioma;
     private readonly CancellationTokenSource _cancelar = new();
+
+    /// <summary>
+    /// A parada <b>suave</b>: encerra a leitura sem matar o motor.
+    /// </summary>
+    /// <remarks>
+    /// <b>Por que são dois.</b> Cancelar o <see cref="_cancelar"/> mata o
+    /// processo do sidecar (<c>MotorSidecar.LegendarAsync</c> registra o
+    /// <c>Matar</c> no token), e matar o processo pula o <c>finalize()</c> — que
+    /// é justamente quem devolve o texto quando nada firmou durante a reunião.
+    /// Em 15/09/2026 isso custou 46 minutos de fala: o motor tinha 14.428
+    /// caracteres guardados no prefixo tentativo e o app o matou antes de pedir.
+    /// <para>
+    /// O suave fecha o canal, o canal manda <c>encerrar</c>, o motor finaliza e
+    /// devolve. O duro continua existindo como último recurso, com prazo.
+    /// </para>
+    /// </remarks>
+    private readonly CancellationTokenSource _parar = new();
     private Task? _laco;
 
     public LegendaAoVivo(string pastaDaGravacao, Motores motores,
@@ -168,9 +185,34 @@ public sealed class LegendaAoVivo : IDisposable
     /// <summary>Começa a legendar. Devolve na hora.</summary>
     public void Comecar() => _laco ??= Task.Run(() => LacoAsync(_cancelar.Token));
 
+    /// <summary>
+    /// Para de ler, espera o motor devolver o texto, e só então desiste.
+    /// </summary>
+    /// <remarks>
+    /// <b>Devolve rápido no caso sadio</b> — o motor já mandou tudo pelos
+    /// parciais e o <c>encerrar</c> só confirma. A espera existe para o caso
+    /// doente, que é onde está o texto que ninguém viu.
+    /// </remarks>
+    public async Task EncerrarAsync(TimeSpan espera)
+    {
+        try { _parar.Cancel(); } catch (ObjectDisposedException) { }
+
+        if (_laco is { } laco)
+        {
+            var venceu = await Task.WhenAny(laco, Task.Delay(espera));
+            if (venceu != laco)
+                Registro.Escrever("legenda",
+                    $"o motor não devolveu o texto em {espera.TotalSeconds:F0}s — desistindo.");
+        }
+
+        Dispose();
+    }
+
     public void Dispose()
     {
+        try { _parar.Cancel(); } catch (ObjectDisposedException) { }
         try { _cancelar.Cancel(); } catch (ObjectDisposedException) { }
+        _parar.Dispose();
         _cancelar.Dispose();
     }
 
@@ -192,12 +234,19 @@ public sealed class LegendaAoVivo : IDisposable
                 $"legenda ligada em {Path.GetFileName(_pasta)} — "
                 + $"quadros de {QuadroS * 1000:F0} ms");
 
-            var lendo = Task.Run(() => LerAsync(canal.Writer, mic, sistema, ct), ct);
+            // **A leitura para no suave; o motor, só no duro.** É o que dá ao
+            // `encerrar` a chance de rodar o `finalize()` antes de o processo
+            // morrer.
+            using var suave = CancellationTokenSource.CreateLinkedTokenSource(
+                ct, _parar.Token);
+            var lendo = Task.Run(
+                () => LerAsync(canal.Writer, mic, sistema, suave.Token), suave.Token);
 
             string firme = await motor.LegendarAsync(
                 canal.Reader, p => Entregar(p, mic, sistema), _idioma, ct);
 
             Firme = firme;
+            SalvarOFinal(firme);
             await lendo;
         }
         catch (OperationCanceledException)
@@ -359,6 +408,33 @@ public sealed class LegendaAoVivo : IDisposable
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// O texto que só apareceu no <c>finalize()</c>, quando nada firmou antes.
+    /// </summary>
+    /// <remarks>
+    /// <b>Só quando não há turno nenhum</b>, e a restrição é deliberada. O caso
+    /// que isto atende é o da sessão que nunca confirma: o prefixo tentativo
+    /// cresce por 46 minutos, o <c>Entregar</c> nunca cria turno, e o texto
+    /// inteiro só existe depois do <c>finalize()</c>. Se houver **algum** turno,
+    /// o caminho incremental funcionou, e emendar o acumulado por cima
+    /// arriscaria duplicar texto — o que é pior que não emendar.
+    /// <para>
+    /// <b>Sai sem dono.</b> O texto veio de uma vez, sem um ponto no tempo onde
+    /// medir o RMS das duas faixas; afirmar que é seu sem saber é o erro que a
+    /// <see cref="Entregar"/> evita pelo mesmo motivo.
+    /// </para>
+    /// </remarks>
+    private void SalvarOFinal(string firme)
+    {
+        if (_turnos.Count > 0 || firme.Trim().Length == 0) return;
+
+        _turnos.Add(new TurnoDaLegenda { Dono = false, Texto = firme.TrimStart() });
+        Gravar();
+        Registro.Escrever("legenda",
+            $"nada firmou durante a reunião — {firme.Length} caracteres salvos "
+            + "pelo finalize().");
     }
 
     /// <summary>O que a legenda deixou numa gravação, ou <c>null</c>.</summary>

@@ -420,6 +420,73 @@ dizendo em português que a legenda é rascunho que se reescreve.
 
 ---
 
+### R6 · O fluxo que não firma — achado em uso real, 15/09/2026
+
+**O sintoma.** Uma reunião de 46 minutos saiu **inteira em cinza**: texto na tela
+o tempo todo, nada confirmado, e **nenhum `legenda.json` escrito**. O dono do
+produto perguntou se era por não ter falado. Não era.
+
+**O que a reprodução mostrou.** O `tools/reproduzir_legenda.py` toca o áudio
+gravado pelo mesmo modelo, o mais rápido que a placa aguentar — o que se mede
+aqui é a **decisão do modelo**, não o percurso, então o relógio não importa.
+Vinte e dois minutos contínuos daquela reunião:
+
+```
+ áudio  quadro   firme   tent.
+   30s     150       0      87
+  300s    1500       0    2583
+ 1320s    6600       0   14408    ← 22 min, zero commits
+```
+
+E então o `finalize()` soltou **14.428 caracteres de uma vez**. O texto existia
+o tempo todo, preso no prefixo tentativo.
+
+**É falha de partida, e ela é permanente.** Fluxos novos sobre o **mesmo áudio**,
+começando em outros minutos, firmam normalmente — ou não firmam nunca:
+
+```
+gravação            janelas sadias                     janelas travadas
+14-58-08 (2 min)    1,2 · 1,2 · 2,2 · 3,4 · 3,4 · 4,6s       1 de 7
+14-01-30 (2 min)    1,2 · 2,2s                               4 de 6
+15-59-41 (2 min)    5,6 · 12,4s                              4 de 6
+```
+
+**Uma em três janelas não arranca**, e quem não arranca nos primeiros segundos
+não arranca mais. Foi sorte, não desenho, que as duas reuniões anteriores
+tivessem funcionado: as duas arrancaram no minuto 0.
+
+**Quatro explicações plausíveis foram medidas e descartadas** — vale registrar,
+porque cada uma parecia a resposta:
+
+| suspeito | por que caiu |
+|---|---|
+| o microfone mudo do dono | o minuto 20 da mesma reunião, igualmente mudo, firma em 6,8 s |
+| falta de pausas na fala | 23,5% de quadros quietos na que funcionou, 25,5% na que falhou |
+| a normalização por janela do `Mix` | **0 de 8.000** quadros dispararam nessa reunião |
+| a placa, ou o encanamento do app | reproduz fora do app, em ferramenta separada |
+
+**Os dois consertos, independentes:**
+
+**1. O texto nunca mais se perde.** O `MotorSidecar.LegendarAsync` registra um
+`Matar` no token de cancelamento — então parar a gravação **matava o sidecar
+antes do `encerrar`**, e o `finalize()` nunca rodava. Agora a
+`LegendaAoVivo` tem **duas paradas**: a suave fecha o canal e deixa o motor
+finalizar e devolver; a dura continua existindo, com prazo de 30 s. E se nenhum
+turno existir ao fim, o texto do `finalize()` vira o `legenda.json`. Só nesse
+caso — havendo turno, o caminho incremental funcionou, e emendar por cima
+arriscaria duplicar.
+
+**2. O fluxo travado recomeça.** O motor conta o áudio desde o último commit; aos
+**45 s sem firmar** ele chama `finalize()`, guarda o texto, e abre fluxo novo. O
+firme acumulado atravessa os recomeços, porque o núcleo espera um prefixo que só
+cresce. **45 s é ~3,6× o pior arranque sadio medido** (12,4 s), e é alto de
+propósito: o recomeço não perde texto, mas perde o **contexto** do modelo.
+
+**Verificado no áudio que falhou**, pelo sidecar de verdade: 2 recomeços, e
+**6.004 caracteres firmes durante** os 10 minutos, contra 0 antes.
+
+---
+
 ## 5. As saídas, se o caminho principal travar
 
 Nenhuma delas é hipotética: as quatro saem de número já medido.
