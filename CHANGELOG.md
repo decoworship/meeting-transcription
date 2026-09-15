@@ -3,6 +3,59 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc13 — 15/09/2026
+
+**A legenda ao vivo escreve.** Ela congelava no terceiro pedaço de áudio por uma
+diferença de uma amostra — pedia um pedaço de tamanho exato, recebia um a menos,
+e ficava pedindo o mesmo para sempre. Agora ela acompanha a fala do começo ao
+fim da reunião.
+
+**O texto leva cerca de 15 segundos para começar a firmar.** O modelo só confirma
+uma palavra quando tem certeza, e essa certeza vem de ouvir o que veio depois.
+Antes disso aparece o texto em cinza, que ainda pode mudar.
+
+## 0.7.0-rc12 — 14/09/2026
+
+**A legenda ao vivo funciona.** Ela lia o arquivo de áudio do jeito certo para
+uma gravação já encerrada — esperando o cabeçalho dizer quanto áudio existe —, e
+esse cabeçalho só é atualizado a cada dez segundos. Resultado: ela via um arquivo
+vazio, concluía que a reunião tinha acabado, e encerrava sem escrever nada.
+Agora ela lê o áudio que está em disco.
+
+## 0.7.0-rc11 — 14/09/2026
+
+**A legenda desistia antes de começar.** Ela sobe junto com a gravação, e o
+arquivo de áudio ainda não existe nesse instante — a legenda lia isso como "a
+reunião acabou" e encerrava com zero texto, no mesmo segundo em que o modelo
+terminava de carregar. Agora ela espera o áudio chegar.
+
+## 0.7.0-rc10 — 14/09/2026
+
+**A legenda ao vivo não ligava nunca.** Com a prévia em blocos desligada — que é
+exatamente a configuração que a legenda precisa —, o app desistia antes de
+tentar. Ela agora tem caminho próprio, e nada dela depende da outra.
+
+## 0.7.0-rc9 — 14/09/2026
+
+**O painel dizia "em blocos de 3 minutos" mesmo quando a legenda era o que
+estava ligado.** Agora ele diz o que está de fato rodando — e, quando nada está
+ligado, diz isso em vez de prometer um texto que não vem.
+
+## 0.7.0-rc8 — 14/09/2026
+
+**A legenda ao vivo não ligava se a prévia em blocos estivesse ligada.** A tela
+dizia que ligar uma desligava a outra, e não desligava — as duas ficavam
+ativas, o bloco ganhava, e a legenda não acontecia sem nada explicar. Agora as
+chaves se excluem de verdade, e quando alguma coisa impede a legenda o motivo
+vai para o registro.
+
+## 0.7.0-rc7 — 12/09/2026
+
+**Baixar o modelo da legenda funcionava e não servia para nada.** O download ia
+até o fim, demorava os 750 MB, e o botão "Baixar" voltava como se nada tivesse
+acontecido — o arquivo era escrito no caminho da pasta em vez de dentro dela.
+Quem já baixou não precisa baixar de novo.
+
 ## 0.7.0-rc6 — 12/09/2026
 
 **A legenda fica para ler depois.** Encerrada a reunião, o que ela ouviu aparece

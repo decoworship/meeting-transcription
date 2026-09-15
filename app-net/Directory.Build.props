@@ -20,7 +20,7 @@
       - o CHANGELOG.md, escrito à mão, que tem que casar com ela.
   -->
   <PropertyGroup>
-    <Version>0.7.0-rc6</Version>
+    <Version>0.7.0-rc13</Version>
   </PropertyGroup>
 
 </Project>
