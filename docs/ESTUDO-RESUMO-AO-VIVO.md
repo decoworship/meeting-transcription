@@ -194,6 +194,10 @@ Lido dos cabeçalhos GGUF, não de ficha técnica:
 
 ## 6. O que eu faria
 
+> **Aplicado em 16/09/2026, e a §8 acrescentou uma ressalva ao Ministral.** A
+> produção saiu sem esquema **e sem instrução de sistema**, por decisão do dono
+> do produto. Leia a §8 antes de agir por esta seção.
+
 **Primeiro, tirar o esquema do caminho do resumo — a decisão vem antes da do
 modelo.** Ele custa quatro dos seis modelos e não protege contra nada que
 `enable_thinking: false` já não proteja. A ata continua com esquema: lá a
@@ -201,7 +205,8 @@ estrutura *é* o produto, e o `VerificadorDeAta` depende dela.
 
 **Depois, e só depois, o modelo.** Com o esquema fora:
 
-- **promover o `ministral-3-3b` a candidato do resumo.** Mesma honestidade dos
+- **promover o `ministral-3-3b` a candidato do resumo** — *com a ressalva da §8:
+  sem instrução, ele inventa mensagem entre aspas.* Mesma honestidade dos
   4B, **540 MiB de VRAM a menos** que o titular, 2,00 GB em disco, e 262K de
   contexto. Foi o único que leu *"abriram o chat"* onde o áudio dizia
   "objetivo" — sinal de que leu pelo sentido, que é o que a instrução pede;
@@ -229,6 +234,113 @@ estrutura *é* o produto, e o `VerificadorDeAta` depende dela.
   diferença entre o Ministral e o titular deixam de ser detalhe;
 - **o custo de rodar isto durante a reunião.** Todas as medições foram com a placa
   livre de legenda. O terceiro contexto CUDA continua sendo o risco conhecido.
+
+---
+
+## 8. E sem instrução nenhuma? — a rodada que decidiu a produção
+
+Feita depois, quando o dono do produto corrigiu o enquadramento: **"para esse
+ponto não vamos ter prompt nem esquema, por enquanto é livre para perguntar
+sobre a reunião"**. Então a pergunta certa não era qual modelo segue melhor uma
+instrução de cinco seções — era **o que cada um faz quando não recebe nenhuma.**
+
+Mesma transcrição, mesma placa, sem `system`, sem esquema, uma pergunta livre:
+*"O que já foi discutido nesta reunião até agora?"*
+
+| modelo | resposta | saída | terminou? | cabeçalhos | bullets | negritos |
+|---|---:|---:|---|---:|---:|---:|
+| `qwen3-1.7b` | 9,4 s | 1.024 tk | **cortado** | 10 | 45 | 63 |
+| `ministral-3-3b` | 15,2 s | 1.024 tk | **cortado** | 3 | 40 | 53 |
+| `qwen3-4b-instruct` | 21,9 s | 1.024 tk | **cortado** | 9 | 42 | 37 |
+| `qwen3.5-4b` | 19,0 s | 942 tk | sim | 5 | 20 | 26 |
+| `gemma-4-e4b` | 19,6 s | 778 tk | sim | 0 | 18 | 20 |
+| `smollm3-3b` | 9,3 s | 631 tk | sim | 0 | 0 | 8 |
+
+**Cinco comportamentos, e cada um pede uma linha de instrução:**
+
+**1. Metade é cortada no meio da frase.** Três dos seis batem nos 1.024 tokens
+com `finish_reason: length`. Sem instrução, "o que já foi discutido" vira
+especificação de projeto: 3,5 a 3,8 KB contra os 1,2 a 2,2 KB que a instrução de
+cinco seções produzia. **Ou o teto sobe, ou a instrução limita** — e limitar é
+melhor, porque quem pergunta no meio de uma reunião lê de relance.
+
+**2. A forma varia de prosa corrida a documento de dez cabeçalhos.** O
+`smollm3-3b` responde em texto puro, sem um bullet; o `qwen3-1.7b` monta dez
+seções com numeração e negrito. **Nenhum dos dois foi pedido.** Se a forma
+importa, ela tem que ser dita; se não for dita, ela é sorteada por modelo.
+
+**3. O `ministral-3-3b` inventa mensagem entre aspas — e foi ele que a §6
+recomendou.** Quatro trechos que ninguém falou, apresentados como exemplo:
+
+> - **Educação do cliente**: Ajuda a otimizar o uso do Wi-Fi
+>   (ex.: *"Você está muito longe do modem? Tente voltar para o 2.4 GHz"*).
+
+Está marcado com `ex.:`, então não é atribuição falsa — mas está entre aspas,
+dentro de um resumo do que foi discutido, e quem lê rápido leva aquilo como fala.
+**A instrução precisa proibir exemplo ilustrativo**, e não só invenção de fato.
+Foi a régua de citações da ferramenta que pegou isto; lendo, eu tinha deixado
+passar.
+
+**4. Preâmbulo.** O `qwen3.5-4b` abre com *"Com base na transcrição da reunião,
+aqui está um resumo detalhado do que foi discutido até o momento:"* — uma linha
+inteira para dizer que vai responder.
+
+**5. O `qwen3-1.7b` afirma decisão de novo**, e agora sem instrução alguma que o
+provocasse: *"os participantes discutiram **e definiram** vários pontos"*. A
+reprovação da §4 não era efeito da instrução.
+
+### A instrução que estes cinco comportamentos pedem
+
+Não é para escrever agora — é o que a próxima rodada deve testar, uma de cada
+vez, com a ferramenta da §9:
+
+1. **um teto de tamanho**, dito em frases e não em tokens;
+2. **proibir exemplo ilustrativo**, inclusive marcado como "ex.:";
+3. **proibir preâmbulo** — começar pela resposta;
+4. **dizer a forma**, ou aceitar que ela varie por modelo;
+5. **separar o que foi dito do que foi decidido** — é onde o 1.7B cai sempre.
+
+### O que a produção passou a fazer
+
+**Sem `system` e sem esquema**, como pedido. O
+[Ponte.cs](../app-net/App/Ponte.cs) manda a transcrição e a pergunta, e nada
+mais; o `MotorDeAta.CorpoDoPedido` passou a aceitar os dois vazios e a omitir o
+campo em vez de mandá-lo em branco — mensagem de sistema vazia alguns templates
+Jinja renderizam como turno vazio, e outros recusam.
+
+**O que sobrou no prompt não é instrução, é entrega:** a moldura
+`=== TRANSCRIÇÃO ===` e, quando a reunião não coube, a linha que diz ao modelo
+que ele está vendo só o fim. A segunda é fato sobre o que ele recebeu — sem ela,
+ele afirma como a reunião começou olhando para o meio dela.
+
+---
+
+## 9. A ferramenta
+
+[`tools/comparar_modelos_de_pergunta.py`](../tools/comparar_modelos_de_pergunta.py),
+irmã do `comparar_modelos_de_ata.py`. **Prompt e esquema são opções**, e o padrão
+é sem os dois — que é o que menos assume.
+
+```bash
+tools/comparar_modelos_de_pergunta.py \
+    --gravacao 2026-09-15_14-01-30 --ate 1200 \
+    --pergunta "O que já foi discutido nesta reunião?" \
+    --modelo qwen3-4b-instruct-q4km.gguf --modelo ministral-3-3b-q4km.gguf
+```
+
+**As três réguas apontam onde olhar, e não dão veredito** — pergunta livre não
+tem gabarito, mas tem uma coisa falsificável: o que a resposta afirma e a
+transcrição não contém.
+
+| régua | o que pega |
+|---|---|
+| **termos de fora** | palavra em maiúscula que não está na transcrição nem na pergunta — é como se acha nome de pessoa inventado |
+| **números de fora** | número que dimensiona algo e ninguém disse. Reusa a régua do `comparar_modelos_de_ata.py`, que já aprendeu a ignorar conta em voz alta |
+| **citações de fora** | trecho entre aspas que ninguém falou — **foi esta que pegou o Ministral** |
+
+**A coluna de termos tem falso positivo por construção**, e ele é informativo:
+"Resumo", "Próximos", "Foco" aparecem porque o modelo inventou *estrutura*, não
+fato. Ler a lista leva dez segundos e diz as duas coisas.
 
 ---
 

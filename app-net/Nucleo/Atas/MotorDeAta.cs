@@ -458,23 +458,9 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         //
         // Modelo que não conhece a variável simplesmente a ignora no Jinja, e é
         // por isso que ela pode ir em todos sem um "se".
-        string corpo = $$"""
-        {
-          "messages": [
-            {"role": "system", "content": {{Texto(sistema)}}},
-            {"role": "user", "content": {{Texto(prompt)}}}
-          ],
-          "temperature": 0.3,
-          "max_tokens": {{tokensDeSaida}},
-          "chat_template_kwargs": {"enable_thinking": false},
-          "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": {{Texto(nomeDoEsquema)}}, "strict": true, "schema": {{esquema}}}
-          }
-        }
-        """;
-
-        var conteudo = new StringContent(corpo, Encoding.UTF8, "application/json");
+        var conteudo = new StringContent(
+            CorpoDoPedido(sistema, prompt, nomeDoEsquema, esquema, tokensDeSaida),
+            Encoding.UTF8, "application/json");
 
         var resposta = await http.PostAsync(
             $"http://127.0.0.1:{porta}/v1/chat/completions", conteudo, ct);
@@ -505,6 +491,71 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
 
         return escolha.GetProperty("message").GetProperty("content").GetString()
             ?? throw new InvalidOperationException("o motor de ata devolveu resposta vazia");
+    }
+
+    /// <summary>
+    /// O corpo do pedido ao <c>llama-server</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Montado como texto, e não por serialização de objeto anônimo:</b>
+    /// <c>JsonSerializer</c> por reflexão é erro de build sob
+    /// <c>PublishTrimmed</c> (IL2026) — compila, passa nos testes, e reprova só
+    /// na publicação. Mesma armadilha que o <c>reuniao.json</c> já tinha dado.
+    /// </para>
+    /// <para>
+    /// <b>O esquema é opcional desde 16/09/2026, e a razão é medida.</b> Para a
+    /// ata ele é o que a torna verificável. Para a <b>pergunta ao vivo</b>, que
+    /// não tem forma fixa, ele custou quatro dos seis modelos comparados: três
+    /// escreviam só a primeira seção de cinco e paravam sozinhos, e o
+    /// <c>gemma-4-e4b</c> queimou os 1.024 tokens de saída para produzir 190
+    /// caracteres — 0,19 caractere por token, com a gramática obrigando-o a
+    /// emitir quase byte a byte. Sem esquema, os seis respondem inteiro.
+    /// Ver <c>docs/ESTUDO-RESUMO-AO-VIVO.md</c> §2.
+    /// </para>
+    /// <para>
+    /// <b>O <c>system</c> também é opcional</b>, e vazio significa mensagem
+    /// nenhuma — não uma mensagem em branco, que alguns templates Jinja
+    /// renderizam como um turno vazio.
+    /// </para>
+    /// <para>
+    /// <b><c>enable_thinking: false</c></b> — medido em 17/08/2026. O Qwen3.5 4B
+    /// é modelo de raciocínio e, com o padrão do template, gastou os tokens de
+    /// saída inteiros pensando. É ele, e não o esquema, quem protege contra a
+    /// deliberação: nas doze rodadas do estudo de 16/09, todas com esta chave,
+    /// nenhum modelo deliberou. Modelo que não conhece a variável a ignora no
+    /// Jinja, e é por isso que ela pode ir em todos sem um "se".
+    /// </para>
+    /// <para>
+    /// Temperatura baixa, mas não zero: ata é registro, não criação. Zero deixa
+    /// o modelo repetitivo em listas longas.
+    /// </para>
+    /// </remarks>
+    public static string CorpoDoPedido(string sistema, string prompt,
+                                       string nomeDoEsquema, string esquema,
+                                       int tokensDeSaida)
+    {
+        string doUsuario = $$"""{"role": "user", "content": {{Texto(prompt)}}}""";
+        string mensagens = sistema is { Length: > 0 }
+            ? $$"""{"role": "system", "content": {{Texto(sistema)}}}, """ + doUsuario
+            : doUsuario;
+
+        string formato = esquema is { Length: > 0 }
+            ? ",\n  \"response_format\": {\"type\": \"json_schema\", \"json_schema\": "
+              + "{\"name\": " + Texto(nomeDoEsquema) + ", \"strict\": true, \"schema\": "
+              + esquema + "}}"
+            : "";
+
+        return $$"""
+        {
+          "messages": [
+            {{mensagens}}
+          ],
+          "temperature": 0.3,
+          "max_tokens": {{tokensDeSaida}},
+          "chat_template_kwargs": {"enable_thinking": false}{{formato}}
+        }
+        """;
     }
 
     /// <summary>

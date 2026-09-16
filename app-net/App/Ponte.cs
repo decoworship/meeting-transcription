@@ -1664,15 +1664,14 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         var cfg = ConfiguracoesDoApp.Carregar();
         var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
 
+        // **Sem sistema e sem esquema** — decisão do dono do produto em
+        // 16/09/2026, e o esquema tem medição por trás: ele custou quatro dos
+        // seis modelos comparados (docs/ESTUDO-RESUMO-AO-VIVO.md §2).
         var respostas = await motor.ResponderAsync(
-            PromptDeReuniao.Sistema, [prompt], "resposta", PerguntaDaReuniao.Esquema,
+            sistema: "", [prompt], nomeDoEsquema: "", esquema: "",
             PerguntaDaReuniao.TokensDeSaida, progresso: null, ct);
 
-        // JsonDocument e não JsonSerializer: reflexão é erro de build sob
-        // PublishTrimmed, e ela reprova só na publicação.
-        using var doc = JsonDocument.Parse(respostas[0]);
-        return doc.RootElement.TryGetProperty("resposta", out var r)
-               && r.GetString() is { Length: > 0 } texto
+        return respostas[0] is { Length: > 0 } texto
             ? texto
             : "o modelo devolveu uma resposta vazia.";
     }

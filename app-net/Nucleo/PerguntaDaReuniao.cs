@@ -1,3 +1,4 @@
+using System.Text;
 using MeetingApp.Nucleo.Atas;
 
 namespace MeetingApp.Nucleo;
@@ -51,20 +52,10 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     /// </remarks>
     public const int TokensDeSaida = 1024;
 
-    /// <summary>O esquema da resposta — um campo só, de texto corrido.</summary>
-    /// <remarks>
-    /// <b>Prosa, e não estrutura</b>, porque a pergunta é livre e a forma da
-    /// resposta depende dela. O esquema existe mesmo assim pelo motivo medido em
-    /// 25/08 (ver <c>MotorDeAta.ResponderAsync</c>): sem ele, um modelo de
-    /// raciocínio delibera até estourar o limite sem emitir nada.
-    /// </remarks>
-    public const string Esquema =
-        """{"type":"object","properties":{"resposta":{"type":"string"}},"required":["resposta"],"additionalProperties":false}""";
-
     /// <summary>Contexto a supor quando o GGUF não declara o dele.</summary>
     private const int ContextoQuandoNaoSeSabe = 16_384;
 
-    /// <summary>Folga para a instrução e a pergunta, em tokens.</summary>
+    /// <summary>Folga para a pergunta e a moldura, em tokens.</summary>
     private const int FolgaDaInstrucao = 512;
 
     /// <summary>
@@ -77,6 +68,10 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     /// **depois** de o modelo ter carregado. Uma pergunta que falhasse assim
     /// custaria nove segundos de espera para terminar em erro, numa reunião
     /// acontecendo.
+    /// <para>
+    /// A constante de 2,5 caracteres por token erra por ~1,5× para o lado
+    /// seguro: medido em 16/09/2026, o formato em turnos dá 3,3 a 3,8.
+    /// </para>
     /// </remarks>
     public static int LimiteDeCaracteres(MetadadosDoGguf modelo)
     {
@@ -114,9 +109,42 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
                 t.Text)),
             limiteDeCaracteres);
 
-    /// <summary>O prompt inteiro, pronto para o modelo.</summary>
-    public static string Montar(TextoDaReuniao texto, string pergunta) =>
-        PromptDeReuniao.Montar(texto.Texto, texto.Cortado, pergunta);
+    /// <summary>
+    /// O prompt inteiro: a transcrição, e a pergunta no fim.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Não há instrução aqui, e é decisão do dono do produto (16/09/2026):</b>
+    /// <i>"para esse ponto não vamos ter prompt nem esquema, por enquanto é livre
+    /// para perguntar sobre a reunião"</i>. Que instrução dar é o que a
+    /// <c>tools/comparar_modelos_de_pergunta.py</c> existe para descobrir.
+    /// </para>
+    /// <para>
+    /// <b>O que sobra não é instrução, é entrega:</b> a moldura que separa a
+    /// transcrição da pergunta, e o aviso de corte — que é fato sobre o que o
+    /// modelo está vendo, e sem ele ele afirma como a reunião começou olhando
+    /// para o meio dela.
+    /// </para>
+    /// <para>
+    /// <b>A pergunta vai por último</b>, depois da transcrição, porque o que fica
+    /// perto do fim do prompt é o que mais pesa na geração. É a mesma ordem do
+    /// <see cref="PromptDeAta"/>, e pela mesma razão.
+    /// </para>
+    /// </remarks>
+    public static string Montar(TextoDaReuniao texto, string pergunta)
+    {
+        var sb = new StringBuilder();
+        if (texto.Cortado)
+            sb.AppendLine(
+                "(Atenção: o que segue é apenas a parte final desta reunião — "
+                + "o começo não coube.)").AppendLine();
+        sb.AppendLine("=== TRANSCRIÇÃO DA REUNIÃO ATÉ AGORA ===");
+        sb.AppendLine(texto.Texto);
+        sb.AppendLine("=== FIM DA TRANSCRIÇÃO ===");
+        sb.AppendLine();
+        sb.Append(pergunta);
+        return sb.ToString();
+    }
 
     /// <summary>Pergunta, e devolve o que o modelo respondeu.</summary>
     /// <exception cref="InvalidOperationException">Já há uma pergunta em voo.</exception>
