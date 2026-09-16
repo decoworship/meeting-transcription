@@ -170,6 +170,17 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
             limiteDeCaracteres);
 
     /// <summary>
+    /// Qual instrução vale: a do botão, ou a da caixa livre.
+    /// </summary>
+    /// <remarks>
+    /// <b>Prender toda pergunta ao formato de lista faria "quem ficou de mandar
+    /// o material?" devolver uma lista de assuntos.</b> O botão tem forma; a
+    /// caixa livre tem só as regras. Ver <see cref="PromptDeReuniao"/>.
+    /// </remarks>
+    public static string Instrucao(bool resumo) =>
+        resumo ? PromptDeReuniao.Resumo : PromptDeReuniao.Livre;
+
+    /// <summary>
     /// O prompt inteiro: a transcrição, e a pergunta no fim.
     /// </summary>
     /// <remarks>

@@ -256,4 +256,145 @@ public sealed class PerguntaDaReuniaoTests
         Assert.NotNull(porque);
         Assert.Contains("Modelos", porque);
     }
+
+    // ────────────────────────── as duas instruções, e o motor quente
+
+    [Fact]
+    public void OBotaoPedeBulletsEACaixaLivreNao()
+    {
+        // **A distinção é o ponto.** Prender toda pergunta ao formato de bullets
+        // faria "quem ficou de mandar o material?" devolver uma lista de
+        // assuntos. O botão tem forma; a caixa livre tem só as regras.
+        Assert.Contains("item", PromptDeReuniao.Resumo, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("item", PromptDeReuniao.Livre, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AsDuasProibemInventar()
+    {
+        // É a única regra que não pode faltar em nenhum dos dois caminhos.
+        foreach (string instrucao in new[] { PromptDeReuniao.Resumo, PromptDeReuniao.Livre })
+            Assert.Contains("transcrição", instrucao);
+    }
+
+    [Fact]
+    public void OModoEscolheAInstrucao()
+    {
+        var texto = new TextoDaReuniao("Você: bom dia", Cortado: false);
+
+        Assert.Equal(PromptDeReuniao.Resumo, PerguntaDaReuniao.Instrucao(resumo: true));
+        Assert.Equal(PromptDeReuniao.Livre, PerguntaDaReuniao.Instrucao(resumo: false));
+        // A moldura da transcrição é a mesma nos dois: o que muda é a instrução.
+        Assert.Contains("Você: bom dia", PerguntaDaReuniao.Montar(texto, "e aí?"));
+    }
+}
+
+/// <summary>O motor que fica de pé entre perguntas, quando a chave permite.</summary>
+/// <remarks>
+/// A vida dele é testável sem placa porque a sessão é injetada: o que se prova
+/// aqui é <b>quando ele abre e quando ele morre</b>, que é onde mora o risco —
+/// um processo de 3,2 GB órfão na placa durante uma reunião.
+/// </remarks>
+public sealed class MotorQuenteTests
+{
+    private sealed class SessaoFalsa : ISessaoDoMotor
+    {
+        public int Perguntas;
+        public bool Fechada;
+        public Exception? Falha;
+
+        public Task<string> PerguntarAsync(string prompt, CancellationToken ct)
+        {
+            Perguntas++;
+            return Falha is null ? Task.FromResult("resposta") : Task.FromException<string>(Falha);
+        }
+
+        public void Dispose() => Fechada = true;
+    }
+
+    private static (MotorQuente, List<SessaoFalsa>) Montar(TimeSpan ocioso)
+    {
+        var abertas = new List<SessaoFalsa>();
+        var motor = new MotorQuente(_ =>
+        {
+            var s = new SessaoFalsa();
+            abertas.Add(s);
+            return Task.FromResult<ISessaoDoMotor>(s);
+        }, ocioso);
+        return (motor, abertas);
+    }
+
+    [Fact]
+    public async Task ASegundaPerguntaReusaOMotorJaDePe()
+    {
+        // É a razão de a chave existir: a primeira pergunta paga os ~20 s de
+        // carga, as seguintes só o tempo de gerar.
+        var (motor, abertas) = Montar(TimeSpan.FromMinutes(10));
+
+        await motor.PerguntarAsync("e aí?", default);
+        await motor.PerguntarAsync("e depois?", default);
+
+        Assert.Single(abertas);
+        Assert.Equal(2, abertas[0].Perguntas);
+    }
+
+    [Fact]
+    public async Task DepoisDoPrazoSemPerguntaEleMorre()
+    {
+        var (motor, abertas) = Montar(TimeSpan.FromMinutes(10));
+        await motor.PerguntarAsync("e aí?", default);
+
+        motor.FecharSeOcioso(motor.UltimoUso + TimeSpan.FromMinutes(11));
+
+        Assert.True(abertas[0].Fechada);
+        Assert.False(motor.Aberto);
+    }
+
+    [Fact]
+    public async Task AntesDoPrazoEleFica()
+    {
+        var (motor, abertas) = Montar(TimeSpan.FromMinutes(10));
+        await motor.PerguntarAsync("e aí?", default);
+
+        motor.FecharSeOcioso(motor.UltimoUso + TimeSpan.FromMinutes(9));
+
+        Assert.False(abertas[0].Fechada);
+        Assert.True(motor.Aberto);
+    }
+
+    [Fact]
+    public async Task FecharDevolveAPlacaNaHora()
+    {
+        // É o que a gravação chama ao parar, e o que a chave chama ao ser
+        // desligada. Sem isto o processo fica órfão até o app sair.
+        var (motor, abertas) = Montar(TimeSpan.FromMinutes(10));
+        await motor.PerguntarAsync("e aí?", default);
+
+        motor.Dispose();
+
+        Assert.True(abertas[0].Fechada);
+        Assert.False(motor.Aberto);
+    }
+
+    [Fact]
+    public async Task UmaPerguntaQueFalhaDerrubaASessao_EAProximaAbreOutra()
+    {
+        // O llama-server morre por VRAM mais do que gostaríamos. Reusar uma
+        // sessão morta devolveria erro em toda pergunta seguinte, para sempre.
+        var abertas = new List<SessaoFalsa>();
+        var motor = new MotorQuente(_ =>
+        {
+            var s = new SessaoFalsa();
+            if (abertas.Count == 0) s.Falha = new InvalidOperationException("sem placa");
+            abertas.Add(s);
+            return Task.FromResult<ISessaoDoMotor>(s);
+        }, TimeSpan.FromMinutes(10));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => motor.PerguntarAsync("e aí?", default));
+        Assert.True(abertas[0].Fechada);
+
+        Assert.Equal("resposta", await motor.PerguntarAsync("de novo?", default));
+        Assert.Equal(2, abertas.Count);
+    }
 }

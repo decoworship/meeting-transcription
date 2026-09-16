@@ -69,12 +69,22 @@ export function painelAoVivo() {
   // **A resposta fica acima do campo**, e não dentro da lista: a lista é o que
   // foi dito, e misturar nela o que um modelo deduziu apagaria a diferença
   // entre o que alguém falou e o que a máquina achou.
-  const resposta = document.createElement("div");
-  resposta.className = "aovivo__resposta";
-  resposta.hidden = true;
+  // **As respostas acumulam, a mais nova no topo.** Antes cada pergunta
+  // apagava a anterior, e perguntar o detalhe custava o que veio antes — visto
+  // em uso em 16/09/2026. O painel é superfície de relance: o que se acabou de
+  // pedir tem de estar em cima, sem rolar.
+  const respostas = document.createElement("div");
+  respostas.className = "aovivo__respostas";
 
   const perguntar = document.createElement("form");
   perguntar.className = "aovivo__perguntar";
+
+  // O botão do resumo, que é a primeira interação: ele manda a instrução de
+  // lista, e a caixa livre ao lado é por onde se pede o detalhe.
+  const resumir = document.createElement("button");
+  resumir.className = "aa-btn aa-btn-secundario aovivo__resumir";
+  resumir.type = "button";
+  resumir.textContent = "O que já rolou?";
 
   const campo = document.createElement("input");
   campo.className = "aa-entrada";
@@ -92,53 +102,64 @@ export function painelAoVivo() {
   // não se promete caixa nenhuma. Mostrá-la com a chave desligada faria a
   // pessoa escrever a pergunta para só então descobrir o impedimento.
   perguntar.hidden = true;
+  resumir.hidden = true;
 
-  raiz.append(topo, aviso, corpo, voltar, resposta, perguntar);
+  raiz.append(topo, aviso, corpo, voltar, resumir, respostas, perguntar);
 
-  perguntar.addEventListener("submit", async (ev) => {
+  resumir.addEventListener("click", () => enviarPergunta("O que já rolou?", true));
+
+  perguntar.addEventListener("submit", (ev) => {
     ev.preventDefault();
     const pergunta = campo.value.trim();
-    if (!pergunta || enviar.disabled) return;
+    if (pergunta) enviarPergunta(pergunta, false);
+  });
 
+  /**
+   * Manda a pergunta e devolve um bloco novo no topo.
+   *
+   * @param resumo quando `true`, vai a instrução de lista do botão; quando
+   *   `false`, a pergunta é livre e o núcleo só acrescenta as regras.
+   */
+  async function enviarPergunta(pergunta, resumo) {
+    if (enviar.disabled) return;
     enviar.disabled = true;
-    resposta.hidden = false;
-    resposta.dataset.estado = "esperando";
-    // A espera é dita de frente, com o motivo. Sem o motivo, dez segundos de
-    // silêncio parecem defeito — e o defeito é o que este projeto evita
-    // parecer quando está funcionando.
-    resposta.replaceChildren(
-      linhaDaPergunta(pergunta),
-      paragrafo("carregando o modelo…", "aovivo__resposta-texto"));
+    resumir.disabled = true;
+
+    const bloco = document.createElement("div");
+    bloco.className = "aovivo__resposta";
+    bloco.dataset.estado = "esperando";
+    bloco.append(linhaDaPergunta(pergunta),
+                 paragrafo("carregando o modelo…", "aovivo__resposta-texto"));
+    respostas.prepend(bloco);
 
     try {
-      const r = await pedir("perguntar-ao-vivo", { pergunta }, (p) => {
+      const r = await pedir("perguntar-ao-vivo", { pergunta, resumo }, (p) => {
         if (raiz.isConnected && p.texto)
-          resposta.replaceChildren(
-            linhaDaPergunta(pergunta),
-            paragrafo(p.texto, "aovivo__resposta-texto"));
+          bloco.replaceChildren(linhaDaPergunta(pergunta),
+                                paragrafo(p.texto, "aovivo__resposta-texto"));
       });
       if (!raiz.isConnected) return;
 
-      resposta.dataset.estado = "pronta";
+      bloco.dataset.estado = "pronta";
       const partes = [linhaDaPergunta(pergunta),
                       paragrafo(r.resposta || "", "aovivo__resposta-texto")];
       // Quem perguntou tem direito de saber que a resposta não considerou a
       // reunião inteira. Escondê-lo faria o modelo parecer confiante sobre um
       // começo que ele não viu.
       if (r.cortado)
-        partes.push(alerta("A reunião não coube inteira: o modelo leu só a parte "
-                         + "final dela.", "atencao"));
-      resposta.replaceChildren(...partes);
-      campo.value = "";
+        partes.push(alerta("A reunião passou de uma hora: o modelo leu só a "
+                         + "parte final dela.", "atencao"));
+      bloco.replaceChildren(...partes);
+      if (!resumo) campo.value = "";
     } catch (erro) {
       if (!raiz.isConnected) return;
-      resposta.dataset.estado = "erro";
-      resposta.replaceChildren(linhaDaPergunta(pergunta),
-                               alerta(erro.message, "atencao"));
+      bloco.dataset.estado = "erro";
+      bloco.replaceChildren(linhaDaPergunta(pergunta), alerta(erro.message, "atencao"));
     } finally {
       enviar.disabled = false;
+      resumir.disabled = false;
     }
-  });
+  }
 
   function linhaDaPergunta(texto) {
     return paragrafo(texto, "aovivo__resposta-pergunta");
@@ -251,6 +272,7 @@ export function painelAoVivo() {
     // A caixa de perguntar tem chave própria, e não depende de a legenda ou a
     // prévia estarem ligadas: ela lê o que houver, e se não houver nada ela diz.
     perguntar.hidden = !!r.perguntar_impedimento;
+    resumir.hidden = perguntar.hidden;
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.

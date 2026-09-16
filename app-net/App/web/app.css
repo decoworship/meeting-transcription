@@ -671,6 +671,17 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 .aovivo__perguntar .aa-entrada { flex: 1; min-width: 0; }
 
+/* O botão do resumo: a primeira interação, e a mais larga — é o que se aperta
+ * sem tirar os olhos da reunião. */
+.aovivo__resumir { margin-top: var(--espaco-3); width: 100%; }
+
+/* As respostas empilham, a mais nova no topo, e a coluna rola junto com o
+ * painel. Sem teto de altura: quem quiser reler rola, e o que acabou de chegar
+ * está sempre em cima. */
+.aovivo__respostas { display: flex; flex-direction: column; gap: var(--espaco-2); }
+.aovivo__respostas:empty { display: none; }
+.aovivo__respostas > .aovivo__resposta { margin-top: 0; }
+
 .aovivo__resposta {
   margin-top: var(--espaco-3);
   padding: var(--espaco-3);

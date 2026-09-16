@@ -334,6 +334,60 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     }
 
     /// <summary>
+    /// Sobe o motor e o deixa de pé, para responder várias perguntas.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o <c>ResponderAsync</c> sem o <c>finally</c> que mata.</b> A
+    /// diferença inteira é essa, e é por isso que ela custa: o processo fica
+    /// segurando a placa até alguém chamar <c>Dispose</c>. Quem decide é a chave
+    /// <see cref="ConfiguracoesDoApp.ModeloQuente"/>, e quem garante que ele
+    /// morre é o <see cref="MotorQuente"/>.
+    /// </para>
+    /// <para>
+    /// <b>O contexto é dimensionado uma vez, pelo pior caso.</b> A sessão não
+    /// sabe que pergunta virá, e subir de novo a cada crescimento da transcrição
+    /// anularia o motivo de ela existir — então ela pede de saída o que a janela
+    /// inteira precisa.
+    /// </para>
+    /// </remarks>
+    /// <param name="caracteresMaximos">O maior prompt que esta sessão verá.</param>
+    public async Task<ISessaoDoMotor> AbrirSessaoAsync(
+        string sistema, string nomeDoEsquema, string esquema,
+        int caracteresMaximos, int tokensDeSaida, CancellationToken ct)
+    {
+        if (caminhos.OQueFalta() is { } falta) throw new InvalidOperationException(falta);
+
+        var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
+        var (contexto, ctk, ctv) = Dimensionar(
+            caracteresMaximos, modelo, VramDaPlaca(), tokensDeSaida);
+        int porta = PortaLivre();
+
+        var processo = Subir(porta, contexto, ctk, ctv);
+        try
+        {
+            await EsperarSubirAsync(processo, porta, ct);
+        }
+        catch
+        {
+            Matar(processo);
+            throw;
+        }
+        return new SessaoAberta(processo, porta, sistema, nomeDoEsquema, esquema, tokensDeSaida);
+    }
+
+    /// <summary>Um <c>llama-server</c> de pé, com a porta dele.</summary>
+    private sealed class SessaoAberta(
+        Process processo, int porta, string sistema, string nomeDoEsquema,
+        string esquema, int tokensDeSaida) : ISessaoDoMotor
+    {
+        public Task<string> PerguntarAsync(string prompt, CancellationToken ct) =>
+            PedirAsync(porta, sistema, prompt, nomeDoEsquema, esquema, tokensDeSaida, ct);
+
+        public void Dispose() => Matar(processo);
+    }
+
+    /// <summary>
     /// A memória total da placa, em bytes. Zero quando não há placa ou não deu.
     /// </summary>
     /// <remarks>

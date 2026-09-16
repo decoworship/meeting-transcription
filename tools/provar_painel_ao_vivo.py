@@ -20,6 +20,8 @@ Ela monta o `painelAoVivo()` sozinho, com a ponte falsa do molde do
 3. **a grade de duas colunas** do Gravador não deixa nada além da prévia
    escorregar para a direita (o ``grid-row: 1 / -1`` **não** atravessa linhas
    implícitas, e sem a regra da coluna 1 a agenda ia parar debaixo da legenda).
+6. **as respostas acumulam**, a mais nova no topo, e o botão do resumo manda o
+   modo que escolhe a instrução;
 5. **a chave desligada esconde a caixa de perguntar** — o núcleo manda o
    impedimento no `aovivo`, e a caixa não nasce;
 4. **a caixa de perguntar ao modelo** faz a volta inteira — espera dizendo por
@@ -53,6 +55,7 @@ window.chrome = { webview: {
       { id: p.id, aovivo_ate: [], perguntar_impedimento: window.__impedimento || null });
     if (p.op === "perguntar-ao-vivo") {
       window.__perguntado = p.pergunta;
+      window.__resumo = p.resumo;
       this._empurrar({ id: p.id, tipo: "progresso",
                        texto: "carregando o modelo e lendo a reunião\u2026" });
       setTimeout(() => this._empurrar(
@@ -180,6 +183,27 @@ def main() -> int:
                 chegouAoNucleo: window.__perguntado,
             })""")
 
+            # **A segunda pergunta não pode apagar a primeira.** Era o que
+            # acontecia até 16/09/2026, e é o que torna impossível pedir o
+            # detalhe sem perder o que veio antes.
+            pg.fill(".aovivo__perguntar .aa-entrada", "e quem ficou de quê?")
+            pg.click(".aovivo__perguntar button")
+            pg.wait_for_function(
+                "document.querySelectorAll(\".aovivo__resposta[data-estado='pronta']\")"
+                ".length === 2", timeout=5000)
+            acumulou = pg.evaluate("""() => {
+                const b = [...document.querySelectorAll('.aovivo__resposta')];
+                return { quantos: b.length,
+                         primeiro: b[0].querySelector('.aovivo__resposta-pergunta').textContent };
+            }""")
+
+            # E o botão do resumo manda o modo, que é o que escolhe a instrução.
+            pg.click(".aovivo__resumir")
+            pg.wait_for_function(
+                "document.querySelectorAll('.aovivo__resposta').length === 3", timeout=5000)
+            modo_do_botao = pg.evaluate("() => window.__resumo")
+
+
             # ── 5: a chave desligada esconde a caixa ───────────────────────
             pg.route("**/desligado",
                      lambda r: r.fulfill(content_type="text/html", body=DESLIGADO))
@@ -242,7 +266,12 @@ def main() -> int:
     print(f"   limpou o campo para a próxima:               {limpou}")
     print(f"   a resposta ficou FORA da lista de falas:     {fora_da_lista}")
 
-    print(f"\n5. com a chave desligada, a caixa some:           {caixa_escondida}")
+    acumula = acumulou["quantos"] == 2
+    mais_nova_no_topo = "e quem ficou de quê?" in acumulou["primeiro"]
+    print(f"\n5. as respostas acumulam: {acumulou['quantos']} blocos + o do botão, "
+          f"topo = {acumulou['primeiro']!r}")
+    print(f"   o botão do resumo manda resumo=true:            {modo_do_botao is True}")
+    print(f"   com a chave desligada, a caixa some:           {caixa_escondida}")
 
     esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
@@ -255,6 +284,7 @@ def main() -> int:
     ok = (separadores == 1 and agrupou and um_volatil and lados
           and colunas and espera_honesta and respondeu and ecoou
           and avisou_do_corte and limpou and fora_da_lista and caixa_escondida
+          and acumula and mais_nova_no_topo and modo_do_botao is True
           and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1

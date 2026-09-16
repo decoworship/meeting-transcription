@@ -147,6 +147,27 @@ public sealed class ConfiguracoesDoApp
     /// </remarks>
     [JsonPropertyName("perguntar_ao_vivo")] public bool PerguntarAoVivo { get; set; }
 
+    /// <summary>
+    /// Deixar o modelo de pé entre perguntas, para perguntar em sequência.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada, e o motivo é medido.</b> Ligada, ela transforma o
+    /// motor no <b>terceiro contexto CUDA residente</b> — que é exatamente a
+    /// carga que derrubou a legenda de 2,46x para 0,45x em 11/09/2026
+    /// (docs/FASE7-ROTA.md §4). Desligada, o motor sobe por pergunta e devolve
+    /// a placa em ~20 s.
+    /// <para>
+    /// O que ela compra: a primeira pergunta paga a carga, as seguintes só o
+    /// tempo de gerar. É para quem vai perguntar várias coisas seguidas.
+    /// </para>
+    /// <para>
+    /// <b>Ela não é permissão para o processo viver para sempre.</b> O motor
+    /// morre ao parar a gravação, depois de
+    /// <c>MotorQuente.OciosoPadrao</c> sem pergunta, e ao desligar a chave.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("modelo_quente")] public bool ModeloQuente { get; set; }
+
     /// <summary>A chave conferida contra os dois valores que existem.</summary>
     /// <remarks>
     /// Portão único, como o <see cref="TemaAceito"/>: quem lê a chave lê por

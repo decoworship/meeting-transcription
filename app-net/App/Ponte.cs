@@ -78,6 +78,11 @@ internal sealed class Pedido
 
     /// <summary>O que se quer saber da reunião em curso, em português.</summary>
     [JsonPropertyName("pergunta")] public string? Pergunta { get; init; }
+
+    /// <summary>
+    /// <c>true</c> no botão de resumo, que tem forma; ausente na caixa livre.
+    /// </summary>
+    [JsonPropertyName("resumo")] public bool? Resumo { get; init; }
 }
 
 internal sealed class Resposta
@@ -627,6 +632,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// </remarks>
     private readonly PerguntaDaReuniao _pergunta = new(PerguntarAoMotorAsync);
 
+    /// <summary>
+    /// O motor de pé entre perguntas, quando a chave <c>modelo_quente</c> liga.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nulo é o estado normal</b>: com a chave desligada, cada pergunta sobe
+    /// e mata o seu próprio motor. Quando existe, ele morre ao parar a gravação
+    /// (<see cref="EncerrarAPrevia"/>), por ociosidade, e quando a chave é
+    /// desligada em Ajustes.
+    /// </remarks>
+    private MotorQuente? _motorQuente;
+
     public async Task AtenderAsync(string mensagem)
     {
         Pedido? p;
@@ -922,6 +938,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "salvar-config":
                     p.Config?.Salvar();
+                    // **Desligar a chave devolve a placa na hora.** Sem isto, a
+                    // pessoa desliga porque precisa da máquina para outra coisa
+                    // e o processo de 3,2 GB continua lá até a gravação parar —
+                    // que é o oposto do que ela pediu ao desligar.
+                    if (ConfiguracoesDoApp.Carregar() is { ModeloQuente: false })
+                    {
+                        _motorQuente?.Dispose();
+                        _motorQuente = null;
+                    }
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
                     break;
 
@@ -1335,6 +1360,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     {
         _pastaAoVivo = null;
 
+        // **A placa volta com a gravação.** Um motor de 3,2 GB órfão depois da
+        // reunião é o pior desfecho desta chave, e é o que ninguém notaria.
+        _motorQuente?.Dispose();
+        _motorQuente = null;
+
         // **Fecha com graça, e em segundo plano.** O `finalize()` do motor é
         // quem devolve o texto quando nada firmou durante a reunião, e esperá-lo
         // aqui seguraria quem acabou de parar a gravação. O arquivo cai na pasta
@@ -1613,21 +1643,59 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             return;
         }
 
+        // **O botão e a caixa livre pedem coisas diferentes.** A instrução vai
+        // depois da transcrição, que foi o ajuste que fez o modelo acertar o
+        // assunto do fim (docs/ESTUDO-RESUMO-AO-VIVO.md §8).
+        bool resumo = p.Resumo == true;
+        string pedido = resumo
+            ? PerguntaDaReuniao.Instrucao(resumo: true)
+            : $"{pergunta}\n\n{PerguntaDaReuniao.Instrucao(resumo: false)}";
+
         // Um progresso só, e fixo. Não há o que medir: o modelo leva de 6 a 9
         // segundos para carregar e depois escreve de uma vez. Inventar uma
         // barra que anda sozinha seria mentir sobre o que está acontecendo.
         Responder(new Resposta
         {
             Id = p.Id, Tipo = "progresso", Etapa = "modelo", Fracao = 0.1,
-            Texto = "carregando o modelo e lendo a reunião…",
+            Texto = cfg.ModeloQuente && _motorQuente?.Aberto == true
+                ? "lendo a reunião…" : "carregando o modelo e lendo a reunião…",
         });
 
-        string resposta = await _pergunta.ResponderAsync(pergunta, texto, CancellationToken.None);
+        string resposta = cfg.ModeloQuente
+            ? await PerguntarQuenteAsync(cfg, pedido, texto)
+            : await _pergunta.ResponderAsync(pedido, texto, CancellationToken.None);
 
         Responder(new Resposta
         {
             Id = p.Id, RespostaDoModelo = resposta, Cortado = texto.Cortado,
         });
+    }
+
+    /// <summary>
+    /// Pergunta ao motor que fica de pé, subindo-o na primeira vez.
+    /// </summary>
+    /// <remarks>
+    /// <b>O contexto é pedido pelo pior caso da janela</b>, e não pelo tamanho
+    /// da transcrição de agora: a sessão não sabe que pergunta virá, e subir de
+    /// novo a cada minuto de reunião anularia o motivo de ela existir.
+    /// </remarks>
+    private async Task<string> PerguntarQuenteAsync(
+        ConfiguracoesDoApp cfg, string pedido, TextoDaReuniao texto)
+    {
+        _motorQuente ??= new MotorQuente(ct =>
+        {
+            var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
+            return motor.AbrirSessaoAsync(
+                PromptDeReuniao.Sistema, nomeDoEsquema: "", esquema: "",
+                PerguntaDaReuniao.JanelaMaximaCaracteres, PerguntaDaReuniao.TokensDeSaida, ct);
+        }, MotorQuente.OciosoPadrao);
+
+        // A ociosidade é conferida na própria pergunta: é o único momento em que
+        // se sabe que há alguém olhando, e evita um relógio a mais no processo.
+        _motorQuente.FecharSeOcioso(DateTime.UtcNow);
+
+        return await _motorQuente.PerguntarAsync(
+            PerguntaDaReuniao.Montar(texto, pedido), CancellationToken.None);
     }
 
     /// <summary>

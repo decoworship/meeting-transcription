@@ -1042,6 +1042,31 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   }), oQueCustaPerguntar);
   painel.appendChild(perguntar);
 
+  // ---- deixar o modelo quente
+  //
+  // **É a única chave desta tela que liga uma carga residente na placa.** Ligada,
+  // o motor vira o terceiro contexto CUDA — a carga que derrubou a legenda de
+  // 2,46x para 0,45x em 11/09. O texto diz isso, porque o sintoma (a legenda
+  // parando de firmar) não aponta para cá.
+  const quente = bloco("Deixar o modelo pronto entre perguntas");
+  quente.classList.add("bloco--chave");
+  const oQueEQuente = document.createElement("p");
+  oQueEQuente.className = "bloco__texto";
+  oQueEQuente.textContent = "Depois da primeira pergunta, o modelo fica de pé "
+    + "esperando a próxima. A primeira continua levando os mesmos vinte "
+    + "segundos; as seguintes respondem quase na hora.";
+  const oQueCustaQuente = document.createElement("p");
+  oQueCustaQuente.className = "campo__dica";
+  oQueCustaQuente.textContent = "Em troca, ele segura cerca de 3 GB da placa "
+    + "enquanto espera — e é isso que pode fazer a legenda ao vivo atrasar. Ele "
+    + "se desliga sozinho depois de dez minutos sem pergunta, e quando a "
+    + "gravação para. Desligando esta chave, a placa volta na hora.";
+  quente.append(oQueEQuente, chave(config.modelo_quente === true, async (v) => {
+    await gravar({ modelo_quente: v });
+    recarregar();
+  }), oQueCustaQuente);
+  painel.appendChild(quente);
+
   // ---- qual modelo separa os falantes
   //
   // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este
