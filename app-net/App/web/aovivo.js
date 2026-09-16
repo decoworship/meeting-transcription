@@ -59,118 +59,11 @@ export function painelAoVivo() {
 
   const aviso = document.createElement("div");
 
-  // ── Perguntar ao modelo o que já aconteceu ───────────────────────────────
-  //
-  // **O motor sobe por pergunta e morre depois dela**, e é por isso que cada
-  // resposta leva uns dez segundos. Um 4B quente a reunião inteira é o terceiro
-  // contexto CUDA que derrubou a legenda de 2,46x para 0,45x em 11/09/2026
-  // (docs/FASE7-ROTA.md §4) — e legenda abaixo de 1x atrasa sem parar.
-  //
-  // **A resposta fica acima do campo**, e não dentro da lista: a lista é o que
-  // foi dito, e misturar nela o que um modelo deduziu apagaria a diferença
-  // entre o que alguém falou e o que a máquina achou.
-  // **As respostas acumulam, a mais nova no topo.** Antes cada pergunta
-  // apagava a anterior, e perguntar o detalhe custava o que veio antes — visto
-  // em uso em 16/09/2026. O painel é superfície de relance: o que se acabou de
-  // pedir tem de estar em cima, sem rolar.
-  const respostas = document.createElement("div");
-  respostas.className = "aovivo__respostas";
-
-  const perguntar = document.createElement("form");
-  perguntar.className = "aovivo__perguntar";
-
-  // O botão do resumo, que é a primeira interação: ele manda a instrução de
-  // lista, e a caixa livre ao lado é por onde se pede o detalhe.
-  const resumir = document.createElement("button");
-  resumir.className = "aa-btn aa-btn-secundario aovivo__resumir";
-  resumir.type = "button";
-  resumir.textContent = "O que já rolou?";
-
-  const campo = document.createElement("input");
-  campo.className = "aa-entrada";
-  campo.type = "text";
-  campo.placeholder = "Pergunte o que já aconteceu…";
-
-  const enviar = document.createElement("button");
-  enviar.className = "aa-btn";
-  enviar.type = "submit";
-  enviar.textContent = "Perguntar";
-
-  perguntar.append(campo, enviar);
-
-  // **Nasce escondida.** O núcleo diz no `aovivo` se ela pode existir; até lá
-  // não se promete caixa nenhuma. Mostrá-la com a chave desligada faria a
-  // pessoa escrever a pergunta para só então descobrir o impedimento.
-  perguntar.hidden = true;
-  resumir.hidden = true;
-
-  raiz.append(topo, aviso, corpo, voltar, resumir, respostas, perguntar);
-
-  resumir.addEventListener("click", () => enviarPergunta("O que já rolou?", true));
-
-  perguntar.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    const pergunta = campo.value.trim();
-    if (pergunta) enviarPergunta(pergunta, false);
-  });
-
-  /**
-   * Manda a pergunta e devolve um bloco novo no topo.
-   *
-   * @param resumo quando `true`, vai a instrução de lista do botão; quando
-   *   `false`, a pergunta é livre e o núcleo só acrescenta as regras.
-   */
-  async function enviarPergunta(pergunta, resumo) {
-    if (enviar.disabled) return;
-    enviar.disabled = true;
-    resumir.disabled = true;
-
-    const bloco = document.createElement("div");
-    bloco.className = "aovivo__resposta";
-    bloco.dataset.estado = "esperando";
-    bloco.append(linhaDaPergunta(pergunta),
-                 paragrafo("carregando o modelo…", "aovivo__resposta-texto"));
-    respostas.prepend(bloco);
-
-    try {
-      const r = await pedir("perguntar-ao-vivo", { pergunta, resumo }, (p) => {
-        if (raiz.isConnected && p.texto)
-          bloco.replaceChildren(linhaDaPergunta(pergunta),
-                                paragrafo(p.texto, "aovivo__resposta-texto"));
-      });
-      if (!raiz.isConnected) return;
-
-      bloco.dataset.estado = "pronta";
-      const partes = [linhaDaPergunta(pergunta),
-                      paragrafo(r.resposta || "", "aovivo__resposta-texto")];
-      // Quem perguntou tem direito de saber que a resposta não considerou a
-      // reunião inteira. Escondê-lo faria o modelo parecer confiante sobre um
-      // começo que ele não viu.
-      if (r.cortado)
-        partes.push(alerta("A reunião passou de uma hora: o modelo leu só a "
-                         + "parte final dela.", "atencao"));
-      bloco.replaceChildren(...partes);
-      if (!resumo) campo.value = "";
-    } catch (erro) {
-      if (!raiz.isConnected) return;
-      bloco.dataset.estado = "erro";
-      bloco.replaceChildren(linhaDaPergunta(pergunta), alerta(erro.message, "atencao"));
-    } finally {
-      enviar.disabled = false;
-      resumir.disabled = false;
-    }
-  }
-
-  function linhaDaPergunta(texto) {
-    return paragrafo(texto, "aovivo__resposta-pergunta");
-  }
-
-  function paragrafo(texto, classe) {
-    const el = document.createElement("p");
-    el.className = classe;
-    el.textContent = texto;
-    return el;
-  }
+  // **O append vem antes de montar a lista**, e não é estilo: a sentinela da
+  // lista virtualizada precisa estar no DOM para o observador enxergá-la. Foi
+  // um dos dois defeitos que deixaram este painel sem desenhar nada até
+  // 10/09/2026.
+  raiz.append(topo, aviso, corpo, voltar);
 
   // A coluna rola sozinha — é o que a decisão D1 pede (duas colunas com
   // rolagens separadas enquanto grava) e o que permite ler o que foi dito há
@@ -269,10 +162,6 @@ export function painelAoVivo() {
         : "";
     if (r.aovivo_impedimento)
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
-    // A caixa de perguntar tem chave própria, e não depende de a legenda ou a
-    // prévia estarem ligadas: ela lê o que houver, e se não houver nada ela diz.
-    perguntar.hidden = !!r.perguntar_impedimento;
-    resumir.hidden = perguntar.hidden;
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.

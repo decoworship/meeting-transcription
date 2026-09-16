@@ -656,49 +656,49 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .aovivo__voltar { margin-top: var(--espaco-2); width: 100%; }
 
-/* ── perguntar ao modelo ───────────────────────────────────────────────────
+/* ── perguntar sobre a reunião ────────────────────────────────────────────
  *
- * **Fora da lista, e visualmente distinto dela.** A lista é o que foi dito; a
- * resposta é o que um modelo deduziu do que foi dito. Misturar as duas apagaria
- * a diferença entre fala e dedução, que é a única coisa que não se pode perder
- * numa tela que alguém vai citar numa reunião. */
-.aovivo__perguntar {
+ * **Bloco próprio, na coluna da esquerda.** A legenda é o que está sendo dito;
+ * isto é o que um modelo deduziu do que foi dito. Na mesma coluna, a resposta
+ * empurrava a legenda para fora da tela. */
+.perguntar__resumir { width: 100%; margin-bottom: var(--espaco-3); }
+
+/* **Teto e rolagem própria.** Sem teto, três perguntas seguidas faziam o bloco
+ * crescer sem parar e empurrar o resto da coluna — o mesmo F-12 que a lista de
+ * trechos já tinha resolvido do seu lado. 45vh deixa ver uma resposta inteira
+ * sem tomar a tela do gravador. */
+.perguntar__respostas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  max-height: 45vh;
+  overflow-y: auto;
+}
+.perguntar__respostas:empty { display: none; }
+
+.perguntar__caixa {
   display: flex;
   gap: var(--espaco-2);
   margin-top: var(--espaco-3);
-  padding-top: var(--espaco-3);
-  border-top: 1px solid var(--cor-borda);
 }
-.aovivo__perguntar .aa-entrada { flex: 1; min-width: 0; }
+.perguntar__caixa .aa-entrada { flex: 1; min-width: 0; }
 
-/* O botão do resumo: a primeira interação, e a mais larga — é o que se aperta
- * sem tirar os olhos da reunião. */
-.aovivo__resumir { margin-top: var(--espaco-3); width: 100%; }
-
-/* As respostas empilham, a mais nova no topo, e a coluna rola junto com o
- * painel. Sem teto de altura: quem quiser reler rola, e o que acabou de chegar
- * está sempre em cima. */
-.aovivo__respostas { display: flex; flex-direction: column; gap: var(--espaco-2); }
-.aovivo__respostas:empty { display: none; }
-.aovivo__respostas > .aovivo__resposta { margin-top: 0; }
-
-.aovivo__resposta {
-  margin-top: var(--espaco-3);
+.perguntar__resposta {
   padding: var(--espaco-3);
   border-radius: var(--raio-medio);
   background: var(--cor-superficie-2);
   border-left: 3px solid var(--cor-destaque);
 }
-.aovivo__resposta-pergunta {
+.perguntar__pergunta {
   margin: 0 0 var(--espaco-2);
   font-size: var(--texto-pequeno);
   color: var(--cor-texto-suave);
 }
-.aovivo__resposta-texto { margin: 0; white-space: pre-wrap; }
+.perguntar__texto { margin: 0; white-space: pre-wrap; }
 
 /* Esperando, o texto fica acinzentado: é o mesmo vocabulário do tentativo da
  * legenda — cinza quer dizer "ainda não é isto". */
-.aovivo__resposta[data-estado="esperando"] .aovivo__resposta-texto {
+.perguntar__resposta[data-estado="esperando"] .perguntar__texto {
   color: var(--cor-texto-suave);
   font-style: italic;
 }

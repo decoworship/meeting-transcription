@@ -263,6 +263,30 @@ public sealed class ConfiguracoesDoApp
         = "qwen3-4b-instruct-q4km.gguf";
 
     /// <summary>
+    /// Qual modelo responde às perguntas durante a reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Separado do <see cref="ModeloDeAta"/> por decisão de 16/09/2026</b>, e
+    /// a razão é que as duas tarefas rodam em mundos diferentes: a ata roda com
+    /// a reunião encerrada e a placa livre, e pode pagar um modelo grande; a
+    /// pergunta divide a placa com a legenda e tem vinte segundos para
+    /// responder. O estudo escolheu modelos diferentes para cada uma
+    /// (docs/ESTUDO-RESUMO-AO-VIVO.md §10).
+    /// <para>
+    /// <b>Vazio significa "o mesmo da ata"</b>, e não um modelo escolhido por
+    /// nós: uma instalação que já existe não pode mudar de comportamento porque
+    /// uma chave nova apareceu, nem apontar para um GGUF que talvez nem esteja
+    /// em disco. Ver <see cref="ModeloParaPergunta"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("modelo_da_pergunta")] public string ModeloDaPergunta { get; set; } = "";
+
+    /// <summary>O modelo que a pergunta ao vivo usa de verdade.</summary>
+    [JsonIgnore]
+    public string ModeloParaPergunta =>
+        ModeloDaPergunta is { Length: > 0 } dele ? dele : ModeloDeAta;
+
+    /// <summary>
     /// Os domínios de e-mail da nossa organização.
     /// </summary>
     /// <remarks>

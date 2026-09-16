@@ -70,7 +70,10 @@ window.chrome = { webview: {
 <div id="alvo"></div>
 <script type="module">
 import { painelAoVivo } from "/aovivo.js";
-document.getElementById("alvo").appendChild(painelAoVivo().raiz);
+import { painelDePerguntas } from "/perguntar.js";
+const alvo = document.getElementById("alvo");
+alvo.appendChild(painelDePerguntas().raiz);
+alvo.appendChild(painelAoVivo().raiz);
 window.__pronto = true;
 </script>
 """
@@ -160,47 +163,47 @@ def main() -> int:
             separadores = pg.locator(".aovivo__bloco").count()
 
             # ── 4: perguntar ao modelo ─────────────────────────────────────
-            pg.fill(".aovivo__perguntar .aa-entrada", "o que ficou decidido?")
-            pg.click(".aovivo__perguntar button")
+            pg.fill(".perguntar__caixa .aa-entrada", "o que ficou decidido?")
+            pg.click(".perguntar__caixa button")
 
             # A espera é dita de frente: dez segundos de silêncio parecem
             # defeito, e o defeito é o que este projeto evita parecer quando
             # está funcionando.
             pg.wait_for_timeout(150)
             esperando = {
-                "estado": pg.get_attribute(".aovivo__resposta", "data-estado"),
-                "texto": pg.inner_text(".aovivo__resposta").strip(),
-                "botao": pg.is_disabled(".aovivo__perguntar button"),
+                "estado": pg.get_attribute(".perguntar__resposta", "data-estado"),
+                "texto": pg.inner_text(".perguntar__resposta").strip(),
+                "botao": pg.is_disabled(".perguntar__caixa button"),
             }
 
-            pg.wait_for_selector(".aovivo__resposta[data-estado='pronta']", timeout=5000)
+            pg.wait_for_selector(".perguntar__resposta[data-estado='pronta']", timeout=5000)
             pergunta = pg.evaluate("""() => ({
-                echo: document.querySelector('.aovivo__resposta-pergunta').textContent,
-                resposta: document.querySelector('.aovivo__resposta-texto').textContent,
-                aviso: !!document.querySelector('.aovivo__resposta .aa-alerta'),
-                campo: document.querySelector('.aovivo__perguntar .aa-entrada').value,
-                naLista: !!document.querySelector('.aovivo__corpo .aovivo__resposta-texto'),
+                echo: document.querySelector('.perguntar__pergunta').textContent,
+                resposta: document.querySelector('.perguntar__texto').textContent,
+                aviso: !!document.querySelector('.perguntar__resposta .aa-alerta'),
+                campo: document.querySelector('.perguntar__caixa .aa-entrada').value,
+                naLista: !!document.querySelector('.aovivo__corpo .perguntar__texto'),
                 chegouAoNucleo: window.__perguntado,
             })""")
 
             # **A segunda pergunta não pode apagar a primeira.** Era o que
             # acontecia até 16/09/2026, e é o que torna impossível pedir o
             # detalhe sem perder o que veio antes.
-            pg.fill(".aovivo__perguntar .aa-entrada", "e quem ficou de quê?")
-            pg.click(".aovivo__perguntar button")
+            pg.fill(".perguntar__caixa .aa-entrada", "e quem ficou de quê?")
+            pg.click(".perguntar__caixa button")
             pg.wait_for_function(
-                "document.querySelectorAll(\".aovivo__resposta[data-estado='pronta']\")"
+                "document.querySelectorAll(\".perguntar__resposta[data-estado='pronta']\")"
                 ".length === 2", timeout=5000)
             acumulou = pg.evaluate("""() => {
-                const b = [...document.querySelectorAll('.aovivo__resposta')];
+                const b = [...document.querySelectorAll('.perguntar__resposta')];
                 return { quantos: b.length,
-                         primeiro: b[0].querySelector('.aovivo__resposta-pergunta').textContent };
+                         primeiro: b[0].querySelector('.perguntar__pergunta').textContent };
             }""")
 
             # E o botão do resumo manda o modo, que é o que escolhe a instrução.
-            pg.click(".aovivo__resumir")
+            pg.click(".perguntar__resumir")
             pg.wait_for_function(
-                "document.querySelectorAll('.aovivo__resposta').length === 3", timeout=5000)
+                "document.querySelectorAll('.perguntar__resposta').length === 3", timeout=5000)
             modo_do_botao = pg.evaluate("() => window.__resumo")
 
 
@@ -210,7 +213,15 @@ def main() -> int:
             pg.goto(f"http://127.0.0.1:{PORTA}/desligado")
             pg.wait_for_function("window.__pronto === true", timeout=5000)
             pg.wait_for_timeout(200)
-            caixa_escondida = pg.locator(".aovivo__perguntar").is_hidden()
+            caixa_escondida = pg.locator("section.perguntar").is_hidden()
+
+            # A pilha tem teto e rolagem própria: sem isso, três perguntas
+            # seguidas empurram o resto da coluna para fora da tela.
+            rolagem = pg.evaluate("""() => {
+                const e = document.querySelector('.perguntar__respostas');
+                const s = getComputedStyle(e);
+                return { overflow: s.overflowY, teto: s.maxHeight };
+            }""")
 
             # ── 3: as duas colunas ─────────────────────────────────────────
             pg.route("**/colunas", lambda r: r.fulfill(content_type="text/html", body=COLUNAS))
@@ -271,7 +282,9 @@ def main() -> int:
     print(f"\n5. as respostas acumulam: {acumulou['quantos']} blocos + o do botão, "
           f"topo = {acumulou['primeiro']!r}")
     print(f"   o botão do resumo manda resumo=true:            {modo_do_botao is True}")
-    print(f"   com a chave desligada, a caixa some:           {caixa_escondida}")
+    print(f"   com a chave desligada, o bloco some:           {caixa_escondida}")
+    tem_rolagem = rolagem["overflow"] == "auto" and rolagem["teto"] not in ("none", "")
+    print(f"   a pilha tem teto ({rolagem['teto']}) e rolagem:      {tem_rolagem}")
 
     esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
@@ -285,7 +298,7 @@ def main() -> int:
           and colunas and espera_honesta and respondeu and ecoou
           and avisou_do_corte and limpou and fora_da_lista and caixa_escondida
           and acumula and mais_nova_no_topo and modo_do_botao is True
-          and not erros)
+          and tem_rolagem and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1
 

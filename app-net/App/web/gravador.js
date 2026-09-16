@@ -21,6 +21,7 @@ import { pedir, assinar } from "/ponte.js";
 import { alerta } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
 import { painelAoVivo } from "/aovivo.js";
+import { painelDePerguntas } from "/perguntar.js";
 
 /** "00:12:34" — aqui o tempo é para cronometrar, ao contrário da lista. */
 function relogio(segundos) {
@@ -240,8 +241,13 @@ export async function telaDoGravador(ctx) {
   // à direita, com rolagens separadas (decisão D1). Parada a gravação, volta a
   // ser uma coluna, e é o CSS que faz isso pelo data-atributo.
   const previa = painelAoVivo();
+  // **A caixa de perguntar é bloco próprio, e cai na coluna da esquerda** — a
+  // regra `> *:not(.aovivo) { grid-column: 1 }` põe lá tudo o que não é a
+  // prévia. É o que separa o que está sendo dito do que um modelo deduziu.
+  const perguntas = painelDePerguntas();
   raiz.dataset.aovivo = String(estado.gravando);
-  raiz.append(cartao, reuniao, proximas, notas.raiz, blocoDisp, blocoPasta, previa.raiz);
+  raiz.append(cartao, reuniao, proximas, notas.raiz, blocoDisp, blocoPasta,
+              perguntas.raiz, previa.raiz);
   tela.replaceChildren(raiz);
 
   // ─────────────────────────────────────────────────────── desenho

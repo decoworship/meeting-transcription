@@ -685,13 +685,28 @@ function abaModelos(catalogo, config, gravar) {
     // que aviso nenhum.
   });
 
-  for (const [familia, titulo, texto, chaveConfig, padrao] of [
+  // **Dois seletores para a mesma família de modelos, e é de propósito.** A ata
+  // roda com a reunião encerrada e a placa livre, e pode pagar um modelo
+  // grande; a pergunta divide a placa com a legenda e tem vinte segundos para
+  // responder. O estudo de 16/09 escolheu modelos diferentes para cada uma.
+  //
+  // O segundo não repete os cartões de download: são os mesmos arquivos, e uma
+  // segunda lista de botões "baixar" faria parecer que são outros.
+  for (const [familia, titulo, texto, chaveConfig, padrao, semCartoes] of [
     ["asr", "Transcrição", "Qual modelo transforma áudio em texto.",
      "modelo_padrao", "large-v3"],
     // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
     // quem abre o .gguf é o llama.cpp, por caminho.
     ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
      "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf"],
+    ["ata", "Pergunta durante a reunião",
+     "Qual modelo responde no Gravador enquanto a reunião acontece. Pode ser "
+     + "diferente do da ata: aqui o que conta é responder rápido e caber na "
+     + "placa junto com a legenda.",
+     "modelo_da_pergunta",
+     // Vazio significa "o mesmo da ata", e é o que o núcleo entende — então o
+     // seletor mostra o da ata até alguém escolher outro.
+     config.modelo_de_ata ?? "qwen3-4b-instruct-q4km.gguf", true],
   ]) {
     const b = bloco(titulo, texto);
     const itens = catalogo.filter((i) => i.pacote.familia === familia);
@@ -711,7 +726,7 @@ function abaModelos(catalogo, config, gravar) {
     });
     b.appendChild(escolha);
 
-    for (const i of itens) b.appendChild(cartaoDeModelo(i));
+    if (!semCartoes) for (const i of itens) b.appendChild(cartaoDeModelo(i));
     painel.appendChild(b);
   }
 

@@ -224,6 +224,32 @@ public sealed class PerguntaDaReuniaoTests
     }
 
     [Fact]
+    public void SemEscolhaPropriaAPerguntaUsaOModeloDaAta()
+    {
+        // **A instalação que já existe não pode mudar de comportamento porque
+        // uma chave nova apareceu.** Vazio significa "o mesmo de sempre", e não
+        // um modelo que talvez nem esteja em disco.
+        var cfg = new ConfiguracoesDoApp { ModeloDeAta = "gemma-4-e4b-q4km.gguf" };
+
+        Assert.Equal("gemma-4-e4b-q4km.gguf", cfg.ModeloParaPergunta);
+    }
+
+    [Fact]
+    public void ComEscolhaPropriaAPerguntaUsaOModeloDela()
+    {
+        // O estudo de 16/09 escolheu modelos diferentes para as duas coisas: a
+        // ata roda com a placa livre e a reunião encerrada; a pergunta divide a
+        // placa com a legenda e responde em vinte segundos.
+        var cfg = new ConfiguracoesDoApp
+        {
+            ModeloDeAta = "gemma-4-e4b-q4km.gguf",
+            ModeloDaPergunta = "qwen3.5-4b-q4km.gguf",
+        };
+
+        Assert.Equal("qwen3.5-4b-q4km.gguf", cfg.ModeloParaPergunta);
+    }
+
+    [Fact]
     public void AChaveNasceDesligada()
     {
         // Tudo o que sobe modelo durante a gravação nasce desligado enquanto o

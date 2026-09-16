@@ -1057,7 +1057,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                                   + "em Ajustes › Transcrição.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
                         PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
-                            cfgAv, CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgAv.ModeloDeAta)),
+                            cfgAv, CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgAv.ModeloParaPergunta)),
                     });
                     break;
 
@@ -1609,7 +1609,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         // normal de quem acabou de instalar. A frase do OQueFalta já diz onde
         // baixar — e dizê-la **antes** de montar o prompt evita a espera inútil.
         var cfg = ConfiguracoesDoApp.Carregar();
-        var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta);
+        var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta);
         if (PerguntaDaReuniao.OQueImpede(cfg, caminhos) is { } falta)
         {
             Responder(new Resposta { Id = p.Id, Erro = falta });
@@ -1684,7 +1684,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     {
         _motorQuente ??= new MotorQuente(ct =>
         {
-            var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
+            var motor = new MotorDeAta(
+                CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta));
             return motor.AbrirSessaoAsync(
                 PromptDeReuniao.Sistema, nomeDoEsquema: "", esquema: "",
                 PerguntaDaReuniao.JanelaMaximaCaracteres, PerguntaDaReuniao.TokensDeSaida, ct);
@@ -1741,13 +1742,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private static async Task<string> PerguntarAoMotorAsync(string prompt, CancellationToken ct)
     {
         var cfg = ConfiguracoesDoApp.Carregar();
-        var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
+        var motor = new MotorDeAta(
+            CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta));
 
-        // **Sem sistema e sem esquema** — decisão do dono do produto em
-        // 16/09/2026, e o esquema tem medição por trás: ele custou quatro dos
-        // seis modelos comparados (docs/ESTUDO-RESUMO-AO-VIVO.md §2).
+        // **Sem esquema, e com as regras no sistema.** O esquema tem medição por
+        // trás: ele custou quatro dos seis modelos comparados
+        // (docs/ESTUDO-RESUMO-AO-VIVO.md §2). As regras, idem — cada linha delas
+        // saiu de um defeito visto rodando.
         var respostas = await motor.ResponderAsync(
-            sistema: "", [prompt], nomeDoEsquema: "", esquema: "",
+            PromptDeReuniao.Sistema, [prompt], nomeDoEsquema: "", esquema: "",
             PerguntaDaReuniao.TokensDeSaida, progresso: null, ct);
 
         return respostas[0] is { Length: > 0 } texto
