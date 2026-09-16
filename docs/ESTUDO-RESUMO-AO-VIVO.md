@@ -140,7 +140,7 @@ Sem o esquema — que é a configuração em que os seis funcionam:
 |---|---:|---:|---:|---:|---:|---:|---:|
 | `qwen3-1.7b` | 4,8 s | 11,9 s | 76,5 | 527 tk | **1.723 MiB** | 1,03 GB | 40.960 |
 | `smollm3-3b` | 9,4 s | 12,2 s | 54,7 | 344 tk | 2.269 MiB | 1,78 GB | 65.536 |
-| **`ministral-3-3b`** | 15,4 s | 17,2 s | 44,6 | 559 tk | **2.652 MiB** | **2,00 GB** | **262.144** |
+| **`ministral-3-3b`** | 15,4 s | 17,2 s | 44,6 | 559 tk | **2.652 MiB** | **2,00 GB** | 16.384 *(262.144 c/ YaRN)* |
 | `qwen3.5-4b` | 14,2 s | 8,6 s | 45,5 | 258 tk | 2.939 MiB | 2,55 GB | 262.144 |
 | `qwen3-4b-instruct` | 12,3 s | 11,1 s | 42,4 | 371 tk | 3.195 MiB | 2,33 GB | 262.144 |
 | `gemma-4-e4b` | 21,9 s | 11,1 s | 38,2 | 313 tk | 3.127 MiB | 4,64 GB | 131.072 |
@@ -209,7 +209,13 @@ Lido dos cabeçalhos GGUF, não de ficha técnica:
   reprovava por contexto cai; o que o reprova neste estudo é outro, e é pior;
 - **o `qwen3-4b-instruct` — o titular — é 262.144**, e a tabela de competidores
   não o lista. Ele não tem problema de contexto nenhum;
-- **o Ministral 3 confirma os 256K** (262.144) e o SmolLM3 os 64K (65.536).
+- **o Ministral 3 declara 262.144, mas os nativos são 16.384** — o GGUF traz
+  `rope.scaling.type = yarn`, fator 16. É a mesma objeção que esta seção levantou
+  contra o `qwen3-1.7b`, e vale igual aqui: acima de ~16 mil tokens ele está em
+  YaRN, que degrada recuperação de trecho longo. No formato em turnos isso são
+  **~65 minutos de reunião**;
+- **o `qwen3.5-4b` não tem escalonamento de rope**: os 262.144 dele são nativos;
+- o SmolLM3 confirma os 64K (65.536).
 
 ---
 
@@ -226,8 +232,10 @@ estrutura *é* o produto, e o `VerificadorDeAta` depende dela.
 
 **Depois, e só depois, o modelo.** Com o esquema fora:
 
-- **promover o `ministral-3-3b` a candidato do resumo** — *com a ressalva da §8:
-  sem instrução, ele inventa mensagem entre aspas.* Mesma honestidade dos
+- **promover o `ministral-3-3b` a candidato do resumo** — *com duas ressalvas
+  que vieram depois, e a segunda é grave: a §8 (sem instrução ele inventa
+  mensagem entre aspas) e a §10 — o contexto nativo dele é 16.384, e com 32k de
+  contexto ele é o que mais come VRAM dos seis.* Mesma honestidade dos
   4B, **540 MiB de VRAM a menos** que o titular, 2,00 GB em disco, e 262K de
   contexto. Foi o único que leu *"abriram o chat"* onde o áudio dizia
   "objetivo" — sinal de que leu pelo sentido, que é o que a instrução pede;
@@ -362,6 +370,79 @@ transcrição não contém.
 **A coluna de termos tem falso positivo por construção**, e ele é informativo:
 "Resumo", "Próximos", "Foco" aparecem porque o modelo inventou *estrutura*, não
 fato. Ler a lista leva dez segundos e diz as duas coisas.
+
+---
+
+## 10. Três reuniões, e a reunião longa muda a escolha — 16/09/2026
+
+Pedido pelo dono do produto depois de escolher `qwen3.5-4b` e `ministral-3-3b`
+para a funcionalidade: rodar mais duas reuniões, para ver se o resultado se
+sustenta.
+
+**Sustenta-se no que importa.** A âncora — o "Agora" acertar o assunto do fim —
+saiu certa em **6 de 6**:
+
+| reunião | corte | `qwen3.5-4b` | `ministral-3-3b` |
+|---|---|---|---|
+| A · chat de suporte | 20 min | ✅ Francine / alcance da massiva | ✅ + a nuance de cruzar dados |
+| B · faturamento | 20 min | ✅ Vanessa / marcação NoBill | ✅ + o nome da frente que a Carla perguntou |
+| C · migração ECS | 10 min | ✅ Felipe e André / mapear URLs | ✅, mas atribui ao Felipe o que foi o André |
+
+**O formato oscila, e cada um oscila para um lado:** o `qwen3.5-4b` manteve as
+três seções em 3 de 3 e **perdeu os títulos em negrito em 2 de 3**; o
+`ministral-3-3b` manteve os negritos em 3 de 3 e **perdeu a seção "O contexto"**
+na reunião C. Nenhum dos dois é estável na forma.
+
+**Invenção continua baixa:** um "termo de fora" em três das seis saídas, e nada
+material. Conferi sete termos específicos da saída mais arriscada (erro 500,
+token, Service ID, Telecom, Gabriela) — **todos estão na transcrição.**
+
+### O número que inverte a escolha
+
+Os três testes são reuniões de 10 a 20 minutos, com contexto de 8k a 12k. Uma
+reunião de duas horas pede ~36k. Medido direto, com `--contexto 32768`:
+
+| | 8k–12k de contexto | **32k de contexto** | diferença |
+|---|---:|---:|---:|
+| `qwen3.5-4b` | 2.899–3.074 MiB | **3.436 MiB** | +~450 MiB |
+| `ministral-3-3b` | 2.649–2.792 MiB | **4.183 MiB** | **+~1.400 MiB** |
+
+**Na reunião curta o Ministral é o mais barato; na longa ele é o mais caro** — e
+por 750 MiB. Contra os ~3.553 MiB livres medidos numa reunião de verdade
+(§"E a VRAM" acima), **ele não cabe** com a legenda ligada; o `qwen3.5-4b` cabe
+com 117 MiB de folga, que é pouco demais para se confiar.
+
+> **A fórmula prevê o contrário do medido**, e isso já tem precedente nesta casa.
+> Pelo cálculo de KV por token, o `qwen3.5-4b` deveria custar 2.191 MiB em 32k e
+> o `ministral-3-3b` 1.780 MiB. A medição diz o oposto. É a mesma armadilha que o
+> `MotorDeAta.Dimensionar` documenta para o Gemma — a conta trata todas as
+> camadas como iguais, e cada família traz um truque diferente. **Quem conhece a
+> arquitetura é o llama.cpp**; a conta escolhe a quantização do cache e não
+> decide quem cabe.
+
+### E o contexto do Ministral não é o que a ficha diz
+
+Lido do GGUF: `rope.scaling.type = yarn`, fator 16,
+`original_context_length = 16384`. **Os 262.144 são YaRN sobre 16.384 nativos** —
+exatamente a objeção que a [CONVERGENCIA](CONVERGENCIA.md) §T2.1 levantou contra
+o `qwen3-1.7b`, e que vale igual aqui. No formato em turnos, 16.384 tokens são
+**~65 minutos de reunião**; passando disso, ele está em YaRN, que degrada
+recuperação de trecho longo — que é precisamente o que a âncora do "Agora" faz.
+
+O `qwen3.5-4b` não tem escalonamento de rope nenhum: os 262.144 dele são nativos.
+
+### O que isto deixa decidido, e o que não
+
+- **`ministral-3-3b` tem teto de ~1 hora de reunião**, por dois motivos
+  independentes que se encontram no mesmo ponto: YaRN na qualidade e 4,2 GB na
+  placa. Abaixo disso ele é excelente e é o mais barato;
+- **`qwen3.5-4b` é o único dos dois que atravessa uma reunião de duas horas** —
+  e ainda assim com folga de 117 MiB, que pede medição em reunião real antes de
+  se prometer;
+- **falta um teto de VRAM no código.** O `PerguntaDaReuniao.LimiteDeCaracteres`
+  corta a transcrição pelo **contexto do modelo** (262.144!), e não pelo que cabe
+  na placa ao lado da legenda. Numa reunião longa ele pediria um contexto que não
+  cabe, e a falha viria depois de o modelo já ter carregado.
 
 ---
 
