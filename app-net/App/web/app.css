@@ -656,6 +656,42 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .aovivo__voltar { margin-top: var(--espaco-2); width: 100%; }
 
+/* ── perguntar ao modelo ───────────────────────────────────────────────────
+ *
+ * **Fora da lista, e visualmente distinto dela.** A lista é o que foi dito; a
+ * resposta é o que um modelo deduziu do que foi dito. Misturar as duas apagaria
+ * a diferença entre fala e dedução, que é a única coisa que não se pode perder
+ * numa tela que alguém vai citar numa reunião. */
+.aovivo__perguntar {
+  display: flex;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-3);
+  padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+}
+.aovivo__perguntar .aa-entrada { flex: 1; min-width: 0; }
+
+.aovivo__resposta {
+  margin-top: var(--espaco-3);
+  padding: var(--espaco-3);
+  border-radius: var(--raio-medio);
+  background: var(--cor-superficie-2);
+  border-left: 3px solid var(--cor-destaque);
+}
+.aovivo__resposta-pergunta {
+  margin: 0 0 var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+}
+.aovivo__resposta-texto { margin: 0; white-space: pre-wrap; }
+
+/* Esperando, o texto fica acinzentado: é o mesmo vocabulário do tentativo da
+ * legenda — cinza quer dizer "ainda não é isto". */
+.aovivo__resposta[data-estado="esperando"] .aovivo__resposta-texto {
+  color: var(--cor-texto-suave);
+  font-style: italic;
+}
+
 /* O separador que nomeia o bloco e o estado dele (decisão D4). Hachura e texto
  * acinzentado dizem "isto ainda pode mudar" sem precisar de legenda. */
 .aovivo__bloco {

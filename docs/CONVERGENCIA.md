@@ -741,6 +741,56 @@ para melhor: **sobram ~3,5 GB**, o que abre a classe dos 3B. A legenda ficou em
 864,8 MiB dígito por dígito nas trinta amostras — evidência contra vazamento de
 VRAM na sessão de streaming, que era a suspeita aberta.
 
+### O primeiro degrau existe, e ele muda a conta — 16/09/2026
+
+**Construído:** a caixa de perguntar, no painel ao vivo do Gravador. Escreve-se
+a pergunta, o motor de ata sobe, responde e morre. As peças:
+
+| peça | onde |
+|---|---|
+| a montagem do texto, o corte e a vez | [PerguntaDaReuniao.cs](../app-net/Nucleo/PerguntaDaReuniao.cs) |
+| a instrução, sozinha porque é o que mais vai mudar | [PromptDeReuniao.cs](../app-net/Nucleo/Atas/PromptDeReuniao.cs) |
+| a op `perguntar-ao-vivo` | [Ponte.cs](../app-net/App/Ponte.cs) |
+| a caixa e a resposta | [aovivo.js](../app-net/App/web/aovivo.js) |
+
+**O motor sobe por pergunta e morre depois dela**, e isso responde ao item 3 do
+`tools/medir_llm_ao_vivo.py` pelo lado do risco, não pelo da conta: um 4B quente
+a reunião inteira é o terceiro contexto CUDA que derrubou a legenda de 2,46× para
+0,45× em 11/09. Custa ~6 s de carga por pergunta, e é o preço de a reunião
+continuar sendo transcrita enquanto se pergunta sobre ela.
+
+**Medido em 16/09/2026**, contra o `legenda.json` real da reunião de 15/09 às
+14:01, com o `qwen3-4b-instruct-q4km` e os mesmos argumentos que o
+`MotorDeAta.Subir` usa (`-ngl 99 -ctk q8_0 -ctv q8_0 -fa on -c 20480`), na 2060
+com o desktop rodando:
+
+```
+ 5,9 s   o modelo carregar
+15,8 s   a resposta inteira (7.274 tokens de prompt, 412 de saída)
+27.130   caracteres de legenda  →  7.274 tokens   (3,73 char/token)
+```
+
+**A conta desta seção supunha o dobro.** A régua de 15/09 mediu o prompt *da
+passada final* — carimbo e falante por trecho —, e deu ~18.000 tokens para 46
+minutos. **A legenda ao vivo custa menos da metade disso** pelo formato: sem
+carimbo, e com os turnos do mesmo lado juntos numa linha só. Isso não reprova
+nem aprova candidato sozinho, mas afrouxa o teto que reprovou o `Gemma 3 1B`.
+
+> **A constante de dimensionamento continua em 2,5 char/token, e de propósito.**
+> Ela agora erra por ~1,5× **para o lado seguro**: superestimar o contexto custa
+> VRAM, subestimar custa a resposta depois de a pessoa já ter esperado.
+
+**A regra de não inventar segura.** Perguntado "qual foi o orçamento aprovado e
+em que data o contrato foi assinado?" sobre uma reunião que não fala de nenhum
+dos dois, a resposta foi *"Isso não foi falado até agora."*, em 43 tokens.
+
+**O que fica aberto, e é a fase de ajustes:** o bake-off dos quatro candidatos
+abaixo (a versão construída usa o modelo de ata configurado, seja ele qual for),
+o comprimento da resposta — pediu-se *"direto e curto"* e vieram 412 tokens —, e
+**o relógio**: a legenda não carimba turno, então pergunta com recorte de tempo
+("os últimos 10 minutos") não tem como ser respondida. O conserto é carimbar o
+turno na `LegendaAoVivo`, e é trabalho à parte.
+
 ### Os quatro competidores do `T2.1`, com o `Gemma 3 1B` já reprovado
 
 | | contexto | GGUF Q4_K_M | licença | pt-BR |

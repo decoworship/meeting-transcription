@@ -59,7 +59,92 @@ export function painelAoVivo() {
 
   const aviso = document.createElement("div");
 
-  raiz.append(topo, aviso, corpo, voltar);
+  // ── Perguntar ao modelo o que já aconteceu ───────────────────────────────
+  //
+  // **O motor sobe por pergunta e morre depois dela**, e é por isso que cada
+  // resposta leva uns dez segundos. Um 4B quente a reunião inteira é o terceiro
+  // contexto CUDA que derrubou a legenda de 2,46x para 0,45x em 11/09/2026
+  // (docs/FASE7-ROTA.md §4) — e legenda abaixo de 1x atrasa sem parar.
+  //
+  // **A resposta fica acima do campo**, e não dentro da lista: a lista é o que
+  // foi dito, e misturar nela o que um modelo deduziu apagaria a diferença
+  // entre o que alguém falou e o que a máquina achou.
+  const resposta = document.createElement("div");
+  resposta.className = "aovivo__resposta";
+  resposta.hidden = true;
+
+  const perguntar = document.createElement("form");
+  perguntar.className = "aovivo__perguntar";
+
+  const campo = document.createElement("input");
+  campo.className = "aa-entrada";
+  campo.type = "text";
+  campo.placeholder = "Pergunte o que já aconteceu…";
+
+  const enviar = document.createElement("button");
+  enviar.className = "aa-btn";
+  enviar.type = "submit";
+  enviar.textContent = "Perguntar";
+
+  perguntar.append(campo, enviar);
+
+  raiz.append(topo, aviso, corpo, voltar, resposta, perguntar);
+
+  perguntar.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const pergunta = campo.value.trim();
+    if (!pergunta || enviar.disabled) return;
+
+    enviar.disabled = true;
+    resposta.hidden = false;
+    resposta.dataset.estado = "esperando";
+    // A espera é dita de frente, com o motivo. Sem o motivo, dez segundos de
+    // silêncio parecem defeito — e o defeito é o que este projeto evita
+    // parecer quando está funcionando.
+    resposta.replaceChildren(
+      linhaDaPergunta(pergunta),
+      paragrafo("carregando o modelo…", "aovivo__resposta-texto"));
+
+    try {
+      const r = await pedir("perguntar-ao-vivo", { pergunta }, (p) => {
+        if (raiz.isConnected && p.texto)
+          resposta.replaceChildren(
+            linhaDaPergunta(pergunta),
+            paragrafo(p.texto, "aovivo__resposta-texto"));
+      });
+      if (!raiz.isConnected) return;
+
+      resposta.dataset.estado = "pronta";
+      const partes = [linhaDaPergunta(pergunta),
+                      paragrafo(r.resposta || "", "aovivo__resposta-texto")];
+      // Quem perguntou tem direito de saber que a resposta não considerou a
+      // reunião inteira. Escondê-lo faria o modelo parecer confiante sobre um
+      // começo que ele não viu.
+      if (r.cortado)
+        partes.push(alerta("A reunião não coube inteira: o modelo leu só a parte "
+                         + "final dela.", "atencao"));
+      resposta.replaceChildren(...partes);
+      campo.value = "";
+    } catch (erro) {
+      if (!raiz.isConnected) return;
+      resposta.dataset.estado = "erro";
+      resposta.replaceChildren(linhaDaPergunta(pergunta),
+                               alerta(erro.message, "atencao"));
+    } finally {
+      enviar.disabled = false;
+    }
+  });
+
+  function linhaDaPergunta(texto) {
+    return paragrafo(texto, "aovivo__resposta-pergunta");
+  }
+
+  function paragrafo(texto, classe) {
+    const el = document.createElement("p");
+    el.className = classe;
+    el.textContent = texto;
+    return el;
+  }
 
   // A coluna rola sozinha — é o que a decisão D1 pede (duas colunas com
   // rolagens separadas enquanto grava) e o que permite ler o que foi dito há

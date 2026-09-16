@@ -20,6 +20,10 @@ Ela monta o `painelAoVivo()` sozinho, com a ponte falsa do molde do
 3. **a grade de duas colunas** do Gravador não deixa nada além da prévia
    escorregar para a direita (o ``grid-row: 1 / -1`` **não** atravessa linhas
    implícitas, e sem a regra da coluna 1 a agenda ia parar debaixo da legenda).
+4. **a caixa de perguntar ao modelo** faz a volta inteira — espera dizendo por
+   quê, resposta na tela, aviso quando o modelo não viu a reunião inteira — e a
+   resposta **não entra na lista**: a lista é o que foi dito, e a resposta é o
+   que um modelo deduziu do que foi dito.
 
 Uso::
 
@@ -44,6 +48,14 @@ window.chrome = { webview: {
   postMessage(txt) {
     const p = JSON.parse(txt);
     if (p.op === "aovivo") this._empurrar({ id: p.id, aovivo_ate: [] });
+    if (p.op === "perguntar-ao-vivo") {
+      window.__perguntado = p.pergunta;
+      this._empurrar({ id: p.id, tipo: "progresso",
+                       texto: "carregando o modelo e lendo a reunião\u2026" });
+      setTimeout(() => this._empurrar(
+        { id: p.id, resposta: "Falaram do instalador e ficou de medir o Parakeet.",
+          cortado: true }), 400);
+    }
   },
   _empurrar(ev) { for (const f of this._ouvintes) f({ data: JSON.stringify(ev) }); },
 }};
@@ -133,6 +145,30 @@ def main() -> int:
                 txt: e.textContent.trim().replace(/\\s+/g, ' ') }))""")
             separadores = pg.locator(".aovivo__bloco").count()
 
+            # ── 4: perguntar ao modelo ─────────────────────────────────────
+            pg.fill(".aovivo__perguntar .aa-entrada", "o que ficou decidido?")
+            pg.click(".aovivo__perguntar button")
+
+            # A espera é dita de frente: dez segundos de silêncio parecem
+            # defeito, e o defeito é o que este projeto evita parecer quando
+            # está funcionando.
+            pg.wait_for_timeout(150)
+            esperando = {
+                "estado": pg.get_attribute(".aovivo__resposta", "data-estado"),
+                "texto": pg.inner_text(".aovivo__resposta").strip(),
+                "botao": pg.is_disabled(".aovivo__perguntar button"),
+            }
+
+            pg.wait_for_selector(".aovivo__resposta[data-estado='pronta']", timeout=5000)
+            pergunta = pg.evaluate("""() => ({
+                echo: document.querySelector('.aovivo__resposta-pergunta').textContent,
+                resposta: document.querySelector('.aovivo__resposta-texto').textContent,
+                aviso: !!document.querySelector('.aovivo__resposta .aa-alerta'),
+                campo: document.querySelector('.aovivo__perguntar .aa-entrada').value,
+                naLista: !!document.querySelector('.aovivo__corpo .aovivo__resposta-texto'),
+                chegouAoNucleo: window.__perguntado,
+            })""")
+
             # ── 3: as duas colunas ─────────────────────────────────────────
             pg.route("**/colunas", lambda r: r.fulfill(content_type="text/html", body=COLUNAS))
             pg.goto(f"http://127.0.0.1:{PORTA}/colunas")
@@ -164,6 +200,29 @@ def main() -> int:
     print(f"   manteve exatamente um balão volátil:          {um_volatil}")
     print(f"   dono à direita, os outros à esquerda:         {lados}")
 
+    print("\n4. perguntar ao modelo:")
+    print(f"   enquanto espera:  estado={esperando['estado']!r} botão travado="
+          f"{esperando['botao']}")
+    print(f"   {esperando['texto']!r}")
+    print(f"   a pergunta chegou ao núcleo:   {pergunta['chegouAoNucleo']!r}")
+    print(f"   a resposta na tela:            {pergunta['resposta']!r}")
+
+    espera_honesta = (esperando["estado"] == "esperando" and esperando["botao"]
+                      and "carregando" in esperando["texto"])
+    respondeu = pergunta["resposta"].startswith("Falaram do instalador")
+    # O eco da pergunta é o que permite ler a resposta depois de a tela ter
+    # rolado — sem ele, "sim" na tela não quer dizer nada.
+    ecoou = "o que ficou decidido?" in pergunta["echo"]
+    avisou_do_corte = pergunta["aviso"]
+    limpou = pergunta["campo"] == ""
+    fora_da_lista = not pergunta["naLista"]
+
+    print(f"\n   a espera diz por que está esperando:          {espera_honesta}")
+    print(f"   respondeu, com o eco da pergunta:            {respondeu and ecoou}")
+    print(f"   avisou que só viu a parte final da reunião:  {avisou_do_corte}")
+    print(f"   limpou o campo para a próxima:               {limpou}")
+    print(f"   a resposta ficou FORA da lista de falas:     {fora_da_lista}")
+
     esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
     colunas = len({c["x"] for c in esq}) == 1 and previa["x"] > max(c["x"] for c in esq)
@@ -173,7 +232,8 @@ def main() -> int:
         print("\nERROS DE JAVASCRIPT:\n  " + "\n  ".join(erros))
 
     ok = (separadores == 1 and agrupou and um_volatil and lados
-          and colunas and not erros)
+          and colunas and espera_honesta and respondeu and ecoou
+          and avisou_do_corte and limpou and fora_da_lista and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1
 

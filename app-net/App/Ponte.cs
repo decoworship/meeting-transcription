@@ -75,6 +75,9 @@ internal sealed class Pedido
 
     /// <summary>O id do evento da agenda a fixar; vazio solta a escolha.</summary>
     [JsonPropertyName("evento")] public string? Evento { get; init; }
+
+    /// <summary>O que se quer saber da reunião em curso, em português.</summary>
+    [JsonPropertyName("pergunta")] public string? Pergunta { get; init; }
 }
 
 internal sealed class Resposta
@@ -110,6 +113,18 @@ internal sealed class Resposta
 
     /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
     [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
+
+    /// <summary>O que o modelo respondeu sobre a reunião em curso.</summary>
+    [JsonPropertyName("resposta")] public string? RespostaDoModelo { get; init; }
+
+    /// <summary>
+    /// O modelo só viu a parte final da reunião — o começo não coube.
+    /// </summary>
+    /// <remarks>
+    /// Vai para a tela, e não só para o prompt: quem perguntou tem direito de
+    /// saber que a resposta não considerou a reunião inteira.
+    /// </remarks>
+    [JsonPropertyName("cortado")] public bool? Cortado { get; init; }
 
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
@@ -583,6 +598,26 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private SessaoAoVivo? _aoVivo;
     private LegendaAoVivo? _legenda;
 
+    /// <summary>
+    /// A pasta da gravação em curso, para a pergunta saber sobre o que é.
+    /// </summary>
+    /// <remarks>
+    /// Guardada mesmo quando nem a legenda nem a prévia ligaram: é o que separa
+    /// "não há reunião acontecendo" de "há, mas ninguém está transcrevendo ela"
+    /// — duas frases que pedem coisas diferentes de quem lê.
+    /// </remarks>
+    private string? _pastaAoVivo;
+
+    /// <summary>
+    /// Quem leva a pergunta ao modelo, uma de cada vez.
+    /// </summary>
+    /// <remarks>
+    /// Uma instância só para a ponte inteira, e é ela que guarda a vez: duas
+    /// subidas do <c>llama-server</c> ao mesmo tempo são dois modelos na placa
+    /// durante uma reunião que está sendo gravada.
+    /// </remarks>
+    private readonly PerguntaDaReuniao _pergunta = new(PerguntarAoMotorAsync);
+
     public async Task AtenderAsync(string mensagem)
     {
         Pedido? p;
@@ -670,6 +705,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "gerar-ata":
                     GerarAta(p);
+                    break;
+
+                case "perguntar-ao-vivo":
+                    await PerguntarAoVivoAsync(p);
                     break;
 
                 case "exportar-ata":
@@ -1231,6 +1270,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
     private void ComecarAPrevia(string pasta)
     {
+        _pastaAoVivo = pasta;
         try
         {
             _aoVivo?.Dispose();
@@ -1282,6 +1322,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// <summary>Descarta a prévia. Nunca lança, pela mesma razão.</summary>
     private void EncerrarAPrevia()
     {
+        _pastaAoVivo = null;
+
         // **Fecha com graça, e em segundo plano.** O `finalize()` do motor é
         // quem devolve o texto quando nada firmou durante a reunião, e esperá-lo
         // aqui seguraria quem acabou de parar a gravação. O arquivo cai na pasta
@@ -1496,6 +1538,145 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// modelo de ata só carregue com a VRAM do ASR liberada. A bolinha do trilho
     /// acende para os dois pelo mesmo caminho.
     /// </remarks>
+    /// <summary>
+    /// Pergunta ao modelo o que já aconteceu na reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É a única operação que sobe um modelo enquanto se grava</b>, e por
+    /// isso ela nasce curta: sobe, pergunta, morre. O motor quente a reunião
+    /// inteira é o terceiro contexto CUDA que derrubou a legenda de 2,46× para
+    /// 0,45× em 11/09/2026 (docs/FASE7-ROTA.md §4) — ver
+    /// <see cref="PerguntaDaReuniao"/>.
+    /// </para>
+    /// <para>
+    /// <b>O <c>gravacao</c> é opcional, e é o banco de ensaio</b>: apontando
+    /// para uma pasta do acervo, a mesma pergunta roda sobre o
+    /// <c>legenda.json</c> dela sem precisar de reunião acontecendo. É como as
+    /// instruções do <see cref="PromptDeReuniao"/> se ajustam.
+    /// </para>
+    /// </remarks>
+    private async Task PerguntarAoVivoAsync(Pedido p)
+    {
+        if (p.Pergunta is not { Length: > 0 } pergunta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = "sem pergunta" });
+            return;
+        }
+
+        // O motor de ata não vem no instalador, e "não está lá" é o estado
+        // normal de quem acabou de instalar. A frase do OQueFalta já diz onde
+        // baixar — e dizê-la **antes** de montar o prompt evita a espera inútil.
+        var cfg = ConfiguracoesDoApp.Carregar();
+        var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta);
+        if (caminhos.OQueFalta() is { } falta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = falta });
+            return;
+        }
+
+        string? pasta = p.Gravacao is { Length: > 0 } g ? g : _pastaAoVivo;
+        if (pasta is null)
+        {
+            Responder(new Resposta
+            {
+                Id = p.Id,
+                Erro = "não há reunião acontecendo — comece a gravar, ou escolha uma "
+                     + "gravação já feita.",
+            });
+            return;
+        }
+
+        int limite = PerguntaDaReuniao.LimiteDeCaracteres(MetadadosDoGguf.Ler(caminhos.Modelo));
+        var texto = LerAReuniaoAteAgora(pasta, limite);
+
+        if (texto.Texto.Length == 0)
+        {
+            Responder(new Resposta
+            {
+                Id = p.Id,
+                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo ou a "
+                     + "prévia em blocos precisam estar ligadas em Ajustes › Transcrição, "
+                     + "e leva alguns segundos até a primeira fala firmar.",
+            });
+            return;
+        }
+
+        // Um progresso só, e fixo. Não há o que medir: o modelo leva de 6 a 9
+        // segundos para carregar e depois escreve de uma vez. Inventar uma
+        // barra que anda sozinha seria mentir sobre o que está acontecendo.
+        Responder(new Resposta
+        {
+            Id = p.Id, Tipo = "progresso", Etapa = "modelo", Fracao = 0.1,
+            Texto = "carregando o modelo e lendo a reunião…",
+        });
+
+        string resposta = await _pergunta.ResponderAsync(pergunta, texto, CancellationToken.None);
+
+        Responder(new Resposta
+        {
+            Id = p.Id, RespostaDoModelo = resposta, Cortado = texto.Cortado,
+        });
+    }
+
+    /// <summary>
+    /// A reunião até agora, na melhor fonte que existir.
+    /// </summary>
+    /// <remarks>
+    /// <b>A legenda primeiro, e o disco é a fonte</b> — não a instância viva.
+    /// O <c>legenda.json</c> é reescrito a cada trecho que firma, então ele é
+    /// tão fresco quanto a memória, e o mesmo caminho serve à gravação já
+    /// encerrada do banco de ensaio.
+    /// <para>
+    /// <b>A repetição não é paranoia.</b> O <c>Gravar()</c> da legenda usa
+    /// <c>File.WriteAllText</c>, que <b>trunca antes de escrever</b>; uma leitura
+    /// no instante errado pega o arquivo pela metade, e o <c>Ler</c> devolve
+    /// <c>null</c> para qualquer erro. Sem repetir, a pergunta feita no momento
+    /// de um commit responderia "ainda não há nada transcrito" numa reunião
+    /// cheia de texto.
+    /// </para>
+    /// </remarks>
+    private TextoDaReuniao LerAReuniaoAteAgora(string pasta, int limite)
+    {
+        for (int tentativa = 0; tentativa < 3; tentativa++)
+        {
+            if (LegendaAoVivo.Ler(pasta) is { Turnos.Count: > 0 } legenda)
+                return PerguntaDaReuniao.DaLegenda(legenda.Turnos, limite);
+
+            if (!File.Exists(Path.Combine(pasta, LegendaAoVivo.Arquivo))) break;
+            Thread.Sleep(50);
+        }
+
+        return PerguntaDaReuniao.DosBlocos(_aoVivo?.Entregues ?? [], limite);
+    }
+
+    /// <summary>
+    /// Leva o prompt ao <c>llama-server</c> e devolve o texto da resposta.
+    /// </summary>
+    /// <remarks>
+    /// Reusa o <c>ResponderAsync</c> do motor de ata, que já sobe, pergunta e
+    /// mata — nenhum código de processo novo. O esquema de um campo só existe
+    /// pela razão medida em 25/08: sem ele, um modelo de raciocínio delibera
+    /// até estourar o limite sem emitir nada.
+    /// </remarks>
+    private static async Task<string> PerguntarAoMotorAsync(string prompt, CancellationToken ct)
+    {
+        var cfg = ConfiguracoesDoApp.Carregar();
+        var motor = new MotorDeAta(CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
+
+        var respostas = await motor.ResponderAsync(
+            PromptDeReuniao.Sistema, [prompt], "resposta", PerguntaDaReuniao.Esquema,
+            PerguntaDaReuniao.TokensDeSaida, progresso: null, ct);
+
+        // JsonDocument e não JsonSerializer: reflexão é erro de build sob
+        // PublishTrimmed, e ela reprova só na publicação.
+        using var doc = JsonDocument.Parse(respostas[0]);
+        return doc.RootElement.TryGetProperty("resposta", out var r)
+               && r.GetString() is { Length: > 0 } texto
+            ? texto
+            : "o modelo devolveu uma resposta vazia.";
+    }
+
     private void GerarAta(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)
