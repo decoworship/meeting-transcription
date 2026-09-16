@@ -55,6 +55,61 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     /// <summary>Contexto a supor quando o GGUF não declara o dele.</summary>
     private const int ContextoQuandoNaoSeSabe = 16_384;
 
+    /// <summary>
+    /// Quanta reunião o modelo lê, no máximo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Decisão do dono do produto em 16/09/2026</b>, e ela tem dois lados que
+    /// caem no mesmo lugar. O de produto: <i>"se passar disso, o início da
+    /// reunião pode ser que não seja tão relevante para ser resumido"</i>. O de
+    /// máquina: sem esta janela, uma reunião de duas horas pede ~32k de contexto,
+    /// e aí <b>não cabe na placa ao lado da legenda</b> — medido em 16/09, o
+    /// <c>ministral-3-3b</c> sobe para 4.183 MiB e o <c>qwen3.5-4b</c> para
+    /// 3.436, contra ~3.553 MiB livres numa reunião de verdade
+    /// (docs/ESTUDO-RESUMO-AO-VIVO.md §10).
+    /// </para>
+    /// <para>
+    /// <b>É teto, e não piso:</b> num modelo que não comporta uma hora de fala,
+    /// quem corta continua sendo o contexto dele.
+    /// </para>
+    /// </remarks>
+    public const int JanelaMaximaMinutos = 60;
+
+    /// <summary>
+    /// Caracteres de transcrição por minuto de reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Medido em três reuniões do acervo</b>, no formato em turnos: 820, 617
+    /// e 619 caracteres por minuto. O valor usado é o <b>maior</b>, e a escolha
+    /// é deliberada — superestimar encurta a janela, que é o lado seguro;
+    /// subestimar a alonga, e o custo disso é a placa estourar durante uma
+    /// reunião que está sendo gravada.
+    /// <para>
+    /// <b>Por que caracteres e não relógio.</b> A legenda ao vivo não carimba
+    /// turno, então "a última hora" não existe como corte de tempo — só como
+    /// tamanho de texto. Quando o turno ganhar carimbo, isto vira minuto de
+    /// verdade e esta constante some.
+    /// </para>
+    /// </remarks>
+    public const int CaracteresPorMinuto = 800;
+
+    /// <summary>A janela em caracteres, que é como ela é aplicada.</summary>
+    public const int JanelaMaximaCaracteres = JanelaMaximaMinutos * CaracteresPorMinuto;
+
+    /// <summary>O que impede a pergunta de acontecer, ou <c>null</c>.</summary>
+    /// <remarks>
+    /// Perguntado <b>antes</b> de montar o prompt, para o motivo aparecer na
+    /// tela em vez de a caixa simplesmente não responder.
+    /// </remarks>
+    public static string? OQueImpede(ConfiguracoesDoApp config, CaminhosDoMotorDeAta caminhos)
+    {
+        if (!config.PerguntarAoVivo)
+            return "perguntar durante a reunião está desligado em Ajustes › Transcrição.";
+
+        return caminhos.OQueFalta();
+    }
+
     /// <summary>Folga para a pergunta e a moldura, em tokens.</summary>
     private const int FolgaDaInstrucao = 512;
 
@@ -62,12 +117,12 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     /// Quanta transcrição cabe no prompt deste modelo.
     /// </summary>
     /// <remarks>
-    /// <b>A reserva que manda não é a nossa.</b> O
-    /// <see cref="MotorDeAta.Dimensionar"/> guarda os <c>TokensDeSaida</c> dele
-    /// — 8.192 — qualquer que seja o <c>max_tokens</c> do pedido, e recusa
-    /// **depois** de o modelo ter carregado. Uma pergunta que falhasse assim
-    /// custaria nove segundos de espera para terminar em erro, numa reunião
-    /// acontecendo.
+    /// <b>Dois tetos, e vence o menor.</b> Um é o contexto do modelo menos o que
+    /// vamos escrever; o outro é a <see cref="JanelaMaximaCaracteres"/>, que na
+    /// prática é quem manda em todo modelo de contexto grande. O
+    /// <see cref="MotorDeAta.Dimensionar"/> recusa **depois** de o modelo ter
+    /// carregado, e uma pergunta que falhasse assim custaria nove segundos de
+    /// espera para terminar em erro, numa reunião acontecendo.
     /// <para>
     /// A constante de 2,5 caracteres por token erra por ~1,5× para o lado
     /// seguro: medido em 16/09/2026, o formato em turnos dá 3,3 a 3,8.
@@ -76,8 +131,13 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     public static int LimiteDeCaracteres(MetadadosDoGguf modelo)
     {
         int contexto = modelo.ContextoMaximo > 0 ? modelo.ContextoMaximo : ContextoQuandoNaoSeSabe;
-        int paraOTexto = contexto - MotorDeAta.TokensDeSaida - FolgaDaInstrucao;
-        return Math.Max(0, (int)(paraOTexto * MotorDeAta.CaracteresPorToken));
+        // A reserva é a NOSSA saída, e não os 8.192 da ata: o Dimensionar passou
+        // a aceitar o orçamento de quem chama, e eram sete mil tokens de
+        // contexto pedidos à toa.
+        int paraOTexto = contexto - TokensDeSaida - FolgaDaInstrucao;
+        int cabeNoModelo = Math.Max(0, (int)(paraOTexto * MotorDeAta.CaracteresPorToken));
+
+        return Math.Min(JanelaMaximaCaracteres, cabeNoModelo);
     }
 
     private int _ocupado;

@@ -114,6 +114,15 @@ internal sealed class Resposta
     /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
     [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
 
+    /// <summary>
+    /// O que impede a caixa de perguntar, ou nulo quando ela pode existir.
+    /// </summary>
+    /// <remarks>
+    /// A tela pergunta ao montar. Sem isto a caixa apareceria ligada com a chave
+    /// desligada, e o erro só viria depois de a pessoa escrever a pergunta.
+    /// </remarks>
+    [JsonPropertyName("perguntar_impedimento")] public string? PerguntarImpedimento { get; init; }
+
     /// <summary>O que o modelo respondeu sobre a reunião em curso.</summary>
     [JsonPropertyName("resposta")] public string? RespostaDoModelo { get; init; }
 
@@ -1022,6 +1031,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                                 : "nem a legenda nem a prévia em blocos estão ligadas "
                                   + "em Ajustes › Transcrição.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
+                        PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
+                            cfgAv, CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgAv.ModeloDeAta)),
                     });
                     break;
 
@@ -1569,7 +1580,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         // baixar — e dizê-la **antes** de montar o prompt evita a espera inútil.
         var cfg = ConfiguracoesDoApp.Carregar();
         var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta);
-        if (caminhos.OQueFalta() is { } falta)
+        if (PerguntaDaReuniao.OQueImpede(cfg, caminhos) is { } falta)
         {
             Responder(new Resposta { Id = p.Id, Erro = falta });
             return;

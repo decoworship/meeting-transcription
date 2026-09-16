@@ -20,6 +20,8 @@ Ela monta o `painelAoVivo()` sozinho, com a ponte falsa do molde do
 3. **a grade de duas colunas** do Gravador não deixa nada além da prévia
    escorregar para a direita (o ``grid-row: 1 / -1`` **não** atravessa linhas
    implícitas, e sem a regra da coluna 1 a agenda ia parar debaixo da legenda).
+5. **a chave desligada esconde a caixa de perguntar** — o núcleo manda o
+   impedimento no `aovivo`, e a caixa não nasce;
 4. **a caixa de perguntar ao modelo** faz a volta inteira — espera dizendo por
    quê, resposta na tela, aviso quando o modelo não viu a reunião inteira — e a
    resposta **não entra na lista**: a lista é o que foi dito, e a resposta é o
@@ -47,7 +49,8 @@ window.chrome = { webview: {
   addEventListener(_, f) { this._ouvintes.push(f); },
   postMessage(txt) {
     const p = JSON.parse(txt);
-    if (p.op === "aovivo") this._empurrar({ id: p.id, aovivo_ate: [] });
+    if (p.op === "aovivo") this._empurrar(
+      { id: p.id, aovivo_ate: [], perguntar_impedimento: window.__impedimento || null });
     if (p.op === "perguntar-ao-vivo") {
       window.__perguntado = p.pergunta;
       this._empurrar({ id: p.id, tipo: "progresso",
@@ -68,6 +71,14 @@ document.getElementById("alvo").appendChild(painelAoVivo().raiz);
 window.__pronto = true;
 </script>
 """
+
+#: A mesma página, com o núcleo dizendo que a caixa não pode existir. É a
+#: regressão que importa: caixa de perguntar aparecendo com a chave desligada
+#: faz a pessoa escrever a pergunta para só então descobrir o impedimento.
+DESLIGADO = PAINEL.replace(
+    "<script>\nwindow.chrome",
+    "<script>\nwindow.__impedimento = 'perguntar durante a reunião está desligado "
+    "em Ajustes › Transcrição.';\nwindow.chrome")
 
 COLUNAS = """<!doctype html><meta charset="utf-8">
 <link rel="stylesheet" href="/app.css">
@@ -169,6 +180,14 @@ def main() -> int:
                 chegouAoNucleo: window.__perguntado,
             })""")
 
+            # ── 5: a chave desligada esconde a caixa ───────────────────────
+            pg.route("**/desligado",
+                     lambda r: r.fulfill(content_type="text/html", body=DESLIGADO))
+            pg.goto(f"http://127.0.0.1:{PORTA}/desligado")
+            pg.wait_for_function("window.__pronto === true", timeout=5000)
+            pg.wait_for_timeout(200)
+            caixa_escondida = pg.locator(".aovivo__perguntar").is_hidden()
+
             # ── 3: as duas colunas ─────────────────────────────────────────
             pg.route("**/colunas", lambda r: r.fulfill(content_type="text/html", body=COLUNAS))
             pg.goto(f"http://127.0.0.1:{PORTA}/colunas")
@@ -223,6 +242,8 @@ def main() -> int:
     print(f"   limpou o campo para a próxima:               {limpou}")
     print(f"   a resposta ficou FORA da lista de falas:     {fora_da_lista}")
 
+    print(f"\n5. com a chave desligada, a caixa some:           {caixa_escondida}")
+
     esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
     colunas = len({c["x"] for c in esq}) == 1 and previa["x"] > max(c["x"] for c in esq)
@@ -233,7 +254,8 @@ def main() -> int:
 
     ok = (separadores == 1 and agrupou and um_volatil and lados
           and colunas and espera_honesta and respondeu and ecoou
-          and avisou_do_corte and limpou and fora_da_lista and not erros)
+          and avisou_do_corte and limpou and fora_da_lista and caixa_escondida
+          and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1
 

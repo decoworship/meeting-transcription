@@ -1013,6 +1013,35 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   }), oQueCustaLegenda);
   painel.appendChild(legenda);
 
+  // ---- perguntar durante a reunião
+  //
+  // **Esta convive com as duas de cima**, e é a única que convive: o motor de
+  // ata sobe por pergunta e morre depois dela, então não disputa a placa o tempo
+  // todo. O que ela custa é um engasgo na legenda enquanto responde.
+  //
+  // A chave existe por um motivo que o dono do produto deu com todas as letras:
+  // poder desligar quando a máquina estiver sendo usada para outra coisa.
+  const perguntar = bloco("Perguntar durante a reunião");
+  perguntar.classList.add("bloco--chave");
+  const oQueEPerguntar = document.createElement("p");
+  oQueEPerguntar.className = "bloco__texto";
+  oQueEPerguntar.textContent = "Uma caixa no Gravador onde você escreve o que "
+    + "quiser sobre a reunião em curso — o que já foi falado, o que ficou "
+    + "pendente, sobre o que estão falando agora. O modelo lê o que já foi "
+    + "transcrito e responde ali mesmo.";
+  const oQueCustaPerguntar = document.createElement("p");
+  oQueCustaPerguntar.className = "campo__dica";
+  oQueCustaPerguntar.textContent = "Cada pergunta leva cerca de vinte segundos, "
+    + "e enquanto o modelo responde a legenda engasga — ele ocupa a placa e "
+    + "devolve logo depois. O modelo lê no máximo a última hora de reunião: "
+    + "acima disso o começo sai, e a resposta diz que saiu. Usa o modelo de ata "
+    + "escolhido em Ajustes › Modelos.";
+  perguntar.append(oQueEPerguntar, chave(config.perguntar_ao_vivo === true, async (v) => {
+    await gravar({ perguntar_ao_vivo: v });
+    recarregar();
+  }), oQueCustaPerguntar);
+  painel.appendChild(perguntar);
+
   // ---- qual modelo separa os falantes
   //
   // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este

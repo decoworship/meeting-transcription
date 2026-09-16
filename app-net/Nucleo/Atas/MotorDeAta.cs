@@ -167,10 +167,17 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     /// <param name="caracteresDoPrompt">O prompt montado, em caracteres.</param>
     /// <param name="modelo">Lido do próprio <c>.gguf</c>.</param>
     /// <param name="vramBytes">Total da placa. Zero quando não se sabe.</param>
+    /// <param name="tokensDeSaida">
+    /// Quanto quem chama vai deixar o modelo escrever. <b>Não é sempre os 8.192
+    /// da ata:</b> a pergunta ao vivo escreve 1.024, e reservar os 8.192 dela
+    /// inflava o contexto em sete mil tokens que ninguém ia usar — o que na
+    /// placa de 6 GB é VRAM que faz diferença durante uma reunião.
+    /// </param>
     public static (int Contexto, string Ctk, string Ctv) Dimensionar(
-        int caracteresDoPrompt, MetadadosDoGguf modelo, long vramBytes)
+        int caracteresDoPrompt, MetadadosDoGguf modelo, long vramBytes,
+        int tokensDeSaida = TokensDeSaida)
     {
-        int precisa = (int)(caracteresDoPrompt / CaracteresPorToken) + TokensDeSaida;
+        int precisa = (int)(caracteresDoPrompt / CaracteresPorToken) + tokensDeSaida;
 
         int teto = modelo.ContextoMaximo > 0
             ? Math.Min(modelo.ContextoMaximo, ContextoMaximoPratico)
@@ -298,7 +305,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
 
         var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
         int maior = perguntas.Max(p => p.Length);
-        var (contexto, ctk, ctv) = Dimensionar(maior, modelo, VramDaPlaca());
+        var (contexto, ctk, ctv) = Dimensionar(maior, modelo, VramDaPlaca(), tokensDeSaida);
         int porta = PortaLivre();
 
         progresso?.Invoke(new ProgressoDaAta("modelo", 0.05, "carregando o modelo"));

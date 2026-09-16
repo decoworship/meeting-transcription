@@ -88,6 +88,11 @@ export function painelAoVivo() {
 
   perguntar.append(campo, enviar);
 
+  // **Nasce escondida.** O núcleo diz no `aovivo` se ela pode existir; até lá
+  // não se promete caixa nenhuma. Mostrá-la com a chave desligada faria a
+  // pessoa escrever a pergunta para só então descobrir o impedimento.
+  perguntar.hidden = true;
+
   raiz.append(topo, aviso, corpo, voltar, resposta, perguntar);
 
   perguntar.addEventListener("submit", async (ev) => {
@@ -243,6 +248,9 @@ export function painelAoVivo() {
         : "";
     if (r.aovivo_impedimento)
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
+    // A caixa de perguntar tem chave própria, e não depende de a legenda ou a
+    // prévia estarem ligadas: ela lê o que houver, e se não houver nada ela diz.
+    perguntar.hidden = !!r.perguntar_impedimento;
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.

@@ -129,6 +129,24 @@ public sealed class ConfiguracoesDoApp
     /// </remarks>
     [JsonPropertyName("legenda_ao_vivo")] public bool LegendaAoVivo { get; set; }
 
+    /// <summary>
+    /// Perguntar ao modelo o que já aconteceu, durante a própria reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada</b>, como tudo o que sobe modelo durante a gravação.
+    /// E ela tem um motivo próprio para ter chave, dito pelo dono do produto em
+    /// 16/09/2026: é para poder <b>desligar</b> quando a máquina estiver sendo
+    /// usada para outra coisa. O motor de ata sobe por pergunta e devolve a
+    /// placa, mas enquanto ele responde a legenda engasga.
+    /// <para>
+    /// Ao contrário da <see cref="LegendaAoVivo"/> e da
+    /// <see cref="TranscricaoAoVivo"/>, <b>esta convive com as duas</b>: ela não
+    /// fica residente, e quem paga a conta é a janela de uma hora
+    /// (<c>PerguntaDaReuniao.JanelaMaximaMinutos</c>).
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("perguntar_ao_vivo")] public bool PerguntarAoVivo { get; set; }
+
     /// <summary>A chave conferida contra os dois valores que existem.</summary>
     /// <remarks>
     /// Portão único, como o <see cref="TemaAceito"/>: quem lê a chave lê por

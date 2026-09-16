@@ -184,4 +184,76 @@ public sealed class PerguntaDaReuniaoTests
         Assert.True(limite > 0);
         Assert.True(limite < PerguntaDaReuniao.LimiteDeCaracteres(Modelo(32_768)));
     }
+
+    // ─────────────────────────────── a janela de uma hora, e a chave
+
+    [Fact]
+    public void AJanelaGuardaUmaHoraDeFala()
+    {
+        // Decidido pelo dono do produto em 16/09/2026: acima de uma hora, o
+        // começo da reunião já não é o que alguém precisa para se situar. E ela
+        // é o teto de VRAM disfarçado de decisão de produto — sem ela, uma
+        // reunião de duas horas pede 32k de contexto, que não cabe ao lado da
+        // legenda (docs/ESTUDO-RESUMO-AO-VIVO.md §10).
+        Assert.Equal(60, PerguntaDaReuniao.JanelaMaximaMinutos);
+        Assert.Equal(60 * PerguntaDaReuniao.CaracteresPorMinuto,
+                     PerguntaDaReuniao.JanelaMaximaCaracteres);
+    }
+
+    [Fact]
+    public void OLimiteNuncaPassaDaJanela_MesmoNumModeloDeContextoEnorme()
+    {
+        // O qwen3.5-4b tem 262.144 nativos. Sem a janela, o limite sairia em
+        // ~600 mil caracteres, e a placa não tem como carregar isso durante uma
+        // reunião que está sendo gravada.
+        int limite = PerguntaDaReuniao.LimiteDeCaracteres(Modelo(262_144));
+
+        Assert.Equal(PerguntaDaReuniao.JanelaMaximaCaracteres, limite);
+    }
+
+    [Fact]
+    public void NumModeloPequenoQuemManda_EOContextoENaoAJanela()
+    {
+        // A janela é um teto, não um piso: um modelo que não comporta uma hora
+        // de fala continua sendo cortado pelo que ele aguenta.
+        int limite = PerguntaDaReuniao.LimiteDeCaracteres(Modelo(8_192));
+
+        Assert.True(limite < PerguntaDaReuniao.JanelaMaximaCaracteres,
+                    $"a janela venceu o contexto: {limite}");
+        Assert.True(limite > 0);
+    }
+
+    [Fact]
+    public void AChaveNasceDesligada()
+    {
+        // Tudo o que sobe modelo durante a gravação nasce desligado enquanto o
+        // SUP-2 estiver aberto. Um padrão que mude aqui é regressão de política.
+        Assert.False(new ConfiguracoesDoApp().PerguntarAoVivo);
+    }
+
+    [Fact]
+    public void DesligadaDizPorQueNaoExiste()
+    {
+        var cfg = new ConfiguracoesDoApp { PerguntarAoVivo = false };
+
+        string? porque = PerguntaDaReuniao.OQueImpede(
+            cfg, new CaminhosDoMotorDeAta("servidor.exe", "modelo.gguf"));
+
+        Assert.NotNull(porque);
+        Assert.Contains("Ajustes", porque);
+    }
+
+    [Fact]
+    public void LigadaSemOMotorEmDiscoDizOndeBaixar()
+    {
+        // "Não está lá" é o estado normal de quem acabou de instalar: o motor de
+        // ata não vem no instalador.
+        var cfg = new ConfiguracoesDoApp { PerguntarAoVivo = true };
+
+        string? porque = PerguntaDaReuniao.OQueImpede(
+            cfg, new CaminhosDoMotorDeAta("/nao/existe.exe", "/nao/existe.gguf"));
+
+        Assert.NotNull(porque);
+        Assert.Contains("Modelos", porque);
+    }
 }
