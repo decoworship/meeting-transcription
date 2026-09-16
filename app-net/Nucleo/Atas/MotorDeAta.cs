@@ -521,10 +521,17 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     /// <para>
     /// <b><c>enable_thinking: false</c></b> — medido em 17/08/2026. O Qwen3.5 4B
     /// é modelo de raciocínio e, com o padrão do template, gastou os tokens de
-    /// saída inteiros pensando. É ele, e não o esquema, quem protege contra a
-    /// deliberação: nas doze rodadas do estudo de 16/09, todas com esta chave,
-    /// nenhum modelo deliberou. Modelo que não conhece a variável a ignora no
+    /// saída inteiros pensando. Modelo que não conhece a variável a ignora no
     /// Jinja, e é por isso que ela pode ir em todos sem um "se".
+    /// </para>
+    /// <para>
+    /// <b>Mas ela não segura todos, e isso foi lido nos templates em
+    /// 16/09/2026.</b> Ela carrega peso em <c>qwen3-1.7b</c> e <c>smollm3-3b</c>,
+    /// que <b>pensam por padrão</b>; é inócua em <c>qwen3.5-4b</c> e
+    /// <c>gemma-4-e4b</c>, cujos templates já nascem com o raciocínio desligado;
+    /// e é ignorada por <c>qwen3-4b-instruct</c> e <c>ministral-3-3b</c>, que
+    /// nem leem a chave. Tirá-la quebra dois modelos em silêncio.
+    /// Ver <c>docs/ESTUDO-RESUMO-AO-VIVO.md</c> §2.
     /// </para>
     /// <para>
     /// Temperatura baixa, mas não zero: ata é registro, não criação. Zero deixa

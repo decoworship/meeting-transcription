@@ -246,7 +246,21 @@ def perguntar(modelo: Path, corpo: dict, troca: Path, rotulo: str,
     except Exception as e:
         return {"erro": f"resposta ilegível: {e}"}
 
-    cru = esc["message"]["content"]
+    cru = esc["message"]["content"] or ""
+
+    # **O pensamento não é resposta, e tem que sair da conta.** O llama-server
+    # devolve `reasoning_content` quando consegue separar; quando não consegue,
+    # o `<think>...</think>` vem dentro do próprio content. Medir os dois juntos
+    # daria um modelo "mais verboso" que na verdade só pensou mais alto.
+    pensamento = esc["message"].get("reasoning_content") or ""
+    if not pensamento and "<think>" in cru:
+        fim = cru.find("</think>")
+        if fim >= 0:
+            pensamento = cru[cru.find("<think>") + 7:fim]
+            cru = cru[fim + 8:].lstrip()
+        else:
+            pensamento, cru = cru, ""   # pensou e não sobrou resposta
+
     try:
         texto, preso = json.loads(cru)["resposta"], True
     except Exception:
@@ -262,6 +276,8 @@ def perguntar(modelo: Path, corpo: dict, troca: Path, rotulo: str,
         "saida_tokens": d["usage"]["completion_tokens"],
         "tok_por_s": round(t.get("predicted_per_second", 0), 1),
         "finish": esc.get("finish_reason"),
+        "pensamento_chars": len(pensamento),
+        "pensou": bool(pensamento),
         "vram_mib": pico - base if pico > 0 and base > 0 else -1,
     }
 
@@ -283,6 +299,14 @@ def main() -> int:
                     help="arquivo com a instrução de sistema. Vazio = nenhuma")
     ap.add_argument("--esquema", action="store_true",
                     help="prender a saída ao esquema JSON, como a ata faz")
+    ap.add_argument("--pensar", action="store_true",
+                    help="ligar o raciocínio explícito. Só quatro modelos leem a chave: "
+                         "qwen3-1.7b e smollm3-3b pensam por padrão SEM ela, e "
+                         "qwen3.5-4b e gemma-4-e4b só pensam COM ela. O "
+                         "qwen3-4b-instruct e o ministral-3-3b nem a leem")
+    ap.add_argument("--saida-max", type=int, default=1024,
+                    help="max_tokens. Pensar consome deste mesmo orçamento, "
+                         "então com --pensar convém subir")
     ap.add_argument("--modelo", action="append", required=True,
                     help="repetível: nome do .gguf")
     ap.add_argument("--contexto", type=int, default=0,
@@ -323,8 +347,9 @@ def main() -> int:
 
             mensagens = ([{"role": "system", "content": sistema}] if sistema else []) \
                 + [{"role": "user", "content": usuario}]
-            corpo = {"messages": mensagens, "temperature": 0.3, "max_tokens": 1024,
-                     "chat_template_kwargs": {"enable_thinking": False}}
+            corpo = {"messages": mensagens, "temperature": 0.3,
+                     "max_tokens": a.saida_max,
+                     "chat_template_kwargs": {"enable_thinking": bool(a.pensar)}}
             if a.esquema:
                 corpo["response_format"] = {
                     "type": "json_schema",
@@ -346,22 +371,22 @@ def main() -> int:
                      **{f"fora_{k}": v for k, v in fora.items()}}
             resultados.append(linha)
             print(f"   {r['resposta_s']}s · {r['saida_tokens']} tk · "
-                  f"{r['vram_mib']} MiB · termos de fora: {len(fora['termos'])}",
-                  flush=True)
+                  f"{r['vram_mib']} MiB · pensou {r['pensamento_chars']} chars · "
+                  f"resposta {len(texto)} chars", flush=True)
 
     (troca / "resultados.json").write_text(
         json.dumps(resultados, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n{'modelo':<26}{'resp':>7}{'tk':>6}{'tok/s':>7}{'VRAM':>8}"
-          f"{'termos':>8}{'núm':>6}{'citaç':>7}{'pt':>4}")
+          f"{'pensou':>8}{'resp.ch':>9}{'termos':>8}{'citaç':>7}")
     for r in resultados:
         if "erro" in r:
             print(f"{r['modelo']:<26}  {r['erro'][:50]}")
             continue
         print(f"{r['modelo']:<26}{r['resposta_s']:>6.1f}s{r['saida_tokens']:>6}"
               f"{r['tok_por_s']:>7.1f}{r['vram_mib']:>7}M"
-              f"{len(r['fora_termos']):>8}{len(r['fora_numeros']):>6}"
-              f"{len(r['fora_citacoes']):>7}{'sim' if r['portugues'] else 'NÃO':>4}")
+              f"{r['pensamento_chars']:>8}{r['chars']:>9}"
+              f"{len(r['fora_termos']):>8}{len(r['fora_citacoes']):>7}")
 
     print(f"\nrespostas e pedidos em {troca}")
     print("As três colunas de 'fora' apontam onde olhar, e não dão veredito:")

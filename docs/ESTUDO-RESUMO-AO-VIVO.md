@@ -105,9 +105,30 @@ termina sozinho.
 > `MotorDeAta.ResponderAsync` documenta a medição de 25/08: sem esquema e **com
 > raciocínio ligado**, o Qwen3.5 deliberou 3.000 tokens sem emitir nada. Nas doze
 > rodadas deste estudo, todas com `enable_thinking: false`, **nenhum modelo
-> deliberou** — os seis terminaram com `stop` e contagem sadia. Quem protege
-> contra a deliberação é a chave do raciocínio; o esquema estava pagando por um
-> trabalho que outro já fazia, e cobrando quatro modelos por isso.
+> deliberou** — os seis terminaram com `stop` e contagem sadia. O esquema estava
+> pagando por um trabalho que ele não precisava fazer, e cobrando quatro modelos
+> por isso.
+
+> **Correção de 16/09/2026, lida dos templates Jinja dentro dos GGUF.** Esta
+> seção dizia que *"quem protege contra a deliberação é a chave do raciocínio"*.
+> **É verdade para dois dos seis, e inócuo para os outros quatro** — e a
+> diferença importa para quem for mexer nisso:
+>
+> | modelo | padrão **sem** a chave | o que `enable_thinking: false` faz |
+> |---|---|---|
+> | `qwen3-1.7b` | **pensa** — o `<think>` fica aberto | **desliga**; carrega peso |
+> | `smollm3-3b` | **pensa** — a chave vem `true` por padrão | **desliga**, via `/no_think` |
+> | `qwen3.5-4b` | não pensa (`is defined and is true`) | nada — a chave é inócua |
+> | `gemma-4-e4b` | não pensa (`default(false)`) | nada — a chave é inócua |
+> | `qwen3-4b-instruct` | não pensa — o template nem lê a chave | ignorada |
+> | `ministral-3-3b` | não pensa — não é modelo de raciocínio | ignorada |
+>
+> **Continua-se passando a chave**, porque ela é grátis e é o que segura dois
+> modelos; o que não se pode é creditá-la pelo que ela não faz. E fica uma
+> divergência não resolvida: a medição de 17/08 viu o Qwen3.5 deliberar *"com o
+> padrão do template"*, e o template do GGUF que está em disco hoje tem o padrão
+> **desligado**. O arquivo é de 18/08, um dia depois — provavelmente foi baixado
+> outro build, e isso não dá para provar agora.
 
 ---
 
