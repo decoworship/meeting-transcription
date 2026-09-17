@@ -478,10 +478,32 @@ timestamps=word   5,04x   475 commits   1º aos 1,2 s
 Mesmo texto, mesmos commits, mesma latência de partida. A diferença está dentro
 do ruído entre rodadas. O motor pede `"none"` hoje por herança, não por medição.
 
-**Há dois caminhos, e o barato talvez baste:** o motor já calcula
-`_ms_de_antes + audio_committed_ms` a cada commit — carimbar o **turno** com
-isso não toca no modelo. O `timestamps="word"` dá a granularidade que a
-atribuição de falante quer, e agora se sabe que ela é grátis.
+**Havia dois caminhos, e o barato NÃO basta — medido em 17/09/2026.** A ideia
+era carimbar o **turno** com o que o motor já sabe
+(`_ms_de_antes + audio_committed_ms`), sem tocar no modelo. Contando os turnos
+das nove gravações do acervo:
+
+```
+gravação              turnos   palavras   donos
+2026-09-15_14-01-30      161      5.116   ambos
+2026-09-15_14-58-08       87      1.911   ambos
+2026-09-15_15-29-32        2      2.907   ambos
+2026-09-16_10-30-08        1      1.673   só "outros"
+2026-09-16_15-29-33      153      2.774   ambos
+2026-09-17_08-59-06        1      4.246   só "outros"
+2026-09-17_10-29-47        1      3.539   só "outros"
+2026-09-17_11-00-45       31      2.385   ambos
+2026-09-17_13-59-57       19        876   ambos
+```
+
+**Em três das nove a reunião inteira é UM turno.** São aquelas em que o dono do
+produto ficou com o microfone mudo: o `dono` nunca vira, e o turno nunca quebra.
+O comportamento está certo — o turno quebra por troca de dono, e não houve
+troca —, mas um turno de 4.246 palavras com um carimbo só não serve para
+sobrepor nada.
+
+**Então o caminho é o `timestamps="word"`**, que já se sabe custar zero. O
+barato não era mais barato: era insuficiente em um terço do acervo.
 
 ### VIVO-2 · Diarizar a legenda depois da reunião, em segundo plano — `feature` · `espera`
 
