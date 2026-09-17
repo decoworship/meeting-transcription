@@ -36,9 +36,16 @@ export function painelDePerguntas() {
   resumir.type = "button";
   resumir.textContent = "O que já rolou?";
 
-  // **As respostas acumulam, a mais nova no topo**, com teto e rolagem. Antes
-  // cada pergunta apagava a anterior, e pedir o detalhe custava o que veio
-  // antes — visto em uso em 16/09/2026.
+  // **As respostas acumulam em ordem de conversa: a mais nova embaixo**, com
+  // teto e rolagem. Antes cada pergunta apagava a anterior, e pedir o detalhe
+  // custava o que veio antes — visto em uso em 16/09/2026.
+  //
+  // **A ordem invertida é do resumo, não das mensagens.** Os tópicos dentro de
+  // uma resposta vêm do mais recente para o mais antigo, porque ali o que
+  // importa é se situar de relance. Numa conversa é o contrário: quem pergunta
+  // o detalhe precisa da pergunta anterior ACIMA da resposta nova, senão a
+  // linha do raciocínio se inverte. Dito pelo dono do produto em 17/09/2026,
+  // depois de usar as duas.
   const respostas = document.createElement("div");
   respostas.className = "perguntar__respostas";
 
@@ -95,8 +102,9 @@ export function painelDePerguntas() {
     bloco.dataset.estado = "esperando";
     bloco.append(linhaDaPergunta(pergunta),
                  paragrafo("carregando o modelo…", "perguntar__texto"));
-    respostas.prepend(bloco);
-    respostas.scrollTop = 0;
+    respostas.append(bloco);
+    // A pilha tem teto: sem rolar, a pergunta nova nasceria fora da vista.
+    respostas.scrollTop = respostas.scrollHeight;
 
     try {
       const r = await pedir("perguntar-ao-vivo", { pergunta, resumo }, (p) => {

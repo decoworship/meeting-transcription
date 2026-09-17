@@ -20,8 +20,8 @@ Ela monta o `painelAoVivo()` sozinho, com a ponte falsa do molde do
 3. **a grade de duas colunas** do Gravador não deixa nada além da prévia
    escorregar para a direita (o ``grid-row: 1 / -1`` **não** atravessa linhas
    implícitas, e sem a regra da coluna 1 a agenda ia parar debaixo da legenda).
-6. **as respostas acumulam**, a mais nova no topo, e o botão do resumo manda o
-   modo que escolhe a instrução;
+6. **as respostas acumulam em ordem de conversa** — a mais nova embaixo — e o
+   botão do resumo manda o modo que escolhe a instrução;
 5. **a chave desligada esconde a caixa de perguntar** — o núcleo manda o
    impedimento no `aovivo`, e a caixa não nasce;
 4. **a caixa de perguntar ao modelo** faz a volta inteira — espera dizendo por
@@ -197,7 +197,7 @@ def main() -> int:
             acumulou = pg.evaluate("""() => {
                 const b = [...document.querySelectorAll('.perguntar__resposta')];
                 return { quantos: b.length,
-                         primeiro: b[0].querySelector('.perguntar__pergunta').textContent };
+                         ultimo: b[b.length - 1].querySelector('.perguntar__pergunta').textContent };
             }""")
 
             # E o botão do resumo manda o modo, que é o que escolhe a instrução.
@@ -278,9 +278,14 @@ def main() -> int:
     print(f"   a resposta ficou FORA da lista de falas:     {fora_da_lista}")
 
     acumula = acumulou["quantos"] == 2
-    mais_nova_no_topo = "e quem ficou de quê?" in acumulou["primeiro"]
+    # **A conversa lê de cima para baixo, como conversa.** A ordem invertida é do
+    # RESUMO — os tópicos dele vêm do mais recente para o mais antigo —, e não
+    # das mensagens: quem pergunta o detalhe precisa ver a pergunta anterior
+    # acima da resposta nova, senão a linha do raciocínio se inverte. Dito pelo
+    # dono do produto em 17/09/2026.
+    mais_nova_embaixo = "e quem ficou de quê?" in acumulou["ultimo"]
     print(f"\n5. as respostas acumulam: {acumulou['quantos']} blocos + o do botão, "
-          f"topo = {acumulou['primeiro']!r}")
+          f"fim = {acumulou['ultimo']!r}")
     print(f"   o botão do resumo manda resumo=true:            {modo_do_botao is True}")
     print(f"   com a chave desligada, o bloco some:           {caixa_escondida}")
     tem_rolagem = rolagem["overflow"] == "auto" and rolagem["teto"] not in ("none", "")
@@ -297,7 +302,7 @@ def main() -> int:
     ok = (separadores == 1 and agrupou and um_volatil and lados
           and colunas and espera_honesta and respondeu and ecoou
           and avisou_do_corte and limpou and fora_da_lista and caixa_escondida
-          and acumula and mais_nova_no_topo and modo_do_botao is True
+          and acumula and mais_nova_embaixo and modo_do_botao is True
           and tem_rolagem and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1
