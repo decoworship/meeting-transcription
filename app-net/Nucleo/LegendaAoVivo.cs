@@ -65,6 +65,16 @@ public sealed class TrechoDaLegenda
     [JsonPropertyName("fim_ms")] public required long FimMs { get; init; }
     [JsonPropertyName("dono")] public required bool Dono { get; init; }
     [JsonPropertyName("texto")] public required string Texto { get; init; }
+
+    /// <summary>
+    /// Quem falou, quando a diarização já rodou. Nulo até lá.
+    /// </summary>
+    /// <remarks>
+    /// Rótulo local do pyannote (<c>Speaker 1</c>…) ou o
+    /// <see cref="VozDoDono.Rotulo"/> quando o trecho é seu — e nesse caso ele
+    /// não passa pela diarização, porque a faixa do microfone é certeza.
+    /// </remarks>
+    [JsonPropertyName("falante")] public string? Falante { get; init; }
 }
 
 /// <summary>O que a legenda deixou para ler depois da reunião.</summary>
@@ -79,6 +89,16 @@ public sealed class LegendaGravada
     [JsonPropertyName("turnos")] public required List<TurnoDaLegenda> Turnos { get; init; }
 
     [JsonPropertyName("trechos")] public List<TrechoDaLegenda> Trechos { get; init; } = [];
+
+    /// <summary>
+    /// A diarização já passou por cima desta legenda.
+    /// </summary>
+    /// <remarks>
+    /// <b>É um campo e não uma dedução.</b> Deduzir por "algum trecho tem
+    /// falante" diria "pendente" para sempre quando a diarização falhasse, e a
+    /// tela ficaria prometendo um resultado que não vem.
+    /// </remarks>
+    [JsonPropertyName("falantes_prontos")] public bool FalantesProntos { get; init; }
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -472,6 +492,32 @@ public sealed class LegendaAoVivo : IDisposable
     /// legenda não pode derrubar a gravação.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Reescreve o <c>legenda.json</c> de fora, com os falantes atribuídos.
+    /// </summary>
+    /// <remarks>
+    /// <b>Existe para a diarização em segundo plano</b> (o <c>VIVO-2</c>), que
+    /// roda depois de a instância ter morrido junto com a gravação. Escreve o
+    /// arquivo inteiro: os turnos como estavam e os trechos com falante.
+    /// </remarks>
+    public static void Gravar(string pastaDaGravacao, List<TurnoDaLegenda> turnos,
+                              List<TrechoDaLegenda> trechos, bool prontos)
+    {
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(pastaDaGravacao, Arquivo),
+                JsonSerializer.Serialize(
+                    new LegendaGravada
+                    {
+                        Turnos = turnos, Trechos = trechos, FalantesProntos = prontos,
+                    },
+                    LegendaJson.Default.LegendaGravada));
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     private void Gravar()
     {
         try
@@ -527,7 +573,11 @@ public sealed class LegendaAoVivo : IDisposable
             // `legenda.json` do acervo não têm `trechos`, e o gerador devolve
             // `null` em vez da lista vazia do `= []` — quem lê quebraria no
             // primeiro `foreach`, e só nos arquivos antigos.
-            if (lida is { Trechos: null }) lida = new LegendaGravada { Turnos = lida.Turnos };
+            if (lida is { Trechos: null })
+                lida = new LegendaGravada
+                {
+                    Turnos = lida.Turnos, FalantesProntos = lida.FalantesProntos,
+                };
             return lida;
         }
         catch (IOException) { return null; }

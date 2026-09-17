@@ -160,8 +160,9 @@ function etiquetaDe(g) {
     // A ata usa o mesmo registro da transcrição, e dizer "Transcrevendo…"
     // enquanto se escreve a ata de uma reunião já transcrita é mentira — foi o
     // que o dono do produto viu no primeiro uso.
-    etiqueta.textContent = rodando.tarefa === "ata"
-      ? "Escrevendo a ata…" : "Transcrevendo…";
+    etiqueta.textContent = rodando.tarefa === "ata" ? "Escrevendo a ata…"
+      : rodando.tarefa === "falantes" ? "Separando falantes…"
+      : "Transcrevendo…";
   } else {
     etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
     etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
@@ -356,6 +357,17 @@ async function telaDePreparo(g) {
     t.className = "bloco__titulo";
     const palavras = turnos.reduce((n, x) => n + x.texto.trim().split(/\s+/).length, 0);
     t.textContent = `O que a legenda ouviu — ${palavras} palavras`;
+
+    // **Enquanto os falantes não chegaram, a legenda está incompleta e diz
+    // isso.** A diarização roda em segundo plano depois da reunião e leva ~2 min
+    // numa de uma hora; quem abrir antes disso veria um rascunho sem quem falou
+    // e não saberia se ele ficou assim ou ainda vai mudar.
+    if (leg?.legenda_falantes === false) {
+      const pendente = document.createElement("span");
+      pendente.className = "aa-etiqueta legenda-gravada__pendente";
+      pendente.textContent = "separando falantes…";
+      t.appendChild(pendente);
+    }
     b.appendChild(t);
 
     const aviso = document.createElement("p");

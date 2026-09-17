@@ -411,7 +411,12 @@ public static class Montagem
     }
 
     /// <summary>O falante de maior sobreposição num intervalo; nulo se não há nenhum.</summary>
-    private static string? DonoDoIntervalo(
+    /// <remarks>
+    /// <b>Pública desde 17/09/2026</b>, para a <see cref="FalantesDaLegenda"/>
+    /// usar a MESMA régua. Duas implementações da mesma sobreposição fariam a
+    /// legenda e a passada final discordarem sobre quem falou no mesmo segundo.
+    /// </remarks>
+    public static string? DonoDoIntervalo(
         double inicio, double fim, IReadOnlyList<SegmentoDeFalante> diarizacao)
     {
         string? melhor = null;

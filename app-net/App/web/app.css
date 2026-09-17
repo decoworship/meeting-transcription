@@ -647,6 +647,15 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   .painel[data-aovivo="true"] > .aovivo { position: static; }
 }
 
+/* A legenda que ainda vai ganhar falantes. Ao lado do título, e não no corpo:
+ * é estado do bloco, não conteúdo dele. */
+.legenda-gravada__pendente {
+  margin-left: var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  font-weight: normal;
+  color: var(--cor-texto-suave);
+}
+
 .aovivo__topo { margin-bottom: var(--espaco-3); }
 .aovivo__dica { margin: var(--espaco-1) 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 

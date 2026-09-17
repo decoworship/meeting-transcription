@@ -110,6 +110,15 @@ internal sealed class Resposta
     /// <summary>O que a legenda deixou numa gravação já encerrada.</summary>
     [JsonPropertyName("legenda_gravada")] public List<TurnoJson>? LegendaGravada { get; init; }
 
+    /// <summary>
+    /// A diarização já passou por esta legenda. <c>false</c> = ainda vem.
+    /// </summary>
+    /// <remarks>
+    /// Nulo quando não há legenda, e aí a tela não afirma nada. É o que separa
+    /// "ficou sem falante" de "ainda está separando".
+    /// </remarks>
+    [JsonPropertyName("legenda_falantes")] public bool? LegendaFalantes { get; init; }
+
     /// <summary>O que impede a prévia, ou nulo quando ela pode acontecer.</summary>
     [JsonPropertyName("aovivo_impedimento")] public string? AoVivoImpedimento { get; init; }
 
@@ -977,6 +986,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta
                     {
                         Id = p.Id,
+                        LegendaFalantes = p.Gravacao is { Length: > 0 } gf
+                            ? LegendaAoVivo.Ler(gf)?.FalantesProntos : null,
                         LegendaGravada = p.Gravacao is { Length: > 0 } g
                             ? LegendaAoVivo.Ler(g)?.Turnos.Select(t => new TurnoJson
                             { Dono = t.Dono, Texto = t.Texto }).ToList()
@@ -1373,6 +1384,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         if (_legenda is { } legenda)
         {
             _legenda = null;
+            string? pastaDaLegenda = _pastaAoVivo;
             _ = Task.Run(async () =>
             {
                 try { await legenda.EncerrarAsync(TimeSpan.FromSeconds(30)); }
@@ -1380,6 +1392,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 {
                     Registro.Escrever("legenda", $"encerramento: {e.Message}");
                 }
+
+                // **Só depois do encerramento**, porque é ele que escreve o
+                // legenda.json final — inclusive o texto que só o finalize()
+                // solta quando nada firmou durante a reunião.
+                if (pastaDaLegenda is { Length: > 0 }) SepararFalantes(pastaDaLegenda);
             });
         }
 
@@ -1579,6 +1596,87 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// modelo de ata só carregue com a VRAM do ASR liberada. A bolinha do trilho
     /// acende para os dois pelo mesmo caminho.
     /// </remarks>
+    /// <summary>
+    /// Separa os falantes da legenda, em segundo plano, depois da reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o <c>VIVO-2</c>.</b> Entrega <i>quem falou</i> no rascunho enquanto
+    /// a pessoa ainda decide se vai transcrever — a diarização custa 32× o tempo
+    /// real, ~2 min numa reunião de uma hora, contra a passada inteira.
+    /// </para>
+    /// <para>
+    /// <b>Sobre o <c>system.wav</c>, e não sobre o mix</b>, pela mesma razão do
+    /// <c>Transcritor</c>: o dono já veio da faixa do microfone, com certeza, e
+    /// não precisa de estimativa por cima.
+    /// </para>
+    /// <para>
+    /// <b>Nunca levanta, e nunca bloqueia.</b> O pior desfecho é a legenda
+    /// ficar sem falante — que é como ela era até hoje.
+    /// </para>
+    /// </remarks>
+    private void SepararFalantes(string pasta)
+    {
+        LegendaGravada? legenda;
+        try
+        {
+            legenda = LegendaAoVivo.Ler(pasta);
+        }
+        catch (Exception) { return; }
+
+        // Sem trecho não há o que sobrepor: é legenda de antes do VIVO-1, ou
+        // reunião em que nada firmou.
+        if (legenda is not { FalantesProntos: false, Trechos.Count: > 0 }) return;
+
+        string sistema = Path.Combine(pasta, "system.wav");
+        if (!File.Exists(sistema)) return;
+
+        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "falantes");
+        EmpurrarTranscricoes();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var cfg = ConfiguracoesDoApp.Carregar();
+                var motores = Motores.AoLadoDoExecutavel();
+                using var motor = await MotorSidecar.IniciarAsync(
+                    motores.Python, [motores.ScriptDiarizacao],
+                    trabalho.Token, Motores.Ambiente());
+                // O SUP-1 pede que toda carga de GPU deixe rastro, e esta é a
+                // terceira — depois do ASR e do reconhecimento de vozes.
+                motor.AoRegistrar += l => Registro.Escrever("diarizacao", l);
+
+                var diarizacao = await motor.DiarizarAsync(
+                    sistema,
+                    (f, t) =>
+                    {
+                        _transcricoes.Progredir(pasta, "falantes", f, t);
+                        EmpurrarTranscricoes();
+                    },
+                    cfg.DiarizacaoPadrao, trabalho.Token);
+
+                var comFalante = FalantesDaLegenda.Atribuir(legenda.Trechos, diarizacao);
+                LegendaAoVivo.Gravar(pasta, legenda.Turnos, comFalante, prontos: true);
+
+                _transcricoes.Terminar(pasta);
+                Registro.Escrever("legenda",
+                    $"falantes separados: {comFalante.Count} trechos, "
+                    + $"{diarizacao.Count} segmentos de diarização.");
+            }
+            catch (OperationCanceledException)
+            {
+                _transcricoes.Terminar(pasta, cancelada: true);
+            }
+            catch (Exception e)
+            {
+                _transcricoes.Terminar(pasta, e.Message);
+                Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
     /// <summary>
     /// Pergunta ao modelo o que já aconteceu na reunião.
     /// </summary>
