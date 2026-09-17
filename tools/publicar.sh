@@ -29,10 +29,21 @@
 # produz, e o C: estava a 97%. Quem tem os motores agora é a instalação oficial,
 # em AppData\Local\Programs\MeetingApp — daí o MOTORES_FONTE apontar para lá.
 #
-# O destino continua sendo esta pasta, e não a oficial, de propósito: um build
-# meio pronto não pode cair no app que grava reunião. Ela volta a existir com o
-# executável e uma JUNÇÃO para os motores oficiais, o que custa 19 MB em vez de
-# 4,3 GB.
+# ── 17/09/2026: o destino voltou a ser a instalação oficial ─────────────────
+#
+# Por decisão do dono do produto. A pasta de trabalho resolvia um problema real
+# — um build meio pronto não podia cair no app que grava reunião — e cobrava por
+# isso um preço que ficou visível no uso: **o menu Iniciar continuava abrindo o
+# app antigo**, e cada funcionalidade nova precisava de uma explicação sobre qual
+# executável abrir. Publicar para testar e não conseguir testar pelo caminho
+# normal é pior do que o risco que a separação evitava.
+#
+# **A trava que resolvia aquele risco continua, e é a única que importa:** o app
+# aberto é intocável, e agora ela protege o app de verdade. Fechar antes de
+# publicar é o preço, e é explícito.
+#
+# As junções não são mais montadas quando o destino é a oficial — os motores já
+# estão lá. Ver `motores_no_destino`.
 #
 # Durante a Fase 2.5 o padrão era uma pasta de teste, MeetingUnificado, porque
 # os dois programas antigos ainda eram os que gravavam e o critério A exigia
@@ -50,15 +61,16 @@
 # peça para uma pessoa olhar.
 #
 # Uso:
-#   tools/publicar.sh                     # publica e instala em C:\Users\andre\MeetingApp
+#   tools/publicar.sh                     # publica e instala na instalação oficial
 #   tools/publicar.sh --so-build          # publica em dist/publicar, sem instalar
-#   tools/publicar.sh --destino <pasta>   # instala em outra pasta
+#   tools/publicar.sh --destino <pasta>   # instala em outra pasta (ganha junções)
 
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 SAIDA="$RAIZ/dist/publicar"
-DESTINO="/mnt/c/Users/andre/MeetingApp"
+OFICIAL="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp"
+DESTINO="$OFICIAL"
 SEGREDO="/mnt/c/Users/andre/.meeting-recorder/google_client_secret.json"
 
 # De onde vêm os 4,3 GB de Python embarcado. Não se copia: o destino ganha uma
@@ -66,7 +78,7 @@ SEGREDO="/mnt/c/Users/andre/.meeting-recorder/google_client_secret.json"
 #
 # É a instalação OFICIAL, a que o instalador produz. Era a pasta de trabalho até
 # 18/08/2026, quando ela foi apagada para liberar disco — ver o cabeçalho.
-MOTORES_FONTE="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
+MOTORES_FONTE="$OFICIAL/motores"
 
 SO_BUILD=0
 while [[ $# -gt 0 ]]; do
@@ -96,7 +108,11 @@ if (( ! SO_BUILD )) && [[ -n "${DESTINO:-}" ]]; then
     "(Get-Process MeetingApp -ErrorAction SilentlyContinue).Path" 2>/dev/null | tr -d '\r')
   alvo=$(wslpath -w "$DESTINO" 2>/dev/null || echo "$DESTINO")
   if grep -qiF "$alvo" <<<"$aberto"; then
-    echo "ERRO: o MeetingApp de $DESTINO está aberto. Feche-o antes de publicar." >&2
+    echo "ERRO: o MeetingApp está aberto e é ele que vai ser substituído." >&2
+    echo "" >&2
+    echo "      FECHE O APP e rode de novo — pelo menu da bandeja, em Sair." >&2
+    echo "      Fechar a janela não basta: ela apenas esconde o app." >&2
+    echo "" >&2
     echo "      (não mate o processo: pode haver uma transcrição — ou uma GRAVAÇÃO —" >&2
     echo "       em andamento; desde a Fase 2.5 o mesmo processo faz as duas coisas)" >&2
     exit 1
@@ -224,6 +240,16 @@ ligar_por_juncao() {
     "-Target '$(wslpath -w "$MOTORES_FONTE/$relativo")' | Out-Null" >/dev/null
 }
 
+# **Na instalação oficial não há o que ligar**: os motores já moram lá, e uma
+# junção de uma pasta para ela mesma é um laço. O `-e` do `ligar_por_juncao` já
+# barraria cada uma, mas dizer isso de frente é melhor que depender do acaso de
+# a pasta existir.
+motores_no_destino=0
+[[ "$DESTINO" == "$OFICIAL" ]] && motores_no_destino=1
+
+if (( motores_no_destino )); then
+  echo "==> motores já no destino (instalação oficial), nada a ligar"
+else
 ligar_por_juncao python              "o app abre, mas não transcreve."
 ligar_por_juncao diarizacao/modelos  "o app transcreve, mas não separa falantes."
 ligar_por_juncao ata                 "o app transcreve, mas gerar ata falha."
@@ -231,6 +257,7 @@ ligar_por_juncao ata                 "o app transcreve, mas gerar ata falha."
 # cai no caminho do HuggingFace — baixando 0,70 GB de novo, em silêncio, na
 # primeira transcrição. Opcional como o resto do MOSS: sem a pasta, só avisa.
 ligar_por_juncao moss/modelos        "o MOSS baixaria o modelo de novo, 0,70 GB."
+fi
 
 # O motor de ata é conferido, não copiado: são 3,5 GB que não mudam a cada
 # build. Sem ele o app abre e transcreve; só a ata falha, e falha na hora de
@@ -263,5 +290,9 @@ done
 
 echo
 echo "Instalado em $DESTINO."
-echo "O MeetingApp e o MeetingRecorder antigos não foram tocados."
+if (( motores_no_destino )); then
+  echo "É a instalação oficial: o menu Iniciar já abre esta versão."
+else
+  echo "O MeetingApp e o MeetingRecorder antigos não foram tocados."
+fi
 echo "Agora abra o app e veja — é a parte que nenhum script faz."

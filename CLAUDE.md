@@ -156,13 +156,24 @@ MeetingApp.exe --web C:\caminho\para\app-net\App\web
 uv sync   # só para as ferramentas de medição em tools/
 ```
 
-**Os 4,3 GB de motores moram na instalação oficial**, em
-`AppData\Local\Programs\MeetingApp\motores`, e em nenhum outro lugar: a pasta
-de trabalho `C:\Users\andre\MeetingApp` foi apagada em 18/08/2026 para liberar
-disco. Os dois scripts leem de lá. O `publicar.sh` continua instalando na pasta
-de trabalho — um build meio pronto não pode cair no app que grava reunião — e a
-recria com o executável mais **junções** para os motores oficiais: 18 MB em vez
-de 4,3 GB. Apagar essa pasta é seguro; junção não é dona dos bytes.
+**Tudo mora na instalação oficial**, em
+`AppData\Local\Programs\MeetingApp` — o executável e os 18 GB de motores. **O
+`publicar.sh` instala lá desde 17/09/2026**, por decisão do dono do produto, e a
+pasta de trabalho `C:\Users\andre\MeetingApp` foi apagada no mesmo dia (735 MB).
+
+A separação existiu de 18/08 a 17/09 e resolvia um risco real — um build meio
+pronto caindo no app que grava reunião. O que a derrubou foi o preço dela no
+uso: **o menu Iniciar continuava abrindo o app antigo**, e cada funcionalidade
+nova vinha com uma explicação sobre qual executável abrir. **A trava que
+resolvia aquele risco continua, e agora protege o app de verdade:** publicar com
+o app aberto é recusado, com a mensagem pedindo para sair pela bandeja. Fechar
+antes de publicar é o preço.
+
+`tools/publicar.sh --destino <pasta>` ainda instala em outro lugar, e aí as
+**junções** para os motores oficiais voltam a ser montadas — 18 MB em vez de
+18 GB. Apagar uma pasta dessas é seguro, mas **desfaça as junções antes**
+(`rmdir` sem `/s`, de um cwd que não seja UNC): apagar por dentro delas leva os
+bytes reais junto.
 
 **Nunca publique com `dotnet publish` na mão.** As três flags
 (`--self-contained`, `PublishSingleFile`, `PublishTrimmed`) e o segredo do Google
