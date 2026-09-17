@@ -530,16 +530,27 @@ normalmente. O que erra é o rascunho.
 `large-v3` como referência, a normalização do `tools/benchmark_wer.py`:
 
 ```
-reunião              legenda   final   cobertura    WER
-2026-09-15_14-01-30     5116    4733       108%    25,6%
-2026-09-15_14-58-08     1911    1742       110%    27,2%
-2026-09-15_15-29-32     2907    2791       104%    22,7%
-2026-09-16_10-30-08     1673    1761        95%    30,7%
-2026-09-16_15-29-33     2776    2534       110%    25,6%
-2026-09-17_08-59-06     4248    4153       102%    23,7%
-2026-09-17_10-29-47     3539    3186       111%    26,9%
-média                                      106%    26,1%
+reunião              legenda   final   cobertura    WER      CER
+2026-09-15_14-01-30     5116    4733       108%    25,6%   13,0%
+2026-09-15_14-58-08     1911    1742       110%    27,2%   15,1%
+2026-09-15_15-29-32     2907    2791       104%    22,7%   12,8%
+2026-09-16_10-30-08     1673    1761        95%    30,7%   20,8%
+2026-09-16_15-29-33     2776    2534       110%    25,6%   14,7%
+2026-09-17_08-59-06     4248    4153       102%    23,7%   14,5%
+2026-09-17_10-29-47     3539    3186       111%    26,9%   14,9%
+média                                      106%    26,1%   15,1%
 ```
+
+**O CER é metade do WER, e isso diz de que tipo é o erro.** Se as palavras
+saíssem trocadas por outras, o CER acompanharia o WER. Ele ficar na metade
+indica erro de **fronteira**: o motor acerta os sons e erra onde a palavra
+começa. A divergência que se leu à mão é exatamente isso — `quintocado` contra
+`quinto cada`, para um áudio que dizia "tá encapotado". Ninguém acertou, mas o
+tipo de erro é o mesmo.
+
+> Os números saíram de duas implementações independentes — a
+> `taxa_de_erro` do `tools/benchmark_wer.py` e uma versão vetorizada escrita
+> para o acervo caber no tempo — e bateram decimal por decimal.
 
 **A cobertura é o achado, e ele contraria o que se esperava: 106%.** A legenda
 produz **mais** palavras que a passada final, não menos. Então os 26% **não são
