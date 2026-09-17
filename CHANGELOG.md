@@ -3,6 +3,41 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc14 — 17/09/2026
+
+**Dá para perguntar sobre a reunião enquanto ela acontece.** No Gravador, um
+bloco novo: o botão **"O que já rolou?"** devolve os assuntos em lista, do mais
+recente para o mais antigo, e a caixa ao lado responde qualquer pergunta sobre o
+que já foi dito — quem ficou de quê, o que ficou decidido, sobre o que estão
+falando agora. As respostas se acumulam, e você pode puxar o detalhe de um
+assunto sem perder o que perguntou antes.
+
+Nasce **desligado**, em Ajustes › Transcrição. Cada pergunta leva cerca de vinte
+segundos, e enquanto o modelo responde a legenda engasga — ele ocupa a placa e a
+devolve logo depois.
+
+**O modelo lê no máximo a última hora de reunião.** Acima disso o começo sai, e a
+resposta diz que saiu — passada uma hora, o início costuma não ser o que alguém
+precisa para se situar, e ler a reunião inteira não caberia na placa junto com a
+legenda.
+
+**Você escolhe o modelo da pergunta separado do da ata**, em Ajustes › Modelos.
+São tarefas diferentes: a ata roda com a reunião encerrada e a placa livre, e
+pode pagar um modelo grande; a pergunta divide a placa com a legenda e tem vinte
+segundos para responder.
+
+**E dá para deixar o modelo pronto entre perguntas**, se você vai perguntar
+várias coisas seguidas. A primeira continua levando os vinte segundos; as
+seguintes respondem quase na hora. Em troca ele segura cerca de 3 GB da placa
+enquanto espera, então essa chave também nasce desligada.
+
+**A legenda ficou mais rápida e parou de tomar a máquina.** Ela pedia ao sistema
+mais threads de processador do que o computador tem núcleos, e perdia tempo na
+disputa. Medido numa reunião real: **36% mais rápida usando 43% menos
+processador**, com o mesmo texto. Em máquina que grava, abre o Teams e o
+navegador ao mesmo tempo, é a diferença entre o texto acompanhar a fala ou
+atrasar.
+
 ## 0.7.0-rc13 — 15/09/2026
 
 **A legenda ao vivo escreve.** Ela congelava no terceiro pedaço de áudio por uma

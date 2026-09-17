@@ -164,6 +164,22 @@ def main() -> int:
     p.add_argument("--minutos", type=float, default=5.0, help="0 = a gravação toda")
     p.add_argument("--de", type=float, default=0.0, help="começar no minuto N")
     p.add_argument("--idioma", default="pt-BR")
+    # O GGUF não mora no repo: ele vem no pacote de motores, e em desenvolvimento
+    # está na instalação oficial. Ver tools/empacotar_motores.sh.
+    p.add_argument("--gguf", default=None,
+                   help="caminho do .gguf (padrão: ao lado do motor, no repo)")
+    # **O que a diarização sobre a legenda precisaria.** A atribuição de falante
+    # é por sobreposição temporal, e a legenda hoje não guarda tempo nenhum.
+    # Pedir carimbo ao fluxo é o caminho óbvio, e o que falta saber é o preço:
+    # a legenda tem 2,46x de margem com o Meet aberto, e pouco a perder.
+    p.add_argument("--timestamps", default="none",
+                   choices=["none", "segment", "word", "token"],
+                   help="o que pedir de carimbo ao fluxo (padrão: none, o de hoje)")
+    # O motor chama session() sem n_threads, e o padrão 0 costuma significar
+    # "todas as CPUs" no ggml. Na máquina do dono do produto o sidecar come dois
+    # núcleos de quatro com o modelo na CUDA.
+    p.add_argument("--threads", type=int, default=0,
+                   help="n_threads da sessão (0 = o padrão da biblioteca)")
     p.add_argument("--pelo-motor", action="store_true",
                    help="falar com motores/legenda/motor.py pelo protocolo, "
                         "em vez de chamar a biblioteca — é o que exercita o "
@@ -176,22 +192,25 @@ def main() -> int:
     import numpy as np
     import transcribe_cpp as t
 
-    gguf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
-                        "motores", "legenda", "modelos",
-                        "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf")
+    gguf = a.gguf or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..",
+        "motores", "legenda", "modelos",
+        "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf")
     try:
         modelo = t.Model(gguf, backend="cuda"); onde = "cuda"
     except Exception as e:
         print(f"sem CUDA ({e!r}) — caindo para CPU", file=sys.stderr)
         modelo = t.Model(gguf, backend="cpu"); onde = "cpu"
 
-    sessao = modelo.session().stream(commit_policy="stable_prefix",
-                                     timestamps="none", language=a.idioma)
+    sessao = modelo.session(n_threads=a.threads).stream(
+        commit_policy="stable_prefix", timestamps=a.timestamps, language=a.idioma)
 
-    print(f"\n{os.path.basename(a.pasta)} · {onde} · idioma={a.idioma} · do minuto {a.de:g}")
+    print(f"\n{os.path.basename(a.pasta)} · {onde} · idioma={a.idioma} · do minuto {a.de:g}"
+          f" · timestamps={a.timestamps} · n_threads={a.threads or 'padrão'}")
     print(f"{'áudio':>8} {'quadro':>7} {'firme':>7} {'tent.':>7}  primeiro firme")
     n = firmes = 0
     primeiro = None
+    cpu0 = time.process_time()
     t0 = time.perf_counter()
     for q in quadros(a.pasta, a.minutos, a.de):
         u = sessao.feed(np.asarray(q, dtype=np.float32))
@@ -209,7 +228,10 @@ def main() -> int:
     x = sessao.text()
     d = time.perf_counter() - t0
     audio = n * QUADRO / TAXA
+    cpu = time.process_time() - cpu0
     print(f"\n{n} quadros · {audio:.0f}s de áudio em {d:.0f}s ({audio/d:.2f}x)")
+    print(f"CPU do processo: {cpu:.0f}s em {d:.0f}s de parede "
+          f"({cpu/d:.2f} núcleos)")
     print(f"commits: {firmes} · primeiro aos "
           f"{f'{primeiro:.1f}s' if primeiro else 'NUNCA'}")
     print(f"firme  ({len(x.committed)} chars): {x.committed[:300]!r}")

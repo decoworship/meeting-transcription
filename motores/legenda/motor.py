@@ -62,6 +62,34 @@ VERSAO = "1"
 ARQUIVO_GGUF = "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf"
 REPO_GGUF = "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf"
 
+def _threads() -> int:
+    """Quantas threads de CPU dar à sessão.
+
+    **O padrão da biblioteca (0) é o pior dos três, medido em 17/09/2026** na
+    máquina do dono do produto (Ryzen 5 3400G, 4 núcleos / 8 lógicos), com o
+    modelo na CUDA, 10 minutos de reunião real::
+
+        n_threads   velocidade   núcleos   commits
+        padrão (0)     4,78x       3,46      475
+        2              5,09x       1,43      475
+        4              6,50x       1,97      475
+
+    Mesma saída nos três — 475 commits, o primeiro aos 1,2 s. **Limitar aos
+    núcleos físicos dá 36% mais velocidade com 43% menos CPU**: o padrão
+    sobre-inscreve threads nos lógicos e perde o tempo em disputa.
+
+    Isso importa mais aqui que em qualquer outro motor: a legenda divide a
+    máquina com a gravação, com o Meet e com o navegador. Em 17/09 o sidecar
+    comia dois núcleos de quatro, e o texto atrasava.
+
+    ``os.cpu_count()`` devolve os **lógicos**; metade é a aproximação dos
+    físicos que vale em toda CPU com SMT, e o piso de 2 protege a máquina
+    pequena. O teto de 8 existe porque acima disso não se mediu nada.
+    """
+    logicos = os.cpu_count() or 4
+    return max(2, min(8, logicos // 2))
+
+
 #: A cada quantos quadros mandar um parcial, quando nada firmou. Serve para a
 #: tela saber que o motor está vivo durante um silêncio longo, sem inundá-la.
 SINAL_DE_VIDA = 25
@@ -160,7 +188,7 @@ class Legendador:
         if idioma:
             kw["language"] = idioma
         self._opcoes = kw
-        self._sessao = self._modelo.session().stream(**kw)
+        self._sessao = self._modelo.session(n_threads=_threads()).stream(**kw)
         self._firme_de_antes = ""
         self._sem_firmar = 0
         self._ms_de_antes = self._ms_do_fluxo = 0
@@ -206,7 +234,7 @@ class Legendador:
         except Exception:
             pass
 
-        self._sessao = self._modelo.session().stream(**self._opcoes)
+        self._sessao = self._modelo.session(n_threads=_threads()).stream(**self._opcoes)
         self._ms_de_antes += self._ms_do_fluxo
         self._ms_do_fluxo = 0
         self._sem_firmar = 0

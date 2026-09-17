@@ -1,6 +1,6 @@
 {
-  "versao": "0.6.2",
-  "publicada": "2026-08-28",
-  "notas": "Conserta um defeito que apagava o vocabulário e as preferências do projeto quando você abria a tela de transcrição de uma reunião já vinculada.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.6.2"
+  "versao": "0.7.0-rc14",
+  "publicada": "2026-09-17",
+  "notas": "Dá para perguntar sobre a reunião enquanto ela acontece: um botão resume o que já foi dito e uma caixa responde o que você quiser sobre ela. Nasce desligado, em Ajustes › Transcrição. E a legenda ao vivo ficou 36% mais rápida usando 43% menos processador.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc14"
 }

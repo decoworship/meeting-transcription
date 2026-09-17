@@ -440,7 +440,117 @@ não dívida.
 
 ---
 
-## 7. Débito técnico e testes
+## 7. Ao vivo: legenda e pergunta
+
+**O tema nasceu em 17/09/2026**, quando a pergunta ao vivo saiu do estudo e
+entrou no app. Os itens abaixo vieram todos de usar a coisa numa reunião de
+verdade, e cada um tem medição atrás — não são ideias.
+
+O que já existe e **não** está aqui: a legenda ao vivo (Fase 7), a caixa de
+perguntar com o botão de resumo, a janela de uma hora, as chaves de ligar e
+desligar. Ver [ESTUDO-RESUMO-AO-VIVO.md](ESTUDO-RESUMO-AO-VIVO.md).
+
+### VIVO-1 · A legenda não carimba o turno — `feature` · `aberto`
+
+**Gatilho: ele bloqueia outras três coisas, e custa zero.** O `TurnoDaLegenda`
+guarda `dono` e `texto`, e nada de tempo. Sem tempo:
+
+- a **diarização não pode rodar sobre a legenda** (`VIVO-2`) — a atribuição de
+  falante é por sobreposição temporal, e não há o que sobrepor;
+- **pergunta com recorte de tempo não existe** — *"o que rolou nos últimos 10
+  minutos"* não tem como ser respondida, e o prompt precisa avisar o modelo
+  disso para ele não inventar horário;
+- a **janela de uma hora é medida em caracteres**, não em minutos:
+  `PerguntaDaReuniao.CaracteresPorMinuto = 800`, aproximado de três reuniões.
+
+**E o preço é zero, medido em 17/09/2026** — 10 min de reunião real, na 2060:
+
+```
+timestamps=none   4,78x   475 commits   1º aos 1,2 s
+timestamps=word   5,04x   475 commits   1º aos 1,2 s
+```
+
+Mesmo texto, mesmos commits, mesma latência de partida. A diferença está dentro
+do ruído entre rodadas. O motor pede `"none"` hoje por herança, não por medição.
+
+**Há dois caminhos, e o barato talvez baste:** o motor já calcula
+`_ms_de_antes + audio_committed_ms` a cada commit — carimbar o **turno** com
+isso não toca no modelo. O `timestamps="word"` dá a granularidade que a
+atribuição de falante quer, e agora se sabe que ela é grátis.
+
+### VIVO-2 · Diarizar a legenda depois da reunião, em segundo plano — `feature` · `espera`
+
+**Depende do `VIVO-1`.** A ideia é entregar *quem falou* no rascunho logo depois
+da reunião, sem esperar a passada final.
+
+**A diarização é barata: 32× o tempo real** — uma reunião de uma hora sai em
+~2 min, cinco vezes menos que o ASR
+([FASE7-RESULTADOS.md](FASE7-RESULTADOS.md) §5).
+
+**Metade do valor já vem de graça:** a legenda separa "você" dos outros pela
+faixa do microfone, sem GPU. O que a diarização acrescenta é separar **os outros
+entre si**.
+
+**O que isto NÃO é:** substituto da passada final. O texto da legenda é
+Nemotron; a passada final é `large-v3` com correção fonética e vocabulário. Isto
+entrega falante no rascunho, e nada além.
+
+**O que falta além do `VIVO-1`:** não há nada rodando em segundo plano depois
+que a gravação para — não existe `transcrever_ao_parar`. O gancho existe
+(`Ponte.EncerrarAPrevia`), a máquina de progresso não.
+
+### VIVO-3 · O vocabulário não chega à legenda — `bug` · `espera`
+
+**Relatado em uso em 17/09/2026:** *"durante a reunião a legenda parece ser boa,
+errando mais em termos específicos"*. Está certo, e não tem conserto por
+configuração.
+
+**O gancho não existe para esta família.** O `initial_prompt` do
+`transcribe_cpp` é do `WhisperRunOptions` — família Whisper, que é a da passada
+final. O Nemotron é da família Parakeet, e o `ParakeetStreamOptions` expõe **uma
+única** opção: `att_context_right`. Não há onde pôr termo.
+
+**As saídas conhecidas, nenhuma barata:** trocar o modelo da legenda por um de
+família que aceite prompt (e refazer o `R1` inteiro), ou corrigir o texto
+**depois** — a correção fonética já existe em `Nucleo/` e roda sobre a passada
+final; aplicá-la à legenda seria sobre texto sem carimbo, o que traz o `VIVO-1`
+de volta.
+
+**Não confundir com defeito:** a passada final continua recebendo o vocabulário
+normalmente. O que erra é o rascunho.
+
+### VIVO-4 · Comparar a legenda com a passada final — `débito` · `aberto`
+
+**Gatilho: o material existe e ninguém olhou.** Cinco gravações têm
+`legenda.json` **e** `transcricao.json` lado a lado — 15/09 (três), 16/09
+(duas). O `legenda.json` sobrevive à transcrição por desenho: é arquivo
+separado, e nunca se funde ao `transcricao.json`.
+
+Sem esta comparação, a frase *"a legenda é boa o bastante"* é impressão. O
+`tools/benchmark_wer.py` e o `wer_contra_gemini.py` já existem e medem
+exatamente isso; falta apontá-los para os pares.
+
+**O que a medição decide:** se a legenda empata com o `large-v3` no texto, o
+`TRA-1` ganha um irmão — a legenda deixaria de ser rascunho e passaria a poupar
+a passada final, como os blocos do MOSS já poupam.
+
+### VIVO-5 · O Sortformer está no pacote, e o `T4.1` não sabe — `feature` · `espera`
+
+**O que mudou:** a [FASE7-FILA.md](FASE7-FILA.md) arquivou o `T4.1` — *"exportar
+o Sortformer para ONNX e rodá-lo offline"* — como adiado e nunca começado. **O
+`transcribe_cpp` que o app já empacota traz o Sortformer pronto**, com
+`SortformerStreamOptions` e quatro pontos de operação (`very_high_latency` a
+`low_latency`, ~30 s a ~1 s de antecipação). O `stream()` tem um parâmetro
+`diarize`.
+
+O trabalho que arquivou o item — exportar para ONNX — **não precisa ser feito**.
+Nada foi medido: nem custo de GPU, nem qualidade, nem se ele convive com a
+legenda na 2060. É candidato ao `VIVO-2` sem passada de pyannote, e é a única
+rota conhecida para falante **durante** a reunião.
+
+---
+
+## 8. Débito técnico e testes
 
 ### DEB-1 · O caminho da ata na ponte não tem teste — `débito` · `aberto`
 
@@ -455,7 +565,7 @@ dava para rodá-lo num teste com um motor falso.
 
 ---
 
-## 8. O que **não** entra
+## 9. O que **não** entra
 
 Para a lista não virar depósito de novo:
 
