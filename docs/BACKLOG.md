@@ -450,6 +450,11 @@ O que já existe e **não** está aqui: a legenda ao vivo (Fase 7), a caixa de
 perguntar com o botão de resumo, a janela de uma hora, as chaves de ligar e
 desligar. Ver [ESTUDO-RESUMO-AO-VIVO.md](ESTUDO-RESUMO-AO-VIVO.md).
 
+**Dois itens já vêm medidos** — o `VIVO-4` (a legenda contra o `large-v3`, sete
+reuniões) e o `VIVO-6` (a legenda sem placa) —, e os dois deram resultado
+negativo para a esperança que os motivou. Ficam escritos porque um número
+negativo economiza a próxima tentativa.
+
 ### VIVO-1 · A legenda não carimba o turno — `feature` · `aberto`
 
 **Gatilho: ele bloqueia outras três coisas, e custa zero.** O `TurnoDaLegenda`
@@ -519,20 +524,35 @@ de volta.
 **Não confundir com defeito:** a passada final continua recebendo o vocabulário
 normalmente. O que erra é o rascunho.
 
-### VIVO-4 · Comparar a legenda com a passada final — `débito` · `aberto`
+### VIVO-4 · A legenda contra a passada final — `débito` · **medido em 17/09/2026**
 
-**Gatilho: o material existe e ninguém olhou.** Cinco gravações têm
-`legenda.json` **e** `transcricao.json` lado a lado — 15/09 (três), 16/09
-(duas). O `legenda.json` sobrevive à transcrição por desenho: é arquivo
-separado, e nunca se funde ao `transcricao.json`.
+**Sete reuniões com `legenda.json` e `transcricao.json` lado a lado**, o
+`large-v3` como referência, a normalização do `tools/benchmark_wer.py`:
 
-Sem esta comparação, a frase *"a legenda é boa o bastante"* é impressão. O
-`tools/benchmark_wer.py` e o `wer_contra_gemini.py` já existem e medem
-exatamente isso; falta apontá-los para os pares.
+```
+reunião              legenda   final   cobertura    WER
+2026-09-15_14-01-30     5116    4733       108%    25,6%
+2026-09-15_14-58-08     1911    1742       110%    27,2%
+2026-09-15_15-29-32     2907    2791       104%    22,7%
+2026-09-16_10-30-08     1673    1761        95%    30,7%
+2026-09-16_15-29-33     2776    2534       110%    25,6%
+2026-09-17_08-59-06     4248    4153       102%    23,7%
+2026-09-17_10-29-47     3539    3186       111%    26,9%
+média                                      106%    26,1%
+```
 
-**O que a medição decide:** se a legenda empata com o `large-v3` no texto, o
-`TRA-1` ganha um irmão — a legenda deixaria de ser rascunho e passaria a poupar
-a passada final, como os blocos do MOSS já poupam.
+**A cobertura é o achado, e ele contraria o que se esperava: 106%.** A legenda
+produz **mais** palavras que a passada final, não menos. Então os 26% **não são
+omissão** — o `R6` não está comendo fala nestas sete. É o Nemotron escrevendo
+palavra diferente do `large-v3`, e às vezes escrevendo demais.
+
+**26% não é erro absoluto.** A passada final entrou como referência e ela não é
+a verdade — é o melhor que o app produz hoje. O número mede **distância entre
+dois motores**. Saber quem erra exige gabarito humano, e isso é outro trabalho.
+
+**O que isto decide sobre o `TRA-1`:** nada ainda. 26% de distância é longe
+demais para a legenda poupar a passada final como os blocos do MOSS poupam — lá
+o texto **empatava**. Para reabrir, seria preciso o gabarito.
 
 ### VIVO-5 · O Sortformer está no pacote, e o `T4.1` não sabe — `feature` · `espera`
 
@@ -547,6 +567,37 @@ O trabalho que arquivou o item — exportar para ONNX — **não precisa ser fei
 Nada foi medido: nem custo de GPU, nem qualidade, nem se ele convive com a
 legenda na 2060. É candidato ao `VIVO-2` sem passada de pyannote, e é a única
 rota conhecida para falante **durante** a reunião.
+
+---
+
+### VIVO-6 · Legenda sem placa: medido, e não fecha nesta CPU — `feature` · `espera`
+
+**Gatilho: perguntado pelo dono do produto em 17/09/2026** — dá para usar a
+legenda em PC sem GPU? Medido no mesmo áudio, 5 min, `n_threads=4`,
+`timestamps=none`, num Ryzen 5 3400G (4 núcleos, 2019):
+
+```
+                velocidade   núcleos   WER contra o Q8
+Q8_0 · CUDA        6,57x       2,00          —
+Q4_K_M · CUDA      4,69x       1,75         6,5%
+Q8_0 · CPU         0,81x       3,82          —
+Q4_K_M · CPU       0,38x       2,92         6,5%
+```
+
+**O critério de morte da fase é 1,5× sustentado**, e o melhor arranjo em CPU dá
+**0,81×** — com a máquina ociosa. Abaixo de 1× a fila cresce para sempre.
+
+**E a quantização menor piora, nos dois backends.** É contraintuitivo e é real:
+o `Q8_0` desempacota quase como leitura de byte, enquanto o `Q4_K_M` paga
+trabalho por peso. Num modelo de 0,6B, que já é barato em memória, o custo de
+desempacotar domina. **O Q4 é estritamente pior: mais lento E 6,5% de WER.** A
+rota "quantizar para caber na CPU" está fechada.
+
+**O que a medição NÃO diz:** que máquina nenhuma sem placa serve. Diz que
+**esta** não serve. Como o `n_threads` já está escolhido e a quantização não
+ajuda, o que falta é CPU: seria preciso ~2× este processador para chegar a
+1,5×, o que coloca a fronteira em torno de um 8 núcleos moderno. Medir num
+desses é o item — não há mais o que otimizar deste lado.
 
 ---
 
