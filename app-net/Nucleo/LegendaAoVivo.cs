@@ -35,10 +35,50 @@ public sealed class TurnoDaLegenda
     [JsonPropertyName("texto")] public required string Texto { get; set; }
 }
 
+/// <summary>
+/// Um pedaço de fala que firmou, com o tempo que ele cobre.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>É o que destrava a diarização sobre a legenda</b> (o <c>VIVO-2</c> do
+/// BACKLOG). A atribuição de falante é por sobreposição temporal, e até
+/// 17/09/2026 o <c>legenda.json</c> não guardava tempo nenhum.
+/// </para>
+/// <para>
+/// <b>Por que o trecho e não o turno.</b> O turno quebra por troca de dono, e
+/// em três das nove gravações do acervo a reunião inteira é <b>um turno só</b>
+/// — aquelas em que o microfone ficou mudo e o dono nunca virou. Um carimbo por
+/// turno daria um intervalo cobrindo a reunião toda. O trecho é o que firma de
+/// cada vez: <b>1,1 s de mediana</b>, medido em 17/09/2026 sobre 120 s de fala.
+/// </para>
+/// <para>
+/// <b>E não é carimbo de palavra.</b> O <c>timestamps="word"</c> do
+/// <c>transcribe_cpp</c> custa zero (4,78x contra 5,04x), mas o
+/// <c>Stream.snapshot()</c> devolve <b>zero palavras</b> em streaming —
+/// sondado em 17/09. O que existe é o <c>audio_committed_ms</c>, que o
+/// protocolo já carregava como <c>ate_ms</c> sem ninguém guardar.
+/// </para>
+/// </remarks>
+public sealed class TrechoDaLegenda
+{
+    [JsonPropertyName("inicio_ms")] public required long InicioMs { get; init; }
+    [JsonPropertyName("fim_ms")] public required long FimMs { get; init; }
+    [JsonPropertyName("dono")] public required bool Dono { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+}
+
 /// <summary>O que a legenda deixou para ler depois da reunião.</summary>
+/// <remarks>
+/// <b>Os turnos são a vista, os trechos são o registro.</b> Os dois dizem a
+/// mesma fala: o turno agrupa por dono para a tela desenhar conversa, o trecho
+/// guarda o tempo para a diarização sobrepor. Arquivo antigo não tem
+/// <c>trechos</c>, e continua legível — são sete no acervo.
+/// </remarks>
 public sealed class LegendaGravada
 {
     [JsonPropertyName("turnos")] public required List<TurnoDaLegenda> Turnos { get; init; }
+
+    [JsonPropertyName("trechos")] public List<TrechoDaLegenda> Trechos { get; init; } = [];
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -162,6 +202,10 @@ public sealed class LegendaAoVivo : IDisposable
     public const string Arquivo = "legenda.json";
 
     private readonly List<TurnoDaLegenda> _turnos = [];
+    private readonly List<TrechoDaLegenda> _trechos = [];
+
+    /// <summary>Onde o firme chegou no parcial anterior. O início do próximo.</summary>
+    private long _ateAnterior;
 
     /// <summary>O que impede a legenda de existir, ou <c>null</c>.</summary>
     /// <remarks>
@@ -180,6 +224,43 @@ public sealed class LegendaAoVivo : IDisposable
                  + "— desligue uma das duas em Ajustes › Transcrição.";
 
         return motores.OQueFaltaParaLegenda();
+    }
+
+    /// <summary>
+    /// Guarda um pedaço que firmou: no turno, para a tela, e no trecho, com o
+    /// tempo, para a diarização.
+    /// </summary>
+    /// <remarks>
+    /// <b>Estático e público porque é a regra, e regra se mede.</b> O
+    /// <c>Entregar</c> precisa das duas faixas em disco e de um sidecar vivo;
+    /// isto aqui não precisa de nada, e é onde mora o que pode sair errado.
+    /// </remarks>
+    /// <param name="anteriorMs">Onde o firme estava no parcial anterior.</param>
+    /// <param name="ateMs">Onde ele está agora.</param>
+    public static void Registrar(List<TrechoDaLegenda> trechos, List<TurnoDaLegenda> turnos,
+                                 long anteriorMs, long ateMs, bool dono, string novo)
+    {
+        if (novo.Trim().Length == 0) return;
+
+        // **A guarda existe porque o relógio pode andar para trás.** O motor
+        // recomeça o fluxo quando ele trava, e o acumulado deveria atravessar os
+        // recomeços — mas um intervalo invertido chegaria à diarização como
+        // sobreposição zero, e o trecho sairia sem falante, em silêncio.
+        long de = Math.Min(anteriorMs, ateMs);
+        long ate = Math.Max(anteriorMs, ateMs);
+
+        trechos.Add(new TrechoDaLegenda
+        {
+            InicioMs = de, FimMs = ate, Dono = dono, Texto = novo.Trim(),
+        });
+
+        // A mesma regra de agrupamento da tela: enquanto o dono não muda, o
+        // texto cresce no mesmo turno. Duas implementações da mesma regra
+        // fariam o arquivo e a tela contarem histórias diferentes.
+        if (turnos.Count == 0 || turnos[^1].Dono != dono)
+            turnos.Add(new TurnoDaLegenda { Dono = dono, Texto = novo.TrimStart() });
+        else
+            turnos[^1].Texto += novo;
     }
 
     /// <summary>Começa a legendar. Devolve na hora.</summary>
@@ -367,16 +448,10 @@ public sealed class LegendaAoVivo : IDisposable
             : p.Firme;
         Firme = p.Firme;
 
-        if (novo.Length > 0)
+        if (novo.Trim().Length > 0)
         {
-            // A mesma regra de agrupamento da tela: enquanto o dono não muda, o
-            // texto cresce no mesmo turno. Duas implementações da mesma regra
-            // fariam o arquivo e a tela contarem histórias diferentes.
-            if (_turnos.Count == 0 || _turnos[^1].Dono != dono)
-                _turnos.Add(new TurnoDaLegenda { Dono = dono, Texto = novo.TrimStart() });
-            else
-                _turnos[^1].Texto += novo;
-
+            Registrar(_trechos, _turnos, _ateAnterior, p.AteMs, dono, novo);
+            _ateAnterior = p.AteMs;
             Gravar();
         }
 
@@ -403,7 +478,8 @@ public sealed class LegendaAoVivo : IDisposable
         {
             File.WriteAllText(
                 Path.Combine(_pasta, Arquivo),
-                JsonSerializer.Serialize(new LegendaGravada { Turnos = _turnos },
+                JsonSerializer.Serialize(
+                    new LegendaGravada { Turnos = _turnos, Trechos = _trechos },
                                          LegendaJson.Default.LegendaGravada));
         }
         catch (IOException) { }
@@ -444,8 +520,15 @@ public sealed class LegendaAoVivo : IDisposable
         {
             string caminho = Path.Combine(pastaDaGravacao, Arquivo);
             if (!File.Exists(caminho)) return null;
-            return JsonSerializer.Deserialize(File.ReadAllText(caminho),
-                                              LegendaJson.Default.LegendaGravada);
+            var lida = JsonSerializer.Deserialize(File.ReadAllText(caminho),
+                                                  LegendaJson.Default.LegendaGravada);
+
+            // **O inicializador não sobrevive à desserialização gerada.** Sete
+            // `legenda.json` do acervo não têm `trechos`, e o gerador devolve
+            // `null` em vez da lista vazia do `= []` — quem lê quebraria no
+            // primeiro `foreach`, e só nos arquivos antigos.
+            if (lida is { Trechos: null }) lida = new LegendaGravada { Turnos = lida.Turnos };
+            return lida;
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }
