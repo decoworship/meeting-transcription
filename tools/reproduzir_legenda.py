@@ -164,6 +164,15 @@ def main() -> int:
     p.add_argument("--minutos", type=float, default=5.0, help="0 = a gravação toda")
     p.add_argument("--de", type=float, default=0.0, help="começar no minuto N")
     p.add_argument("--idioma", default="pt-BR")
+    # Forçar CPU serve para medir a máquina sem placa, que é um caso de uso real
+    # e nunca foi medido com n_threads escolhido — o 0,99x da FASE7-RESULTADOS
+    # §9.1 usou o padrão da biblioteca, que hoje se sabe ser o pior.
+    p.add_argument("--backend", default="auto", choices=["auto", "cuda", "cpu"])
+    # **O texto inteiro, para comparar entre rodadas.** Backends diferentes
+    # somam em ordens diferentes, e ninguém neste projeto conferiu se o CPU e a
+    # CUDA produzem o MESMO texto — imprimir 300 caracteres não responde isso.
+    p.add_argument("--salvar", default=None,
+                   help="arquivo onde escrever o texto firme inteiro")
     # O GGUF não mora no repo: ele vem no pacote de motores, e em desenvolvimento
     # está na instalação oficial. Ver tools/empacotar_motores.sh.
     p.add_argument("--gguf", default=None,
@@ -196,11 +205,14 @@ def main() -> int:
         os.path.dirname(os.path.abspath(__file__)), "..",
         "motores", "legenda", "modelos",
         "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf")
-    try:
-        modelo = t.Model(gguf, backend="cuda"); onde = "cuda"
-    except Exception as e:
-        print(f"sem CUDA ({e!r}) — caindo para CPU", file=sys.stderr)
+    if a.backend == "cpu":
         modelo = t.Model(gguf, backend="cpu"); onde = "cpu"
+    else:
+        try:
+            modelo = t.Model(gguf, backend="cuda"); onde = "cuda"
+        except Exception as e:
+            print(f"sem CUDA ({e!r}) — caindo para CPU", file=sys.stderr)
+            modelo = t.Model(gguf, backend="cpu"); onde = "cpu"
 
     sessao = modelo.session(n_threads=a.threads).stream(
         commit_policy="stable_prefix", timestamps=a.timestamps, language=a.idioma)
@@ -235,6 +247,10 @@ def main() -> int:
     print(f"commits: {firmes} · primeiro aos "
           f"{f'{primeiro:.1f}s' if primeiro else 'NUNCA'}")
     print(f"firme  ({len(x.committed)} chars): {x.committed[:300]!r}")
+    if a.salvar:
+        with open(a.salvar, "w", encoding="utf-8") as f:
+            f.write(x.committed)
+        print(f"texto firme salvo em {a.salvar}")
     print(f"tent.  ({len(x.tentative)} chars): {x.tentative[:200]!r}")
     print("\nVEREDITO:", "firmou" if x.committed.strip() else "NÃO FIRMOU")
     return 0
