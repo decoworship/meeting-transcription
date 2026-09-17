@@ -541,12 +541,38 @@ reunião              legenda   final   cobertura    WER      CER
 média                                      106%    26,1%   15,1%
 ```
 
-**O CER é metade do WER, e isso diz de que tipo é o erro.** Se as palavras
-saíssem trocadas por outras, o CER acompanharia o WER. Ele ficar na metade
-indica erro de **fronteira**: o motor acerta os sons e erra onde a palavra
-começa. A divergência que se leu à mão é exatamente isso — `quintocado` contra
-`quinto cada`, para um áudio que dizia "tá encapotado". Ninguém acertou, mas o
-tipo de erro é o mesmo.
+**O CER é metade do WER.** A primeira leitura disto — escrita aqui e depois
+derrubada — foi que o erro seria de **fronteira**, o motor acertando os sons e
+errando onde a palavra começa. **Medido, é falso:** fronteira pura é **2,0%** do
+erro. A inferência a partir do CER não se sustentou, e o que a classificação
+achou no lugar é mais útil.
+
+**De que tipo são as 6.271 palavras divergentes**, alinhando as duas sequências
+e classificando cada bloco:
+
+```
+fronteira   as letras são as MESMAS, só o corte muda      123     2,0%
+quase       parecidas (>=0,7 de similaridade)             926    14,8%
+conteúdo    palavra de verdade diferente                2.527    40,3%
+a mais      a legenda escreveu, a final não tem         1.920    30,6%
+a menos     a final tem, a legenda não escreveu           775    12,4%
+```
+
+**Os 30,6% "a mais" são disfluência, e isso relativiza o WER inteiro.** Lidos à
+mão, são muleta, gagueira e repetição — `'ne a gente ta ta a'`, `'o o ne'`,
+`'ele ele e'`, `'viu viu da'`. **A legenda transcreve o que foi literalmente
+dito; o `large-v3` limpa.** Não é alucinação nem perda: é estilo. Para legenda
+ao vivo, transcrever o "né" está certo; para documento, limpá-lo está certo.
+
+**E os 2% de fronteira que existem são quase todos termo técnico** —
+`'tecni co'`, `'wi fi'`, `'a p i'`, `'diagno stico'`. É a mesma população de
+palavras do `VIVO-3`, e a mesma cura serviria às duas.
+
+> **Ressalva do método:** o alinhamento por `difflib` sobre duas sequências
+> longas e ruidosas produz blocos grandes espúrios — pares como
+> `'c a boa tarde boa tarde gente tudo'` contra `'chido'` são artefato de
+> alinhamento, não um erro só. O número de "conteúdo" é o mais afetado por isso
+> e deve ser lido como **teto**, não como medida.
 
 > Os números saíram de duas implementações independentes — a
 > `taxa_de_erro` do `tools/benchmark_wer.py` e uma versão vetorizada escrita
