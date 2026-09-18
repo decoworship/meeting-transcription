@@ -52,7 +52,7 @@ public sealed class RetomadaPorMotorTests : IDisposable
     {
         // O caso que este arquivo existe para impedir: os três parâmetros de
         // sempre batem, e mesmo assim o ASR tem de rodar de novo.
-        Parcial(Vozes.MotorMoss);
+        Parcial("moss");
         Assert.Null(Retomada.Ler(_pasta, "large-v3", "pt", null, Vozes.MotorClassico));
     }
 
@@ -60,7 +60,7 @@ public sealed class RetomadaPorMotorTests : IDisposable
     public void OParcialClassicoNaoServeAUmaRodadaDoMoss()
     {
         Parcial(Vozes.MotorClassico);
-        Assert.Null(Retomada.Ler(_pasta, "large-v3", "pt", null, Vozes.MotorMoss));
+        Assert.Null(Retomada.Ler(_pasta, "large-v3", "pt", null, "moss"));
     }
 
     [Fact]
@@ -68,8 +68,8 @@ public sealed class RetomadaPorMotorTests : IDisposable
     {
         // Ele continua valendo para o que é: no caminho do MOSS a etapa pendente
         // é a costura, e o parcial guarda os rótulos locais para ela refazer.
-        Parcial(Vozes.MotorMoss);
-        Assert.NotNull(Retomada.Ler(_pasta, "large-v3", "pt", null, Vozes.MotorMoss));
+        Parcial("moss");
+        Assert.NotNull(Retomada.Ler(_pasta, "large-v3", "pt", null, "moss"));
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class RetomadaPorMotorTests : IDisposable
         File.WriteAllText(Path.Combine(_pasta, "transcricao.json"), json);
 
         Assert.NotNull(Retomada.Ler(_pasta, "large-v3", "pt", null, Vozes.MotorClassico));
-        Assert.Null(Retomada.Ler(_pasta, "large-v3", "pt", null, Vozes.MotorMoss));
+        Assert.Null(Retomada.Ler(_pasta, "large-v3", "pt", null, "moss"));
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class RetomadaPorMotorTests : IDisposable
 
         var doMoss = new ResultadoDaTranscricao
         {
-            Language = "pt", Duration = 1, Segments = [], Engine = Vozes.MotorMoss,
+            Language = "pt", Duration = 1, Segments = [], Engine = "moss",
         };
         Assert.Contains("\"engine\": \"moss\"", doMoss.ParaJson());
     }

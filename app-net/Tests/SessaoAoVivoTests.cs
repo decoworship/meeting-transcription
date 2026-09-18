@@ -119,21 +119,12 @@ public sealed class SessaoAoVivoTests : IDisposable
     }
 
     [Fact]
-    public void ComOMossMasSemOMotorEmDiscoTambemDiz()
-    {
-        var motores = new Motores("python", "asr.py", "diar.py", "modelos.py");
-        var cfg = new ConfiguracoesDoApp { MotorDeTranscricao = Vozes.MotorMoss };
-
-        Assert.Contains("motor MOSS não está em", SessaoAoVivo.OQueImpede(motores, cfg));
-    }
-
-    [Fact]
     public void OBlocoDaPreviaEODoPipelineSaoOMesmo()
     {
-        // Três minutos, escrito num lugar só. Dois números diferentes fariam a
-        // prévia e a passada final cortarem a reunião em pontos distintos, e a
-        // comparação entre as duas deixaria de fazer sentido.
-        Assert.Equal(MossEmBlocos.BlocoS, SessaoAoVivo.BlocoS);
+        // Três minutos, e o número tem medição: o bloco de 3 min tem a
+        // diarização do de 5 sem os órfãos do de 1 (FASE7-RESULTADOS §3).
+        // A constante morava na MossEmBlocos até 17/09/2026; o teste sobrevive
+        // porque o número é do bloco, não do motor que o lia.
         Assert.Equal(180.0, SessaoAoVivo.BlocoS);
     }
 

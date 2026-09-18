@@ -184,7 +184,32 @@ para o winget.
 a régua do eixo correspondente não piora sobre o acervo. Se um teste precisar
 mudar, o corte pegou osso.
 
-### O MOSS é o primeiro a sair — decidido em 15/09/2026
+### O MOSS é o primeiro a sair — decidido em 15/09/2026, **feito em 17/09/2026**
+
+> **Executado.** Saíram o `motores/moss/motor.py`, a `Nucleo/MossEmBlocos.cs`, o
+> pacote do `Catalogo`, o `ScriptMoss`/`OQueFaltaParaMoss` dos `Motores`, a
+> bifurcação inteira do `Transcritor` (o ramo, a costura e as duas condições que
+> dela dependiam), o seletor de motor em Ajustes e o MOSS dos três scripts de
+> empacotamento. **628 testes passam.**
+>
+> **O `MotorAceito` sobreviveu com um valor só**, e de propósito: um `app.json`
+> com `"moss"` escrito — e eles existem, de quem experimentou — precisa voltar
+> ao clássico **em silêncio**, e não recusar a transcrição. Mesma razão para o
+> `Vozes.MotorAceitoNaAmostra` continuar existindo devolvendo `null`: o arquivo
+> de vozes de quem experimentou tem o campo escrito, e quem lê precisa
+> continuar tratando isso.
+>
+> **A `CosturaDeFalantes` NÃO saiu**, ao contrário do que esta seção previa. A
+> condição de reabertura nº 3 — *"a `CosturaDeFalantes` achar outro
+> consumidor"* — foi satisfeita no mesmo dia pelo `VIVO-2`: a diarização sobre a
+> legenda produz rótulos locais (`Speaker 1`…) exatamente como os blocos do MOSS
+> produziam, e transformá-los em pessoa é o que ela faz. **Fica pendente de
+> decisão do dono do produto.**
+>
+> O GGUF não estava em disco nesta máquina, então o corte não rendeu os 0,67 GB
+> previstos aqui — rendeu o código.
+
+
 
 **Quem decidiu foi o dono do produto, depois de ver a legenda funcionando em
 reunião de verdade.** A tabela acima tinha sido escrita supondo o contrário — o

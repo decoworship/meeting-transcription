@@ -253,10 +253,6 @@ else
 ligar_por_juncao python              "o app abre, mas não transcreve."
 ligar_por_juncao diarizacao/modelos  "o app transcreve, mas não separa falantes."
 ligar_por_juncao ata                 "o app transcreve, mas gerar ata falha."
-# O GGUF do MOSS, 0,70 GB. Sem a junção o motor não acha o modelo ao lado dele e
-# cai no caminho do HuggingFace — baixando 0,70 GB de novo, em silêncio, na
-# primeira transcrição. Opcional como o resto do MOSS: sem a pasta, só avisa.
-ligar_por_juncao moss/modelos        "o MOSS baixaria o modelo de novo, 0,70 GB."
 fi
 
 # O motor de ata é conferido, não copiado: são 3,5 GB que não mudam a cada
@@ -270,7 +266,7 @@ else
 fi
 
 echo "==> sincronizando os sidecars"
-# O `moss` e a `legenda` entraram na Fase 7 e são os opcionais: numa instalação
+# A `legenda` entrou na Fase 7 e é a opcional: numa instalação
 # que ainda não passou pelo empacotador eles não existem, e não existir não é
 # erro — as chaves `motor_de_transcricao` e `legenda_ao_vivo` nascem desligadas e
 # ninguém os procura. Por isso só são copiados se a pasta estiver lá.
@@ -278,8 +274,8 @@ echo "==> sincronizando os sidecars"
 # **A legenda precisa da pasta criada na mão na primeira vez**, porque ela é
 # motor novo e nenhuma instalação a tem ainda. Copiar sempre que a fonte existe
 # resolve, e é o que a condição abaixo faz.
-for m in asr diarizacao modelos moss legenda; do
-  [[ ("$m" == "moss" || "$m" == "legenda") \
+for m in asr diarizacao modelos legenda; do
+  [[ "$m" == "legenda" \
      && ! -d "$DESTINO/motores/$m" && ! -d "$MOTORES_FONTE/$m" \
      && ! -d "$RAIZ/motores/$m" ]] \
     && { echo "    (sem motores/$m nesta instalação — pulando)"; continue; }

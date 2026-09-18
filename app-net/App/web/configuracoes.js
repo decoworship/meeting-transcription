@@ -738,7 +738,6 @@ function abaModelos(catalogo, config, gravar) {
   // Ele precisa existir mesmo estando a chave que o liga fora desta tela: sem
   // cartão, o modelo não teria como ser baixado, e o motor subiria sem ele. Um
   // teste guarda esse par — ver CatalogoTests.TodoPacoteTemIdUnicoEFamiliaConhecida.
-  const doMoss = catalogo.filter((i) => i.pacote.familia === "moss");
   if (doMoss.length > 0) {
     const b = bloco("Transcrição em uma passada (opcional)",
       "Um modelo que transcreve e separa os falantes ao mesmo tempo. "
@@ -940,34 +939,6 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   hot.append(oQueCusta, chave(config.usar_hotwords === true,
     (v) => gravar({ usar_hotwords: v })), porQueImporta);
   painel.appendChild(hot);
-
-  // ---- qual motor produz texto e falante
-  //
-  // A escolha existia só no app.json até 09/09/2026, e quem quisesse comparar os
-  // dois motores tinha de fechar o app e editar um arquivo à mão. A gravação
-  // fica salva, então dá para transcrever a mesma reunião nos dois e comparar —
-  // e é essa comparação que a chave existe para permitir.
-  const motor = bloco("Motor de transcrição",
-    "O de sempre são dois modelos: um escreve o texto, outro separa quem falou, "
-    + "e o app cruza os dois pelo tempo. O MOSS faz as duas coisas numa passada.");
-  const escolhaDoMotor = campo("Usar", "select",
-    { opcoes: ["O de sempre (dois modelos)", "MOSS (uma passada)"] });
-  const selMotor = escolhaDoMotor.querySelector("select");
-  selMotor.options[0].value = "classico";
-  selMotor.options[1].value = "moss";
-  selMotor.value = config.motor_de_transcricao === "moss" ? "moss" : "classico";
-  selMotor.addEventListener("change", async (e) => {
-    await gravar({ motor_de_transcricao: e.target.value });
-    recarregar();
-  });
-  const oQueMuda = document.createElement("p");
-  oQueMuda.className = "campo__dica";
-  oQueMuda.textContent = "Com o MOSS o vocabulário funciona diferente: ele não "
-    + "aceita a lista de termos enquanto transcreve, então os nomes e siglas do "
-    + "projeto só são corrigidos depois, na revisão. Termo que ele não ouviu não "
-    + "volta. Ele precisa do modelo baixado em Ajustes › Modelos.";
-  motor.append(escolhaDoMotor, oQueMuda);
-  painel.appendChild(motor);
 
   // ---- a prévia durante a própria reunião
   //

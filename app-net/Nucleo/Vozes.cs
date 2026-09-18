@@ -265,9 +265,6 @@ public sealed class Vozes
     /// </remarks>
     public const string MotorClassico = "classico";
 
-    /// <summary>O MOSS: texto e falante numa passada só.</summary>
-    public const string MotorMoss = "moss";
-
     /// <summary>O motor de uma amostra; ausente é o clássico.</summary>
     /// <remarks>
     /// Ausente não é "desconhecido": antes de 03/09/2026 não havia outro motor,
@@ -286,10 +283,14 @@ public sealed class Vozes
     /// atualização em que nada mudou. Quem lê já sabe que ausente é o clássico
     /// (<see cref="MotorDe"/>), porque antes de 03/09/2026 não havia outro.
     /// </remarks>
-    public static string? MotorAceitoNaAmostra(string? motor) =>
-        string.Equals(motor?.Trim(), MotorMoss, StringComparison.OrdinalIgnoreCase)
-            ? MotorMoss
-            : null;
+    /// <remarks>
+    /// <b>Sempre nulo desde 17/09/2026</b>, quando o MOSS saiu e voltou a haver
+    /// um motor só. A função fica porque o <b>arquivo de vozes de quem
+    /// experimentou o MOSS tem o campo escrito</b>, e quem lê precisa continuar
+    /// tratando isso — o desfazer em bloco depende de saber de onde a amostra
+    /// veio. Ver docs/CONVERGENCIA.md.
+    /// </remarks>
+    public static string? MotorAceitoNaAmostra(string? motor) => null;
 
     /// <summary>
     /// A geração de regras de inscrição que vale hoje.

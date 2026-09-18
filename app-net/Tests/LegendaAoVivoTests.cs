@@ -77,7 +77,7 @@ public sealed class LegendaAoVivoTests
         var m = Motores.AoLadoDoExecutavel();
 
         Assert.EndsWith(Path.Combine("legenda", "motor.py"), m.ScriptLegenda);
-        Assert.NotEqual(m.ScriptMoss, m.ScriptLegenda);
+        Assert.NotEqual(m.ScriptAsr, m.ScriptLegenda);
     }
 
     /// <summary>

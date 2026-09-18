@@ -173,10 +173,13 @@ public sealed class ConfiguracoesDoApp
     /// Portão único, como o <see cref="TemaAceito"/>: quem lê a chave lê por
     /// aqui, e o que sai daqui é uma das duas constantes deste repositório.
     /// </remarks>
-    public static string MotorAceito(string? motor) =>
-        string.Equals(motor?.Trim(), Vozes.MotorMoss, StringComparison.OrdinalIgnoreCase)
-            ? Vozes.MotorMoss
-            : Vozes.MotorClassico;
+    /// <remarks>
+    /// <b>Desde 17/09/2026 só há um motor</b>, e a função sobrevive por isso: um
+    /// <c>app.json</c> com <c>"moss"</c> escrito lá — e eles existem, de quem
+    /// experimentou — precisa voltar ao clássico em silêncio, e não recusar a
+    /// transcrição. Ver docs/CONVERGENCIA.md, "O MOSS é o primeiro a sair".
+    /// </remarks>
+    public static string MotorAceito(string? motor) => Vozes.MotorClassico;
 
     /// <summary>
     /// Corrigir a grafia dos termos do projeto no texto transcrito.

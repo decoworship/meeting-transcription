@@ -11,7 +11,6 @@
 #   motores/asr/motor.py             o sidecar de transcrição
 #   motores/diarizacao/motor.py      o sidecar de diarização
 #   motores/modelos/motor.py         o sidecar que baixa modelo sob controle
-#   motores/moss/motor.py            o sidecar do MOSS (opcional, Fase 7)
 #
 # Um Python só para os dois motores, e não um por motor: o app aponta para um
 # `python.exe` (ver Nucleo/Transcritor.cs), e separar os ambientes só valeria
@@ -28,7 +27,7 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 DESTINO="${1:-$RAIZ/dist/motores}"
 PYTHON_VERSAO="3.12.8"
 PLATAFORMA="x86_64-pc-windows-msvc"
-# Cravada, e não "a mais nova": é a versão em que o MOSS foi medido, e o
+# Cravada, e não "a mais nova": é a versão em que a legenda foi medido, e o
 # `transcribe.cpp` ainda está em 0.x — onde a compatibilidade não é promessa.
 TRANSCRIBE_CPP_VERSAO="0.2.3"
 
@@ -81,8 +80,8 @@ uv pip install \
 # declarado como `extra`, e é esse que **não** pode vir do PyPI: lá ele é um stub
 # de versão 0.0.0 que não registra o backend, e a falha é muda — o modelo carrega,
 # roda em CPU, e a reunião leva a tarde. É a mesma sequência do cabeçalho do
-# tools/medir_moss.py, que é onde o motor foi medido.
-echo "==> transcribe.cpp para o motor MOSS (~200 MB)"
+# tools/medir_legenda.py, que é onde o motor foi medido.
+echo "==> transcribe.cpp para a legenda ao vivo (~200 MB)"
 TCPP="https://github.com/handy-computer/transcribe.cpp/releases/download/v$TRANSCRIBE_CPP_VERSAO"
 
 # 1. o pacote e o backend de CPU, do PyPI — resolvidos como dependência normal.
@@ -165,14 +164,14 @@ rm -rf "$DESTINO/python/Lib/site-packages/torch/include" \
 # **E é o win_amd64**, não o manylinux que as ferramentas de medição usam: as
 # medições rodaram no WSL, o app é Windows, e o mesmo release publica os dois.
 echo "==> os sidecars"
-mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos" "$DESTINO/moss"
+mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos"
 cp "$RAIZ/motores/asr/motor.py" "$DESTINO/asr/"
 cp "$RAIZ/motores/diarizacao/motor.py" "$DESTINO/diarizacao/"
 # O motor de modelos não traz dependência nova: a huggingface_hub já vem
 # junto do faster-whisper e do pyannote, que a baixam por conta própria.
 cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
 
-# **O GGUF do MOSS não vem aqui, e isso é decisão e não esquecimento.** São
+# **O GGUF não vem aqui, e isso é decisão e não esquecimento.** São
 # 0,70 GB, e o instalador exclui `*.gguf` por decisão registrada
 # (instalador/MeetingApp.iss, e a régua do montar_instalador.sh reprova se um
 # escapar): pôr o arquivo nesta pasta o faria ser descartado em silêncio, e o
@@ -182,7 +181,6 @@ cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
 # `Nucleo/Catalogo.cs`, baixado sob demanda pelo sidecar `modelos`. Quem liga a
 # chave `motor_de_transcricao` baixa 0,70 GB uma vez; quem não liga não paga
 # nada. Ver docs/FASE7-BACKEND.md A1.
-cp "$RAIZ/motores/moss/motor.py" "$DESTINO/moss/"
 
 # ── as réguas ────────────────────────────────────────────────────────────────
 #
@@ -205,13 +203,13 @@ TORCH_V=$(grep -oP "__version__ = '\K[^']+" \
       ambiente; ela tem de vir ANTES."
 echo "    torch: $TORCH_V"
 
-# O backend de CUDA do MOSS é um pacote separado, e é o que o PyPI entrega como
-# stub 0.0.0. Se ele sumir, o MOSS carrega e roda em CPU — mesma falha muda.
+# O backend de CUDA é um pacote separado, e é o que o PyPI entrega como
+# stub 0.0.0. Se ele sumir, a legenda carrega e roda em CPU — mesma falha muda.
 [[ -d "$DESTINO/python/Lib/site-packages/transcribe_cpp_native_cu12" ]] \
-  || reprovar "falta o transcribe_cpp_native_cu12 — o motor MOSS rodaria em CPU."
+  || reprovar "falta o transcribe_cpp_native_cu12 — a legenda rodaria em CPU."
 echo "    transcribe.cpp: com backend de CUDA"
 
-for m in asr diarizacao modelos moss; do
+for m in asr diarizacao modelos legenda; do
   [[ -f "$DESTINO/$m/motor.py" ]] || reprovar "falta $m/motor.py no empacotamento."
 done
 echo "    os quatro sidecars: no lugar"
