@@ -75,6 +75,14 @@ internal sealed class Pedido
 
     /// <summary>O id do evento da agenda a fixar; vazio solta a escolha.</summary>
     [JsonPropertyName("evento")] public string? Evento { get; init; }
+
+    /// <summary>O que se quer saber da reunião em curso, em português.</summary>
+    [JsonPropertyName("pergunta")] public string? Pergunta { get; init; }
+
+    /// <summary>
+    /// <c>true</c> no botão de resumo, que tem forma; ausente na caixa livre.
+    /// </summary>
+    [JsonPropertyName("resumo")] public bool? Resumo { get; init; }
 }
 
 internal sealed class Resposta
@@ -102,6 +110,15 @@ internal sealed class Resposta
     /// <summary>O que a legenda deixou numa gravação já encerrada.</summary>
     [JsonPropertyName("legenda_gravada")] public List<TurnoJson>? LegendaGravada { get; init; }
 
+    /// <summary>
+    /// A diarização já passou por esta legenda. <c>false</c> = ainda vem.
+    /// </summary>
+    /// <remarks>
+    /// Nulo quando não há legenda, e aí a tela não afirma nada. É o que separa
+    /// "ficou sem falante" de "ainda está separando".
+    /// </remarks>
+    [JsonPropertyName("legenda_falantes")] public bool? LegendaFalantes { get; init; }
+
     /// <summary>O que impede a prévia, ou nulo quando ela pode acontecer.</summary>
     [JsonPropertyName("aovivo_impedimento")] public string? AoVivoImpedimento { get; init; }
 
@@ -110,6 +127,27 @@ internal sealed class Resposta
 
     /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
     [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
+
+    /// <summary>
+    /// O que impede a caixa de perguntar, ou nulo quando ela pode existir.
+    /// </summary>
+    /// <remarks>
+    /// A tela pergunta ao montar. Sem isto a caixa apareceria ligada com a chave
+    /// desligada, e o erro só viria depois de a pessoa escrever a pergunta.
+    /// </remarks>
+    [JsonPropertyName("perguntar_impedimento")] public string? PerguntarImpedimento { get; init; }
+
+    /// <summary>O que o modelo respondeu sobre a reunião em curso.</summary>
+    [JsonPropertyName("resposta")] public string? RespostaDoModelo { get; init; }
+
+    /// <summary>
+    /// O modelo só viu a parte final da reunião — o começo não coube.
+    /// </summary>
+    /// <remarks>
+    /// Vai para a tela, e não só para o prompt: quem perguntou tem direito de
+    /// saber que a resposta não considerou a reunião inteira.
+    /// </remarks>
+    [JsonPropertyName("cortado")] public bool? Cortado { get; init; }
 
     [JsonPropertyName("erro")] public string? Erro { get; init; }
     [JsonPropertyName("gravacoes")] public List<GravacaoResumo>? Gravacoes { get; init; }
@@ -471,6 +509,17 @@ internal sealed class TurnoJson
 {
     [JsonPropertyName("dono")] public required bool Dono { get; init; }
     [JsonPropertyName("texto")] public required string Texto { get; init; }
+
+    /// <summary>
+    /// Quem falou, quando a separação já rodou. Nulo até lá.
+    /// </summary>
+    /// <remarks>
+    /// <b>A tela desenha o que a separação produziu, e não os turnos crus.</b>
+    /// O turno agrupa por dono — "você" contra "os outros" — e o falante é mais
+    /// fino que isso: vem dos trechos, que carregam tempo. Quando há falante, a
+    /// fala é agrupada por ele.
+    /// </remarks>
+    [JsonPropertyName("falante")] public string? Falante { get; init; }
 }
 
 /// <summary>Um pedaço da legenda ao vivo, como a tela o recebe.</summary>
@@ -583,6 +632,37 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private SessaoAoVivo? _aoVivo;
     private LegendaAoVivo? _legenda;
 
+    /// <summary>
+    /// A pasta da gravação em curso, para a pergunta saber sobre o que é.
+    /// </summary>
+    /// <remarks>
+    /// Guardada mesmo quando nem a legenda nem a prévia ligaram: é o que separa
+    /// "não há reunião acontecendo" de "há, mas ninguém está transcrevendo ela"
+    /// — duas frases que pedem coisas diferentes de quem lê.
+    /// </remarks>
+    private string? _pastaAoVivo;
+
+    /// <summary>
+    /// Quem leva a pergunta ao modelo, uma de cada vez.
+    /// </summary>
+    /// <remarks>
+    /// Uma instância só para a ponte inteira, e é ela que guarda a vez: duas
+    /// subidas do <c>llama-server</c> ao mesmo tempo são dois modelos na placa
+    /// durante uma reunião que está sendo gravada.
+    /// </remarks>
+    private readonly PerguntaDaReuniao _pergunta = new(PerguntarAoMotorAsync);
+
+    /// <summary>
+    /// O motor de pé entre perguntas, quando a chave <c>modelo_quente</c> liga.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nulo é o estado normal</b>: com a chave desligada, cada pergunta sobe
+    /// e mata o seu próprio motor. Quando existe, ele morre ao parar a gravação
+    /// (<see cref="EncerrarAPrevia"/>), por ociosidade, e quando a chave é
+    /// desligada em Ajustes.
+    /// </remarks>
+    private MotorQuente? _motorQuente;
+
     public async Task AtenderAsync(string mensagem)
     {
         Pedido? p;
@@ -670,6 +750,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "gerar-ata":
                     GerarAta(p);
+                    break;
+
+                case "perguntar-ao-vivo":
+                    await PerguntarAoVivoAsync(p);
                     break;
 
                 case "exportar-ata":
@@ -874,6 +958,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                 case "salvar-config":
                     p.Config?.Salvar();
+                    // **Desligar a chave devolve a placa na hora.** Sem isto, a
+                    // pessoa desliga porque precisa da máquina para outra coisa
+                    // e o processo de 3,2 GB continua lá até a gravação parar —
+                    // que é o oposto do que ela pediu ao desligar.
+                    if (ConfiguracoesDoApp.Carregar() is { ModeloQuente: false })
+                    {
+                        _motorQuente?.Dispose();
+                        _motorQuente = null;
+                    }
                     Responder(new Resposta { Id = p.Id, Config = ConfiguracoesDoApp.Carregar() });
                     break;
 
@@ -901,13 +994,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // e não entra no lugar dela: serve para conferir, antes de
                 // gastar a placa, se o que foi dito está lá.
                 case "legenda-gravada":
+                    // **Os trechos ganham dos turnos quando existem.** Eles
+                    // carregam falante, e é isso que a separação produziu; os
+                    // turnos são a vista antiga, de antes de haver falante.
                     Responder(new Resposta
                     {
                         Id = p.Id,
+                        LegendaFalantes = p.Gravacao is { Length: > 0 } gf
+                            ? LegendaAoVivo.Ler(gf)?.FalantesProntos : null,
                         LegendaGravada = p.Gravacao is { Length: > 0 } g
-                            ? LegendaAoVivo.Ler(g)?.Turnos.Select(t => new TurnoJson
-                            { Dono = t.Dono, Texto = t.Texto }).ToList()
-                            : null,
+                            ? FalasDaLegenda(LegendaAoVivo.Ler(g)) : null,
                     });
                     break;
 
@@ -983,6 +1079,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                                 : "nem a legenda nem a prévia em blocos estão ligadas "
                                   + "em Ajustes › Transcrição.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
+                        PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
+                            cfgAv, CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgAv.ModeloParaPergunta)),
                     });
                     break;
 
@@ -1231,6 +1329,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
     private void ComecarAPrevia(string pasta)
     {
+        _pastaAoVivo = pasta;
         try
         {
             _aoVivo?.Dispose();
@@ -1282,9 +1381,41 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// <summary>Descarta a prévia. Nunca lança, pela mesma razão.</summary>
     private void EncerrarAPrevia()
     {
-        try { _legenda?.Dispose(); }
-        catch (ObjectDisposedException) { }
-        _legenda = null;
+        // **A pasta é capturada ANTES de zerar o campo**, e a ordem é o defeito
+        // que a primeira reunião com o VIVO-2 encontrou: o `_pastaAoVivo = null`
+        // vinha primeiro, a separação de falantes recebia nulo e nunca era
+        // chamada — sem erro, sem linha no registro, e a tela prometendo
+        // "separando falantes…" para sempre. Visto em 18/09/2026.
+        string? pastaDaLegenda = _pastaAoVivo;
+        _pastaAoVivo = null;
+
+        // **A placa volta com a gravação.** Um motor de 3,2 GB órfão depois da
+        // reunião é o pior desfecho desta chave, e é o que ninguém notaria.
+        _motorQuente?.Dispose();
+        _motorQuente = null;
+
+        // **Fecha com graça, e em segundo plano.** O `finalize()` do motor é
+        // quem devolve o texto quando nada firmou durante a reunião, e esperá-lo
+        // aqui seguraria quem acabou de parar a gravação. O arquivo cai na pasta
+        // um instante depois, que é cedo o bastante: ninguém lê a legenda
+        // gravada antes de a tela de transcrever abrir.
+        if (_legenda is { } legenda)
+        {
+            _legenda = null;
+            _ = Task.Run(async () =>
+            {
+                try { await legenda.EncerrarAsync(TimeSpan.FromSeconds(30)); }
+                catch (Exception e)
+                {
+                    Registro.Escrever("legenda", $"encerramento: {e.Message}");
+                }
+
+                // **Só depois do encerramento**, porque é ele que escreve o
+                // legenda.json final — inclusive o texto que só o finalize()
+                // solta quando nada firmou durante a reunião.
+                if (pastaDaLegenda is { Length: > 0 }) SepararFalantes(pastaDaLegenda);
+            });
+        }
 
         try { _aoVivo?.Dispose(); }
         catch (Exception) { /* a gravação não pode parar por causa da prévia */ }
@@ -1482,6 +1613,395 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// modelo de ata só carregue com a VRAM do ASR liberada. A bolinha do trilho
     /// acende para os dois pelo mesmo caminho.
     /// </remarks>
+    /// <summary>
+    /// Separa os falantes da legenda, em segundo plano, depois da reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o <c>VIVO-2</c>.</b> Entrega <i>quem falou</i> no rascunho enquanto
+    /// a pessoa ainda decide se vai transcrever — a diarização custa 32× o tempo
+    /// real, ~2 min numa reunião de uma hora, contra a passada inteira.
+    /// </para>
+    /// <para>
+    /// <b>Sobre o <c>system.wav</c>, e não sobre o mix</b>, pela mesma razão do
+    /// <c>Transcritor</c>: o dono já veio da faixa do microfone, com certeza, e
+    /// não precisa de estimativa por cima.
+    /// </para>
+    /// <para>
+    /// <b>Nunca levanta, e nunca bloqueia.</b> O pior desfecho é a legenda
+    /// ficar sem falante — que é como ela era até hoje.
+    /// </para>
+    /// </remarks>
+    private void SepararFalantes(string pasta)
+    {
+        LegendaGravada? legenda;
+        try
+        {
+            legenda = LegendaAoVivo.Ler(pasta);
+        }
+        catch (Exception) { return; }
+
+        // Sem trecho não há o que sobrepor: é legenda de antes do VIVO-1, ou
+        // reunião em que nada firmou.
+        if (legenda is not { FalantesProntos: false, Trechos.Count: > 0 }) return;
+
+        string sistema = Path.Combine(pasta, "system.wav");
+        if (!File.Exists(sistema)) return;
+
+        // **O registro recusa duas tarefas ao mesmo tempo, e recusar é legítimo:**
+        // as duas disputariam a placa. O que não pode é morrer em silêncio — este
+        // método roda dentro de um Task.Run, e a exceção não teria quem a
+        // observasse.
+        TrabalhoDeTranscricao trabalho;
+        try
+        {
+            trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "falantes");
+        }
+        catch (InvalidOperationException e)
+        {
+            // Sem separação, e a legenda não fica prometendo: marca como feita,
+            // sem falante. O registro diz por quê.
+            LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+            Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
+            return;
+        }
+        EmpurrarTranscricoes();
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var cfg = ConfiguracoesDoApp.Carregar();
+                var motores = Motores.AoLadoDoExecutavel();
+                using var motor = await MotorSidecar.IniciarAsync(
+                    motores.Python, [motores.ScriptDiarizacao],
+                    trabalho.Token, Motores.Ambiente());
+                // O SUP-1 pede que toda carga de GPU deixe rastro, e esta é a
+                // terceira — depois do ASR e do reconhecimento de vozes.
+                motor.AoRegistrar += l => Registro.Escrever("diarizacao", l);
+
+                var diarizacao = await motor.DiarizarAsync(
+                    sistema,
+                    (f, t) =>
+                    {
+                        _transcricoes.Progredir(pasta, "falantes", f, t);
+                        EmpurrarTranscricoes();
+                    },
+                    cfg.DiarizacaoPadrao, trabalho.Token);
+
+                var comFalante = FalantesDaLegenda.Atribuir(legenda.Trechos, diarizacao);
+
+                // **O mesmo banco de vozes da passada final**, e é o que torna
+                // isto um pipeline só: os rótulos do pyannote são locais à
+                // reunião, e quem os transforma em pessoa é o banco — que
+                // melhora a cada reunião, porque é aí que ele ganha amostra.
+                //
+                // **Nunca derruba a separação.** Não reconhecer é o estado
+                // normal de quem nunca foi apresentado, e um rótulo sem nome é
+                // melhor que trecho nenhum.
+                int nomeados = 0;
+                try
+                {
+                    _transcricoes.Progredir(pasta, "falantes", 0.8,
+                                            "procurando vozes conhecidas");
+                    EmpurrarTranscricoes();
+
+                    var faixas = Faixas.Ler(Path.Combine(pasta, "mic.wav"), sistema);
+                    var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
+                        .ReconhecerAsync(pasta, ComoSegmentos(comFalante), faixas.Mic,
+                                         trabalho.Token);
+
+                    if (conhecidos.Count > 0)
+                    {
+                        comFalante = [.. comFalante.Select(t =>
+                            t.Falante is { } r && conhecidos.TryGetValue(r, out string? nome)
+                                ? new TrechoDaLegenda
+                                {
+                                    InicioMs = t.InicioMs, FimMs = t.FimMs,
+                                    Dono = t.Dono, Texto = t.Texto, Falante = nome,
+                                }
+                                : t)];
+                        nomeados = conhecidos.Count;
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e)
+                {
+                    Registro.Escrever("legenda", $"vozes conhecidas: {e.Message}");
+                }
+
+                LegendaAoVivo.Gravar(pasta, legenda.Turnos, comFalante, prontos: true);
+
+                _transcricoes.Terminar(pasta);
+                Registro.Escrever("legenda",
+                    $"falantes separados: {comFalante.Count} trechos, "
+                    + $"{diarizacao.Count} segmentos de diarização, "
+                    + $"{nomeados} reconhecidos pelo banco de vozes.");
+            }
+            catch (OperationCanceledException)
+            {
+                _transcricoes.Terminar(pasta, cancelada: true);
+            }
+            catch (Exception e)
+            {
+                // **A tela para de prometer.** Marcar como feita sem falante é
+                // honesto — tentou-se e não saiu —, e deixar `false` faria o
+                // aviso "separando falantes…" ficar para sempre, que é a tela
+                // prometendo um resultado que não vem.
+                try
+                {
+                    LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+                }
+                catch (Exception) { /* disco: o aviso fica, e é o menor dos males */ }
+
+                _transcricoes.Terminar(pasta, e.Message);
+                Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
+            }
+            EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// A legenda gravada como a tela a desenha: falas agrupadas.
+    /// </summary>
+    /// <remarks>
+    /// <b>Agrupa por falante quando ele existe, e por dono quando não.</b> Sem
+    /// isto a tela mostraria 91 linhas de um segundo cada — a granularidade do
+    /// trecho é a do commit do motor, e serve à diarização, não aos olhos.
+    /// <para>
+    /// Os turnos crus ficam de reserva para a legenda gravada antes do
+    /// <c>VIVO-1</c>, que não tem trecho nenhum.
+    /// </para>
+    /// </remarks>
+    private static List<TurnoJson>? FalasDaLegenda(LegendaGravada? legenda)
+    {
+        if (legenda is null) return null;
+        if (legenda.Trechos.Count == 0)
+            return [.. legenda.Turnos.Select(t => new TurnoJson
+            {
+                Dono = t.Dono, Texto = t.Texto,
+            })];
+
+        var falas = new List<TurnoJson>();
+        foreach (var t in legenda.Trechos)
+        {
+            // Quebra quando muda quem fala. Sem falante, o dono é o critério —
+            // que é exatamente o que o turno sempre foi.
+            bool mesmo = falas.Count > 0
+                         && falas[^1].Falante == t.Falante
+                         && falas[^1].Dono == t.Dono;
+            if (mesmo)
+                falas[^1] = new TurnoJson
+                {
+                    Dono = t.Dono, Falante = t.Falante,
+                    // **Sem espaço quando a palavra continua.** Os trechos são
+                    // fatias de um fluxo só, e o motor parte no meio da palavra
+                    // — juntar com espaço mostraria "a Palo ma tem".
+                    Texto = falas[^1].Texto + (t.Colado ? "" : " ") + t.Texto,
+                };
+            else
+                falas.Add(new TurnoJson { Dono = t.Dono, Falante = t.Falante, Texto = t.Texto });
+        }
+        return falas;
+    }
+
+    /// <summary>
+    /// Os trechos da legenda como o reconhecimento de vozes os espera.
+    /// </summary>
+    /// <remarks>
+    /// <b>Conversão e não cópia de regra.</b> O <c>ReconhecerAsync</c> trabalha
+    /// sobre <see cref="SegmentoFinal"/> porque é o que a passada final produz;
+    /// dar a ele a mesma forma é o que permite os dois caminhos usarem o
+    /// <b>mesmo</b> banco de vozes, em vez de dois que divergem.
+    /// </remarks>
+    private static List<SegmentoFinal> ComoSegmentos(IEnumerable<TrechoDaLegenda> trechos) =>
+        [.. trechos.Select(t => new SegmentoFinal
+        {
+            Start = t.InicioMs / 1000.0,
+            End = t.FimMs / 1000.0,
+            Text = t.Texto,
+            Speaker = t.Falante,
+        })];
+
+    /// <summary>
+    /// Pergunta ao modelo o que já aconteceu na reunião.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É a única operação que sobe um modelo enquanto se grava</b>, e por
+    /// isso ela nasce curta: sobe, pergunta, morre. O motor quente a reunião
+    /// inteira é o terceiro contexto CUDA que derrubou a legenda de 2,46× para
+    /// 0,45× em 11/09/2026 (docs/FASE7-ROTA.md §4) — ver
+    /// <see cref="PerguntaDaReuniao"/>.
+    /// </para>
+    /// <para>
+    /// <b>O <c>gravacao</c> é opcional, e é o banco de ensaio</b>: apontando
+    /// para uma pasta do acervo, a mesma pergunta roda sobre o
+    /// <c>legenda.json</c> dela sem precisar de reunião acontecendo. É como as
+    /// instruções do <see cref="PromptDeReuniao"/> se ajustam.
+    /// </para>
+    /// </remarks>
+    private async Task PerguntarAoVivoAsync(Pedido p)
+    {
+        if (p.Pergunta is not { Length: > 0 } pergunta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = "sem pergunta" });
+            return;
+        }
+
+        // O motor de ata não vem no instalador, e "não está lá" é o estado
+        // normal de quem acabou de instalar. A frase do OQueFalta já diz onde
+        // baixar — e dizê-la **antes** de montar o prompt evita a espera inútil.
+        var cfg = ConfiguracoesDoApp.Carregar();
+        var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta);
+        if (PerguntaDaReuniao.OQueImpede(cfg, caminhos) is { } falta)
+        {
+            Responder(new Resposta { Id = p.Id, Erro = falta });
+            return;
+        }
+
+        string? pasta = p.Gravacao is { Length: > 0 } g ? g : _pastaAoVivo;
+        if (pasta is null)
+        {
+            Responder(new Resposta
+            {
+                Id = p.Id,
+                Erro = "não há reunião acontecendo — comece a gravar, ou escolha uma "
+                     + "gravação já feita.",
+            });
+            return;
+        }
+
+        int limite = PerguntaDaReuniao.LimiteDeCaracteres(MetadadosDoGguf.Ler(caminhos.Modelo));
+        var texto = LerAReuniaoAteAgora(pasta, limite);
+
+        if (texto.Texto.Length == 0)
+        {
+            Responder(new Resposta
+            {
+                Id = p.Id,
+                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo ou a "
+                     + "prévia em blocos precisam estar ligadas em Ajustes › Transcrição, "
+                     + "e leva alguns segundos até a primeira fala firmar.",
+            });
+            return;
+        }
+
+        // **O botão e a caixa livre pedem coisas diferentes.** A instrução vai
+        // depois da transcrição, que foi o ajuste que fez o modelo acertar o
+        // assunto do fim (docs/ESTUDO-RESUMO-AO-VIVO.md §8).
+        bool resumo = p.Resumo == true;
+        string pedido = resumo
+            ? PerguntaDaReuniao.Instrucao(resumo: true)
+            : $"{pergunta}\n\n{PerguntaDaReuniao.Instrucao(resumo: false)}";
+
+        // Um progresso só, e fixo. Não há o que medir: o modelo leva de 6 a 9
+        // segundos para carregar e depois escreve de uma vez. Inventar uma
+        // barra que anda sozinha seria mentir sobre o que está acontecendo.
+        Responder(new Resposta
+        {
+            Id = p.Id, Tipo = "progresso", Etapa = "modelo", Fracao = 0.1,
+            Texto = cfg.ModeloQuente && _motorQuente?.Aberto == true
+                ? "lendo a reunião…" : "carregando o modelo e lendo a reunião…",
+        });
+
+        string resposta = cfg.ModeloQuente
+            ? await PerguntarQuenteAsync(cfg, pedido, texto)
+            : await _pergunta.ResponderAsync(pedido, texto, CancellationToken.None);
+
+        Responder(new Resposta
+        {
+            Id = p.Id, RespostaDoModelo = resposta, Cortado = texto.Cortado,
+        });
+    }
+
+    /// <summary>
+    /// Pergunta ao motor que fica de pé, subindo-o na primeira vez.
+    /// </summary>
+    /// <remarks>
+    /// <b>O contexto é pedido pelo pior caso da janela</b>, e não pelo tamanho
+    /// da transcrição de agora: a sessão não sabe que pergunta virá, e subir de
+    /// novo a cada minuto de reunião anularia o motivo de ela existir.
+    /// </remarks>
+    private async Task<string> PerguntarQuenteAsync(
+        ConfiguracoesDoApp cfg, string pedido, TextoDaReuniao texto)
+    {
+        _motorQuente ??= new MotorQuente(ct =>
+        {
+            var motor = new MotorDeAta(
+                CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta));
+            return motor.AbrirSessaoAsync(
+                PromptDeReuniao.Sistema, nomeDoEsquema: "", esquema: "",
+                PerguntaDaReuniao.JanelaMaximaCaracteres, PerguntaDaReuniao.TokensDeSaida, ct);
+        }, MotorQuente.OciosoPadrao);
+
+        // A ociosidade é conferida na própria pergunta: é o único momento em que
+        // se sabe que há alguém olhando, e evita um relógio a mais no processo.
+        _motorQuente.FecharSeOcioso(DateTime.UtcNow);
+
+        return await _motorQuente.PerguntarAsync(
+            PerguntaDaReuniao.Montar(texto, pedido), CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A reunião até agora, na melhor fonte que existir.
+    /// </summary>
+    /// <remarks>
+    /// <b>A legenda primeiro, e o disco é a fonte</b> — não a instância viva.
+    /// O <c>legenda.json</c> é reescrito a cada trecho que firma, então ele é
+    /// tão fresco quanto a memória, e o mesmo caminho serve à gravação já
+    /// encerrada do banco de ensaio.
+    /// <para>
+    /// <b>A repetição não é paranoia.</b> O <c>Gravar()</c> da legenda usa
+    /// <c>File.WriteAllText</c>, que <b>trunca antes de escrever</b>; uma leitura
+    /// no instante errado pega o arquivo pela metade, e o <c>Ler</c> devolve
+    /// <c>null</c> para qualquer erro. Sem repetir, a pergunta feita no momento
+    /// de um commit responderia "ainda não há nada transcrito" numa reunião
+    /// cheia de texto.
+    /// </para>
+    /// </remarks>
+    private TextoDaReuniao LerAReuniaoAteAgora(string pasta, int limite)
+    {
+        for (int tentativa = 0; tentativa < 3; tentativa++)
+        {
+            if (LegendaAoVivo.Ler(pasta) is { Turnos.Count: > 0 } legenda)
+                return PerguntaDaReuniao.DaLegenda(legenda.Turnos, limite);
+
+            if (!File.Exists(Path.Combine(pasta, LegendaAoVivo.Arquivo))) break;
+            Thread.Sleep(50);
+        }
+
+        return PerguntaDaReuniao.DosBlocos(_aoVivo?.Entregues ?? [], limite);
+    }
+
+    /// <summary>
+    /// Leva o prompt ao <c>llama-server</c> e devolve o texto da resposta.
+    /// </summary>
+    /// <remarks>
+    /// Reusa o <c>ResponderAsync</c> do motor de ata, que já sobe, pergunta e
+    /// mata — nenhum código de processo novo. O esquema de um campo só existe
+    /// pela razão medida em 25/08: sem ele, um modelo de raciocínio delibera
+    /// até estourar o limite sem emitir nada.
+    /// </remarks>
+    private static async Task<string> PerguntarAoMotorAsync(string prompt, CancellationToken ct)
+    {
+        var cfg = ConfiguracoesDoApp.Carregar();
+        var motor = new MotorDeAta(
+            CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloParaPergunta));
+
+        // **Sem esquema, e com as regras no sistema.** O esquema tem medição por
+        // trás: ele custou quatro dos seis modelos comparados
+        // (docs/ESTUDO-RESUMO-AO-VIVO.md §2). As regras, idem — cada linha delas
+        // saiu de um defeito visto rodando.
+        var respostas = await motor.ResponderAsync(
+            PromptDeReuniao.Sistema, [prompt], nomeDoEsquema: "", esquema: "",
+            PerguntaDaReuniao.TokensDeSaida, progresso: null, ct);
+
+        return respostas[0] is { Length: > 0 } texto
+            ? texto
+            : "o modelo devolveu uma resposta vazia.";
+    }
+
     private void GerarAta(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)

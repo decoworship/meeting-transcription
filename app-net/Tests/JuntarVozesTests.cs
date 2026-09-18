@@ -68,7 +68,7 @@ public sealed class JuntarVozesTests : IDisposable
         // Sem isto, juntar seria uma forma silenciosa de apagar a auditoria — e
         // a auditoria é o que distingue esta biblioteca da anterior.
         var v = Banco();
-        v.Aprender("Diego", Amostra("reuniao-x", Vozes.MotorMoss));
+        v.Aprender("Diego", Amostra("reuniao-x", "moss"));
         v.Aprender("Diego Lacerda", Amostra("reuniao-y"));
 
         v.Juntar("Diego", "Diego Lacerda");
@@ -76,7 +76,7 @@ public sealed class JuntarVozesTests : IDisposable
         var perfil = v.Perfil("Diego Lacerda")!;
         Assert.Equal(2, perfil.Amostras.Count);
         Assert.Contains(perfil.Amostras, a => a.Origem.Gravacao == "reuniao-x");
-        Assert.Contains(perfil.Amostras, a => Vozes.MotorDe(a) == Vozes.MotorMoss);
+        Assert.Contains(perfil.Amostras, a => Vozes.MotorDe(a) == "moss");
         Assert.Contains(perfil.Amostras, a => Vozes.MotorDe(a) == Vozes.MotorClassico);
     }
 

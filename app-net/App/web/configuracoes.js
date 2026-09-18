@@ -685,13 +685,28 @@ function abaModelos(catalogo, config, gravar) {
     // que aviso nenhum.
   });
 
-  for (const [familia, titulo, texto, chaveConfig, padrao] of [
+  // **Dois seletores para a mesma família de modelos, e é de propósito.** A ata
+  // roda com a reunião encerrada e a placa livre, e pode pagar um modelo
+  // grande; a pergunta divide a placa com a legenda e tem vinte segundos para
+  // responder. O estudo de 16/09 escolheu modelos diferentes para cada uma.
+  //
+  // O segundo não repete os cartões de download: são os mesmos arquivos, e uma
+  // segunda lista de botões "baixar" faria parecer que são outros.
+  for (const [familia, titulo, texto, chaveConfig, padrao, semCartoes] of [
     ["asr", "Transcrição", "Qual modelo transforma áudio em texto.",
      "modelo_padrao", "large-v3"],
     // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
     // quem abre o .gguf é o llama.cpp, por caminho.
     ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
      "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf"],
+    ["ata", "Pergunta durante a reunião",
+     "Qual modelo responde no Gravador enquanto a reunião acontece. Pode ser "
+     + "diferente do da ata: aqui o que conta é responder rápido e caber na "
+     + "placa junto com a legenda.",
+     "modelo_da_pergunta",
+     // Vazio significa "o mesmo da ata", e é o que o núcleo entende — então o
+     // seletor mostra o da ata até alguém escolher outro.
+     config.modelo_de_ata ?? "qwen3-4b-instruct-q4km.gguf", true],
   ]) {
     const b = bloco(titulo, texto);
     const itens = catalogo.filter((i) => i.pacote.familia === familia);
@@ -711,7 +726,7 @@ function abaModelos(catalogo, config, gravar) {
     });
     b.appendChild(escolha);
 
-    for (const i of itens) b.appendChild(cartaoDeModelo(i));
+    if (!semCartoes) for (const i of itens) b.appendChild(cartaoDeModelo(i));
     painel.appendChild(b);
   }
 
@@ -723,7 +738,6 @@ function abaModelos(catalogo, config, gravar) {
   // Ele precisa existir mesmo estando a chave que o liga fora desta tela: sem
   // cartão, o modelo não teria como ser baixado, e o motor subiria sem ele. Um
   // teste guarda esse par — ver CatalogoTests.TodoPacoteTemIdUnicoEFamiliaConhecida.
-  const doMoss = catalogo.filter((i) => i.pacote.familia === "moss");
   if (doMoss.length > 0) {
     const b = bloco("Transcrição em uma passada (opcional)",
       "Um modelo que transcreve e separa os falantes ao mesmo tempo. "
@@ -926,34 +940,6 @@ function abaTranscricao(config, gravar, diarizadores = []) {
     (v) => gravar({ usar_hotwords: v })), porQueImporta);
   painel.appendChild(hot);
 
-  // ---- qual motor produz texto e falante
-  //
-  // A escolha existia só no app.json até 09/09/2026, e quem quisesse comparar os
-  // dois motores tinha de fechar o app e editar um arquivo à mão. A gravação
-  // fica salva, então dá para transcrever a mesma reunião nos dois e comparar —
-  // e é essa comparação que a chave existe para permitir.
-  const motor = bloco("Motor de transcrição",
-    "O de sempre são dois modelos: um escreve o texto, outro separa quem falou, "
-    + "e o app cruza os dois pelo tempo. O MOSS faz as duas coisas numa passada.");
-  const escolhaDoMotor = campo("Usar", "select",
-    { opcoes: ["O de sempre (dois modelos)", "MOSS (uma passada)"] });
-  const selMotor = escolhaDoMotor.querySelector("select");
-  selMotor.options[0].value = "classico";
-  selMotor.options[1].value = "moss";
-  selMotor.value = config.motor_de_transcricao === "moss" ? "moss" : "classico";
-  selMotor.addEventListener("change", async (e) => {
-    await gravar({ motor_de_transcricao: e.target.value });
-    recarregar();
-  });
-  const oQueMuda = document.createElement("p");
-  oQueMuda.className = "campo__dica";
-  oQueMuda.textContent = "Com o MOSS o vocabulário funciona diferente: ele não "
-    + "aceita a lista de termos enquanto transcreve, então os nomes e siglas do "
-    + "projeto só são corrigidos depois, na revisão. Termo que ele não ouviu não "
-    + "volta. Ele precisa do modelo baixado em Ajustes › Modelos.";
-  motor.append(escolhaDoMotor, oQueMuda);
-  painel.appendChild(motor);
-
   // ---- a prévia durante a própria reunião
   //
   // Nasce desligada, e continua desligada por padrão: enquanto o SUP-2 estiver
@@ -1012,6 +998,60 @@ function abaTranscricao(config, gravar, diarizadores = []) {
     recarregar();
   }), oQueCustaLegenda);
   painel.appendChild(legenda);
+
+  // ---- perguntar durante a reunião
+  //
+  // **Esta convive com as duas de cima**, e é a única que convive: o motor de
+  // ata sobe por pergunta e morre depois dela, então não disputa a placa o tempo
+  // todo. O que ela custa é um engasgo na legenda enquanto responde.
+  //
+  // A chave existe por um motivo que o dono do produto deu com todas as letras:
+  // poder desligar quando a máquina estiver sendo usada para outra coisa.
+  const perguntar = bloco("Perguntar durante a reunião");
+  perguntar.classList.add("bloco--chave");
+  const oQueEPerguntar = document.createElement("p");
+  oQueEPerguntar.className = "bloco__texto";
+  oQueEPerguntar.textContent = "Uma caixa no Gravador onde você escreve o que "
+    + "quiser sobre a reunião em curso — o que já foi falado, o que ficou "
+    + "pendente, sobre o que estão falando agora. O modelo lê o que já foi "
+    + "transcrito e responde ali mesmo.";
+  const oQueCustaPerguntar = document.createElement("p");
+  oQueCustaPerguntar.className = "campo__dica";
+  oQueCustaPerguntar.textContent = "Cada pergunta leva cerca de vinte segundos, "
+    + "e enquanto o modelo responde a legenda engasga — ele ocupa a placa e "
+    + "devolve logo depois. O modelo lê no máximo a última hora de reunião: "
+    + "acima disso o começo sai, e a resposta diz que saiu. Usa o modelo de ata "
+    + "escolhido em Ajustes › Modelos.";
+  perguntar.append(oQueEPerguntar, chave(config.perguntar_ao_vivo === true, async (v) => {
+    await gravar({ perguntar_ao_vivo: v });
+    recarregar();
+  }), oQueCustaPerguntar);
+  painel.appendChild(perguntar);
+
+  // ---- deixar o modelo quente
+  //
+  // **É a única chave desta tela que liga uma carga residente na placa.** Ligada,
+  // o motor vira o terceiro contexto CUDA — a carga que derrubou a legenda de
+  // 2,46x para 0,45x em 11/09. O texto diz isso, porque o sintoma (a legenda
+  // parando de firmar) não aponta para cá.
+  const quente = bloco("Deixar o modelo pronto entre perguntas");
+  quente.classList.add("bloco--chave");
+  const oQueEQuente = document.createElement("p");
+  oQueEQuente.className = "bloco__texto";
+  oQueEQuente.textContent = "Depois da primeira pergunta, o modelo fica de pé "
+    + "esperando a próxima. A primeira continua levando os mesmos vinte "
+    + "segundos; as seguintes respondem quase na hora.";
+  const oQueCustaQuente = document.createElement("p");
+  oQueCustaQuente.className = "campo__dica";
+  oQueCustaQuente.textContent = "Em troca, ele segura cerca de 3 GB da placa "
+    + "enquanto espera — e é isso que pode fazer a legenda ao vivo atrasar. Ele "
+    + "se desliga sozinho depois de dez minutos sem pergunta, e quando a "
+    + "gravação para. Desligando esta chave, a placa volta na hora.";
+  quente.append(oQueEQuente, chave(config.modelo_quente === true, async (v) => {
+    await gravar({ modelo_quente: v });
+    recarregar();
+  }), oQueCustaQuente);
+  painel.appendChild(quente);
 
   // ---- qual modelo separa os falantes
   //

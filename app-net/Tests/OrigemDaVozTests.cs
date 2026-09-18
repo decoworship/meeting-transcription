@@ -55,8 +55,8 @@ public sealed class OrigemDaVozTests
     [Fact]
     public void AsDuasOrigensSaoDistinguiveis()
     {
-        Assert.Equal(Vozes.MotorMoss, Vozes.MotorDe(Amostra(Vozes.MotorMoss)));
-        Assert.NotEqual(Vozes.MotorDe(Amostra(Vozes.MotorMoss)),
+        Assert.Equal("moss", Vozes.MotorDe(Amostra("moss")));
+        Assert.NotEqual(Vozes.MotorDe(Amostra("moss")),
                         Vozes.MotorDe(Amostra(null)));
     }
 
@@ -69,7 +69,10 @@ public sealed class OrigemDaVozTests
         Assert.Null(Vozes.MotorAceitoNaAmostra(null));
         Assert.Null(Vozes.MotorAceitoNaAmostra("classico"));
         Assert.Null(Vozes.MotorAceitoNaAmostra("qualquer coisa"));
-        Assert.Equal(Vozes.MotorMoss, Vozes.MotorAceitoNaAmostra("moss"));
+        // **E desde 17/09/2026, nem o "moss" carimba**: há um motor só. O
+        // arquivo de quem experimentou continua com o campo escrito, e o
+        // MotorDe sabe lê-lo — o que não acontece mais é escrever.
+        Assert.Null(Vozes.MotorAceitoNaAmostra("moss"));
     }
 
     [Fact]
@@ -77,21 +80,22 @@ public sealed class OrigemDaVozTests
     {
         // O que não sobrevive à serialização não serve para desfazer em bloco
         // depois — que é a única razão de este campo existir.
-        string json = JsonSerializer.Serialize(Amostra(Vozes.MotorMoss));
+        string json = JsonSerializer.Serialize(Amostra("moss"));
         Assert.Contains("\"motor\":\"moss\"", json);
 
         var lida = JsonSerializer.Deserialize<AmostraDeVoz>(json);
-        Assert.Equal(Vozes.MotorMoss, Vozes.MotorDe(lida!));
+        Assert.Equal("moss", Vozes.MotorDe(lida!));
     }
 
     [Fact]
     public void AChaveDoAppEODaAmostraDizemAMesmaPalavra()
     {
-        // As duas pontas escrevem "moss" e "classico" por conta própria, e é
-        // assim que uma delas fica para trás. Um teste é mais barato que a
-        // caçada — mesmo raciocínio do MarcaTests.
+        // **Desde 17/09/2026 há um motor só, e o que este teste guarda mudou
+        // de objeto:** não é mais "as duas pontas escrevem a mesma palavra", é
+        // "o app.json de quem experimentou o MOSS volta ao clássico sem
+        // recusar a transcrição". Ver docs/CONVERGENCIA.md.
         Assert.Equal(Vozes.MotorClassico, new ConfiguracoesDoApp().MotorDeTranscricao);
-        Assert.Equal(Vozes.MotorMoss, ConfiguracoesDoApp.MotorAceito("moss"));
+        Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito("moss"));
         Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito("classico"));
     }
 
@@ -103,8 +107,7 @@ public sealed class OrigemDaVozTests
         Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito("MOSSS"));
         Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito(null));
         Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito(""));
-        // Maiúscula não é typo: é a mesma escolha escrita de outro jeito.
-        Assert.Equal(Vozes.MotorMoss, ConfiguracoesDoApp.MotorAceito("MOSS"));
+        Assert.Equal(Vozes.MotorClassico, ConfiguracoesDoApp.MotorAceito("MOSS"));
     }
 
     [Fact]
@@ -114,8 +117,8 @@ public sealed class OrigemDaVozTests
             Directory.CreateTempSubdirectory("motor-chave").FullName, "app.json");
         try
         {
-            new ConfiguracoesDoApp { MotorDeTranscricao = Vozes.MotorMoss }.Salvar(caminho);
-            Assert.Equal(Vozes.MotorMoss,
+            new ConfiguracoesDoApp { MotorDeTranscricao = "moss" }.Salvar(caminho);
+            Assert.Equal("moss",
                          ConfiguracoesDoApp.Carregar(caminho).MotorDeTranscricao);
 
             // E um app.json antigo, sem a chave, continua sendo o clássico.

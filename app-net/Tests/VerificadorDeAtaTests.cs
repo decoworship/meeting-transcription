@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MeetingApp.Nucleo;
 using MeetingApp.Nucleo.Atas;
 using Xunit;
@@ -476,6 +477,63 @@ public sealed class MotorDeAtaTests
         Assert.Equal("r", ata!.Resumo);
         Assert.Equal("cliente", ata.Acoes[0].Lado);
         Assert.Equal("Status", ata.Secoes[0].Titulo);
+    }
+
+    // ─────────────── o corpo do pedido ao llama-server
+    [Fact]
+    public void ComEsquemaOCorpoPrendeASaidaAoFormato()
+    {
+        // É o que torna a ata verificável: sem a gramática, o modelo escreve o
+        // responsável fora do formato e o VerificadorDeAta não tem o que conferir.
+        string corpo = MotorDeAta.CorpoDoPedido(
+            "você redige atas", "a reunião foi assim", "ata", AtaGerada.Esquema, 8192);
+
+        Assert.Contains("\"response_format\"", corpo);
+        Assert.Contains("\"json_schema\"", corpo);
+        using var doc = JsonDocument.Parse(corpo);
+        Assert.Equal(8192, doc.RootElement.GetProperty("max_tokens").GetInt32());
+    }
+
+    [Fact]
+    public void SemEsquemaOCorpoDeixaARespostaLivre()
+    {
+        // A pergunta ao vivo não tem forma fixa, e prender a saída custou quatro
+        // dos seis modelos medidos em 16/09/2026: três escreviam só a primeira
+        // seção e o Gemma queimava 1.024 tokens para 190 caracteres, porque a
+        // gramática o obrigava a emitir byte a byte.
+        // Ver docs/ESTUDO-RESUMO-AO-VIVO.md §2.
+        string corpo = MotorDeAta.CorpoDoPedido(
+            "", "o que já foi falado?", "", "", 1024);
+
+        Assert.DoesNotContain("response_format", corpo);
+        using var doc = JsonDocument.Parse(corpo);
+        Assert.Equal(1024, doc.RootElement.GetProperty("max_tokens").GetInt32());
+    }
+
+    [Fact]
+    public void SemSistemaOCorpoNaoMandaMensagemVazia()
+    {
+        // "Não vamos ter prompt" precisa significar mensagem nenhuma, e não uma
+        // mensagem de sistema em branco — que alguns templates Jinja renderizam
+        // como um turno vazio e outros recusam.
+        string corpo = MotorDeAta.CorpoDoPedido("", "e aí?", "", "", 1024);
+
+        using var doc = JsonDocument.Parse(corpo);
+        var msgs = doc.RootElement.GetProperty("messages");
+        Assert.Equal(1, msgs.GetArrayLength());
+        Assert.Equal("user", msgs[0].GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public void AFalaComAspasNaoQuebraOJson()
+    {
+        // 35 mil caracteres de fala real trazem aspas, barras e quebras de linha.
+        string corpo = MotorDeAta.CorpoDoPedido(
+            "", "ele disse \"não vai dar\" e saiu\nlinha dois", "", "", 512);
+
+        using var doc = JsonDocument.Parse(corpo);
+        Assert.Contains("não vai dar",
+            doc.RootElement.GetProperty("messages")[0].GetProperty("content").GetString());
     }
 }
 

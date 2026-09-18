@@ -123,7 +123,12 @@ public sealed class RegistroDeTranscricoes
         {
             if (_atual is { } emCurso)
                 throw new InvalidOperationException(
-                    $"já estou {(emCurso.Tarefa == "ata" ? "escrevendo a ata de" : "transcrevendo")} "
+                    $"já estou {emCurso.Tarefa switch
+                    {
+                        "ata" => "escrevendo a ata de",
+                        "falantes" => "separando os falantes de",
+                        _ => "transcrevendo",
+                    }} "
                     + $"\"{emCurso.Nome}\". "
                     + "Uma de cada vez: as duas disputariam a mesma placa de vídeo.");
 

@@ -22,11 +22,15 @@ import { assinarTranscricoes, transcricoes } from "/transcricoes.js";
 
 const DESTINO_DA_TAREFA = {
   transcricao: "ir-reunioes",
+  // A separação de falantes acende a mesma bolinha da transcrição: ela roda
+  // sobre a legenda de uma reunião, e é em Reuniões que se vai olhar.
+  falantes: "ir-reunioes",
   ata: "ir-atas",
 };
 
 const ROTULO_DA_TAREFA = {
   transcricao: "transcrevendo",
+  falantes: "separando os falantes de",
   ata: "escrevendo a ata de",
 };
 

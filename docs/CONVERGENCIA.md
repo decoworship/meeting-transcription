@@ -184,7 +184,32 @@ para o winget.
 a régua do eixo correspondente não piora sobre o acervo. Se um teste precisar
 mudar, o corte pegou osso.
 
-### O MOSS é o primeiro a sair — decidido em 15/09/2026
+### O MOSS é o primeiro a sair — decidido em 15/09/2026, **feito em 17/09/2026**
+
+> **Executado.** Saíram o `motores/moss/motor.py`, a `Nucleo/MossEmBlocos.cs`, o
+> pacote do `Catalogo`, o `ScriptMoss`/`OQueFaltaParaMoss` dos `Motores`, a
+> bifurcação inteira do `Transcritor` (o ramo, a costura e as duas condições que
+> dela dependiam), o seletor de motor em Ajustes e o MOSS dos três scripts de
+> empacotamento. **628 testes passam.**
+>
+> **O `MotorAceito` sobreviveu com um valor só**, e de propósito: um `app.json`
+> com `"moss"` escrito — e eles existem, de quem experimentou — precisa voltar
+> ao clássico **em silêncio**, e não recusar a transcrição. Mesma razão para o
+> `Vozes.MotorAceitoNaAmostra` continuar existindo devolvendo `null`: o arquivo
+> de vozes de quem experimentou tem o campo escrito, e quem lê precisa
+> continuar tratando isso.
+>
+> **A `CosturaDeFalantes` NÃO saiu**, ao contrário do que esta seção previa. A
+> condição de reabertura nº 3 — *"a `CosturaDeFalantes` achar outro
+> consumidor"* — foi satisfeita no mesmo dia pelo `VIVO-2`: a diarização sobre a
+> legenda produz rótulos locais (`Speaker 1`…) exatamente como os blocos do MOSS
+> produziam, e transformá-los em pessoa é o que ela faz. **Fica pendente de
+> decisão do dono do produto.**
+>
+> O GGUF não estava em disco nesta máquina, então o corte não rendeu os 0,67 GB
+> previstos aqui — rendeu o código.
+
+
 
 **Quem decidiu foi o dono do produto, depois de ver a legenda funcionando em
 reunião de verdade.** A tabela acima tinha sido escrita supondo o contrário — o
@@ -618,11 +643,16 @@ relógio: é que **ele para o ASR**.
 
 E aí o modelo menor deixa de ser concessão e vira o mecanismo:
 
-| | `gemma-4-e4b` (hoje) | **`gemma-4-e2b`** | `qwen3-1.7b` |
+| | `gemma-4-e4b` (hoje) | `gemma-4-e2b` | `qwen3-1.7b` |
 |---|---|---|---|
-| disco | 4,98 GB | **3,11 GB** (Q4_K_M) | 1,1 GB |
+| disco | 4,98 GB | 3,11 GB (Q4_K_M) | 1,1 GB |
 | VRAM | 4.512 a 5.727 MiB ([ATA.md](ATA.md) §8) | não medido | não medido |
-| na 2060 de 6 GB | **enche a placa** | **não cabe com a prévia** | **o único que cabe** |
+| contexto | 128K | 128K | **32K** nativo (131K só com YaRN) |
+| na 2060 de 6 GB | **enche a placa** | marginal | cabe |
+
+> **Esta tabela envelheceu em 15/09/2026, e a seção abaixo a substitui.** Ela
+> escolheu por VRAM estimada e **não olhou o contexto** — que é o que decide.
+> Fica aqui porque é o registro de como a decisão foi tomada antes da medição.
 
 > **Correção de 10/09/2026, e ela inverte a recomendação.** Uma fonte secundária
 > deu o E2B como *"~1,3 GB em disco"*, e este documento chegou a dizer que ele
@@ -682,11 +712,14 @@ O pacote **já existe no catálogo** (`qwen3-1.7b-instruct`,
 `TamanhoMedido = false` e com a nota *"ainda não medido aqui"*. Baixar e medir é
 o trabalho todo.
 
-**Os três testes, em ordem, e o primeiro pode dispensar os outros:**
+**Os testes, em ordem, e o primeiro pode dispensar os outros:**
 
-1. **VRAM do 1.7B com a legenda rodando.** Cabe junto na 2060, ou não? É a
-   pergunta que decide o desenho inteiro. `tools/medir_llm_ao_vivo.py` já mede a
-   espera; falta a memória com carga concorrente;
+0. **o cache KV com ~32 mil tokens**, para cada candidato, em fp16 e em `q8_0`.
+   Se o KV dominar, a escolha deixa de ser entre famílias e passa a ser entre
+   quantizações de cache — e talvez nenhum 3B caiba;
+1. **VRAM com a legenda rodando.** Cabe junto na 2060, ou não? A parte da legenda
+   já está medida (864,8 MiB, acima); falta a do LLM com carga concorrente.
+   `tools/medir_llm_ao_vivo.py` já mede a espera;
 2. **o cache de prompt do `llama.cpp`.** A [FASE7-FRONTEND.md](FASE7-FRONTEND.md)
    §2.2 já apontava: a transcrição cresce **por acréscimo**, então o prefixo é
    sempre o mesmo — é o caso ideal de reaproveitamento de KV. Se funcionar, a
@@ -694,6 +727,128 @@ o trabalho todo.
 3. **quanto de transcrito basta.** A §10.2 diz que acima de ~60 min o prompt
    cresce demais, e que a saída é *"um resumo corrente mais os últimos N
    minutos"* — **trabalho de desenho, não de modelo, e não foi medido**.
+
+### A régua que faltava: quanto custa uma reunião como prompt — 15/09/2026
+
+Medido no acervo do dono do produto, contando o prompt como ele chegaria ao
+modelo — carimbo e falante por trecho, não só o texto:
+
+```
+ 46 min   1.239 trechos    ~18.000 tokens
+ 61 min   1.486 trechos    ~19.900 tokens
+ 84 min     937 trechos    ~21.600 tokens
+122 min   2.058 trechos    ~31.900 tokens   ← a maior do acervo
+```
+
+**Uma reunião de duas horas custa ~32 mil tokens**, e é esse número que reprova
+candidato — antes de qualquer conversa sobre qualidade.
+
+**O titular tem um problema que esta seção não tinha visto.** O `qwen3-1.7b` é
+**32K nativo**; a reunião de 122 min ocupa 31.891 desses 32.768. Ele só cobre o
+acervo inteiro via **YaRN**, e YaRN degrada justamente recuperação de trecho
+longo, que é o que a busca na reunião faz. Foi escolhido por caber na VRAM, com o
+contexto nunca conferido.
+
+### E a VRAM, agora medida em reunião de verdade — 15/09/2026
+
+Durante uma reunião em curso, com Meet, legenda e desktop, pelos contadores do
+Windows (`GPU Process Memory`, pid do sidecar) e pelo `nvidia-smi`:
+
+```
+  864,8 MiB   a legenda (Nemotron Q8_0)   ← plano nas 30 amostras, sem crescer
+~1.726 MiB   o resto: desktop, Chrome/Meet, WebView2
+2.181–2.591  a placa inteira, de 6.144 MiB
+~3.553 MiB   LIVRE no pico da placa
+```
+
+**Isto corrige a estimativa de ~2,9 GB** que esta seção usava, e a correção é
+para melhor: **sobram ~3,5 GB**, o que abre a classe dos 3B. A legenda ficou em
+864,8 MiB dígito por dígito nas trinta amostras — evidência contra vazamento de
+VRAM na sessão de streaming, que era a suspeita aberta.
+
+### O primeiro degrau existe, e ele muda a conta — 16/09/2026
+
+**Construído:** a caixa de perguntar, no painel ao vivo do Gravador. Escreve-se
+a pergunta, o motor de ata sobe, responde e morre. As peças:
+
+| peça | onde |
+|---|---|
+| a montagem do texto, o corte e a vez | [PerguntaDaReuniao.cs](../app-net/Nucleo/PerguntaDaReuniao.cs) |
+| a instrução, sozinha porque é o que mais vai mudar | [PromptDeReuniao.cs](../app-net/Nucleo/Atas/PromptDeReuniao.cs) |
+| a op `perguntar-ao-vivo` | [Ponte.cs](../app-net/App/Ponte.cs) |
+| a caixa e a resposta | [aovivo.js](../app-net/App/web/aovivo.js) |
+
+**O motor sobe por pergunta e morre depois dela**, e isso responde ao item 3 do
+`tools/medir_llm_ao_vivo.py` pelo lado do risco, não pelo da conta: um 4B quente
+a reunião inteira é o terceiro contexto CUDA que derrubou a legenda de 2,46× para
+0,45× em 11/09. Custa ~6 s de carga por pergunta, e é o preço de a reunião
+continuar sendo transcrita enquanto se pergunta sobre ela.
+
+**Medido em 16/09/2026**, contra o `legenda.json` real da reunião de 15/09 às
+14:01, com o `qwen3-4b-instruct-q4km` e os mesmos argumentos que o
+`MotorDeAta.Subir` usa (`-ngl 99 -ctk q8_0 -ctv q8_0 -fa on -c 20480`), na 2060
+com o desktop rodando:
+
+```
+ 5,9 s   o modelo carregar
+15,8 s   a resposta inteira (7.274 tokens de prompt, 412 de saída)
+27.130   caracteres de legenda  →  7.274 tokens   (3,73 char/token)
+```
+
+**A conta desta seção supunha o dobro.** A régua de 15/09 mediu o prompt *da
+passada final* — carimbo e falante por trecho —, e deu ~18.000 tokens para 46
+minutos. **A legenda ao vivo custa menos da metade disso** pelo formato: sem
+carimbo, e com os turnos do mesmo lado juntos numa linha só. Isso não reprova
+nem aprova candidato sozinho, mas afrouxa o teto que reprovou o `Gemma 3 1B`.
+
+> **A constante de dimensionamento continua em 2,5 char/token, e de propósito.**
+> Ela agora erra por ~1,5× **para o lado seguro**: superestimar o contexto custa
+> VRAM, subestimar custa a resposta depois de a pessoa já ter esperado.
+
+**A regra de não inventar segura.** Perguntado "qual foi o orçamento aprovado e
+em que data o contrato foi assinado?" sobre uma reunião que não fala de nenhum
+dos dois, a resposta foi *"Isso não foi falado até agora."*, em 43 tokens.
+
+**O que fica aberto, e é a fase de ajustes:** o bake-off dos quatro candidatos
+abaixo (a versão construída usa o modelo de ata configurado, seja ele qual for),
+o comprimento da resposta — pediu-se *"direto e curto"* e vieram 412 tokens —, e
+**o relógio**: a legenda não carimba turno, então pergunta com recorte de tempo
+("os últimos 10 minutos") não tem como ser respondida. O conserto é carimbar o
+turno na `LegendaAoVivo`, e é trabalho à parte.
+
+### Os quatro competidores do `T2.1`, com o `Gemma 3 1B` já reprovado
+
+| | contexto | GGUF Q4_K_M | licença | pt-BR |
+|---|---|---:|---|---|
+| **`Ministral-3-3B-Instruct-2512`** | **256K** | **2,15 GB** | Apache 2.0 | na lista oficial |
+| **`SmolLM3-3B`** | 64K (128K YaRN) | ~2,1 GB | Apache 2.0 | 1 dos 6 idiomas do *instruction tuning* |
+| `qwen3-1.7b` (titular) | **32K** (131K YaRN) | 1,1 GB | Apache 2.0 | sim, e perde nome próprio 3/10 |
+| ~~`Gemma 3 1B`~~ | ⛔ **32K** | ~0,8 GB | Gemma | o elo fraco da família |
+
+**O `Gemma 3 1B` está reprovado por aritmética**, e não por opinião: 32K de
+contexto contra os 31.891 tokens da maior reunião do acervo deixa ~900 tokens
+para system prompt, pergunta **e** resposta. Não é apertado — é impossível.
+
+**O `Ministral 3` não é o Ministral de 2024.** Aquele era só API, sem pesos; esta
+é a família de dezembro de 2025, Apache 2.0 de verdade, com GGUF publicado pela
+própria Mistral. Traz duas coisas que o resto não tem e que o `Nucleo/Atas/` usa:
+*function calling* nativo com saída JSON, e adesão forte a system prompt — que é
+exatamente o mecanismo que o MOSS perdeu (`C0`).
+
+**O `SmolLM3` entra pelo modo duplo.** Numa caixa de pergunta ao vivo a latência
+**é** o produto, e `no_think` desliga o raciocínio explícito por chave, em vez de
+torcer para o modelo ser breve.
+
+> **O custo que ninguém contou ainda, e que pode inverter esta ordem: o cache
+> KV.** Com ~32 mil tokens de prompt, num 3B o KV em fp16 pode **rivalizar com os
+> próprios pesos** — 2,15 GB de Ministral podem virar 4 GB em uso, e aí nada
+> cabe. O `llama.cpp` corta isso pela metade com `--cache-type-k q8_0
+> --cache-type-v q8_0`. **É a primeira coisa a medir**, e por isso a lista de
+> testes abaixo ganhou um item zero.
+
+**E o `gemma-4-e2b` continua de fora**, mesmo com os 3,5 GB medidos: 3,11 GB de
+pesos mais o KV de uma reunião longa estoura a folga. Ele segue valendo para a
+ata, com a reunião encerrada e a placa livre.
 
 **E a qualidade tem régua, ao contrário da primeira vez.** A §10.3 é explícita:
 *"isto não é uma medição de qualidade — são quatro respostas lidas por mim, sem

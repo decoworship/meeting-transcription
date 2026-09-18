@@ -77,7 +77,7 @@ public sealed class LegendaAoVivoTests
         var m = Motores.AoLadoDoExecutavel();
 
         Assert.EndsWith(Path.Combine("legenda", "motor.py"), m.ScriptLegenda);
-        Assert.NotEqual(m.ScriptMoss, m.ScriptLegenda);
+        Assert.NotEqual(m.ScriptAsr, m.ScriptLegenda);
     }
 
     /// <summary>
@@ -309,5 +309,161 @@ public sealed class LegendaAoVivoTests
         w.Write("data".ToCharArray());
         w.Write(0);                        // **zero**: o header ainda não sabe
         for (int i = 0; i < amostras; i++) w.Write((short)(i % 1000));
+    }
+
+    // ─────────────────────────────── o carimbo de tempo (VIVO-1)
+
+    [Fact]
+    public void OPedacoFirmeGuardaOIntervaloQueEleCobre()
+    {
+        // **É o que destrava a diarização sobre a legenda.** A atribuição de
+        // falante é por sobreposição temporal, e até 17/09/2026 o legenda.json
+        // não tinha tempo nenhum.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, anteriorMs: 0, ateMs: 2170, dono: false,
+                                novo: " Roupa curta aí");
+        LegendaAoVivo.Registrar(trechos, turnos, anteriorMs: 2170, ateMs: 4410, dono: false,
+                                novo: " tá frio");
+
+        Assert.Equal(2, trechos.Count);
+        Assert.Equal(0, trechos[0].InicioMs);
+        Assert.Equal(2170, trechos[0].FimMs);
+        Assert.Equal(2170, trechos[1].InicioMs);
+        Assert.Equal(4410, trechos[1].FimMs);
+        Assert.Equal("Roupa curta aí", trechos[0].Texto);
+    }
+
+    [Fact]
+    public void OTrechoGuardaODonoDeleMesmoQuandoOTurnoNaoQuebra()
+    {
+        // **O turno não serve de carimbo, e o acervo mostrou por quê:** em três
+        // das nove gravações a reunião inteira é um turno só, porque o dono
+        // nunca mudou (microfone mudo). O trecho é a granularidade que sobrevive
+        // a isso — ~1,1 s de mediana, medido em 17/09.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        for (int i = 0; i < 4; i++)
+            LegendaAoVivo.Registrar(trechos, turnos, i * 1000, (i + 1) * 1000, false, $" f{i}");
+
+        Assert.Single(turnos);              // um turno só, como no acervo
+        Assert.Equal(4, trechos.Count);     // e quatro pontos no tempo
+        Assert.All(trechos, t => Assert.False(t.Dono));
+    }
+
+    [Fact]
+    public void UmRelogioQueAndaParaTrasNaoViraIntervaloNegativo()
+    {
+        // O motor recomeça o fluxo quando ele trava, e o acumulado atravessa os
+        // recomeços — mas confiar nisso sem guarda deixaria um intervalo
+        // invertido chegar à diarização, que o leria como sobreposição zero.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, anteriorMs: 5000, ateMs: 3000, false, " oi");
+
+        Assert.Single(trechos);
+        Assert.True(trechos[0].FimMs >= trechos[0].InicioMs,
+                    $"intervalo invertido: {trechos[0].InicioMs}–{trechos[0].FimMs}");
+    }
+
+    [Fact]
+    public void SemTextoNovoNaoNasceTrecho()
+    {
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "");
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "   ");
+
+        Assert.Empty(trechos);
+        Assert.Empty(turnos);
+    }
+
+    [Fact]
+    public void OArquivoAntigoSemTrechosContinuaLegivel()
+    {
+        // Sete legenda.json já existem no acervo sem o campo. Quebrá-los para
+        // ganhar o carimbo seria trocar dado por dado.
+        string pasta = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(pasta);
+        try
+        {
+            File.WriteAllText(Path.Combine(pasta, LegendaAoVivo.Arquivo),
+                """{"turnos":[{"dono":true,"texto":"bom dia"}]}""");
+
+            var lida = LegendaAoVivo.Ler(pasta);
+
+            Assert.NotNull(lida);
+            Assert.Single(lida!.Turnos);
+            Assert.Empty(lida.Trechos);
+        }
+        finally { Directory.Delete(pasta, recursive: true); }
+    }
+
+    // ──────────────────── a palavra partida entre dois commits
+
+    [Fact]
+    public void OTrechoQueContinuaAPalavraAnteriorEMarcado()
+    {
+        // **Visto em uso em 18/09/2026:** o motor firmou 'a Palo' e depois
+        // 'ma tem Uberlândia', e a diarização deu falantes DIFERENTES às duas
+        // metades de "Paloma". A fronteira do commit não é fronteira de palavra.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, " a Palo");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, "ma tem Uberlândia",
+                                anteriorBruto: " a Palo");
+
+        Assert.False(trechos[0].Colado);
+        Assert.True(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void EspacoNaFronteiraSignificaPalavraNova()
+    {
+        // O espaço vive no COMEÇO do pedaço novo, e é ele que diz que a palavra
+        // anterior acabou. Sem esta guarda, 'vou' + ' acho' seria fundido.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "Eu não vou");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, " acho que vai",
+                                anteriorBruto: "Eu não vou");
+
+        Assert.False(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void PontuacaoNaFronteiraNaoEPalavraPartida()
+    {
+        // 'Eu não vou' + ', acho que vai' não tem espaço, mas também não parte
+        // palavra nenhuma. Fundir por isso agruparia meia reunião.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "Eu não vou");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, ", acho que vai",
+                                anteriorBruto: "Eu não vou");
+
+        Assert.False(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void UmEspacoNOFIMDoAnteriorTambemFechaAPalavra()
+    {
+        // O commit pode terminar com espaço, e aí o Trim o apagaria do texto
+        // guardado — é por isso que a regra olha o BRUTO, e não o que ficou.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "a Palo ");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, "ma tem",
+                                anteriorBruto: "a Palo ");
+
+        Assert.False(trechos[1].Colado);
     }
 }

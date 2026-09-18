@@ -73,7 +73,7 @@ public sealed class LegendaDeFioAFioTests
             double rms = Math.Sqrt(fala.Select(v => (double)v * v).Average());
             _saida.WriteLine($"áudio: RMS {rms:F4} pico {fala.Max(Math.Abs):F3}");
 
-            using var legenda = new LegendaAoVivo(
+            var legenda = new LegendaAoVivo(
                 pasta, motores, Motores.Ambiente(),
                 p => { lock (pedacos) pedacos.Add(p); });
             legenda.Comecar();
@@ -87,31 +87,46 @@ public sealed class LegendaDeFioAFioTests
             // A legenda tem o que sobrou do áudio para drenar.
             await Task.Delay(TimeSpan.FromSeconds(8));
 
+            // **Encerrar com graça, que é o que o app faz ao parar a gravação.**
+            // É aqui que mora a garantia que este teste existe para provar: o
+            // `finalize()` do motor devolve o texto mesmo quando nada firmou.
+            await legenda.EncerrarAsync(TimeSpan.FromSeconds(60));
+
             string texto;
             lock (pedacos) texto = string.Concat(pedacos.Select(p => p.Novo));
+            var gravada = LegendaAoVivo.Ler(pasta);
+            string emDisco = string.Concat(gravada?.Turnos.Select(t => t.Texto) ?? []);
+
             _saida.WriteLine($"quadros lidos: {legenda.Quadros}");
             _saida.WriteLine($"pedaços recebidos: {pedacos.Count}");
-            _saida.WriteLine($"texto firme: {texto}");
-            lock (pedacos)
-            {
-                _saida.WriteLine($"último tentativo: "
-                    + $"{pedacos.LastOrDefault(x => x.Tentativo.Length > 0)?.Tentativo}");
-                foreach (var x in pedacos.Take(4))
-                    _saida.WriteLine($"  novo=[{x.Novo}] tent=[{x.Tentativo}]");
-            }
+            _saida.WriteLine($"firmou durante: {texto.Length} chars");
+            _saida.WriteLine($"gravado em disco: {emDisco.Length} chars");
+            _saida.WriteLine($"  {emDisco[..Math.Min(160, emDisco.Length)]}");
 
-            // **As três afirmações que as sete versões quebraram**, em ordem de
-            // profundidade — a primeira que falhar diz onde procurar.
+            // **As três afirmações**, em ordem de profundidade — a primeira que
+            // falhar diz onde procurar.
             Assert.True(legenda.Quadros > Segundos * 2,
                 $"leu {legenda.Quadros} quadros de ~{Segundos * 5} esperados — "
                 + "a leitura não está acompanhando o áudio.");
             Assert.True(pedacos.Count > 0,
                 "nenhum pedaço chegou à tela: o motor não devolveu parcial.");
 
-            // **E o firme, que leva ~14 s para começar.** É por isso que o teste
-            // alimenta 40 s: com 20 ele reprovaria uma legenda sadia.
-            Assert.False(string.IsNullOrWhiteSpace(texto),
-                "nada firmou em 40 s de fala — o prefixo estável parou de confirmar.");
+            // **E o texto em disco, que é a garantia de verdade.**
+            //
+            // <b>Esta asserção substituiu "algo firmou em 40 s", e a troca tem
+            // motivo medido.</b> Firmar durante a reunião **não é determinístico**:
+            // uma em três janelas de 2 min não arranca o `stable_prefix`, e quem
+            // não arranca cedo não arranca mais (docs/FASE7-ROTA.md §4, `R6`).
+            // Um teste que afirmasse isso reprovaria por sorte do áudio — e um
+            // teste que reprova por sorte é desligado na semana seguinte.
+            //
+            // O que **é** determinístico, e é o que o produto promete, é que o
+            // texto não se perde: o encerramento suave deixa o `finalize()`
+            // rodar, e o que ele devolver vira arquivo. Era exatamente isto que
+            // faltava quando 46 minutos de reunião não deixaram rastro.
+            Assert.False(string.IsNullOrWhiteSpace(emDisco),
+                "a legenda não deixou texto em disco — o encerramento suave não "
+                + "chegou ao finalize(), ou o resultado não foi gravado.");
         }
         finally
         {

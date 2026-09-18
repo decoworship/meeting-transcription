@@ -59,6 +59,10 @@ export function painelAoVivo() {
 
   const aviso = document.createElement("div");
 
+  // **O append vem antes de montar a lista**, e não é estilo: a sentinela da
+  // lista virtualizada precisa estar no DOM para o observador enxergá-la. Foi
+  // um dos dois defeitos que deixaram este painel sem desenhar nada até
+  // 10/09/2026.
   raiz.append(topo, aviso, corpo, voltar);
 
   // A coluna rola sozinha — é o que a decisão D1 pede (duas colunas com

@@ -34,8 +34,8 @@ decisão do dono do produto, e é tratada fora dele.
 
 **A Fase 7 começou estudo e virou execução.** Aberta em 27/08/2026 para
 perguntar se transcrever durante a própria reunião valia a pena, ela mediu, disse
-que sim, e **construiu**: a prévia por blocos de 3 minutos está em RC na
-`0.7.0-rc3`. **O argumento mais forte contra ela continua de pé e não é
+que sim, e **construiu**: a legenda ao vivo e a pergunta durante a reunião estão
+em RC na `0.7.0-rc14`. **O argumento mais forte contra ela continua de pé e não é
 técnico**: hoje o desligamento do §3.0 custa uma transcrição, que a retomada
 recupera; ao vivo custaria a reunião. Por isso tudo nasce desligado.
 
@@ -50,22 +50,22 @@ travar. Os outros quatro continuam valendo para o que cada um é —
 [FASE7.md](docs/FASE7.md) é histórico, e quatro das suas seis posições estão
 erradas.**
 
-**O que o dono do produto pediu em 10/09/2026 e ainda não existe: legenda ao
-vivo, sub-segundo.** O que está pronto são blocos de 3 min, e o nome disso é
-*consciência da reunião*, nunca tempo real. O caminho está no §4 da rota, e o
-candidato é o `nemotron-3.5-asr-streaming-0.6b`, que roda no **mesmo
-`transcribe.cpp` que o MOSS já empacota**.
+**A Fase 7 entregou a legenda ao vivo e a pergunta durante a reunião.** A
+legenda é o `nemotron-3.5-asr-streaming-0.6b` no `transcribe.cpp`, com quadro de
+200 ms; a caixa de perguntar sobe o motor de ata por pergunta e o devolve. As
+duas nascem desligadas, em Ajustes › Transcrição, e o `legenda.json` guarda
+turnos (a vista) e trechos carimbados (o registro que a diarização sobrepõe).
+Ver [docs/ESTUDO-RESUMO-AO-VIVO.md](docs/ESTUDO-RESUMO-AO-VIVO.md) e o tema 7 do
+[docs/BACKLOG.md](docs/BACKLOG.md).
 
-**Da Fase 7 saiu uma coisa que não é ao vivo: o MOSS como motor opcional.** Ele
-faz texto e falante numa passada, e ganhou do pipeline de dois motores no acervo
-([docs/FASE7-RESULTADOS.md](docs/FASE7-RESULTADOS.md) §7.4). A chave é
-`motor_de_transcricao` no `app.json`, **padrão `classico`**, e a bifurcação vive
-entre o `Faixas.Ler` e o `VozDoDono.Trilha` do `Transcritor` — **nada abaixo dela
-muda**, e é isso que preserva a correção fonética, a revisão de termos e o dono
-que vem de graça pela faixa do microfone. Os rótulos do MOSS são locais ao bloco
-de 3 min, e quem os transforma em pessoa é a `Nucleo/CosturaDeFalantes.cs`, por
-vetor de voz. **O GGUF dele não viaja no instalador** — o `.iss` exclui `*.gguf`
-—, é pacote do `Catalogo` e se baixa por Ajustes › Modelos.
+**O MOSS saiu em 17/09/2026**, e ele foi o motor opcional que fazia texto e
+falante numa passada. O nicho dele ficou espremido: por cima, a legenda faz o
+"durante a reunião" melhor; por baixo, a passada final é a verdade e tem
+hotword — que ele não tem, e não por configuração
+([docs/CONVERGENCIA.md](docs/CONVERGENCIA.md), "O MOSS é o primeiro a sair"). A
+chave `motor_de_transcricao` **voltou a ter um valor só**, e um `app.json` com
+`"moss"` escrito cai no clássico em silêncio. O `transcribe_cpp` **ficou**: ele
+é o runtime da legenda, e sempre foi compartilhado.
 
 **O tema mora no `app.json` e é aplicado pelo núcleo**, que reescreve o
 `data-tema` do `index.html` enquanto o serve (`App/Conteudo.cs`). Não é
@@ -140,7 +140,7 @@ mais trabalho que alguém deva.
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 574 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 628 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB
@@ -156,13 +156,24 @@ MeetingApp.exe --web C:\caminho\para\app-net\App\web
 uv sync   # só para as ferramentas de medição em tools/
 ```
 
-**Os 4,3 GB de motores moram na instalação oficial**, em
-`AppData\Local\Programs\MeetingApp\motores`, e em nenhum outro lugar: a pasta
-de trabalho `C:\Users\andre\MeetingApp` foi apagada em 18/08/2026 para liberar
-disco. Os dois scripts leem de lá. O `publicar.sh` continua instalando na pasta
-de trabalho — um build meio pronto não pode cair no app que grava reunião — e a
-recria com o executável mais **junções** para os motores oficiais: 18 MB em vez
-de 4,3 GB. Apagar essa pasta é seguro; junção não é dona dos bytes.
+**Tudo mora na instalação oficial**, em
+`AppData\Local\Programs\MeetingApp` — o executável e os 18 GB de motores. **O
+`publicar.sh` instala lá desde 17/09/2026**, por decisão do dono do produto, e a
+pasta de trabalho `C:\Users\andre\MeetingApp` foi apagada no mesmo dia (735 MB).
+
+A separação existiu de 18/08 a 17/09 e resolvia um risco real — um build meio
+pronto caindo no app que grava reunião. O que a derrubou foi o preço dela no
+uso: **o menu Iniciar continuava abrindo o app antigo**, e cada funcionalidade
+nova vinha com uma explicação sobre qual executável abrir. **A trava que
+resolvia aquele risco continua, e agora protege o app de verdade:** publicar com
+o app aberto é recusado, com a mensagem pedindo para sair pela bandeja. Fechar
+antes de publicar é o preço.
+
+`tools/publicar.sh --destino <pasta>` ainda instala em outro lugar, e aí as
+**junções** para os motores oficiais voltam a ser montadas — 18 MB em vez de
+18 GB. Apagar uma pasta dessas é seguro, mas **desfaça as junções antes**
+(`rmdir` sem `/s`, de um cwd que não seja UNC): apagar por dentro delas leva os
+bytes reais junto.
 
 **Nunca publique com `dotnet publish` na mão.** As três flags
 (`--self-contained`, `PublishSingleFile`, `PublishTrimmed`) e o segredo do Google

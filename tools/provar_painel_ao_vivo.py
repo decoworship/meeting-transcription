@@ -20,6 +20,14 @@ Ela monta o `painelAoVivo()` sozinho, com a ponte falsa do molde do
 3. **a grade de duas colunas** do Gravador não deixa nada além da prévia
    escorregar para a direita (o ``grid-row: 1 / -1`` **não** atravessa linhas
    implícitas, e sem a regra da coluna 1 a agenda ia parar debaixo da legenda).
+6. **as respostas acumulam em ordem de conversa** — a mais nova embaixo — e o
+   botão do resumo manda o modo que escolhe a instrução;
+5. **a chave desligada esconde a caixa de perguntar** — o núcleo manda o
+   impedimento no `aovivo`, e a caixa não nasce;
+4. **a caixa de perguntar ao modelo** faz a volta inteira — espera dizendo por
+   quê, resposta na tela, aviso quando o modelo não viu a reunião inteira — e a
+   resposta **não entra na lista**: a lista é o que foi dito, e a resposta é o
+   que um modelo deduziu do que foi dito.
 
 Uso::
 
@@ -43,7 +51,17 @@ window.chrome = { webview: {
   addEventListener(_, f) { this._ouvintes.push(f); },
   postMessage(txt) {
     const p = JSON.parse(txt);
-    if (p.op === "aovivo") this._empurrar({ id: p.id, aovivo_ate: [] });
+    if (p.op === "aovivo") this._empurrar(
+      { id: p.id, aovivo_ate: [], perguntar_impedimento: window.__impedimento || null });
+    if (p.op === "perguntar-ao-vivo") {
+      window.__perguntado = p.pergunta;
+      window.__resumo = p.resumo;
+      this._empurrar({ id: p.id, tipo: "progresso",
+                       texto: "carregando o modelo e lendo a reunião\u2026" });
+      setTimeout(() => this._empurrar(
+        { id: p.id, resposta: "Falaram do instalador e ficou de medir o Parakeet.",
+          cortado: true }), 400);
+    }
   },
   _empurrar(ev) { for (const f of this._ouvintes) f({ data: JSON.stringify(ev) }); },
 }};
@@ -52,10 +70,21 @@ window.chrome = { webview: {
 <div id="alvo"></div>
 <script type="module">
 import { painelAoVivo } from "/aovivo.js";
-document.getElementById("alvo").appendChild(painelAoVivo().raiz);
+import { painelDePerguntas } from "/perguntar.js";
+const alvo = document.getElementById("alvo");
+alvo.appendChild(painelDePerguntas().raiz);
+alvo.appendChild(painelAoVivo().raiz);
 window.__pronto = true;
 </script>
 """
+
+#: A mesma página, com o núcleo dizendo que a caixa não pode existir. É a
+#: regressão que importa: caixa de perguntar aparecendo com a chave desligada
+#: faz a pessoa escrever a pergunta para só então descobrir o impedimento.
+DESLIGADO = PAINEL.replace(
+    "<script>\nwindow.chrome",
+    "<script>\nwindow.__impedimento = 'perguntar durante a reunião está desligado "
+    "em Ajustes › Transcrição.';\nwindow.chrome")
 
 COLUNAS = """<!doctype html><meta charset="utf-8">
 <link rel="stylesheet" href="/app.css">
@@ -133,6 +162,67 @@ def main() -> int:
                 txt: e.textContent.trim().replace(/\\s+/g, ' ') }))""")
             separadores = pg.locator(".aovivo__bloco").count()
 
+            # ── 4: perguntar ao modelo ─────────────────────────────────────
+            pg.fill(".perguntar__caixa .aa-entrada", "o que ficou decidido?")
+            pg.click(".perguntar__caixa button")
+
+            # A espera é dita de frente: dez segundos de silêncio parecem
+            # defeito, e o defeito é o que este projeto evita parecer quando
+            # está funcionando.
+            pg.wait_for_timeout(150)
+            esperando = {
+                "estado": pg.get_attribute(".perguntar__resposta", "data-estado"),
+                "texto": pg.inner_text(".perguntar__resposta").strip(),
+                "botao": pg.is_disabled(".perguntar__caixa button"),
+            }
+
+            pg.wait_for_selector(".perguntar__resposta[data-estado='pronta']", timeout=5000)
+            pergunta = pg.evaluate("""() => ({
+                echo: document.querySelector('.perguntar__pergunta').textContent,
+                resposta: document.querySelector('.perguntar__texto').textContent,
+                aviso: !!document.querySelector('.perguntar__resposta .aa-alerta'),
+                campo: document.querySelector('.perguntar__caixa .aa-entrada').value,
+                naLista: !!document.querySelector('.aovivo__corpo .perguntar__texto'),
+                chegouAoNucleo: window.__perguntado,
+            })""")
+
+            # **A segunda pergunta não pode apagar a primeira.** Era o que
+            # acontecia até 16/09/2026, e é o que torna impossível pedir o
+            # detalhe sem perder o que veio antes.
+            pg.fill(".perguntar__caixa .aa-entrada", "e quem ficou de quê?")
+            pg.click(".perguntar__caixa button")
+            pg.wait_for_function(
+                "document.querySelectorAll(\".perguntar__resposta[data-estado='pronta']\")"
+                ".length === 2", timeout=5000)
+            acumulou = pg.evaluate("""() => {
+                const b = [...document.querySelectorAll('.perguntar__resposta')];
+                return { quantos: b.length,
+                         ultimo: b[b.length - 1].querySelector('.perguntar__pergunta').textContent };
+            }""")
+
+            # E o botão do resumo manda o modo, que é o que escolhe a instrução.
+            pg.click(".perguntar__resumir")
+            pg.wait_for_function(
+                "document.querySelectorAll('.perguntar__resposta').length === 3", timeout=5000)
+            modo_do_botao = pg.evaluate("() => window.__resumo")
+
+
+            # ── 5: a chave desligada esconde a caixa ───────────────────────
+            pg.route("**/desligado",
+                     lambda r: r.fulfill(content_type="text/html", body=DESLIGADO))
+            pg.goto(f"http://127.0.0.1:{PORTA}/desligado")
+            pg.wait_for_function("window.__pronto === true", timeout=5000)
+            pg.wait_for_timeout(200)
+            caixa_escondida = pg.locator("section.perguntar").is_hidden()
+
+            # A pilha tem teto e rolagem própria: sem isso, três perguntas
+            # seguidas empurram o resto da coluna para fora da tela.
+            rolagem = pg.evaluate("""() => {
+                const e = document.querySelector('.perguntar__respostas');
+                const s = getComputedStyle(e);
+                return { overflow: s.overflowY, teto: s.maxHeight };
+            }""")
+
             # ── 3: as duas colunas ─────────────────────────────────────────
             pg.route("**/colunas", lambda r: r.fulfill(content_type="text/html", body=COLUNAS))
             pg.goto(f"http://127.0.0.1:{PORTA}/colunas")
@@ -164,6 +254,43 @@ def main() -> int:
     print(f"   manteve exatamente um balão volátil:          {um_volatil}")
     print(f"   dono à direita, os outros à esquerda:         {lados}")
 
+    print("\n4. perguntar ao modelo:")
+    print(f"   enquanto espera:  estado={esperando['estado']!r} botão travado="
+          f"{esperando['botao']}")
+    print(f"   {esperando['texto']!r}")
+    print(f"   a pergunta chegou ao núcleo:   {pergunta['chegouAoNucleo']!r}")
+    print(f"   a resposta na tela:            {pergunta['resposta']!r}")
+
+    espera_honesta = (esperando["estado"] == "esperando" and esperando["botao"]
+                      and "carregando" in esperando["texto"])
+    respondeu = pergunta["resposta"].startswith("Falaram do instalador")
+    # O eco da pergunta é o que permite ler a resposta depois de a tela ter
+    # rolado — sem ele, "sim" na tela não quer dizer nada.
+    ecoou = "o que ficou decidido?" in pergunta["echo"]
+    avisou_do_corte = pergunta["aviso"]
+    limpou = pergunta["campo"] == ""
+    fora_da_lista = not pergunta["naLista"]
+
+    print(f"\n   a espera diz por que está esperando:          {espera_honesta}")
+    print(f"   respondeu, com o eco da pergunta:            {respondeu and ecoou}")
+    print(f"   avisou que só viu a parte final da reunião:  {avisou_do_corte}")
+    print(f"   limpou o campo para a próxima:               {limpou}")
+    print(f"   a resposta ficou FORA da lista de falas:     {fora_da_lista}")
+
+    acumula = acumulou["quantos"] == 2
+    # **A conversa lê de cima para baixo, como conversa.** A ordem invertida é do
+    # RESUMO — os tópicos dele vêm do mais recente para o mais antigo —, e não
+    # das mensagens: quem pergunta o detalhe precisa ver a pergunta anterior
+    # acima da resposta nova, senão a linha do raciocínio se inverte. Dito pelo
+    # dono do produto em 17/09/2026.
+    mais_nova_embaixo = "e quem ficou de quê?" in acumulou["ultimo"]
+    print(f"\n5. as respostas acumulam: {acumulou['quantos']} blocos + o do botão, "
+          f"fim = {acumulou['ultimo']!r}")
+    print(f"   o botão do resumo manda resumo=true:            {modo_do_botao is True}")
+    print(f"   com a chave desligada, o bloco some:           {caixa_escondida}")
+    tem_rolagem = rolagem["overflow"] == "auto" and rolagem["teto"] not in ("none", "")
+    print(f"   a pilha tem teto ({rolagem['teto']}) e rolagem:      {tem_rolagem}")
+
     esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
     colunas = len({c["x"] for c in esq}) == 1 and previa["x"] > max(c["x"] for c in esq)
@@ -173,7 +300,10 @@ def main() -> int:
         print("\nERROS DE JAVASCRIPT:\n  " + "\n  ".join(erros))
 
     ok = (separadores == 1 and agrupou and um_volatil and lados
-          and colunas and not erros)
+          and colunas and espera_honesta and respondeu and ecoou
+          and avisou_do_corte and limpou and fora_da_lista and caixa_escondida
+          and acumula and mais_nova_embaixo and modo_do_botao is True
+          and tem_rolagem and not erros)
     print("\nVEREDITO:", "o painel ao vivo desenha" if ok else "QUEBRADO")
     return 0 if ok else 1
 

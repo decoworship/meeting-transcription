@@ -4,7 +4,7 @@ import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
          campoComSugestoes, preencherSugestoes, confirmar, avisar,
-         anunciar } from "/pecas.js";
+         anunciar, corDoFalante } from "/pecas.js";
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
@@ -160,8 +160,9 @@ function etiquetaDe(g) {
     // A ata usa o mesmo registro da transcrição, e dizer "Transcrevendo…"
     // enquanto se escreve a ata de uma reunião já transcrita é mentira — foi o
     // que o dono do produto viu no primeiro uso.
-    etiqueta.textContent = rodando.tarefa === "ata"
-      ? "Escrevendo a ata…" : "Transcrevendo…";
+    etiqueta.textContent = rodando.tarefa === "ata" ? "Escrevendo a ata…"
+      : rodando.tarefa === "falantes" ? "Separando falantes…"
+      : "Transcrevendo…";
   } else {
     etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
     etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
@@ -356,6 +357,17 @@ async function telaDePreparo(g) {
     t.className = "bloco__titulo";
     const palavras = turnos.reduce((n, x) => n + x.texto.trim().split(/\s+/).length, 0);
     t.textContent = `O que a legenda ouviu — ${palavras} palavras`;
+
+    // **Enquanto os falantes não chegaram, a legenda está incompleta e diz
+    // isso.** A diarização roda em segundo plano depois da reunião e leva ~2 min
+    // numa de uma hora; quem abrir antes disso veria um rascunho sem quem falou
+    // e não saberia se ele ficou assim ou ainda vai mudar.
+    if (leg?.legenda_falantes === false) {
+      const pendente = document.createElement("span");
+      pendente.className = "aa-etiqueta legenda-gravada__pendente";
+      pendente.textContent = "separando falantes…";
+      t.appendChild(pendente);
+    }
     b.appendChild(t);
 
     const aviso = document.createElement("p");
@@ -367,10 +379,25 @@ async function telaDePreparo(g) {
 
     const corpo = document.createElement("div");
     corpo.className = "transcricao legenda-gravada__corpo";
+    // A ordem em que os falantes aparecem decide a cor de cada um — a mesma
+    // regra da revisão, para a mesma pessoa não trocar de cor entre as telas.
+    const ordem = [...new Set(turnos.map((x) => x.falante).filter(Boolean))];
     for (const x of turnos) {
       const fala = document.createElement("div");
       fala.className = "fala";
       fala.dataset.dono = String(x.dono);
+
+      // **Quem falou, quando a separação já rodou.** Antes de 18/09/2026 a
+      // legenda só sabia "você" contra "os outros", e o lado da tela dizia
+      // isso; agora, quando o falante existe, ele é dito com todas as letras.
+      if (x.falante) {
+        const quem = document.createElement("span");
+        quem.className = "fala__falante";
+        quem.style.color = corDoFalante(x.falante, ordem.indexOf(x.falante));
+        quem.textContent = x.falante;
+        fala.appendChild(quem);
+      }
+
       const p = document.createElement("p");
       p.className = "fala__texto";
       p.textContent = x.texto.trim();

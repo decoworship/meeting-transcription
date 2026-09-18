@@ -129,15 +129,57 @@ public sealed class ConfiguracoesDoApp
     /// </remarks>
     [JsonPropertyName("legenda_ao_vivo")] public bool LegendaAoVivo { get; set; }
 
+    /// <summary>
+    /// Perguntar ao modelo o que já aconteceu, durante a própria reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada</b>, como tudo o que sobe modelo durante a gravação.
+    /// E ela tem um motivo próprio para ter chave, dito pelo dono do produto em
+    /// 16/09/2026: é para poder <b>desligar</b> quando a máquina estiver sendo
+    /// usada para outra coisa. O motor de ata sobe por pergunta e devolve a
+    /// placa, mas enquanto ele responde a legenda engasga.
+    /// <para>
+    /// Ao contrário da <see cref="LegendaAoVivo"/> e da
+    /// <see cref="TranscricaoAoVivo"/>, <b>esta convive com as duas</b>: ela não
+    /// fica residente, e quem paga a conta é a janela de uma hora
+    /// (<c>PerguntaDaReuniao.JanelaMaximaMinutos</c>).
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("perguntar_ao_vivo")] public bool PerguntarAoVivo { get; set; }
+
+    /// <summary>
+    /// Deixar o modelo de pé entre perguntas, para perguntar em sequência.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada, e o motivo é medido.</b> Ligada, ela transforma o
+    /// motor no <b>terceiro contexto CUDA residente</b> — que é exatamente a
+    /// carga que derrubou a legenda de 2,46x para 0,45x em 11/09/2026
+    /// (docs/FASE7-ROTA.md §4). Desligada, o motor sobe por pergunta e devolve
+    /// a placa em ~20 s.
+    /// <para>
+    /// O que ela compra: a primeira pergunta paga a carga, as seguintes só o
+    /// tempo de gerar. É para quem vai perguntar várias coisas seguidas.
+    /// </para>
+    /// <para>
+    /// <b>Ela não é permissão para o processo viver para sempre.</b> O motor
+    /// morre ao parar a gravação, depois de
+    /// <c>MotorQuente.OciosoPadrao</c> sem pergunta, e ao desligar a chave.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("modelo_quente")] public bool ModeloQuente { get; set; }
+
     /// <summary>A chave conferida contra os dois valores que existem.</summary>
     /// <remarks>
     /// Portão único, como o <see cref="TemaAceito"/>: quem lê a chave lê por
     /// aqui, e o que sai daqui é uma das duas constantes deste repositório.
     /// </remarks>
-    public static string MotorAceito(string? motor) =>
-        string.Equals(motor?.Trim(), Vozes.MotorMoss, StringComparison.OrdinalIgnoreCase)
-            ? Vozes.MotorMoss
-            : Vozes.MotorClassico;
+    /// <remarks>
+    /// <b>Desde 17/09/2026 só há um motor</b>, e a função sobrevive por isso: um
+    /// <c>app.json</c> com <c>"moss"</c> escrito lá — e eles existem, de quem
+    /// experimentou — precisa voltar ao clássico em silêncio, e não recusar a
+    /// transcrição. Ver docs/CONVERGENCIA.md, "O MOSS é o primeiro a sair".
+    /// </remarks>
+    public static string MotorAceito(string? motor) => Vozes.MotorClassico;
 
     /// <summary>
     /// Corrigir a grafia dos termos do projeto no texto transcrito.
@@ -222,6 +264,30 @@ public sealed class ConfiguracoesDoApp
     /// </remarks>
     [JsonPropertyName("modelo_de_ata")] public string ModeloDeAta { get; set; }
         = "qwen3-4b-instruct-q4km.gguf";
+
+    /// <summary>
+    /// Qual modelo responde às perguntas durante a reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Separado do <see cref="ModeloDeAta"/> por decisão de 16/09/2026</b>, e
+    /// a razão é que as duas tarefas rodam em mundos diferentes: a ata roda com
+    /// a reunião encerrada e a placa livre, e pode pagar um modelo grande; a
+    /// pergunta divide a placa com a legenda e tem vinte segundos para
+    /// responder. O estudo escolheu modelos diferentes para cada uma
+    /// (docs/ESTUDO-RESUMO-AO-VIVO.md §10).
+    /// <para>
+    /// <b>Vazio significa "o mesmo da ata"</b>, e não um modelo escolhido por
+    /// nós: uma instalação que já existe não pode mudar de comportamento porque
+    /// uma chave nova apareceu, nem apontar para um GGUF que talvez nem esteja
+    /// em disco. Ver <see cref="ModeloParaPergunta"/>.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("modelo_da_pergunta")] public string ModeloDaPergunta { get; set; } = "";
+
+    /// <summary>O modelo que a pergunta ao vivo usa de verdade.</summary>
+    [JsonIgnore]
+    public string ModeloParaPergunta =>
+        ModeloDaPergunta is { Length: > 0 } dele ? dele : ModeloDeAta;
 
     /// <summary>
     /// Os domínios de e-mail da nossa organização.

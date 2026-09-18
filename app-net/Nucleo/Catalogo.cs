@@ -277,23 +277,6 @@ public static class Catalogo
                  + "Meet aberto, e 0,11 s entre a fala e o texto firmar. "
                  + "Não separa falantes — só a sua voz da dos outros.",
         },
-        new PacoteDeModelo
-        {
-            Id = "moss-transcribe-diarize",
-            Nome = "MOSS Transcribe-Diarize",
-            Familia = "moss",
-            Descricao = "Transcreve e separa falantes numa passada só. "
-                      + "Ganhou do motor de sempre no texto e no falante.",
-            Repositorio = "handy-computer/moss-transcribe-diarize-gguf",
-            Arquivo = "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
-            NomeLocal = "MOSS-Transcribe-Diarize-Q5_K_M.gguf",
-            // Medido no HuggingFace em 04/09/2026, e não estimado.
-            TamanhoEsperadoBytes = 700_313_760,
-            TamanhoMedido = true,
-            Nota = "Não usa o vocabulário como o motor de sempre: nenhum runtime "
-                 + "ggml expõe o hotword dele, então os termos do projeto só são "
-                 + "corrigidos depois, na revisão. Ver docs/FASE7-RESULTADOS.md §12.",
-        },
         // ── A família "diarizacao" saiu do catálogo na Fase 4 ───────────────
         //
         // Não porque a diarização tenha mudado, mas porque ela **deixou de ser
@@ -449,10 +432,6 @@ public static class Catalogo
                 EmUso = pacote.Familia switch
                 {
                     "ata" => pacote.NomeLocal == config.ModeloDeAta,
-                    // Não há o que escolher dentro da família: ou a chave está
-                    // no MOSS e o único GGUF dele está em uso, ou não está.
-                    "moss" => ConfiguracoesDoApp.MotorAceito(config.MotorDeTranscricao)
-                              == Vozes.MotorMoss,
                     // "asr" e o que vier depois: o id é o que o motor recebe.
                     _ => pacote.Id == config.ModeloPadrao,
                 },

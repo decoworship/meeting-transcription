@@ -64,21 +64,26 @@ public sealed class DestinoDoPacoteTests
     }
 
     [Fact]
-    public void OMossEArquivoAvulsoEOAsrNao()
+    public void ALegendaEArquivoAvulsoEOAsrNao()
     {
         // Os dois lados da distinção, cravados: o ASR é repositório inteiro no
-        // cache do HuggingFace; o MOSS é um GGUF que o transcribe.cpp abre por
-        // caminho, como o llama.cpp faz com os de ata.
-        var moss = Catalogo.Pacotes.Single(p => p.Familia == "moss");
+        // cache do HuggingFace; a legenda é um GGUF que o transcribe.cpp abre
+        // por caminho, como o llama.cpp faz com os de ata.
+        //
+        // **O exemplo era o MOSS até 17/09/2026**, e trocou de sujeito quando
+        // ele saiu (docs/CONVERGENCIA.md). A distinção que o teste guarda não
+        // mudou: ela é do destino do download, e não do motor.
+        var legenda = Catalogo.Pacotes.Single(p => p.Familia == "legenda");
         var asr = Catalogo.Pacotes.First(p => p.Familia == "asr");
 
-        Assert.True(Catalogo.EhArquivoAvulso(moss));
+        Assert.True(Catalogo.EhArquivoAvulso(legenda));
         Assert.False(Catalogo.EhArquivoAvulso(asr));
 
-        // E o nome do arquivo é o que o motores/moss/motor.py procura. Os dois
-        // estão escritos nos dois lugares de propósito — o motor precisa dele
-        // para carregar e o catálogo para baixar —, então um teste os amarra.
-        Assert.Equal("MOSS-Transcribe-Diarize-Q5_K_M.gguf",
-                     Path.GetFileName(Catalogo.ArquivoDoPacote(moss)));
+        // E o nome do arquivo é o que o motores/legenda/motor.py procura. Os
+        // dois estão escritos nos dois lugares de propósito — o motor precisa
+        // dele para carregar e o catálogo para baixar —, então um teste os
+        // amarra.
+        Assert.Equal("nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
+                     Path.GetFileName(Catalogo.ArquivoDoPacote(legenda)));
     }
 }

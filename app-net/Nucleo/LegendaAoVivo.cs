@@ -35,10 +35,89 @@ public sealed class TurnoDaLegenda
     [JsonPropertyName("texto")] public required string Texto { get; set; }
 }
 
+/// <summary>
+/// Um pedaço de fala que firmou, com o tempo que ele cobre.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>É o que destrava a diarização sobre a legenda</b> (o <c>VIVO-2</c> do
+/// BACKLOG). A atribuição de falante é por sobreposição temporal, e até
+/// 17/09/2026 o <c>legenda.json</c> não guardava tempo nenhum.
+/// </para>
+/// <para>
+/// <b>Por que o trecho e não o turno.</b> O turno quebra por troca de dono, e
+/// em três das nove gravações do acervo a reunião inteira é <b>um turno só</b>
+/// — aquelas em que o microfone ficou mudo e o dono nunca virou. Um carimbo por
+/// turno daria um intervalo cobrindo a reunião toda. O trecho é o que firma de
+/// cada vez: <b>1,1 s de mediana</b>, medido em 17/09/2026 sobre 120 s de fala.
+/// </para>
+/// <para>
+/// <b>E não é carimbo de palavra.</b> O <c>timestamps="word"</c> do
+/// <c>transcribe_cpp</c> custa zero (4,78x contra 5,04x), mas o
+/// <c>Stream.snapshot()</c> devolve <b>zero palavras</b> em streaming —
+/// sondado em 17/09. O que existe é o <c>audio_committed_ms</c>, que o
+/// protocolo já carregava como <c>ate_ms</c> sem ninguém guardar.
+/// </para>
+/// </remarks>
+public sealed class TrechoDaLegenda
+{
+    [JsonPropertyName("inicio_ms")] public required long InicioMs { get; init; }
+    [JsonPropertyName("fim_ms")] public required long FimMs { get; init; }
+    [JsonPropertyName("dono")] public required bool Dono { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+
+    /// <summary>
+    /// Quem falou, quando a diarização já rodou. Nulo até lá.
+    /// </summary>
+    /// <remarks>
+    /// Rótulo local do pyannote (<c>Speaker 1</c>…) ou o
+    /// <see cref="VozDoDono.Rotulo"/> quando o trecho é seu — e nesse caso ele
+    /// não passa pela diarização, porque a faixa do microfone é certeza.
+    /// </remarks>
+    [JsonPropertyName("falante")] public string? Falante { get; init; }
+
+    /// <summary>
+    /// Este trecho continua a <b>palavra</b> que o anterior deixou pela metade.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A fronteira do commit não é fronteira de palavra</b>, e isso custou um
+    /// defeito visível: em 18/09/2026 o motor firmou <c>'a Palo'</c> e depois
+    /// <c>'ma tem Uberlândia'</c>, e a diarização deu falantes <b>diferentes</b>
+    /// às duas metades de "Paloma". Uma palavra tem um dono só.
+    /// </para>
+    /// <para>
+    /// <b>O sinal só existe no bruto.</b> O <c>Texto</c> é guardado aparado, e
+    /// aparar apaga justamente o espaço cuja ausência define a colagem — por
+    /// isso a decisão é tomada no <see cref="LegendaAoVivo.Registrar"/>, com os
+    /// dois pedaços crus na mão, e não pode ser refeita depois.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("colado")] public bool Colado { get; init; }
+}
+
 /// <summary>O que a legenda deixou para ler depois da reunião.</summary>
+/// <remarks>
+/// <b>Os turnos são a vista, os trechos são o registro.</b> Os dois dizem a
+/// mesma fala: o turno agrupa por dono para a tela desenhar conversa, o trecho
+/// guarda o tempo para a diarização sobrepor. Arquivo antigo não tem
+/// <c>trechos</c>, e continua legível — são sete no acervo.
+/// </remarks>
 public sealed class LegendaGravada
 {
     [JsonPropertyName("turnos")] public required List<TurnoDaLegenda> Turnos { get; init; }
+
+    [JsonPropertyName("trechos")] public List<TrechoDaLegenda> Trechos { get; init; } = [];
+
+    /// <summary>
+    /// A diarização já passou por cima desta legenda.
+    /// </summary>
+    /// <remarks>
+    /// <b>É um campo e não uma dedução.</b> Deduzir por "algum trecho tem
+    /// falante" diria "pendente" para sempre quando a diarização falhasse, e a
+    /// tela ficaria prometendo um resultado que não vem.
+    /// </remarks>
+    [JsonPropertyName("falantes_prontos")] public bool FalantesProntos { get; init; }
 }
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
@@ -106,6 +185,23 @@ public sealed class LegendaAoVivo : IDisposable
     private readonly Action<PedacoDaLegenda> _aoPedaco;
     private readonly string? _idioma;
     private readonly CancellationTokenSource _cancelar = new();
+
+    /// <summary>
+    /// A parada <b>suave</b>: encerra a leitura sem matar o motor.
+    /// </summary>
+    /// <remarks>
+    /// <b>Por que são dois.</b> Cancelar o <see cref="_cancelar"/> mata o
+    /// processo do sidecar (<c>MotorSidecar.LegendarAsync</c> registra o
+    /// <c>Matar</c> no token), e matar o processo pula o <c>finalize()</c> — que
+    /// é justamente quem devolve o texto quando nada firmou durante a reunião.
+    /// Em 15/09/2026 isso custou 46 minutos de fala: o motor tinha 14.428
+    /// caracteres guardados no prefixo tentativo e o app o matou antes de pedir.
+    /// <para>
+    /// O suave fecha o canal, o canal manda <c>encerrar</c>, o motor finaliza e
+    /// devolve. O duro continua existindo como último recurso, com prazo.
+    /// </para>
+    /// </remarks>
+    private readonly CancellationTokenSource _parar = new();
     private Task? _laco;
 
     public LegendaAoVivo(string pastaDaGravacao, Motores motores,
@@ -145,6 +241,13 @@ public sealed class LegendaAoVivo : IDisposable
     public const string Arquivo = "legenda.json";
 
     private readonly List<TurnoDaLegenda> _turnos = [];
+    private readonly List<TrechoDaLegenda> _trechos = [];
+
+    /// <summary>Onde o firme chegou no parcial anterior. O início do próximo.</summary>
+    private long _ateAnterior;
+
+    /// <summary>O último pedaço firme, <b>sem aparar</b>. Ver TrechoDaLegenda.Colado.</summary>
+    private string _ultimoBruto = "";
 
     /// <summary>O que impede a legenda de existir, ou <c>null</c>.</summary>
     /// <remarks>
@@ -165,12 +268,86 @@ public sealed class LegendaAoVivo : IDisposable
         return motores.OQueFaltaParaLegenda();
     }
 
+    /// <summary>
+    /// Guarda um pedaço que firmou: no turno, para a tela, e no trecho, com o
+    /// tempo, para a diarização.
+    /// </summary>
+    /// <remarks>
+    /// <b>Estático e público porque é a regra, e regra se mede.</b> O
+    /// <c>Entregar</c> precisa das duas faixas em disco e de um sidecar vivo;
+    /// isto aqui não precisa de nada, e é onde mora o que pode sair errado.
+    /// </remarks>
+    /// <param name="anteriorMs">Onde o firme estava no parcial anterior.</param>
+    /// <param name="ateMs">Onde ele está agora.</param>
+    /// <param name="anteriorBruto">
+    /// O pedaço anterior <b>sem aparar</b>. É dele que sai a resposta para "a
+    /// palavra continua?", e o texto guardado não serve porque foi aparado.
+    /// </param>
+    public static void Registrar(List<TrechoDaLegenda> trechos, List<TurnoDaLegenda> turnos,
+                                 long anteriorMs, long ateMs, bool dono, string novo,
+                                 string anteriorBruto = "")
+    {
+        if (novo.Trim().Length == 0) return;
+
+        // **Colado = os dois lados da fronteira são letra, sem espaço no meio.**
+        // Pontuação não conta: 'vou' + ', acho' não parte palavra nenhuma, e
+        // fundir por isso agruparia meia reunião num trecho só.
+        bool colado = anteriorBruto.Length > 0
+                      && char.IsLetterOrDigit(anteriorBruto[^1])
+                      && char.IsLetterOrDigit(novo[0]);
+
+        // **A guarda existe porque o relógio pode andar para trás.** O motor
+        // recomeça o fluxo quando ele trava, e o acumulado deveria atravessar os
+        // recomeços — mas um intervalo invertido chegaria à diarização como
+        // sobreposição zero, e o trecho sairia sem falante, em silêncio.
+        long de = Math.Min(anteriorMs, ateMs);
+        long ate = Math.Max(anteriorMs, ateMs);
+
+        trechos.Add(new TrechoDaLegenda
+        {
+            InicioMs = de, FimMs = ate, Dono = dono, Texto = novo.Trim(), Colado = colado,
+        });
+
+        // A mesma regra de agrupamento da tela: enquanto o dono não muda, o
+        // texto cresce no mesmo turno. Duas implementações da mesma regra
+        // fariam o arquivo e a tela contarem histórias diferentes.
+        if (turnos.Count == 0 || turnos[^1].Dono != dono)
+            turnos.Add(new TurnoDaLegenda { Dono = dono, Texto = novo.TrimStart() });
+        else
+            turnos[^1].Texto += novo;
+    }
+
     /// <summary>Começa a legendar. Devolve na hora.</summary>
     public void Comecar() => _laco ??= Task.Run(() => LacoAsync(_cancelar.Token));
 
+    /// <summary>
+    /// Para de ler, espera o motor devolver o texto, e só então desiste.
+    /// </summary>
+    /// <remarks>
+    /// <b>Devolve rápido no caso sadio</b> — o motor já mandou tudo pelos
+    /// parciais e o <c>encerrar</c> só confirma. A espera existe para o caso
+    /// doente, que é onde está o texto que ninguém viu.
+    /// </remarks>
+    public async Task EncerrarAsync(TimeSpan espera)
+    {
+        try { _parar.Cancel(); } catch (ObjectDisposedException) { }
+
+        if (_laco is { } laco)
+        {
+            var venceu = await Task.WhenAny(laco, Task.Delay(espera));
+            if (venceu != laco)
+                Registro.Escrever("legenda",
+                    $"o motor não devolveu o texto em {espera.TotalSeconds:F0}s — desistindo.");
+        }
+
+        Dispose();
+    }
+
     public void Dispose()
     {
+        try { _parar.Cancel(); } catch (ObjectDisposedException) { }
         try { _cancelar.Cancel(); } catch (ObjectDisposedException) { }
+        _parar.Dispose();
         _cancelar.Dispose();
     }
 
@@ -192,12 +369,19 @@ public sealed class LegendaAoVivo : IDisposable
                 $"legenda ligada em {Path.GetFileName(_pasta)} — "
                 + $"quadros de {QuadroS * 1000:F0} ms");
 
-            var lendo = Task.Run(() => LerAsync(canal.Writer, mic, sistema, ct), ct);
+            // **A leitura para no suave; o motor, só no duro.** É o que dá ao
+            // `encerrar` a chance de rodar o `finalize()` antes de o processo
+            // morrer.
+            using var suave = CancellationTokenSource.CreateLinkedTokenSource(
+                ct, _parar.Token);
+            var lendo = Task.Run(
+                () => LerAsync(canal.Writer, mic, sistema, suave.Token), suave.Token);
 
             string firme = await motor.LegendarAsync(
                 canal.Reader, p => Entregar(p, mic, sistema), _idioma, ct);
 
             Firme = firme;
+            SalvarOFinal(firme);
             await lendo;
         }
         catch (OperationCanceledException)
@@ -318,16 +502,11 @@ public sealed class LegendaAoVivo : IDisposable
             : p.Firme;
         Firme = p.Firme;
 
-        if (novo.Length > 0)
+        if (novo.Trim().Length > 0)
         {
-            // A mesma regra de agrupamento da tela: enquanto o dono não muda, o
-            // texto cresce no mesmo turno. Duas implementações da mesma regra
-            // fariam o arquivo e a tela contarem histórias diferentes.
-            if (_turnos.Count == 0 || _turnos[^1].Dono != dono)
-                _turnos.Add(new TurnoDaLegenda { Dono = dono, Texto = novo.TrimStart() });
-            else
-                _turnos[^1].Texto += novo;
-
+            Registrar(_trechos, _turnos, _ateAnterior, p.AteMs, dono, novo, _ultimoBruto);
+            _ateAnterior = p.AteMs;
+            _ultimoBruto = novo;
             Gravar();
         }
 
@@ -348,28 +527,112 @@ public sealed class LegendaAoVivo : IDisposable
     /// legenda não pode derrubar a gravação.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Reescreve o <c>legenda.json</c> de fora, com os falantes atribuídos.
+    /// </summary>
+    /// <remarks>
+    /// <b>Existe para a diarização em segundo plano</b> (o <c>VIVO-2</c>), que
+    /// roda depois de a instância ter morrido junto com a gravação. Escreve o
+    /// arquivo inteiro: os turnos como estavam e os trechos com falante.
+    /// </remarks>
+    public static void Gravar(string pastaDaGravacao, List<TurnoDaLegenda> turnos,
+                              List<TrechoDaLegenda> trechos, bool prontos)
+    {
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(pastaDaGravacao, Arquivo),
+                JsonSerializer.Serialize(
+                    new LegendaGravada
+                    {
+                        Turnos = turnos, Trechos = trechos, FalantesProntos = prontos,
+                    },
+                    LegendaJson.Default.LegendaGravada));
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
     private void Gravar()
     {
         try
         {
             File.WriteAllText(
                 Path.Combine(_pasta, Arquivo),
-                JsonSerializer.Serialize(new LegendaGravada { Turnos = _turnos },
+                JsonSerializer.Serialize(
+                    new LegendaGravada { Turnos = _turnos, Trechos = _trechos },
                                          LegendaJson.Default.LegendaGravada));
         }
         catch (IOException) { }
         catch (UnauthorizedAccessException) { }
     }
 
+    /// <summary>
+    /// O texto que só apareceu no <c>finalize()</c>, quando nada firmou antes.
+    /// </summary>
+    /// <remarks>
+    /// <b>Só quando não há turno nenhum</b>, e a restrição é deliberada. O caso
+    /// que isto atende é o da sessão que nunca confirma: o prefixo tentativo
+    /// cresce por 46 minutos, o <c>Entregar</c> nunca cria turno, e o texto
+    /// inteiro só existe depois do <c>finalize()</c>. Se houver **algum** turno,
+    /// o caminho incremental funcionou, e emendar o acumulado por cima
+    /// arriscaria duplicar texto — o que é pior que não emendar.
+    /// <para>
+    /// <b>Sai sem dono.</b> O texto veio de uma vez, sem um ponto no tempo onde
+    /// medir o RMS das duas faixas; afirmar que é seu sem saber é o erro que a
+    /// <see cref="Entregar"/> evita pelo mesmo motivo.
+    /// </para>
+    /// </remarks>
+    private void SalvarOFinal(string firme)
+    {
+        if (_turnos.Count > 0 || firme.Trim().Length == 0) return;
+
+        _turnos.Add(new TurnoDaLegenda { Dono = false, Texto = firme.TrimStart() });
+        Gravar();
+        Registro.Escrever("legenda",
+            $"nada firmou durante a reunião — {firme.Length} caracteres salvos "
+            + "pelo finalize().");
+    }
+
     /// <summary>O que a legenda deixou numa gravação, ou <c>null</c>.</summary>
+    /// <remarks>
+    /// <b>Tenta três vezes, e não é paranoia.</b> O <see cref="Gravar()"/> usa
+    /// <c>File.WriteAllText</c>, que <b>trunca antes de escrever</b>: uma
+    /// leitura no instante errado pega o arquivo pela metade e o JSON não
+    /// desserializa. Sem repetir, a tela que abre a reunião no momento em que a
+    /// separação de falantes termina vê legenda nenhuma — visto em uso em
+    /// 18/09/2026, com o bloco sumindo da tela enquanto o trabalho rodava.
+    /// </remarks>
     public static LegendaGravada? Ler(string pastaDaGravacao)
+    {
+        for (int tentativa = 0; tentativa < 3; tentativa++)
+        {
+            if (LerUmaVez(pastaDaGravacao) is { } lida) return lida;
+            if (!File.Exists(Path.Combine(pastaDaGravacao, Arquivo))) return null;
+            Thread.Sleep(40);
+        }
+        return LerUmaVez(pastaDaGravacao);
+    }
+
+    private static LegendaGravada? LerUmaVez(string pastaDaGravacao)
     {
         try
         {
             string caminho = Path.Combine(pastaDaGravacao, Arquivo);
             if (!File.Exists(caminho)) return null;
-            return JsonSerializer.Deserialize(File.ReadAllText(caminho),
-                                              LegendaJson.Default.LegendaGravada);
+            var lida = JsonSerializer.Deserialize(File.ReadAllText(caminho),
+                                                  LegendaJson.Default.LegendaGravada);
+
+            // **O inicializador não sobrevive à desserialização gerada.** Sete
+            // `legenda.json` do acervo não têm `trechos`, e o gerador devolve
+            // `null` em vez da lista vazia do `= []` — quem lê quebraria no
+            // primeiro `foreach`, e só nos arquivos antigos.
+            if (lida is { Trechos: null })
+                lida = new LegendaGravada
+                {
+                    Turnos = lida.Turnos, FalantesProntos = lida.FalantesProntos,
+                };
+            return lida;
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }

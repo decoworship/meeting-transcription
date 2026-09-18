@@ -52,8 +52,16 @@ public sealed record BlocoAoVivo(
 /// </remarks>
 public sealed class SessaoAoVivo : IDisposable
 {
-    /// <summary>O bloco, em segundos. O mesmo do <see cref="MossEmBlocos"/>.</summary>
-    public const double BlocoS = MossEmBlocos.BlocoS;
+    /// <summary>
+    /// O bloco, em segundos.
+    /// </summary>
+    /// <remarks>
+    /// <b>Três minutos, e o número é medido.</b> O bloco de 3 min tem a
+    /// diarização do de 5 sem os órfãos do de 1
+    /// (docs/FASE7-RESULTADOS.md §3). A constante morava na
+    /// <c>MossEmBlocos</c>, que saiu em 17/09/2026 com o MOSS.
+    /// </remarks>
+    public const double BlocoS = 180.0;
 
     /// <summary>
     /// Quanto esperar além do fim do bloco antes de lê-lo.
@@ -126,9 +134,7 @@ public sealed class SessaoAoVivo : IDisposable
         // dos outros do outro, sem nome —, o que a prévia precisa é **texto**, e
         // o dono vem da faixa do microfone sem custar GPU. O motor clássico faz
         // texto. Ver docs/FASE7-ROTA.md §0.6.
-        return ConfiguracoesDoApp.MotorAceito(config.MotorDeTranscricao) == Vozes.MotorMoss
-            ? motores.OQueFaltaParaMoss()
-            : motores.OQueFalta();
+        return motores.OQueFalta();
     }
 
     /// <summary>Começa a acompanhar a gravação. Devolve na hora.</summary>
@@ -156,14 +162,10 @@ public sealed class SessaoAoVivo : IDisposable
         MotorSidecar? motor = null;
         try
         {
-            // O sidecar do motor escolhido em Ajustes. O MOSS devolve falante
-            // junto e o clássico não — e a prévia não usa nem um nem outro, então
-            // a diferença que sobra é só qual processo sobe.
-            string[] args = _motor == Vozes.MotorMoss
-                ? [_motores.ScriptMoss]
-                : _modelo is { Length: > 0 }
-                    ? [_motores.ScriptAsr, "--modelo", _modelo]
-                    : [_motores.ScriptAsr];
+            // Um motor só desde 17/09/2026 (docs/CONVERGENCIA.md).
+            string[] args = _modelo is { Length: > 0 }
+                ? [_motores.ScriptAsr, "--modelo", _modelo]
+                : [_motores.ScriptAsr];
 
             motor = await MotorSidecar.IniciarAsync(_motores.Python, args, ct, _ambiente);
             motor.AoRegistrar += l => Registro.Escrever("aovivo", l);
@@ -261,16 +263,11 @@ public sealed class SessaoAoVivo : IDisposable
 
             Faixas.Escrever(temporario, mix);
 
-            // **O falante do motor é descartado nos dois caminhos**, e é por isso
-            // que os dois servem. O MOSS devolve `S1`, `S2`… locais ao bloco, e a
-            // costura que os transformaria em pessoa divide 8 em 15
-            // (docs/FASE7-RESULTADOS.md §11.2). Ao vivo a tela afirma só o que a
-            // faixa do microfone sabe, e o `AtribuirDono` adiante põe isso.
-            List<SegmentoFinal> locais = _motor == Vozes.MotorMoss
-                ? [.. (await motor.TranscreverESepararAsync(temporario, null, null, null, ct))
-                        .Segmentos.Select(s => new SegmentoFinal
-                        { Start = s.Inicio, End = s.Fim, Text = s.Texto })]
-                : [.. (await motor.TranscreverAsync(temporario, null, null, null, ct))
+            // **O falante do motor é descartado**, e sempre foi: ao vivo a tela
+            // afirma só o que a faixa do microfone sabe, e o `AtribuirDono`
+            // adiante põe isso. Ver docs/FASE7-ROTA.md §0.6.
+            List<SegmentoFinal> locais =
+                [.. (await motor.TranscreverAsync(temporario, null, null, null, ct))
                         .Segmentos.Select(s => new SegmentoFinal
                         { Start = s.Inicio, End = s.Fim, Text = s.Texto })];
 

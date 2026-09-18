@@ -440,7 +440,227 @@ não dívida.
 
 ---
 
-## 7. Débito técnico e testes
+## 7. Ao vivo: legenda e pergunta
+
+**O tema nasceu em 17/09/2026**, quando a pergunta ao vivo saiu do estudo e
+entrou no app. Os itens abaixo vieram todos de usar a coisa numa reunião de
+verdade, e cada um tem medição atrás — não são ideias.
+
+O que já existe e **não** está aqui: a legenda ao vivo (Fase 7), a caixa de
+perguntar com o botão de resumo, a janela de uma hora, as chaves de ligar e
+desligar. Ver [ESTUDO-RESUMO-AO-VIVO.md](ESTUDO-RESUMO-AO-VIVO.md).
+
+**Dois itens já vêm medidos** — o `VIVO-4` (a legenda contra o `large-v3`, sete
+reuniões) e o `VIVO-6` (a legenda sem placa) —, e os dois deram resultado
+negativo para a esperança que os motivou. Ficam escritos porque um número
+negativo economiza a próxima tentativa.
+
+### VIVO-1 · A legenda não carimba o turno — `feature` · `aberto`
+
+**Gatilho: ele bloqueia outras três coisas, e custa zero.** O `TurnoDaLegenda`
+guarda `dono` e `texto`, e nada de tempo. Sem tempo:
+
+- a **diarização não pode rodar sobre a legenda** (`VIVO-2`) — a atribuição de
+  falante é por sobreposição temporal, e não há o que sobrepor;
+- **pergunta com recorte de tempo não existe** — *"o que rolou nos últimos 10
+  minutos"* não tem como ser respondida, e o prompt precisa avisar o modelo
+  disso para ele não inventar horário;
+- a **janela de uma hora é medida em caracteres**, não em minutos:
+  `PerguntaDaReuniao.CaracteresPorMinuto = 800`, aproximado de três reuniões.
+
+**E o preço é zero, medido em 17/09/2026** — 10 min de reunião real, na 2060:
+
+```
+timestamps=none   4,78x   475 commits   1º aos 1,2 s
+timestamps=word   5,04x   475 commits   1º aos 1,2 s
+```
+
+Mesmo texto, mesmos commits, mesma latência de partida. A diferença está dentro
+do ruído entre rodadas. O motor pede `"none"` hoje por herança, não por medição.
+
+**Havia dois caminhos, e o barato NÃO basta — medido em 17/09/2026.** A ideia
+era carimbar o **turno** com o que o motor já sabe
+(`_ms_de_antes + audio_committed_ms`), sem tocar no modelo. Contando os turnos
+das nove gravações do acervo:
+
+```
+gravação              turnos   palavras   donos
+2026-09-15_14-01-30      161      5.116   ambos
+2026-09-15_14-58-08       87      1.911   ambos
+2026-09-15_15-29-32        2      2.907   ambos
+2026-09-16_10-30-08        1      1.673   só "outros"
+2026-09-16_15-29-33      153      2.774   ambos
+2026-09-17_08-59-06        1      4.246   só "outros"
+2026-09-17_10-29-47        1      3.539   só "outros"
+2026-09-17_11-00-45       31      2.385   ambos
+2026-09-17_13-59-57       19        876   ambos
+```
+
+**Em três das nove a reunião inteira é UM turno.** São aquelas em que o dono do
+produto ficou com o microfone mudo: o `dono` nunca vira, e o turno nunca quebra.
+O comportamento está certo — o turno quebra por troca de dono, e não houve
+troca —, mas um turno de 4.246 palavras com um carimbo só não serve para
+sobrepor nada.
+
+**Então o caminho é o `timestamps="word"`**, que já se sabe custar zero. O
+barato não era mais barato: era insuficiente em um terço do acervo.
+
+### VIVO-2 · Diarizar a legenda depois da reunião, em segundo plano — `feature` · `espera`
+
+**Depende do `VIVO-1`.** A ideia é entregar *quem falou* no rascunho logo depois
+da reunião, sem esperar a passada final.
+
+**A diarização é barata: 32× o tempo real** — uma reunião de uma hora sai em
+~2 min, cinco vezes menos que o ASR
+([FASE7-RESULTADOS.md](FASE7-RESULTADOS.md) §5).
+
+**Metade do valor já vem de graça:** a legenda separa "você" dos outros pela
+faixa do microfone, sem GPU. O que a diarização acrescenta é separar **os outros
+entre si**.
+
+**O que isto NÃO é:** substituto da passada final. O texto da legenda é
+Nemotron; a passada final é `large-v3` com correção fonética e vocabulário. Isto
+entrega falante no rascunho, e nada além.
+
+**O que falta além do `VIVO-1`:** não há nada rodando em segundo plano depois
+que a gravação para — não existe `transcrever_ao_parar`. O gancho existe
+(`Ponte.EncerrarAPrevia`), a máquina de progresso não.
+
+### VIVO-3 · O vocabulário não chega à legenda — `bug` · `espera`
+
+**Relatado em uso em 17/09/2026:** *"durante a reunião a legenda parece ser boa,
+errando mais em termos específicos"*. Está certo, e não tem conserto por
+configuração.
+
+**O gancho não existe para esta família.** O `initial_prompt` do
+`transcribe_cpp` é do `WhisperRunOptions` — família Whisper, que é a da passada
+final. O Nemotron é da família Parakeet, e o `ParakeetStreamOptions` expõe **uma
+única** opção: `att_context_right`. Não há onde pôr termo.
+
+**As saídas conhecidas, nenhuma barata:** trocar o modelo da legenda por um de
+família que aceite prompt (e refazer o `R1` inteiro), ou corrigir o texto
+**depois** — a correção fonética já existe em `Nucleo/` e roda sobre a passada
+final; aplicá-la à legenda seria sobre texto sem carimbo, o que traz o `VIVO-1`
+de volta.
+
+**Não confundir com defeito:** a passada final continua recebendo o vocabulário
+normalmente. O que erra é o rascunho.
+
+### VIVO-4 · A legenda contra a passada final — `débito` · **medido em 17/09/2026**
+
+**Sete reuniões com `legenda.json` e `transcricao.json` lado a lado**, o
+`large-v3` como referência, a normalização do `tools/benchmark_wer.py`:
+
+```
+reunião              legenda   final   cobertura    WER      CER
+2026-09-15_14-01-30     5116    4733       108%    25,6%   13,0%
+2026-09-15_14-58-08     1911    1742       110%    27,2%   15,1%
+2026-09-15_15-29-32     2907    2791       104%    22,7%   12,8%
+2026-09-16_10-30-08     1673    1761        95%    30,7%   20,8%
+2026-09-16_15-29-33     2776    2534       110%    25,6%   14,7%
+2026-09-17_08-59-06     4248    4153       102%    23,7%   14,5%
+2026-09-17_10-29-47     3539    3186       111%    26,9%   14,9%
+média                                      106%    26,1%   15,1%
+```
+
+**O CER é metade do WER.** A primeira leitura disto — escrita aqui e depois
+derrubada — foi que o erro seria de **fronteira**, o motor acertando os sons e
+errando onde a palavra começa. **Medido, é falso:** fronteira pura é **2,0%** do
+erro. A inferência a partir do CER não se sustentou, e o que a classificação
+achou no lugar é mais útil.
+
+**De que tipo são as 6.271 palavras divergentes**, alinhando as duas sequências
+e classificando cada bloco:
+
+```
+fronteira   as letras são as MESMAS, só o corte muda      123     2,0%
+quase       parecidas (>=0,7 de similaridade)             926    14,8%
+conteúdo    palavra de verdade diferente                2.527    40,3%
+a mais      a legenda escreveu, a final não tem         1.920    30,6%
+a menos     a final tem, a legenda não escreveu           775    12,4%
+```
+
+**Os 30,6% "a mais" são disfluência, e isso relativiza o WER inteiro.** Lidos à
+mão, são muleta, gagueira e repetição — `'ne a gente ta ta a'`, `'o o ne'`,
+`'ele ele e'`, `'viu viu da'`. **A legenda transcreve o que foi literalmente
+dito; o `large-v3` limpa.** Não é alucinação nem perda: é estilo. Para legenda
+ao vivo, transcrever o "né" está certo; para documento, limpá-lo está certo.
+
+**E os 2% de fronteira que existem são quase todos termo técnico** —
+`'tecni co'`, `'wi fi'`, `'a p i'`, `'diagno stico'`. É a mesma população de
+palavras do `VIVO-3`, e a mesma cura serviria às duas.
+
+> **Ressalva do método:** o alinhamento por `difflib` sobre duas sequências
+> longas e ruidosas produz blocos grandes espúrios — pares como
+> `'c a boa tarde boa tarde gente tudo'` contra `'chido'` são artefato de
+> alinhamento, não um erro só. O número de "conteúdo" é o mais afetado por isso
+> e deve ser lido como **teto**, não como medida.
+
+> Os números saíram de duas implementações independentes — a
+> `taxa_de_erro` do `tools/benchmark_wer.py` e uma versão vetorizada escrita
+> para o acervo caber no tempo — e bateram decimal por decimal.
+
+**A cobertura é o achado, e ele contraria o que se esperava: 106%.** A legenda
+produz **mais** palavras que a passada final, não menos. Então os 26% **não são
+omissão** — o `R6` não está comendo fala nestas sete. É o Nemotron escrevendo
+palavra diferente do `large-v3`, e às vezes escrevendo demais.
+
+**26% não é erro absoluto.** A passada final entrou como referência e ela não é
+a verdade — é o melhor que o app produz hoje. O número mede **distância entre
+dois motores**. Saber quem erra exige gabarito humano, e isso é outro trabalho.
+
+**O que isto decide sobre o `TRA-1`:** nada ainda. 26% de distância é longe
+demais para a legenda poupar a passada final como os blocos do MOSS poupam — lá
+o texto **empatava**. Para reabrir, seria preciso o gabarito.
+
+### VIVO-5 · O Sortformer está no pacote, e o `T4.1` não sabe — `feature` · `espera`
+
+**O que mudou:** a [FASE7-FILA.md](FASE7-FILA.md) arquivou o `T4.1` — *"exportar
+o Sortformer para ONNX e rodá-lo offline"* — como adiado e nunca começado. **O
+`transcribe_cpp` que o app já empacota traz o Sortformer pronto**, com
+`SortformerStreamOptions` e quatro pontos de operação (`very_high_latency` a
+`low_latency`, ~30 s a ~1 s de antecipação). O `stream()` tem um parâmetro
+`diarize`.
+
+O trabalho que arquivou o item — exportar para ONNX — **não precisa ser feito**.
+Nada foi medido: nem custo de GPU, nem qualidade, nem se ele convive com a
+legenda na 2060. É candidato ao `VIVO-2` sem passada de pyannote, e é a única
+rota conhecida para falante **durante** a reunião.
+
+---
+
+### VIVO-6 · Legenda sem placa: medido, e não fecha nesta CPU — `feature` · `espera`
+
+**Gatilho: perguntado pelo dono do produto em 17/09/2026** — dá para usar a
+legenda em PC sem GPU? Medido no mesmo áudio, 5 min, `n_threads=4`,
+`timestamps=none`, num Ryzen 5 3400G (4 núcleos, 2019):
+
+```
+                velocidade   núcleos   WER contra o Q8
+Q8_0 · CUDA        6,57x       2,00          —
+Q4_K_M · CUDA      4,69x       1,75         6,5%
+Q8_0 · CPU         0,81x       3,82          —
+Q4_K_M · CPU       0,38x       2,92         6,5%
+```
+
+**O critério de morte da fase é 1,5× sustentado**, e o melhor arranjo em CPU dá
+**0,81×** — com a máquina ociosa. Abaixo de 1× a fila cresce para sempre.
+
+**E a quantização menor piora, nos dois backends.** É contraintuitivo e é real:
+o `Q8_0` desempacota quase como leitura de byte, enquanto o `Q4_K_M` paga
+trabalho por peso. Num modelo de 0,6B, que já é barato em memória, o custo de
+desempacotar domina. **O Q4 é estritamente pior: mais lento E 6,5% de WER.** A
+rota "quantizar para caber na CPU" está fechada.
+
+**O que a medição NÃO diz:** que máquina nenhuma sem placa serve. Diz que
+**esta** não serve. Como o `n_threads` já está escolhido e a quantização não
+ajuda, o que falta é CPU: seria preciso ~2× este processador para chegar a
+1,5×, o que coloca a fronteira em torno de um 8 núcleos moderno. Medir num
+desses é o item — não há mais o que otimizar deste lado.
+
+---
+
+## 8. Débito técnico e testes
 
 ### DEB-1 · O caminho da ata na ponte não tem teste — `débito` · `aberto`
 
@@ -455,7 +675,7 @@ dava para rodá-lo num teste com um motor falso.
 
 ---
 
-## 8. O que **não** entra
+## 9. O que **não** entra
 
 Para a lista não virar depósito de novo:
 

@@ -135,16 +135,7 @@ versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
 # mensagem, o que manda quem lê rodá-lo uma terceira vez. As duas saídas que
 # funcionam estão na mensagem.
 #
-# **O `moss` entra nesta lista, e é o único que pode faltar.** Ele é opcional —
-# quem não liga a chave `motor_de_transcricao` nunca o vê —, então a ausência não
-# reprova o instalador; o que reprova é ele estar lá **velho**, que é o defeito
-# que esta régua inteira existe para pegar.
-for m in asr diarizacao modelos moss; do
-  if [[ "$m" == "moss" && ! -f "$MOTORES/moss/motor.py" ]]; then
-    echo "    AVISO: sem motores/moss — o instalador sai sem o motor MOSS, e a" >&2
-    echo "           chave 'motor de transcrição' não terá o que escolher." >&2
-    continue
-  fi
+for m in asr diarizacao modelos; do
   [[ -f "$MOTORES/$m/motor.py" ]] || reprovar "falta motores/$m/motor.py"
   if ! diff -q "$RAIZ/motores/$m/motor.py" "$MOTORES/$m/motor.py" >/dev/null; then
     reprovar "motores/$m/motor.py do repositório difere do que está em $MOTORES.
@@ -234,8 +225,8 @@ FINAL="$SAIDA/MeetingApp-$VERSAO-instalador.exe"
 # tem os motores dentro, e um grande demais tem um .gguf que escapou do Excludes.
 #
 # **A expectativa mudou em 04/09/2026**, e vale escrita: eram 1,59 GB, e o
-# `transcribe.cpp` do motor MOSS acrescenta ~200 MB de nativo ao Python
-# embarcado — passa a ~1,79 GB. O GGUF do MOSS (0,70 GB) **não** entra aqui: ele
+# `transcribe.cpp` da legenda ao vivo acrescenta ~200 MB de nativo ao Python
+# embarcado — passa a ~1,79 GB. Os GGUF **não** entra aqui: ele
 # é pacote do Catalogo, baixado sob demanda, justamente porque o `Excludes` do
 # .iss descartaria o arquivo em silêncio. Ver docs/FASE7-BACKEND.md A1.
 #

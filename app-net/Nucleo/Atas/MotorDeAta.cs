@@ -167,10 +167,17 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     /// <param name="caracteresDoPrompt">O prompt montado, em caracteres.</param>
     /// <param name="modelo">Lido do próprio <c>.gguf</c>.</param>
     /// <param name="vramBytes">Total da placa. Zero quando não se sabe.</param>
+    /// <param name="tokensDeSaida">
+    /// Quanto quem chama vai deixar o modelo escrever. <b>Não é sempre os 8.192
+    /// da ata:</b> a pergunta ao vivo escreve 1.024, e reservar os 8.192 dela
+    /// inflava o contexto em sete mil tokens que ninguém ia usar — o que na
+    /// placa de 6 GB é VRAM que faz diferença durante uma reunião.
+    /// </param>
     public static (int Contexto, string Ctk, string Ctv) Dimensionar(
-        int caracteresDoPrompt, MetadadosDoGguf modelo, long vramBytes)
+        int caracteresDoPrompt, MetadadosDoGguf modelo, long vramBytes,
+        int tokensDeSaida = TokensDeSaida)
     {
-        int precisa = (int)(caracteresDoPrompt / CaracteresPorToken) + TokensDeSaida;
+        int precisa = (int)(caracteresDoPrompt / CaracteresPorToken) + tokensDeSaida;
 
         int teto = modelo.ContextoMaximo > 0
             ? Math.Min(modelo.ContextoMaximo, ContextoMaximoPratico)
@@ -298,7 +305,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
 
         var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
         int maior = perguntas.Max(p => p.Length);
-        var (contexto, ctk, ctv) = Dimensionar(maior, modelo, VramDaPlaca());
+        var (contexto, ctk, ctv) = Dimensionar(maior, modelo, VramDaPlaca(), tokensDeSaida);
         int porta = PortaLivre();
 
         progresso?.Invoke(new ProgressoDaAta("modelo", 0.05, "carregando o modelo"));
@@ -324,6 +331,60 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         {
             Matar(processo);
         }
+    }
+
+    /// <summary>
+    /// Sobe o motor e o deixa de pé, para responder várias perguntas.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>É o <c>ResponderAsync</c> sem o <c>finally</c> que mata.</b> A
+    /// diferença inteira é essa, e é por isso que ela custa: o processo fica
+    /// segurando a placa até alguém chamar <c>Dispose</c>. Quem decide é a chave
+    /// <see cref="ConfiguracoesDoApp.ModeloQuente"/>, e quem garante que ele
+    /// morre é o <see cref="MotorQuente"/>.
+    /// </para>
+    /// <para>
+    /// <b>O contexto é dimensionado uma vez, pelo pior caso.</b> A sessão não
+    /// sabe que pergunta virá, e subir de novo a cada crescimento da transcrição
+    /// anularia o motivo de ela existir — então ela pede de saída o que a janela
+    /// inteira precisa.
+    /// </para>
+    /// </remarks>
+    /// <param name="caracteresMaximos">O maior prompt que esta sessão verá.</param>
+    public async Task<ISessaoDoMotor> AbrirSessaoAsync(
+        string sistema, string nomeDoEsquema, string esquema,
+        int caracteresMaximos, int tokensDeSaida, CancellationToken ct)
+    {
+        if (caminhos.OQueFalta() is { } falta) throw new InvalidOperationException(falta);
+
+        var modelo = MetadadosDoGguf.Ler(caminhos.Modelo);
+        var (contexto, ctk, ctv) = Dimensionar(
+            caracteresMaximos, modelo, VramDaPlaca(), tokensDeSaida);
+        int porta = PortaLivre();
+
+        var processo = Subir(porta, contexto, ctk, ctv);
+        try
+        {
+            await EsperarSubirAsync(processo, porta, ct);
+        }
+        catch
+        {
+            Matar(processo);
+            throw;
+        }
+        return new SessaoAberta(processo, porta, sistema, nomeDoEsquema, esquema, tokensDeSaida);
+    }
+
+    /// <summary>Um <c>llama-server</c> de pé, com a porta dele.</summary>
+    private sealed class SessaoAberta(
+        Process processo, int porta, string sistema, string nomeDoEsquema,
+        string esquema, int tokensDeSaida) : ISessaoDoMotor
+    {
+        public Task<string> PerguntarAsync(string prompt, CancellationToken ct) =>
+            PedirAsync(porta, sistema, prompt, nomeDoEsquema, esquema, tokensDeSaida, ct);
+
+        public void Dispose() => Matar(processo);
     }
 
     /// <summary>
@@ -458,23 +519,9 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         //
         // Modelo que não conhece a variável simplesmente a ignora no Jinja, e é
         // por isso que ela pode ir em todos sem um "se".
-        string corpo = $$"""
-        {
-          "messages": [
-            {"role": "system", "content": {{Texto(sistema)}}},
-            {"role": "user", "content": {{Texto(prompt)}}}
-          ],
-          "temperature": 0.3,
-          "max_tokens": {{tokensDeSaida}},
-          "chat_template_kwargs": {"enable_thinking": false},
-          "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": {{Texto(nomeDoEsquema)}}, "strict": true, "schema": {{esquema}}}
-          }
-        }
-        """;
-
-        var conteudo = new StringContent(corpo, Encoding.UTF8, "application/json");
+        var conteudo = new StringContent(
+            CorpoDoPedido(sistema, prompt, nomeDoEsquema, esquema, tokensDeSaida),
+            Encoding.UTF8, "application/json");
 
         var resposta = await http.PostAsync(
             $"http://127.0.0.1:{porta}/v1/chat/completions", conteudo, ct);
@@ -505,6 +552,78 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
 
         return escolha.GetProperty("message").GetProperty("content").GetString()
             ?? throw new InvalidOperationException("o motor de ata devolveu resposta vazia");
+    }
+
+    /// <summary>
+    /// O corpo do pedido ao <c>llama-server</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Montado como texto, e não por serialização de objeto anônimo:</b>
+    /// <c>JsonSerializer</c> por reflexão é erro de build sob
+    /// <c>PublishTrimmed</c> (IL2026) — compila, passa nos testes, e reprova só
+    /// na publicação. Mesma armadilha que o <c>reuniao.json</c> já tinha dado.
+    /// </para>
+    /// <para>
+    /// <b>O esquema é opcional desde 16/09/2026, e a razão é medida.</b> Para a
+    /// ata ele é o que a torna verificável. Para a <b>pergunta ao vivo</b>, que
+    /// não tem forma fixa, ele custou quatro dos seis modelos comparados: três
+    /// escreviam só a primeira seção de cinco e paravam sozinhos, e o
+    /// <c>gemma-4-e4b</c> queimou os 1.024 tokens de saída para produzir 190
+    /// caracteres — 0,19 caractere por token, com a gramática obrigando-o a
+    /// emitir quase byte a byte. Sem esquema, os seis respondem inteiro.
+    /// Ver <c>docs/ESTUDO-RESUMO-AO-VIVO.md</c> §2.
+    /// </para>
+    /// <para>
+    /// <b>O <c>system</c> também é opcional</b>, e vazio significa mensagem
+    /// nenhuma — não uma mensagem em branco, que alguns templates Jinja
+    /// renderizam como um turno vazio.
+    /// </para>
+    /// <para>
+    /// <b><c>enable_thinking: false</c></b> — medido em 17/08/2026. O Qwen3.5 4B
+    /// é modelo de raciocínio e, com o padrão do template, gastou os tokens de
+    /// saída inteiros pensando. Modelo que não conhece a variável a ignora no
+    /// Jinja, e é por isso que ela pode ir em todos sem um "se".
+    /// </para>
+    /// <para>
+    /// <b>Mas ela não segura todos, e isso foi lido nos templates em
+    /// 16/09/2026.</b> Ela carrega peso em <c>qwen3-1.7b</c> e <c>smollm3-3b</c>,
+    /// que <b>pensam por padrão</b>; é inócua em <c>qwen3.5-4b</c> e
+    /// <c>gemma-4-e4b</c>, cujos templates já nascem com o raciocínio desligado;
+    /// e é ignorada por <c>qwen3-4b-instruct</c> e <c>ministral-3-3b</c>, que
+    /// nem leem a chave. Tirá-la quebra dois modelos em silêncio.
+    /// Ver <c>docs/ESTUDO-RESUMO-AO-VIVO.md</c> §2.
+    /// </para>
+    /// <para>
+    /// Temperatura baixa, mas não zero: ata é registro, não criação. Zero deixa
+    /// o modelo repetitivo em listas longas.
+    /// </para>
+    /// </remarks>
+    public static string CorpoDoPedido(string sistema, string prompt,
+                                       string nomeDoEsquema, string esquema,
+                                       int tokensDeSaida)
+    {
+        string doUsuario = $$"""{"role": "user", "content": {{Texto(prompt)}}}""";
+        string mensagens = sistema is { Length: > 0 }
+            ? $$"""{"role": "system", "content": {{Texto(sistema)}}}, """ + doUsuario
+            : doUsuario;
+
+        string formato = esquema is { Length: > 0 }
+            ? ",\n  \"response_format\": {\"type\": \"json_schema\", \"json_schema\": "
+              + "{\"name\": " + Texto(nomeDoEsquema) + ", \"strict\": true, \"schema\": "
+              + esquema + "}}"
+            : "";
+
+        return $$"""
+        {
+          "messages": [
+            {{mensagens}}
+          ],
+          "temperature": 0.3,
+          "max_tokens": {{tokensDeSaida}},
+          "chat_template_kwargs": {"enable_thinking": false}{{formato}}
+        }
+        """;
     }
 
     /// <summary>
