@@ -3,6 +3,53 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0 — 18/09/2026
+
+A versão da **reunião ao vivo**: o app deixou de ser só um gravador que
+transcreve depois, e passa a acompanhar a conversa enquanto ela acontece.
+Tudo o que segue **nasce desligado**, em Ajustes › Transcrição — quem não
+ligar nada continua com o app de sempre.
+
+**A legenda ao vivo.** Com ela ligada, o Gravador mostra o que está sendo dito
+quase no instante da fala. O texto em cinza ainda pode mudar; o firme não muda
+mais. Ela separa a sua voz da dos outros pelo lado da tela, sem adivinhar nome
+de ninguém.
+
+**Perguntar sobre a reunião enquanto ela acontece.** Um botão — "O que já
+rolou?" — devolve os assuntos em lista, do mais recente para o mais antigo. A
+caixa ao lado responde o que você quiser sobre o que já foi dito: quem ficou de
+quê, o que ficou decidido, sobre o que estão falando agora. As respostas se
+acumulam, e dá para puxar o detalhe de um assunto sem perder o que veio antes.
+
+Cada pergunta leva cerca de vinte segundos, e o modelo lê no máximo a última
+hora de reunião — acima disso a resposta avisa que só viu o fim. Se você vai
+perguntar várias coisas seguidas, a chave "deixar o modelo pronto entre
+perguntas" faz da segunda em diante quase instantâneas, em troca de cerca de
+3 GB da placa ocupados enquanto espera.
+
+**Quem falou na legenda, separado sozinho no fim.** Quando a reunião acaba, o
+app separa os falantes da legenda em segundo plano — a lista de reuniões mostra
+"Separando falantes…" e leva cerca de dois minutos numa reunião de uma hora.
+Quem o app já conhece aparece com o nome, pelo mesmo banco de vozes da
+transcrição: cada reunião que você nomeia melhora todas as próximas.
+
+**O modelo da pergunta é escolhido à parte do modelo da ata**, em Ajustes ›
+Modelos. São tarefas diferentes: a ata roda com a reunião encerrada e a placa
+livre; a pergunta divide a placa com a legenda e tem vinte segundos para
+responder.
+
+**A legenda ficou mais rápida e parou de tomar a máquina** — 36% mais rápida
+usando 43% menos processador, com o mesmo texto. Em máquina que grava, abre o
+Teams e o navegador ao mesmo tempo, é a diferença entre o texto acompanhar a
+fala ou atrasar.
+
+**Um motor a menos.** O MOSS, que transcrevia e separava falantes numa passada
+só, saiu: a legenda faz melhor o que ele fazia durante a reunião, e a
+transcrição do fim continua sendo a que vale — e é a única que usa o seu
+vocabulário. Quem o tinha escolhido volta ao motor de sempre sem fazer nada.
+
+---
+
 ## 0.7.0-rc18 — 18/09/2026
 
 **Uma palavra não é mais dividida entre duas pessoas.** O motor da legenda

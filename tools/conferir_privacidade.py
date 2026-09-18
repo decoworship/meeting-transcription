@@ -101,6 +101,42 @@ AUDIO_PERMITIDO = re.compile(
 # software o tempo todo. O que não pode crescer é a *largura* de cada exceção:
 # ela nomeia um termo e um caminho, e não um diretório inteiro.
 HOMONIMOS: list[tuple[re.Pattern, str, str]] = [
+    # ── 'Christopher', 18 achados na 0.7.0 ───────────────────────────────────
+    #
+    # Todos em pacote de terceiro, e todos autoria: citação acadêmica, crédito
+    # de contribuidor ou lista de AUTHORS. Conferidos um a um em 18/09/2026:
+    #
+    #   sklearn   "Carl E. Rasmussen and Christopher K.I. Williams" — o livro de
+    #             Gaussian Processes, citado nas referências de cinco módulos
+    #   pygments  "Contributed by Christopher Creutzig <christopher@creutzig.de>"
+    #   networkx  "originally coded by Christopher Ellison"
+    #   scipy     "Meyer, Raphael A., Cameron Musco, Christopher Musco, …"
+    #
+    # **É o caso que o cabeçalho previu**: nome próprio comum colide com autoria
+    # de software. Cada entrada nomeia um caminho, e não um diretório — o
+    # `site-packages` inteiro perdoado esconderia um vazamento de verdade.
+    (re.compile(r"sklearn[/\\](gaussian_process|decomposition|mixture)[/\\]"), "Christopher",
+     "a referência [RW2006] do livro de Gaussian Processes, de Rasmussen e "
+     "Williams, citada nas docstrings do sklearn."),
+    (re.compile(r"scipy[/\\]sparse[/\\]linalg[/\\]_expm_multiply\.py$"), "Christopher",
+     "a referência a Christopher Musco na docstring do _expm_multiply."),
+    (re.compile(r"networkx[/\\]algorithms[/\\]isomorphism[/\\]isomorphvf2\.py$"), "Christopher",
+     "o crédito a Christopher Ellison, autor original do módulo."),
+    (re.compile(r"pygments[/\\]lexers[/\\]algebra\.py$"), "Christopher",
+     "o crédito a Christopher Creutzig, que contribuiu o lexer."),
+    (re.compile(r"pygments-[\d.]+\.dist-info[/\\]licenses[/\\]AUTHORS$"), "Christopher",
+     "a lista de autores do pygments."),
+    (re.compile(r"sympy-[\d.]+\.dist-info[/\\](AUTHORS|METADATA)$"), "Christopher",
+     "a lista de autores do sympy, que o METADATA repete."),
+    (re.compile(r"onnxruntime[/\\]ThirdPartyNotices\.txt$"), "Christopher",
+     "as licenças de terceiros que o onnxruntime carrega."),
+    (re.compile(r"numpy[/\\]random[/\\].*\.pyd$"), "Christopher",
+     "a autoria do gerador aleatório do numpy, compilada dentro do .pyd."),
+    (re.compile(r"numpy[/\\]typing[/\\]tests[/\\]data[/\\]"), "Christopher",
+     "os arquivos de teste de tipagem do numpy, que exercitam o gerador."),
+    (re.compile(r"hf_xet-[\d.]+\.dist-info[/\\]sboms[/\\].*\.cyclonedx\.json$"), "Christopher",
+     "autoria de dependências no SBOM do hf_xet, como o 'Eduardo' abaixo."),
+
     (re.compile(r"av\.libs[/\\]avformat-"), "Vivo",
      "o demuxer 'Vivo' do ffmpeg — o formato de vídeo da Vivo Software, "
      "dos anos 90. Aparece ao lado de 'vivo' e 'viv' na tabela de formatos."),

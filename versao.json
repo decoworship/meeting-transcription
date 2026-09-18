@@ -1,6 +1,6 @@
 {
-  "versao": "0.7.0-rc18",
+  "versao": "0.7.0",
   "publicada": "2026-09-18",
-  "notas": "Uma palavra não é mais dividida entre duas pessoas na legenda: o corte do motor caía no meio de um nome e, na troca de falante, cada metade ia para uma pessoa.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc18"
+  "notas": "A versão da reunião ao vivo: legenda enquanto a conversa acontece, um botão que resume o que já rolou, uma caixa para perguntar o que quiser sobre a reunião em curso, e a separação de quem falou feita sozinha quando ela acaba. Tudo nasce desligado, em Ajustes › Transcrição.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0"
 }
