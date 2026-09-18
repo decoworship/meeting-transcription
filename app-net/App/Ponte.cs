@@ -1369,6 +1369,12 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// <summary>Descarta a prévia. Nunca lança, pela mesma razão.</summary>
     private void EncerrarAPrevia()
     {
+        // **A pasta é capturada ANTES de zerar o campo**, e a ordem é o defeito
+        // que a primeira reunião com o VIVO-2 encontrou: o `_pastaAoVivo = null`
+        // vinha primeiro, a separação de falantes recebia nulo e nunca era
+        // chamada — sem erro, sem linha no registro, e a tela prometendo
+        // "separando falantes…" para sempre. Visto em 18/09/2026.
+        string? pastaDaLegenda = _pastaAoVivo;
         _pastaAoVivo = null;
 
         // **A placa volta com a gravação.** Um motor de 3,2 GB órfão depois da
@@ -1384,7 +1390,6 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         if (_legenda is { } legenda)
         {
             _legenda = null;
-            string? pastaDaLegenda = _pastaAoVivo;
             _ = Task.Run(async () =>
             {
                 try { await legenda.EncerrarAsync(TimeSpan.FromSeconds(30)); }
@@ -1631,7 +1636,23 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         string sistema = Path.Combine(pasta, "system.wav");
         if (!File.Exists(sistema)) return;
 
-        var trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "falantes");
+        // **O registro recusa duas tarefas ao mesmo tempo, e recusar é legítimo:**
+        // as duas disputariam a placa. O que não pode é morrer em silêncio — este
+        // método roda dentro de um Task.Run, e a exceção não teria quem a
+        // observasse.
+        TrabalhoDeTranscricao trabalho;
+        try
+        {
+            trabalho = _transcricoes.Comecar(pasta, NomeDaGravacao(pasta), "falantes");
+        }
+        catch (InvalidOperationException e)
+        {
+            // Sem separação, e a legenda não fica prometendo: marca como feita,
+            // sem falante. O registro diz por quê.
+            LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+            Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
+            return;
+        }
         EmpurrarTranscricoes();
 
         _ = Task.Run(async () =>
@@ -1711,6 +1732,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             catch (Exception e)
             {
+                // **A tela para de prometer.** Marcar como feita sem falante é
+                // honesto — tentou-se e não saiu —, e deixar `false` faria o
+                // aviso "separando falantes…" ficar para sempre, que é a tela
+                // prometendo um resultado que não vem.
+                try
+                {
+                    LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+                }
+                catch (Exception) { /* disco: o aviso fica, e é o menor dos males */ }
+
                 _transcricoes.Terminar(pasta, e.Message);
                 Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
             }

@@ -1,6 +1,6 @@
 {
-  "versao": "0.7.0-rc15",
+  "versao": "0.7.0-rc16",
   "publicada": "2026-09-18",
-  "notas": "Quando a reunião acaba, o app separa quem falou na legenda sozinho, em segundo plano — e usa o mesmo banco de vozes da transcrição, então quem você já nomeou aparece com o nome.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc15"
+  "notas": "Conserta a separação de falantes da legenda, que mostrava \"separando falantes…\" para sempre sem nunca começar.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc16"
 }

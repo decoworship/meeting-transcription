@@ -3,6 +3,17 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc16 — 18/09/2026
+
+**A separação de falantes não começava.** O aviso "separando falantes…"
+aparecia e ficava para sempre, porque o app perdia o caminho da gravação um
+instante antes de começar o trabalho — e como nada chegava a rodar, nem erro
+havia. Agora roda.
+
+**E quando não puder rodar, o aviso sai.** Se já houver uma transcrição em
+curso, ou se a separação falhar, a legenda fica sem falantes e o aviso some,
+em vez de prometer um resultado que não vem. O motivo vai para o registro.
+
 ## 0.7.0-rc15 — 18/09/2026
 
 **Quando a reunião acaba, o app separa quem falou na legenda — sozinho, em
