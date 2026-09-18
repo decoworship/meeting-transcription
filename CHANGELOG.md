@@ -3,6 +3,26 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc15 — 18/09/2026
+
+**Quando a reunião acaba, o app separa quem falou na legenda — sozinho, em
+segundo plano.** Enquanto você decide se vai transcrever, a lista de reuniões
+mostra "Separando falantes…" e a legenda daquela reunião ganha um aviso de que
+ainda não está pronta. Leva cerca de dois minutos numa reunião de uma hora.
+
+**E os nomes vêm do mesmo lugar de sempre.** Quem o app já conhece aparece com
+o nome na legenda, pelo mesmo banco de vozes que a transcrição usa — então cada
+reunião que você nomeia melhora todas as próximas, inclusive as legendas.
+
+**A legenda passou a guardar o tempo de cada trecho.** É o que torna a separação
+de falantes possível, e não mudou nada do que você vê durante a reunião.
+
+**Um motor a menos.** O MOSS, que transcrevia e separava falantes numa passada
+só, saiu: a legenda ao vivo faz melhor o que ele fazia durante a reunião, e a
+transcrição do fim continua sendo a que vale — e é a única que usa o seu
+vocabulário. Quem tinha o MOSS escolhido volta ao motor de sempre sem precisar
+fazer nada.
+
 ## 0.7.0-rc14 — 17/09/2026
 
 **Dá para perguntar sobre a reunião enquanto ela acontece.** No Gravador, um

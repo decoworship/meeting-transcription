@@ -195,8 +195,9 @@ public sealed class Vozes
     /// fala de outra pessoa, e a transcrição sai plausível e errada.
     /// </para>
     /// <para>
-    /// <b>Ele não é o mesmo problema do
-    /// <see cref="LimiarDeCosturaNaReuniao"/>, e por isso não é o mesmo
+    /// <b>Ele não era o mesmo problema do limiar de costura dentro da reunião</b>
+    /// — que saiu em 18/09/2026 junto com a CosturaDeFalantes —, e por isso não
+    /// era o mesmo
     /// número.</b> Até 03/09/2026 havia um limiar só para os dois usos, e a
     /// Fase 7 mediu duas vezes, independentemente, que 0,70 é apertado demais
     /// <b>dentro</b> da mesma reunião: o T3.1 achou 0,60 para nomear cedo, com
@@ -208,32 +209,6 @@ public sealed class Vozes
     /// </remarks>
     public const double LimiarDeReconhecimento = 0.70;
 
-    /// <summary>
-    /// Acima disto, é a mesma pessoa — <b>dentro</b> da mesma reunião.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// O caso fácil, e é isso que justifica o número mais baixo: o alvo e a
-    /// amostra vêm do mesmo áudio, gravado no mesmo minuto, com as mesmas
-    /// condições acústicas, e o conjunto de candidatos são as poucas pessoas
-    /// daquela sala. É o limiar que a <see cref="CosturaDeFalantes"/> usa para
-    /// decidir se o falante deste bloco é alguém que já falou.
-    /// </para>
-    /// <para>
-    /// <b>0,55, medido em 03/09/2026 sobre seis gravações do acervo</b>
-    /// (<c>docs/FASE7-RESULTADOS.md</c> §11.2). O que o limiar regula aqui
-    /// <b>não é o acerto</b> — ele é quase insensível — <b>é quanta gente o app
-    /// inventa</b>: em 0,75 a costura conclui que há 44 falantes onde há 8, e a
-    /// métrica de acerto não enxerga isso porque dividir custa menos que fundir.
-    /// Em 0,45 ela começa a fundir demais, e a gravação de 41 min perde 4
-    /// pontos. 0,55 fica no máximo, ou junto dele, nas seis.
-    /// </para>
-    /// <para>
-    /// Baixá-lo sem medir troca um erro que a pessoa conserta juntando duas
-    /// linhas por um que ela não tem como perceber.
-    /// </para>
-    /// </remarks>
-    public const double LimiarDeCosturaNaReuniao = 0.55;
 
     /// <summary>Abaixo disto, a amostra vai para revisão em vez de entrar direto.</summary>
     public const double LimiarDeQuarentena = 0.35;

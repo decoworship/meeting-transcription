@@ -1657,12 +1657,53 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     cfg.DiarizacaoPadrao, trabalho.Token);
 
                 var comFalante = FalantesDaLegenda.Atribuir(legenda.Trechos, diarizacao);
+
+                // **O mesmo banco de vozes da passada final**, e é o que torna
+                // isto um pipeline só: os rótulos do pyannote são locais à
+                // reunião, e quem os transforma em pessoa é o banco — que
+                // melhora a cada reunião, porque é aí que ele ganha amostra.
+                //
+                // **Nunca derruba a separação.** Não reconhecer é o estado
+                // normal de quem nunca foi apresentado, e um rótulo sem nome é
+                // melhor que trecho nenhum.
+                int nomeados = 0;
+                try
+                {
+                    _transcricoes.Progredir(pasta, "falantes", 0.8,
+                                            "procurando vozes conhecidas");
+                    EmpurrarTranscricoes();
+
+                    var faixas = Faixas.Ler(Path.Combine(pasta, "mic.wav"), sistema);
+                    var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
+                        .ReconhecerAsync(pasta, ComoSegmentos(comFalante), faixas.Mic,
+                                         trabalho.Token);
+
+                    if (conhecidos.Count > 0)
+                    {
+                        comFalante = [.. comFalante.Select(t =>
+                            t.Falante is { } r && conhecidos.TryGetValue(r, out string? nome)
+                                ? new TrechoDaLegenda
+                                {
+                                    InicioMs = t.InicioMs, FimMs = t.FimMs,
+                                    Dono = t.Dono, Texto = t.Texto, Falante = nome,
+                                }
+                                : t)];
+                        nomeados = conhecidos.Count;
+                    }
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception e)
+                {
+                    Registro.Escrever("legenda", $"vozes conhecidas: {e.Message}");
+                }
+
                 LegendaAoVivo.Gravar(pasta, legenda.Turnos, comFalante, prontos: true);
 
                 _transcricoes.Terminar(pasta);
                 Registro.Escrever("legenda",
                     $"falantes separados: {comFalante.Count} trechos, "
-                    + $"{diarizacao.Count} segmentos de diarização.");
+                    + $"{diarizacao.Count} segmentos de diarização, "
+                    + $"{nomeados} reconhecidos pelo banco de vozes.");
             }
             catch (OperationCanceledException)
             {
@@ -1676,6 +1717,24 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             EmpurrarTranscricoes();
         });
     }
+
+    /// <summary>
+    /// Os trechos da legenda como o reconhecimento de vozes os espera.
+    /// </summary>
+    /// <remarks>
+    /// <b>Conversão e não cópia de regra.</b> O <c>ReconhecerAsync</c> trabalha
+    /// sobre <see cref="SegmentoFinal"/> porque é o que a passada final produz;
+    /// dar a ele a mesma forma é o que permite os dois caminhos usarem o
+    /// <b>mesmo</b> banco de vozes, em vez de dois que divergem.
+    /// </remarks>
+    private static List<SegmentoFinal> ComoSegmentos(IEnumerable<TrechoDaLegenda> trechos) =>
+        [.. trechos.Select(t => new SegmentoFinal
+        {
+            Start = t.InicioMs / 1000.0,
+            End = t.FimMs / 1000.0,
+            Text = t.Texto,
+            Speaker = t.Falante,
+        })];
 
     /// <summary>
     /// Pergunta ao modelo o que já aconteceu na reunião.
