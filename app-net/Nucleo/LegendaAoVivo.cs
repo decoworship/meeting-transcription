@@ -75,6 +75,25 @@ public sealed class TrechoDaLegenda
     /// não passa pela diarização, porque a faixa do microfone é certeza.
     /// </remarks>
     [JsonPropertyName("falante")] public string? Falante { get; init; }
+
+    /// <summary>
+    /// Este trecho continua a <b>palavra</b> que o anterior deixou pela metade.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A fronteira do commit não é fronteira de palavra</b>, e isso custou um
+    /// defeito visível: em 18/09/2026 o motor firmou <c>'a Palo'</c> e depois
+    /// <c>'ma tem Uberlândia'</c>, e a diarização deu falantes <b>diferentes</b>
+    /// às duas metades de "Paloma". Uma palavra tem um dono só.
+    /// </para>
+    /// <para>
+    /// <b>O sinal só existe no bruto.</b> O <c>Texto</c> é guardado aparado, e
+    /// aparar apaga justamente o espaço cuja ausência define a colagem — por
+    /// isso a decisão é tomada no <see cref="LegendaAoVivo.Registrar"/>, com os
+    /// dois pedaços crus na mão, e não pode ser refeita depois.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("colado")] public bool Colado { get; init; }
 }
 
 /// <summary>O que a legenda deixou para ler depois da reunião.</summary>
@@ -227,6 +246,9 @@ public sealed class LegendaAoVivo : IDisposable
     /// <summary>Onde o firme chegou no parcial anterior. O início do próximo.</summary>
     private long _ateAnterior;
 
+    /// <summary>O último pedaço firme, <b>sem aparar</b>. Ver TrechoDaLegenda.Colado.</summary>
+    private string _ultimoBruto = "";
+
     /// <summary>O que impede a legenda de existir, ou <c>null</c>.</summary>
     /// <remarks>
     /// Perguntado <b>antes</b> de a gravação ser observada, para o motivo
@@ -257,10 +279,22 @@ public sealed class LegendaAoVivo : IDisposable
     /// </remarks>
     /// <param name="anteriorMs">Onde o firme estava no parcial anterior.</param>
     /// <param name="ateMs">Onde ele está agora.</param>
+    /// <param name="anteriorBruto">
+    /// O pedaço anterior <b>sem aparar</b>. É dele que sai a resposta para "a
+    /// palavra continua?", e o texto guardado não serve porque foi aparado.
+    /// </param>
     public static void Registrar(List<TrechoDaLegenda> trechos, List<TurnoDaLegenda> turnos,
-                                 long anteriorMs, long ateMs, bool dono, string novo)
+                                 long anteriorMs, long ateMs, bool dono, string novo,
+                                 string anteriorBruto = "")
     {
         if (novo.Trim().Length == 0) return;
+
+        // **Colado = os dois lados da fronteira são letra, sem espaço no meio.**
+        // Pontuação não conta: 'vou' + ', acho' não parte palavra nenhuma, e
+        // fundir por isso agruparia meia reunião num trecho só.
+        bool colado = anteriorBruto.Length > 0
+                      && char.IsLetterOrDigit(anteriorBruto[^1])
+                      && char.IsLetterOrDigit(novo[0]);
 
         // **A guarda existe porque o relógio pode andar para trás.** O motor
         // recomeça o fluxo quando ele trava, e o acumulado deveria atravessar os
@@ -271,7 +305,7 @@ public sealed class LegendaAoVivo : IDisposable
 
         trechos.Add(new TrechoDaLegenda
         {
-            InicioMs = de, FimMs = ate, Dono = dono, Texto = novo.Trim(),
+            InicioMs = de, FimMs = ate, Dono = dono, Texto = novo.Trim(), Colado = colado,
         });
 
         // A mesma regra de agrupamento da tela: enquanto o dono não muda, o
@@ -470,8 +504,9 @@ public sealed class LegendaAoVivo : IDisposable
 
         if (novo.Trim().Length > 0)
         {
-            Registrar(_trechos, _turnos, _ateAnterior, p.AteMs, dono, novo);
+            Registrar(_trechos, _turnos, _ateAnterior, p.AteMs, dono, novo, _ultimoBruto);
             _ateAnterior = p.AteMs;
+            _ultimoBruto = novo;
             Gravar();
         }
 

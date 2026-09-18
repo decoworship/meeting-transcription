@@ -1794,7 +1794,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 falas[^1] = new TurnoJson
                 {
                     Dono = t.Dono, Falante = t.Falante,
-                    Texto = falas[^1].Texto + " " + t.Texto,
+                    // **Sem espaço quando a palavra continua.** Os trechos são
+                    // fatias de um fluxo só, e o motor parte no meio da palavra
+                    // — juntar com espaço mostraria "a Palo ma tem".
+                    Texto = falas[^1].Texto + (t.Colado ? "" : " ") + t.Texto,
                 };
             else
                 falas.Add(new TurnoJson { Dono = t.Dono, Falante = t.Falante, Texto = t.Texto });

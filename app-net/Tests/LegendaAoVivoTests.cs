@@ -402,4 +402,68 @@ public sealed class LegendaAoVivoTests
         }
         finally { Directory.Delete(pasta, recursive: true); }
     }
+
+    // ──────────────────── a palavra partida entre dois commits
+
+    [Fact]
+    public void OTrechoQueContinuaAPalavraAnteriorEMarcado()
+    {
+        // **Visto em uso em 18/09/2026:** o motor firmou 'a Palo' e depois
+        // 'ma tem Uberlândia', e a diarização deu falantes DIFERENTES às duas
+        // metades de "Paloma". A fronteira do commit não é fronteira de palavra.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, " a Palo");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, "ma tem Uberlândia",
+                                anteriorBruto: " a Palo");
+
+        Assert.False(trechos[0].Colado);
+        Assert.True(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void EspacoNaFronteiraSignificaPalavraNova()
+    {
+        // O espaço vive no COMEÇO do pedaço novo, e é ele que diz que a palavra
+        // anterior acabou. Sem esta guarda, 'vou' + ' acho' seria fundido.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "Eu não vou");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, " acho que vai",
+                                anteriorBruto: "Eu não vou");
+
+        Assert.False(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void PontuacaoNaFronteiraNaoEPalavraPartida()
+    {
+        // 'Eu não vou' + ', acho que vai' não tem espaço, mas também não parte
+        // palavra nenhuma. Fundir por isso agruparia meia reunião.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "Eu não vou");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, ", acho que vai",
+                                anteriorBruto: "Eu não vou");
+
+        Assert.False(trechos[1].Colado);
+    }
+
+    [Fact]
+    public void UmEspacoNOFIMDoAnteriorTambemFechaAPalavra()
+    {
+        // O commit pode terminar com espaço, e aí o Trim o apagaria do texto
+        // guardado — é por isso que a regra olha o BRUTO, e não o que ficou.
+        var trechos = new List<TrechoDaLegenda>();
+        var turnos = new List<TurnoDaLegenda>();
+
+        LegendaAoVivo.Registrar(trechos, turnos, 0, 1000, false, "a Palo ");
+        LegendaAoVivo.Registrar(trechos, turnos, 1000, 2000, false, "ma tem",
+                                anteriorBruto: "a Palo ");
+
+        Assert.False(trechos[1].Colado);
+    }
 }

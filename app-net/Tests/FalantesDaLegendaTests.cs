@@ -89,4 +89,45 @@ public sealed class FalantesDaLegendaTests
         Assert.Equal(5678, saida[0].FimMs);
         Assert.Equal("trecho 1234", saida[0].Texto);
     }
+
+    [Fact]
+    public void UmaPalavraPartidaNaoGanhaDoisFalantes()
+    {
+        // **O defeito que este método existe para impedir**, visto em
+        // 18/09/2026: "Paloma" saiu como 'a Palo' (SPEAKER_03) e
+        // 'ma tem Uberlândia' (SPEAKER_02). Uma palavra tem um dono só.
+        var trechos = new[]
+        {
+            new TrechoDaLegenda { InicioMs = 0, FimMs = 2000, Dono = false, Texto = "a Palo" },
+            new TrechoDaLegenda
+            {
+                InicioMs = 2000, FimMs = 3000, Dono = false,
+                Texto = "ma tem Uberlândia", Colado = true,
+            },
+        };
+        var diarizacao = new[] { D(0, 2.0, "Speaker 1"), D(2.0, 3.0, "Speaker 2") };
+
+        var saida = FalantesDaLegenda.Atribuir(trechos, diarizacao);
+
+        Assert.Single(saida);
+        Assert.Equal("a Paloma tem Uberlândia", saida[0].Texto);
+        // O intervalo é a união, e o falante é o de maior sobreposição nela.
+        Assert.Equal(0, saida[0].InicioMs);
+        Assert.Equal(3000, saida[0].FimMs);
+        Assert.Equal("Speaker 1", saida[0].Falante);
+    }
+
+    [Fact]
+    public void TrechoSoltoNaoEFundidoComOVizinho()
+    {
+        var trechos = new[]
+        {
+            new TrechoDaLegenda { InicioMs = 0, FimMs = 1000, Dono = false, Texto = "bom dia" },
+            new TrechoDaLegenda { InicioMs = 1000, FimMs = 2000, Dono = false, Texto = "tudo bem" },
+        };
+
+        var saida = FalantesDaLegenda.Atribuir(trechos, [D(0, 2.0, "Speaker 1")]);
+
+        Assert.Equal(2, saida.Count);
+    }
 }

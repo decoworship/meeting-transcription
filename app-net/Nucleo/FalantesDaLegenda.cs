@@ -38,10 +38,11 @@ public static class FalantesDaLegenda
         IReadOnlyList<TrechoDaLegenda> trechos,
         IReadOnlyList<SegmentoDeFalante> diarizacao)
     {
-        var saida = new List<TrechoDaLegenda>(trechos.Count);
+        var inteiros = Juntar(trechos);
+        var saida = new List<TrechoDaLegenda>(inteiros.Count);
         string? anterior = null;
 
-        foreach (var t in trechos)
+        foreach (var t in inteiros)
         {
             string? quem;
             if (t.Dono)
@@ -74,5 +75,52 @@ public static class FalantesDaLegenda
         }
 
         return saida;
+    }
+
+    /// <summary>
+    /// Funde os trechos que partem uma palavra ao meio.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Antes de atribuir, e não depois</b>, porque é a atribuição que causa o
+    /// dano: em 18/09/2026 o motor firmou <c>'a Palo'</c> e <c>'ma tem
+    /// Uberlândia'</c>, e a diarização deu falantes diferentes às duas metades
+    /// de "Paloma". Corrigir depois exigiria decidir qual metade estava certa;
+    /// fundir antes faz a pergunta não existir — <b>uma palavra tem um dono
+    /// só</b>.
+    /// </para>
+    /// <para>
+    /// <b>O texto é concatenado sem espaço</b>, que é como ele saiu do motor: os
+    /// dois pedaços são fatias de um mesmo fluxo, e o espaço que não havia entre
+    /// eles é justamente o sinal de que a palavra continua.
+    /// </para>
+    /// <para>
+    /// <b>O intervalo vira a união.</b> Isso engrossa o carimbo pelo tamanho de
+    /// um commit — ~1,1 s de mediana —, e é o preço de não partir a palavra.
+    /// </para>
+    /// </remarks>
+    private static List<TrechoDaLegenda> Juntar(IReadOnlyList<TrechoDaLegenda> trechos)
+    {
+        var juntos = new List<TrechoDaLegenda>(trechos.Count);
+        foreach (var t in trechos)
+        {
+            if (t.Colado && juntos.Count > 0)
+            {
+                var a = juntos[^1];
+                juntos[^1] = new TrechoDaLegenda
+                {
+                    InicioMs = a.InicioMs,
+                    FimMs = Math.Max(a.FimMs, t.FimMs),
+                    // O dono do pedaço maior manda: a palavra inteira é de quem
+                    // falou a maior parte dela.
+                    Dono = (t.FimMs - t.InicioMs) > (a.FimMs - a.InicioMs) ? t.Dono : a.Dono,
+                    Texto = a.Texto + t.Texto,
+                    Colado = a.Colado,
+                };
+                continue;
+            }
+            juntos.Add(t);
+        }
+        return juntos;
     }
 }

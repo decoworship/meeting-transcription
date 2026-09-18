@@ -3,6 +3,14 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc18 — 18/09/2026
+
+**Uma palavra não é mais dividida entre duas pessoas.** O motor da legenda
+confirma o texto aos pedaços, e o corte cai onde ele quiser — às vezes no meio
+de um nome. Quando isso acontecia bem na troca de quem estava falando, "Paloma"
+virava "Palo" de um e "ma" de outro. Agora as duas metades viram uma palavra só,
+de quem falou a maior parte dela, antes de o app decidir quem falou.
+
 ## 0.7.0-rc17 — 18/09/2026
 
 **Agora dá para ver quem falou na legenda.** A separação já rodava e guardava o
