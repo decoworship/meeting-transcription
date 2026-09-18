@@ -111,12 +111,21 @@ linhas), o PLDA (`core/plda.py`, 135) e a binarização (`utils/signal.py`, 375)
 são numpy/scipy puros. É a parte que eu erraria em silêncio se reescrevesse, e
 ela não precisa ser reescrita.
 
-> **Correção de uma afirmação minha, feita ao revisar este documento.** Eu
-> escrevi que o `clustering.py` *"entra sem edição"*. **Não entra:** ele importa
-> `permutate` de `utils/permutation.py`, que tem 28 menções a torch. É o único
-> arquivo caro que sobrou escondido, e ele tem que ser portado junto. Conferir os
-> imports antes de afirmar reaproveitamento é barato; não conferir teria virado
-> uma surpresa no meio da implementação.
+> **Duas correções minhas sobre este ponto, e a segunda desfaz a primeira.**
+>
+> Ao revisar este documento eu vi que o `clustering.py` importa `permutate` de
+> `utils/permutation.py` (275 linhas, 28 menções a torch) e escrevi que ele
+> teria de ser portado junto.
+>
+> **Ao implementar, isso caiu.** O `permutate` aparece **uma vez** no
+> `clustering.py`, na linha 729, e ela está dentro da `OracleClustering` — uma
+> classe de *avaliação*, que compara contra uma anotação de referência que o app
+> nunca tem em produção. A `BaseClustering` não o usa (0 ocorrências), e a
+> `VBxClustering` tampouco. **Removida a `OracleClustering`, o arquivo fica sem
+> torch**, e o `permutation.py` inteiro não precisa ser portado.
+>
+> A lição vale escrita: contar menções a `torch` por arquivo diz o custo máximo,
+> não o custo real. O que decide é **quem chama o quê no caminho de produção**.
 
 As 9 ocorrências de `speaker_diarization.py` são `torch.vstack` e
 `torch.from_numpy` empilhando lotes. O `core/io.py` quase todo é caso geral de
@@ -178,9 +187,13 @@ motores/diarizacao/
     __init__.py
     segmentacao.py          janela deslizante + sessão ONNX + powerset
     embedding.py            fbank em numpy + sessão ONNX
-    permutacao.py           o `permutate`, portado de torch para numpy
-    clustering.py           a cola do VBx — importa vbx.py e plda.py do pyannote
-    anotacao.py             montagem do RTTM
+    diarizacao.py           a cola: apply, reconstruct, contagem de falantes
+    vendor/                 código do pyannote.audio (MIT), copiado e podado
+      __init__.py
+      vbx.py                sem edição
+      plda.py               só os imports
+      signal.py             sem edição
+      clustering.py         sem a OracleClustering
   modelos/
     community-1/
       segmentation/model.onnx      5,6 MB   ← novo, ao lado do .bin

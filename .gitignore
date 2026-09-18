@@ -75,3 +75,4 @@ motores/*/modelos/
 # modelo do pyannote na primeira execução. Versioná-lo poria 25 MB no histórico
 # para guardar algo que um comando reproduz.
 tools/_wespeaker_resnet34.onnx
+__pycache__/
