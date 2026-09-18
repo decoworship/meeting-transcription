@@ -1,6 +1,6 @@
 {
-  "versao": "0.7.0-rc16",
+  "versao": "0.7.0-rc17",
   "publicada": "2026-09-18",
-  "notas": "Conserta a separação de falantes da legenda, que mostrava \"separando falantes…\" para sempre sem nunca começar.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc16"
+  "notas": "A legenda passa a mostrar quem falou, depois que o app separa os falantes — e não some mais da tela enquanto isso acontece.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0-rc17"
 }

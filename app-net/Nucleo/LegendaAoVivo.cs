@@ -560,7 +560,26 @@ public sealed class LegendaAoVivo : IDisposable
     }
 
     /// <summary>O que a legenda deixou numa gravação, ou <c>null</c>.</summary>
+    /// <remarks>
+    /// <b>Tenta três vezes, e não é paranoia.</b> O <see cref="Gravar()"/> usa
+    /// <c>File.WriteAllText</c>, que <b>trunca antes de escrever</b>: uma
+    /// leitura no instante errado pega o arquivo pela metade e o JSON não
+    /// desserializa. Sem repetir, a tela que abre a reunião no momento em que a
+    /// separação de falantes termina vê legenda nenhuma — visto em uso em
+    /// 18/09/2026, com o bloco sumindo da tela enquanto o trabalho rodava.
+    /// </remarks>
     public static LegendaGravada? Ler(string pastaDaGravacao)
+    {
+        for (int tentativa = 0; tentativa < 3; tentativa++)
+        {
+            if (LerUmaVez(pastaDaGravacao) is { } lida) return lida;
+            if (!File.Exists(Path.Combine(pastaDaGravacao, Arquivo))) return null;
+            Thread.Sleep(40);
+        }
+        return LerUmaVez(pastaDaGravacao);
+    }
+
+    private static LegendaGravada? LerUmaVez(string pastaDaGravacao)
     {
         try
         {

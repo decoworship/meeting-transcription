@@ -3,6 +3,17 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.0-rc17 — 18/09/2026
+
+**Agora dá para ver quem falou na legenda.** A separação já rodava e guardava o
+resultado, mas a tela continuava mostrando o rascunho do mesmo jeito de antes —
+só o seu lado contra o dos outros. Cada fala agora traz o nome de quem falou, na
+mesma cor que a revisão usa para aquela pessoa.
+
+**E a legenda não some mais da tela enquanto o app separa os falantes.** Abrir a
+reunião exatamente no instante em que o resultado era gravado fazia o bloco
+inteiro desaparecer, como se não houvesse legenda nenhuma.
+
 ## 0.7.0-rc16 — 18/09/2026
 
 **A separação de falantes não começava.** O aviso "separando falantes…"

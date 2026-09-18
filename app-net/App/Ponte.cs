@@ -509,6 +509,17 @@ internal sealed class TurnoJson
 {
     [JsonPropertyName("dono")] public required bool Dono { get; init; }
     [JsonPropertyName("texto")] public required string Texto { get; init; }
+
+    /// <summary>
+    /// Quem falou, quando a separação já rodou. Nulo até lá.
+    /// </summary>
+    /// <remarks>
+    /// <b>A tela desenha o que a separação produziu, e não os turnos crus.</b>
+    /// O turno agrupa por dono — "você" contra "os outros" — e o falante é mais
+    /// fino que isso: vem dos trechos, que carregam tempo. Quando há falante, a
+    /// fala é agrupada por ele.
+    /// </remarks>
+    [JsonPropertyName("falante")] public string? Falante { get; init; }
 }
 
 /// <summary>Um pedaço da legenda ao vivo, como a tela o recebe.</summary>
@@ -983,15 +994,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // e não entra no lugar dela: serve para conferir, antes de
                 // gastar a placa, se o que foi dito está lá.
                 case "legenda-gravada":
+                    // **Os trechos ganham dos turnos quando existem.** Eles
+                    // carregam falante, e é isso que a separação produziu; os
+                    // turnos são a vista antiga, de antes de haver falante.
                     Responder(new Resposta
                     {
                         Id = p.Id,
                         LegendaFalantes = p.Gravacao is { Length: > 0 } gf
                             ? LegendaAoVivo.Ler(gf)?.FalantesProntos : null,
                         LegendaGravada = p.Gravacao is { Length: > 0 } g
-                            ? LegendaAoVivo.Ler(g)?.Turnos.Select(t => new TurnoJson
-                            { Dono = t.Dono, Texto = t.Texto }).ToList()
-                            : null,
+                            ? FalasDaLegenda(LegendaAoVivo.Ler(g)) : null,
                     });
                     break;
 
@@ -1747,6 +1759,47 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             EmpurrarTranscricoes();
         });
+    }
+
+    /// <summary>
+    /// A legenda gravada como a tela a desenha: falas agrupadas.
+    /// </summary>
+    /// <remarks>
+    /// <b>Agrupa por falante quando ele existe, e por dono quando não.</b> Sem
+    /// isto a tela mostraria 91 linhas de um segundo cada — a granularidade do
+    /// trecho é a do commit do motor, e serve à diarização, não aos olhos.
+    /// <para>
+    /// Os turnos crus ficam de reserva para a legenda gravada antes do
+    /// <c>VIVO-1</c>, que não tem trecho nenhum.
+    /// </para>
+    /// </remarks>
+    private static List<TurnoJson>? FalasDaLegenda(LegendaGravada? legenda)
+    {
+        if (legenda is null) return null;
+        if (legenda.Trechos.Count == 0)
+            return [.. legenda.Turnos.Select(t => new TurnoJson
+            {
+                Dono = t.Dono, Texto = t.Texto,
+            })];
+
+        var falas = new List<TurnoJson>();
+        foreach (var t in legenda.Trechos)
+        {
+            // Quebra quando muda quem fala. Sem falante, o dono é o critério —
+            // que é exatamente o que o turno sempre foi.
+            bool mesmo = falas.Count > 0
+                         && falas[^1].Falante == t.Falante
+                         && falas[^1].Dono == t.Dono;
+            if (mesmo)
+                falas[^1] = new TurnoJson
+                {
+                    Dono = t.Dono, Falante = t.Falante,
+                    Texto = falas[^1].Texto + " " + t.Texto,
+                };
+            else
+                falas.Add(new TurnoJson { Dono = t.Dono, Falante = t.Falante, Texto = t.Texto });
+        }
+        return falas;
     }
 
     /// <summary>

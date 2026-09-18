@@ -649,6 +649,15 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 /* A legenda que ainda vai ganhar falantes. Ao lado do título, e não no corpo:
  * é estado do bloco, não conteúdo dele. */
+/* Quem falou, na legenda já separada. Acima do texto e na cor do falante — a
+ * mesma paleta da revisão, para a mesma pessoa não trocar de cor entre telas. */
+.fala__falante {
+  display: block;
+  margin-bottom: 2px;
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+}
+
 .legenda-gravada__pendente {
   margin-left: var(--espaco-2);
   font-size: var(--texto-pequeno);
