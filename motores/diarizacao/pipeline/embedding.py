@@ -1,6 +1,31 @@
 # motores/diarizacao/pipeline/embedding.py  (primeira parte; o resto é a Tarefa 4)
 """O vetor de voz sem torch: fbank em numpy, ResNet em ONNX, pooling em numpy."""
+import math
+from pathlib import Path
+
 import numpy as np
+from einops import rearrange
+
+from fbank import banco_mel, fbank_centrado
+from fbank import JANELA as JANELA_FBANK
+from sessao import abrir
+
+TAXA = 16000
+DIMENSAO = 256
+LOTE = 32
+
+#: o mínimo de amostras de onda que o codificador aceita sem erro — **não**
+#: é `duration` do modelo (5 s), como uma primeira leitura sugere. É o
+#: mesmo `min_num_samples` que o `PyannoteAudioPretrainedSpeakerEmbedding`
+#: do pyannote acha por busca binária (medido: 400 amostras, 25 ms), e o
+#: motivo é o fbank: com menos que `JANELA_FBANK` amostras (400, a janela
+#: de 25 ms do Kaldi em `fbank.py`), `fbank()` produz zero quadros e tudo
+#: depois quebra. Usar 5 s aqui (a duração da JANELA do modelo, não o
+#: mínimo real) fazia o limiar de "máscara limpa suficiente" ficar ~150x
+#: maior que o do pyannote, e trocava a máscara escolhida (limpa vs. suja)
+#: em boa parte das janelas — medido: 37 de 153 pares (janela, falante)
+#: com diferença > 1e-2 antes desta correção, zero depois.
+MIN_AMOSTRAS_EMBEDDING = JANELA_FBANK
 
 
 def estatisticas_ponderadas(quadros: np.ndarray, pesos: np.ndarray) -> np.ndarray:
@@ -39,3 +64,73 @@ def estatisticas_ponderadas(quadros: np.ndarray, pesos: np.ndarray) -> np.ndarra
     v2 = np.square(w).sum(axis=2)
     var = (dx2 * w).sum(axis=2) / (v1 - v2 / v1 + 1e-8)
     return np.concatenate([media, np.sqrt(var)], axis=1).astype(np.float32)
+
+
+class Extrator:
+    """O vetor de voz de cada par (janela, falante).
+
+    **A máscara é o ponto.** Cada janela de 10 s tem até 3 falantes locais, e o
+    vetor de cada um sai do MESMO áudio com uma máscara por quadro diferente.
+    É por isso que o pooling é ponderado, e é por isso que o modelo foi partido
+    em dois na exportação (docs/DIARIZACAO-ONNX.md, a correção do §3).
+    """
+
+    def __init__(self, dir_embedding, preferir_gpu: bool = True):
+        d = Path(dir_embedding)
+        self.cod, self.provedor = abrir(d / "codificador.onnx", preferir_gpu)
+        self.cab, _ = abrir(d / "cabeca.onnx", preferir_gpu)
+        mel = d / "mel.npy"
+        self.mel = np.load(mel) if mel.exists() else banco_mel()
+
+    def __call__(self, onda, segmentacao_binaria, excluir_sobreposicao=True):
+        dados = segmentacao_binaria.data              # (n_jan, n_quadros, 3)
+        n_jan, n_quadros, n_falantes = dados.shape
+        janela = segmentacao_binaria.sliding_window
+
+        if excluir_sobreposicao:
+            # o mínimo de quadros que o codificador exige, convertido do
+            # mínimo de amostras (MIN_AMOSTRAS_EMBEDDING) para a grade de
+            # quadros da segmentação
+            n_amostras = janela.duration * TAXA
+            min_quadros = math.ceil(n_quadros * MIN_AMOSTRAS_EMBEDDING / n_amostras)
+            limpos = 1.0 * (np.sum(dados, axis=2, keepdims=True) < 2)
+            limpa = dados * limpos
+        else:
+            min_quadros = -1
+            limpa = dados
+
+        n = int(janela.duration * TAXA)
+        ondas, mascaras = [], []
+        for j in range(n_jan):
+            a = int(j * janela.step * TAXA)
+            pedaco = onda[a:a + n]
+            if len(pedaco) < n:                       # mode="pad"
+                pedaco = np.pad(pedaco, (0, n - len(pedaco)))
+            for f in range(n_falantes):
+                m_suja = np.nan_to_num(dados[j, :, f], nan=0.0).astype(np.float32)
+                m_limpa = np.nan_to_num(limpa[j, :, f], nan=0.0).astype(np.float32)
+                ondas.append(pedaco)
+                mascaras.append(m_limpa if m_limpa.sum() > min_quadros else m_suja)
+
+        saidas = []
+        for i in range(0, len(ondas), LOTE):
+            lote_onda = ondas[i:i + LOTE]
+            lote_masc = np.stack(mascaras[i:i + LOTE])
+            fb = np.concatenate([fbank_centrado(o, self.mel) for o in lote_onda])
+            quadros = self.cod.run(None, {"fbank": fb.astype(np.float32)})[0]
+            stats = estatisticas_ponderadas(quadros, lote_masc)
+            saidas.append(self.cab.run(None, {"estatisticas": stats})[0])
+
+        vetores = np.vstack(saidas)
+        # Divergência do brief: NÃO forçamos NaN aqui. Medido contra
+        # `SpeakerDiarization.get_embeddings` (60 s reais): quando um
+        # falante não fala na janela, a máscara é toda zero, mas o `_pool`
+        # do pyannote (o mesmo formato que `estatisticas_ponderadas`
+        # implementa, com os dois `1e-8`) não produz NaN nesse caso — produz
+        # média 0 e desvio 0 de forma finita, porque o denominador nunca
+        # zera. O `get_embeddings` do pyannote em si também não insere NaN
+        # em lugar nenhum (conferido lendo o código-fonte instalado). Um
+        # `vazias → NaN` manual aqui inventaria NaN onde o gabarito não tem
+        # nenhum: no teste de 60 s, `esperado` tem zero NaN no total.
+
+        return rearrange(vetores, "(c s) d -> c s d", c=n_jan)
