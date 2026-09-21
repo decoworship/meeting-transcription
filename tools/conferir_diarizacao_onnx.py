@@ -130,20 +130,24 @@ def grade(trechos: list[dict], duracao: float, passo: float = 0.01) -> np.ndarra
     return g
 
 
-def acordo(esperado: list[dict], obtido: list[dict], duracao: float) -> float:
-    """A fração do tempo falado em que os dois concordam, com rótulos casados.
+def _casar_falantes(
+    esperado: list[dict], obtido: list[dict], duracao: float, passo: float = 0.01
+) -> tuple[np.ndarray, np.ndarray]:
+    """As duas grades, com os rótulos do obtido casados aos do esperado.
 
     O casamento é húngaro: o SPEAKER_00 do ONNX não é necessariamente o
     SPEAKER_00 do torch, e comparar rótulo com rótulo reprovaria um porte
-    correto.
+    correto. É a única implementação do casamento — `acordo` e
+    `acordo_so_falado_do_gabarito` são duas contas diferentes sobre o mesmo
+    par de grades, não duas formas de casar.
     """
     from scipy.optimize import linear_sum_assignment
 
-    ge, go = grade(esperado, duracao), grade(obtido, duracao)
+    ge, go = grade(esperado, duracao, passo), grade(obtido, duracao, passo)
     re_ = sorted({x for x in ge if x})
     ro = sorted({x for x in go if x})
     if not re_ or not ro:
-        return 0.0
+        return ge, go
     custo = np.zeros((len(re_), len(ro)))
     for i, a in enumerate(re_):
         for j, b in enumerate(ro):
@@ -151,8 +155,41 @@ def acordo(esperado: list[dict], obtido: list[dict], duracao: float) -> float:
     li, lj = linear_sum_assignment(custo)
     mapa = {ro[j]: re_[i] for i, j in zip(li, lj)}
     go_map = np.array([mapa.get(x, x) for x in go], dtype=object)
-    falado = ge != ""
+    return ge, go_map
+
+
+def acordo(esperado: list[dict], obtido: list[dict], duracao: float) -> float:
+    """A fração do tempo falado, **união**, em que os dois concordam.
+
+    A união, e não só o que o gabarito chama de fala. Comparar apenas sobre
+    `ge != ""` mede o que o obtido **deixa de ouvir** e é cego ao que ele ouve
+    a mais: um pipeline que carimbasse um falante sobre o silêncio do gabarito
+    ainda marcaria 1,0000. Com a união, cada quadro em que só um dos dois diz
+    "alguém fala" conta como discordância — que é o que ele é. (Corrigido em
+    3d9cee0 para o test_diarizacao.py; esta cópia tinha ficado com a conta
+    antiga, cega ao alarme falso — ver docs/DIARIZACAO-ONNX.md.)
+    """
+    ge, go_map = _casar_falantes(esperado, obtido, duracao)
+    falado = (ge != "") | (go_map != "")
+    if not falado.any():
+        return 0.0
     return float(np.sum((ge == go_map) & falado) / np.sum(falado))
+
+
+def acordo_so_falado_do_gabarito(
+    esperado: list[dict], obtido: list[dict], duracao: float
+) -> float:
+    """A mesma conta, só sobre o que o gabarito chama de fala.
+
+    É o número antigo — cego ao alarme falso — mantido só para comparação: a
+    diferença entre ele e `acordo` é quanto o obtido ouviu a mais que o
+    gabarito.
+    """
+    ge, go_map = _casar_falantes(esperado, obtido, duracao)
+    so_gabarito = ge != ""
+    if not so_gabarito.any():
+        return 0.0
+    return float(np.sum((ge == go_map) & so_gabarito) / np.sum(so_gabarito))
 
 
 def falantes_do_gemini(caminho: Path) -> dict[str, tuple[int, int]]:

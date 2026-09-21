@@ -213,10 +213,13 @@ saem do mesmo arquivo e o `tools/empacotar_modelos_de_diarizacao.sh` já sabe
 montar a pasta.
 
 **As duas implementações convivem atrás de uma chave**, `motor_de_diarizacao`
-no `app.json`, com `"torch"` como padrão até a régua fechar. Um `app.json` com
-valor desconhecido cai no padrão **em silêncio**, pela mesma razão que o
-`MotorAceito` do MOSS sobreviveu com um valor só: recusar a diarização por causa
-de uma chave é pior que ignorá-la.
+na requisição do sidecar (`escolher_motor` em `motor.py`), com `"torch"` como
+padrão até a régua fechar. Um valor desconhecido cai no padrão **em
+silêncio**, pela mesma razão que o `MotorAceito` do MOSS sobreviveu com um
+valor só: recusar a diarização por causa de uma chave é pior que ignorá-la.
+**Ela ainda não está ligada ao núcleo**: a chave existe só dentro do sidecar
+hoje — `grep -r motor_de_diarizacao` não encontra nada em `.cs`, `app.json`
+ou `web/` — e não vive "no `app.json`" até o C# passá-la adiante.
 
 ### O que o porte preserva por construção
 
@@ -343,6 +346,33 @@ critério de saída para começar a limpeza está, hoje, satisfeito pelo número
 medido — mas a decisão de começar a limpeza continua sendo do dono do
 produto, e este documento não a toma (ver "O que este plano NÃO faz, de
 propósito", no fim do plano de implementação).
+
+**Um risco em aberto: nenhum número desta seção rodou no runtime que o app usa.**
+V1, V2 e V3 rodaram todos no venv de desenvolvimento (WSL), não no Python
+embarcado que o instalador entrega. Medido em 21/09/2026:
+
+| | venv de dev (onde V1/V2/V3 rodaram) | Python embarcado (o que é distribuído) |
+|---|---|---|
+| Python | 3.13.12 | 3.12 |
+| onnxruntime | 1.23.2 | 1.29.0 |
+| numpy | 2.2.6 | 2.5.2 |
+| scikit-learn | 1.8.0 | 1.9.0 |
+| provedor CUDA | ausente | ausente |
+| SO | Linux/WSL | Windows |
+
+Recorrer a V1 no Python embarcado é o item mais barato desta lista que ainda
+pode mudar a resposta — ~15 min, sem precisar de torch, com os artefatos já
+na pasta do modelo instalado. **Este plano deliberadamente deixou isso fora
+do escopo** (a medição foi restrita ao venv do WSL), e por isso fica escrito
+aqui: é o risco mais barato que continua aberto antes de aprovar a remoção do
+torch.
+
+Uma segunda consequência da mesma tabela: o onnxruntime embarcado é
+**CPU-only**. No runtime de destino, o motor onnx roda sempre em CPU,
+enquanto o torch tem CUDA — então, dos números da tabela de V2 acima, os
+2566 s da gravação de 48,5 min são a figura que uma pessoa realmente
+experimentaria, não uma comparação teórica entre dois caminhos igualmente
+disponíveis.
 
 ---
 

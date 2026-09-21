@@ -1,4 +1,3 @@
-# motores/diarizacao/pipeline/embedding.py  (primeira parte; o resto é a Tarefa 4)
 """O vetor de voz sem torch: fbank em numpy, ResNet em ONNX, pooling em numpy."""
 import math
 from pathlib import Path
@@ -93,7 +92,18 @@ class Extrator:
         self.cod, self.provedor = abrir(d / "codificador.onnx", preferir_gpu)
         self.cab, _ = abrir(d / "cabeca.onnx", preferir_gpu)
         mel = d / "mel.npy"
-        self.mel = np.load(mel) if mel.exists() else banco_mel()
+        if not mel.exists():
+            # NUNCA cair para banco_mel() aqui: ela importa torchaudio e
+            # torch (fbank.py), e este é o caminho de produção que existe
+            # para não carregar torch. `mel.npy` é gerado uma vez por
+            # tools/exportar_diarizacao_onnx.py e guardado ao lado dos
+            # outros três artefatos onnx — banco_mel() é como o exportador
+            # constrói essa tabela, não um substituto em tempo de execução.
+            raise RuntimeError(
+                f"{mel} não existe. Rode tools/exportar_diarizacao_onnx.py "
+                "para gerar os artefatos onnx completos."
+            )
+        self.mel = np.load(mel)
 
     def __call__(self, onda, segmentacao_binaria, excluir_sobreposicao=True):
         dados = segmentacao_binaria.data              # (n_jan, n_quadros, 3)

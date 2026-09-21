@@ -36,7 +36,11 @@ def test_embeddings_batem_com_o_get_embeddings_do_pyannote():
         onda, binaria, excluir_sobreposicao=True)
 
     assert obtido.shape == esperado.shape, (obtido.shape, esperado.shape)
-    # NaN aparece onde o falante não fala na janela, e tem de aparecer nos dois
+    # Zero NaN nos dois lados — nem o pyannote nem o Extrator inserem NaN
+    # quando o falante não fala na janela; os dois produzem média/desvio 0 de
+    # forma finita (ver embedding.py, o comentário no fim de `Extrator.__call__`).
+    # A comparação continua explícita, e não um `assert not obtido.any-nan`,
+    # porque é a igualdade dos dois lados que a régua mede, não um fato isolado.
     assert np.array_equal(np.isnan(obtido), np.isnan(esperado))
     ok = ~np.isnan(obtido)
     assert np.abs(obtido[ok] - esperado[ok]).max() < 1e-2

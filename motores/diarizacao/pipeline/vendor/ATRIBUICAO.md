@@ -1,11 +1,29 @@
 # Código vendorizado
 
 Estes arquivos **não são deste projeto**. São do `pyannote.audio`, copiados em
-18/09/2026 da versão **4.0.7**, sob a licença **MIT**.
+18/09/2026 da versão **4.0.7**. Cinco são **MIT**; `vbx.py` é **Apache-2.0** —
+são licenças diferentes, com obrigações diferentes, e cada arquivo carrega a
+sua própria no cabeçalho.
 
+## Os cinco MIT
+
+- arquivos: `diarizacao_utils.py`, `clustering.py`, `agregacao.py`,
+  `signal.py`, `plda.py`
 - autoria: Hervé Bredin e colaboradores (CNRS, pyannoteAI)
 - origem: https://github.com/pyannote/pyannote-audio
 - licença: MIT — o texto viaja no cabeçalho de cada arquivo
+
+## `vbx.py` — Apache-2.0
+
+- linhagem: BUT Speech@FIT / VBx (Lukáš Burget, Pavel Pálka), com uma
+  atualização de assinatura de Hervé Bredin ao entrar no pyannote.audio —
+  ver o "Revision History" no cabeçalho do arquivo
+- origem imediata (copiado deste caminho): `pyannote/audio/utils/vbx.py`, na
+  mesma versão 4.0.7
+- origem original: https://github.com/BUTSpeechFIT/VBx
+- licença: Apache License 2.0 — o texto completo viaja no cabeçalho do
+  arquivo; redistribuir é permitido, mas as obrigações (aviso de mudanças,
+  licença de patente) são diferentes das do MIT dos outros cinco
 
 ## Por que foram copiados
 

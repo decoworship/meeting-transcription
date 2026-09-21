@@ -90,16 +90,29 @@ def _pipeline_local(nome: str = PADRAO) -> str | None:
 
 
 def _modelo_onnx_local(nome: str = PADRAO) -> str | None:
-    """A pasta do modelo onnx embarcado, ou ``None`` quando ele não está lá.
+    """A pasta do modelo onnx embarcado, ou ``None`` quando algum dos quatro
+    artefatos não está lá.
 
     É a mesma pasta que o pipeline torch usa (``modelos/<nome>``) — os dois
     formatos vivem lado a lado, como o docs/DIARIZACAO-ONNX.md §4 desenha.
+
+    Os quatro são o que ``tools/exportar_diarizacao_onnx.py`` produz, e os
+    quatro são exigidos: faltar só o ``mel.npy`` não impede o pipeline de
+    carregar, porque ``Extrator`` cairia para ``banco_mel()`` — que importa
+    torch e torchaudio (``fbank.py``) e derrotaria em silêncio o motivo de o
+    motor onnx existir. Conferir os quatro aqui, antes de entrar no caminho
+    onnx, é o que torna esse import impossível.
     """
     if not nome or os.path.basename(nome) != nome or nome in (".", ".."):
         return None
     pasta = os.path.join(_LOCAIS, nome)
-    onnx = os.path.join(pasta, "segmentation", "model.onnx")
-    return pasta if os.path.isfile(onnx) else None
+    artefatos = (
+        os.path.join(pasta, "segmentation", "model.onnx"),
+        os.path.join(pasta, "embedding", "codificador.onnx"),
+        os.path.join(pasta, "embedding", "cabeca.onnx"),
+        os.path.join(pasta, "embedding", "mel.npy"),
+    )
+    return pasta if all(os.path.isfile(a) for a in artefatos) else None
 
 
 def _voz_local() -> str | None:
@@ -198,19 +211,31 @@ class Pipeline:
         pasta = _modelo_onnx_local(modelo)
         if pasta is None:
             raise RuntimeError(
-                f"o modelo onnx {modelo!r} não está em {_LOCAIS}. Rode "
-                "tools/empacotar_modelos_de_diarizacao.sh."
+                f"o modelo onnx {modelo!r} não está completo em {_LOCAIS} "
+                "(faltam segmentation/model.onnx, embedding/codificador.onnx, "
+                "embedding/cabeca.onnx ou embedding/mel.npy). Rode "
+                "tools/exportar_diarizacao_onnx.py."
             )
         # pipeline/ tem imports próprios sem prefixo de pacote
         # (`from segmentacao import ...`), então ele entra no sys.path em vez
         # de ser importado como submódulo de motores.diarizacao.
         pipeline_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
         if pipeline_dir not in sys.path:
-            sys.path.insert(0, pipeline_dir)
+            sys.path.append(pipeline_dir)
         from diarizacao import Diarizador
 
-        self._onnx = Diarizador(pasta, preferir_gpu=True)
-        _log(f"pipeline onnx carregado: {pasta}")
+        # preferir_gpu=False: o motor onnx só foi medido no CPU EP (V1, V2,
+        # V3 — docs/DIARIZACAO-ONNX.md §5.1). O torch desliga TF32 para ser
+        # reprodutível; aqui não existe o equivalente para o CUDA EP do
+        # onnxruntime, e ligar isso sem uma régua sobre ele seria trocar a
+        # matemática medida por uma não medida. O runtime embarcado do app
+        # também não tem provedor CUDA hoje, então isto não custa nada agora
+        # — só evita a armadilha da primeira máquina que instalar
+        # onnxruntime-gpu.
+        self._onnx = Diarizador(pasta, preferir_gpu=False)
+        _log(f"pipeline onnx carregado: {pasta} "
+             f"(segmentação em {self._onnx.seg.provedor}, "
+             f"embedding em {self._onnx.emb.provedor})")
 
     #: Como o modelo de voz se identifica nas amostras guardadas.
     #:

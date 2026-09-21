@@ -72,6 +72,12 @@ na mesma sessão devolveria a saída do primeiro nas duas medições. Um nome co
 separador ou `..` é recusado antes de virar caminho: ele vem de arquivo de
 configuração editável à mão.
 
+`motor_de_diarizacao` também é opcional em `diarizar` — `"torch"` (padrão) ou
+`"onnx"` (docs/DIARIZACAO-ONNX.md), e um valor desconhecido cai no padrão em
+silêncio, como `modelo`. **O núcleo C# ainda não envia este campo**: a chave
+existe hoje só dentro do sidecar (`escolher_motor` em `motores/diarizacao/motor.py`)
+enquanto a régua de saída do porte não fecha.
+
 > **O `modelo` não é o modelo de voz.** O mesmo motor carrega duas coisas: o
 > pipeline que separa falantes, que se escolhe, e o modelo que transforma voz em
 > vetor, que **não** se escolhe — trocá-lo invalidaria toda voz já aprendida,

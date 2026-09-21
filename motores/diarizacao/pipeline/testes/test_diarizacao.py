@@ -19,6 +19,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+#: `acordo`/`_casar_falantes` vivem em tools/conferir_diarizacao_onnx.py — é a
+#: única implementação (F1 da revisão de 21/09/2026): ele gerou o gabarito
+#: desta régua, então os dois têm de medir concordância do mesmo jeito.
+sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "tools"))
 
 RAIZ = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
             "/diarizacao/modelos/community-1")
@@ -27,14 +31,6 @@ WAV = ("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings"
 #: A saída do torch+CUDA medida em 18/09/2026: 404 trechos, 3 falantes.
 #: Gere com: python tools/conferir_diarizacao_onnx.py --gravar-gabarito
 GABARITO = Path(__file__).parent / "gabarito_14min.json"
-
-
-def _grade(trechos, dur, passo=0.01):
-    """Quem fala em cada centésimo de segundo — a grade que a V1 compara."""
-    g = np.full(int(dur / passo), "", dtype=object)
-    for t in trechos:
-        g[int(t["inicio"] / passo):int(t["fim"] / passo)] = t["falante"]
-    return g
 
 
 def test_V1_mesma_decisao_de_falante_em_99_por_cento_do_tempo():
@@ -61,40 +57,26 @@ def test_V1_mesma_decisao_de_falante_em_99_por_cento_do_tempo():
     assert len({t["falante"] for t in obtido}) == len({t["falante"] for t in esperado})
 
     # 2. mesma atribuição em >=99% do tempo falado, com os rótulos casados
-    #    pelo melhor pareamento (SPEAKER_00 do ONNX pode ser o _01 do torch)
-    from scipy.optimize import linear_sum_assignment
-    ge, go = _grade(esperado, dur), _grade(obtido, dur)
-    re_ = sorted({x for x in ge if x})
-    ro = sorted({x for x in go if x})
-    custo = np.zeros((len(re_), len(ro)))
-    for i, a in enumerate(re_):
-        for j, b in enumerate(ro):
-            custo[i, j] = -np.sum((ge == a) & (go == b))
-    li, lj = linear_sum_assignment(custo)
-    mapa = {ro[j]: re_[i] for i, j in zip(li, lj)}
-    go_map = np.array([mapa.get(x, x) for x in go], dtype=object)
-
-    # A UNIÃO, e não só o que o gabarito chama de fala. Comparar apenas sobre
-    # `ge != ""` mede o que o ONNX **deixa de ouvir** e é cego ao que ele ouve
-    # a mais: no gabarito, 672,7 s dos 878,4 s são fala (76,6%), e um pipeline
-    # que carimbasse um falante nos ~205 s de silêncio ainda marcaria 1,0000.
-    # Com a união, cada quadro em que só um dos dois diz "alguém fala" conta
-    # como discordância — que é o que ele é.
-    falado = (ge != "") | (go_map != "")
-    acordo = np.sum((ge == go_map) & falado) / np.sum(falado)
-
+    #    pelo melhor pareamento (SPEAKER_00 do ONNX pode ser o _01 do torch).
+    #    `acordo` é a UNIÃO, e não só o que o gabarito chama de fala: comparar
+    #    apenas sobre o falado do gabarito mede o que o ONNX **deixa de
+    #    ouvir** e é cego ao que ele ouve a mais — no gabarito, 672,7 s dos
+    #    878,4 s são fala (76,6%), e um pipeline que carimbasse um falante nos
+    #    ~205 s de silêncio ainda marcaria 1,0000. Ver a implementação e o
+    #    porquê em tools/conferir_diarizacao_onnx.py.
+    from conferir_diarizacao_onnx import acordo, acordo_so_falado_do_gabarito
+    valor = acordo(esperado, obtido, dur)
     # Só sobre o que o gabarito chama de fala, para o relatório: é o número
     # antigo, e a diferença entre os dois é o alarme falso.
-    so_gabarito = ge != ""
-    acordo_antigo = np.sum((ge == go_map) & so_gabarito) / np.sum(so_gabarito)
+    valor_antigo = acordo_so_falado_do_gabarito(esperado, obtido, dur)
 
     # os números aparecem mesmo quando passa (`pytest -s`): um acordo que cai
     # de 0,999 para 0,991 continua passando, e é assim que se vê a queda antes
     # de ela virar reprovação
     print(f"\nV1: {len(obtido)} trechos × {len(esperado)} do gabarito, "
-          f"acordo (união) {acordo:.4f}, "
-          f"acordo (só o falado do gabarito) {acordo_antigo:.4f}")
-    assert acordo >= 0.99, f"acordo de apenas {acordo:.4f}"
+          f"acordo (união) {valor:.4f}, "
+          f"acordo (só o falado do gabarito) {valor_antigo:.4f}")
+    assert valor >= 0.99, f"acordo de apenas {valor:.4f}"
 
     # 3. e a mesma fragmentação. Duas saídas podem concordar sobre quem fala em
     #    cada quadro e ainda assim partir a linha do tempo de formas muito
