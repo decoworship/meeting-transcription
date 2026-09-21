@@ -289,6 +289,63 @@ cópia simplesmente deixa de existir** — e é a maior delas que sai.
 
 ---
 
+## 5.1 — as réguas, medidas
+
+Medido em 21/09/2026. A tabela do §5 dizia o que se pretendia medir; esta
+seção diz o que se mediu. As quatro fecharam.
+
+**V1 — o RTTM da gravação de 14,6 min, contra a saída torch+CUDA de
+18/09/2026.** Acordo **1,0000**, nos dois cálculos: só sobre o falado do
+gabarito, e sobre a união que inclui os ~205 s de silêncio. 404 trechos × 404,
+3 falantes × 3. O segundo número é o que importa mais: ele diz que o ONNX
+também não carimba falante onde o torch não ouve ninguém. 836 s em CPU.
+
+**V2 — as quatro gravações do acervo com `gemini.md`.** Acordo **1,0000 nas
+quatro**, contagem de trechos idêntica e tempo por falante idêntico ao décimo
+de segundo entre torch e onnx. Contagem de falantes contra o Gemini, igual nas
+quatro, nos dois motores.
+
+| gravação | duração | trechos | falantes | torch | onnx |
+|---|---:|---:|---:|---:|---:|
+| 2026-08-21_11-00-33 | 7,7 min | 137 | 6 | 270 s | 703 s |
+| 2026-08-25_08-59-22 | 14,6 min | 404 | 3 | 170 s | 684 s |
+| 2026-08-20_15-59-20 | 32,1 min | 889 | 3 | 652 s | 1500 s |
+| 2026-08-27_15-28-37 | 48,5 min | 805 | 3 | 1433 s | 2566 s |
+
+**Os tempos desta tabela não são comparáveis entre si.** O torch rodou em
+**CUDA** e o ONNX em **CPU** — o usuário recusou instalar o `onnxruntime-gpu`
+(Ruling C5 do pré-voo), e o `sessao.py` avisou a queda para CPU no stderr em
+cada execução. Ler 170 s contra 684 s como "o porte é 4x mais lento" é uma
+leitura enganada pela tabela: os dois lados não estão na mesma pista. A única
+comparação de velocidade honesta que este porte tem é a da V3 abaixo, onde os
+dois lados rodam em CPU — e lá quem ganha é o ONNX.
+
+**V3 — as decisões de voz, 49 vozes, 1176 pares.** **0 discordâncias** nos
+três limiares 0,55 · 0,60 · 0,70. Cosseno mínimo torch × ONNX
+**0,999999992** (mediano 0,999999999984), maior diferença **2,19e-05**.
+Velocidade sobre 2664 s de áudio, os dois lados em CPU: torch 573,42 s (4,6x o
+tempo real), numpy+onnx 206,64 s (12,9x) — o ONNX é 2,8x mais rápido nesta
+comparação, que é justa porque ninguém está em GPU.
+
+Esta é a régua que decide se o banco de vozes precisa ser re-extraído — era o
+item que o plano marcava como "pare e leve ao dono do produto" se desse
+diferente. **Deu zero, e o banco não precisa ser re-extraído.**
+
+**V4 — a suíte do C#.** **626 passed**, e o número importa menos que o fato
+por trás dele: este branch **não toca um único arquivo `.cs`**. O `628` que o
+brief e o `CLAUDE.md` citam está desatualizado em relação à base deste branch
+— conferido por `git stash` e por `git diff --name-only main...HEAD` (Tarefa
+7). Não é regressão: é a mesma régua do `C0`, na forma mais forte possível —
+nenhum teste C# mudou porque nenhum arquivo C# mudou.
+
+**As quatro réguas fecharam. Nenhuma reprovou.** O que o §5 pedia como
+critério de saída para começar a limpeza está, hoje, satisfeito pelo número
+medido — mas a decisão de começar a limpeza continua sendo do dono do
+produto, e este documento não a toma (ver "O que este plano NÃO faz, de
+propósito", no fim do plano de implementação).
+
+---
+
 ## 6. O que este porte NÃO resolve
 
 **A CUDA fica, e o bloqueio é o `large-v3`.** O `faster-whisper` roda em
