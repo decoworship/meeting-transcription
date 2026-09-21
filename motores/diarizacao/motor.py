@@ -56,6 +56,22 @@ _LOCAIS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "modelos")
 #: O pipeline usado quando ninguém pede outro.
 PADRAO = "community-1"
 
+#: Os motores de diarização aceitos. O `torch` é o pyannote como sempre foi; o
+#: `onnx` é o porte de 18/09/2026 (docs/DIARIZACAO-ONNX.md).
+MOTORES = ("torch", "onnx")
+PADRAO_DE_MOTOR = "torch"
+
+
+def escolher_motor(valor: str | None) -> str:
+    """O motor pedido, ou o padrão — **nunca um erro**.
+
+    Um `app.json` com valor desconhecido cai no padrão em silêncio. Recusar a
+    diarização por causa de uma chave é pior que ignorá-la: a pessoa perde a
+    separação de falantes de uma reunião que já aconteceu. É a mesma decisão
+    do `MotorAceito` quando o MOSS saiu.
+    """
+    return valor if valor in MOTORES else PADRAO_DE_MOTOR
+
 
 def _pipeline_local(nome: str = PADRAO) -> str | None:
     """A pasta de um pipeline embarcado, ou ``None`` quando ele não está lá.
@@ -71,6 +87,19 @@ def _pipeline_local(nome: str = PADRAO) -> str | None:
         return None
     pasta = os.path.join(_LOCAIS, nome)
     return pasta if os.path.isfile(os.path.join(pasta, "config.yaml")) else None
+
+
+def _modelo_onnx_local(nome: str = PADRAO) -> str | None:
+    """A pasta do modelo onnx embarcado, ou ``None`` quando ele não está lá.
+
+    É a mesma pasta que o pipeline torch usa (``modelos/<nome>``) — os dois
+    formatos vivem lado a lado, como o docs/DIARIZACAO-ONNX.md §4 desenha.
+    """
+    if not nome or os.path.basename(nome) != nome or nome in (".", ".."):
+        return None
+    pasta = os.path.join(_LOCAIS, nome)
+    onnx = os.path.join(pasta, "segmentation", "model.onnx")
+    return pasta if os.path.isfile(onnx) else None
 
 
 def _voz_local() -> str | None:
@@ -93,24 +122,44 @@ class Pipeline:
 
     def __init__(self) -> None:
         self._pipeline = None
+        self._onnx = None
         self._modelo = None
+        self._motor = None
         self._voz = None
         self.dispositivo = "?"
 
-    def carregar(self, id_req: int, modelo: str | None = None) -> None:
+    def _carregado(self) -> bool:
+        return self._pipeline is not None or self._onnx is not None
+
+    def carregar(self, id_req: int, modelo: str | None = None,
+                 motor: str = PADRAO_DE_MOTOR) -> None:
         modelo = modelo or PADRAO
 
-        # Trocar de modelo recarrega. Manter o pipeline quente é o que faz a
-        # segunda reunião não pagar o carregamento de novo, e a comparação entre
-        # dois modelos na mesma sessão devolveria a saída do primeiro nas duas
-        # medições — errada, e calada.
-        if self._pipeline is not None and self._modelo == modelo:
+        # Duas dimensões decidem se recarrega agora: o modelo (community-1,
+        # ...) e o motor (torch, onnx). Manter o pipeline quente é o que faz
+        # a segunda reunião não pagar o carregamento de novo — e um motor
+        # parado respondendo por outro é exatamente a classe de bug que este
+        # porte já produziu três vezes, então as duas dimensões têm de bater
+        # juntas para pular o recarregamento.
+        if self._motor == motor and self._modelo == modelo and self._carregado():
             return
-        if self._pipeline is not None:
-            _log(f"trocando o pipeline de {self._modelo} para {modelo}")
-            self._pipeline = None
+        if self._carregado():
+            _log(f"trocando de motor={self._motor}/modelo={self._modelo} "
+                 f"para motor={motor}/modelo={modelo}")
+        self._pipeline = None
+        self._onnx = None
 
         _enviar(id=id_req, tipo="progresso", pct=0.0, texto="carregando o modelo")
+
+        if motor == "onnx":
+            self._carregar_onnx(modelo)
+        else:
+            self._carregar_torch(modelo)
+
+        self._modelo = modelo
+        self._motor = motor
+
+    def _carregar_torch(self, modelo: str) -> None:
         from pyannote.audio import Pipeline as PyannotePipeline
         import torch
 
@@ -138,10 +187,30 @@ class Pipeline:
             repo = PIPELINE_DE_DIARIZACAO if modelo == PADRAO else modelo
             _log(f"pipeline do HuggingFace: {repo}")
             self._pipeline = PyannotePipeline.from_pretrained(repo, token=token)
-        self._modelo = modelo
         self.dispositivo = "cuda" if torch.cuda.is_available() else "cpu"
         self._pipeline.to(torch.device(self.dispositivo))
         _log(f"pipeline carregado em {self.dispositivo}")
+
+    def _carregar_onnx(self, modelo: str) -> None:
+        # NUNCA importa torch neste caminho — é o ponto inteiro do porte
+        # (docs/DIARIZACAO-ONNX.md): carregar 4,5 GB de torch para não usá-los
+        # derrotaria a razão de a chave existir.
+        pasta = _modelo_onnx_local(modelo)
+        if pasta is None:
+            raise RuntimeError(
+                f"o modelo onnx {modelo!r} não está em {_LOCAIS}. Rode "
+                "tools/empacotar_modelos_de_diarizacao.sh."
+            )
+        # pipeline/ tem imports próprios sem prefixo de pacote
+        # (`from segmentacao import ...`), então ele entra no sys.path em vez
+        # de ser importado como submódulo de motores.diarizacao.
+        pipeline_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
+        if pipeline_dir not in sys.path:
+            sys.path.insert(0, pipeline_dir)
+        from diarizacao import Diarizador
+
+        self._onnx = Diarizador(pasta, preferir_gpu=True)
+        _log(f"pipeline onnx carregado: {pasta}")
 
     #: Como o modelo de voz se identifica nas amostras guardadas.
     #:
@@ -202,10 +271,17 @@ class Pipeline:
         vetor = self._voz({"waveform": junto, "sample_rate": taxa})
         return np.asarray(vetor).astype(float).ravel().tolist()
 
-    def diarizar(self, caminho: str, id_req: int,
-                 modelo: str | None = None) -> list[dict]:
-        self.carregar(id_req, modelo)
+    def diarizar(self, caminho: str, id_req: int, modelo: str | None = None,
+                 motor: str | None = None) -> list[dict]:
+        motor = escolher_motor(motor)
+        self.carregar(id_req, modelo, motor)
         _enviar(id=id_req, tipo="progresso", pct=0.3, texto="analisando falantes")
+
+        if motor == "onnx":
+            onda, taxa = self._ler_onda(caminho)
+            # Mesma forma que o caminho torch abaixo — list[dict] com
+            # inicio/fim/falante — por construção do Diarizador (T6).
+            return self._onnx(onda, taxa)
 
         saida = self._pipeline(self._ler_wav(caminho))
         # O pyannote 3.1+ devolve um objeto com a anotação dentro; versões
@@ -249,6 +325,31 @@ class Pipeline:
         # (canal, tempo), que é a forma que o pyannote espera.
         return {"waveform": torch.from_numpy(sinal).unsqueeze(0), "sample_rate": taxa}
 
+    @staticmethod
+    def _ler_onda(caminho: str) -> tuple:
+        """O mesmo áudio que `_ler_wav` lê, mas em numpy puro — sem torch.
+
+        O `Diarizador` (T6) recebe onda + taxa, não o dict torch que o
+        caminho pyannote espera. Duplica a leitura de `_ler_wav` em vez de
+        chamá-la porque `_ler_wav` importa torch incondicionalmente, e
+        importar torch no caminho onnx derrotaria o porte inteiro
+        (docs/DIARIZACAO-ONNX.md).
+        """
+        import numpy as np
+        import wave
+
+        with wave.open(caminho, "rb") as w:
+            if w.getsampwidth() != 2 or w.getnchannels() != 1:
+                raise RuntimeError(
+                    f"esperado WAV mono de 16 bits, veio {w.getnchannels()} canais "
+                    f"de {8 * w.getsampwidth()} bits"
+                )
+            taxa = w.getframerate()
+            bruto = w.readframes(w.getnframes())
+
+        sinal = np.frombuffer(bruto, dtype=np.int16).astype(np.float32) / 32768.0
+        return sinal, taxa
+
 
 def main() -> int:
     pipeline = Pipeline()
@@ -282,7 +383,8 @@ def main() -> int:
                 _enviar(id=id_req, tipo="resultado", vetor=vetor,
                         modelo=pipeline.modelo_de_voz())
             else:
-                segmentos = pipeline.diarizar(caminho, id_req, req.get("modelo"))
+                segmentos = pipeline.diarizar(caminho, id_req, req.get("modelo"),
+                                              req.get("motor_de_diarizacao"))
                 _enviar(id=id_req, tipo="resultado", segmentos=segmentos)
 
         except Exception as e:
