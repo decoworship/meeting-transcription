@@ -24,6 +24,8 @@ Copiar é a única forma de usar estes arquivos sem o pacote que os contém.
 | `signal.py` | **nenhuma** |
 | `plda.py` | só imports: `vbx_setup` vem do arquivo ao lado, e o ramo do HuggingFace virou erro — aqui o checkpoint é sempre pasta em disco |
 | `clustering.py` | removida a `OracleClustering`, que era a única usuária de `permutate` e `oracle_segmentation` (ambos com torch); imports de `PLDA` e `cluster_vbx` apontam para os arquivos ao lado; `AudioFile` era anotação de tipo vinda de `core/io.py` |
+| `diarizacao_utils.py` | só imports: `trim` e `aggregate` vêm do `agregacao.py` ao lado (e perderam o prefixo `Inference.`), `Binarize` vem do `signal.py` ao lado, e o `DiarizationErrorRate` desceu para dentro do `optimal_mapping` |
+| `agregacao.py` | **é um recorte**: só os `@staticmethod` `trim` e `aggregate` do `core/inference.py`, virados função de módulo. O resto do arquivo é a maquinaria de inferência em torch, que o `segmentacao.py` substitui |
 
 **A matemática não foi tocada.** O VBx, o PLDA e a binarização estão como
 estavam — é por isso que a régua `V1` pode exigir a mesma decisão de falante.

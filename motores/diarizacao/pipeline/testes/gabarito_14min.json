@@ -1,0 +1,2027 @@
+{
+ "gravacao": "2026-08-25_08-59-22",
+ "audio": "/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings/2026-08-25_08-59-22/mix.wav",
+ "motor": "torch",
+ "trechos": [
+  {
+   "inicio": 2.7815937500000003,
+   "fim": 4.148468750000001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 4.35096875,
+   "fim": 5.127218750000001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 7.67534375,
+   "fim": 8.114093750000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 8.114093750000002,
+   "fim": 8.181593750000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 8.586593750000002,
+   "fim": 8.62034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 8.62034375,
+   "fim": 8.654093750000001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 8.654093750000001,
+   "fim": 9.025343750000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 9.025343750000001,
+   "fim": 9.29534375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 9.29534375,
+   "fim": 9.31221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 9.98721875,
+   "fim": 10.03784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 10.03784375,
+   "fim": 10.594718750000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 10.594718750000002,
+   "fim": 10.61159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 12.73784375,
+   "fim": 12.754718750000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 12.754718750000002,
+   "fim": 12.974093750000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 12.974093750000002,
+   "fim": 13.024718750000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 13.024718750000002,
+   "fim": 14.00346875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 14.374718750000003,
+   "fim": 14.745968750000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 15.25221875,
+   "fim": 16.51784375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 17.42909375,
+   "fim": 20.23034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 20.83784375,
+   "fim": 21.83346875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 21.52971875,
+   "fim": 21.88409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 21.88409375,
+   "fim": 22.609718750000003,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 22.609718750000003,
+   "fim": 22.660343750000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 22.660343750000003,
+   "fim": 22.67721875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 22.99784375,
+   "fim": 23.01471875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 23.01471875,
+   "fim": 24.63471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 25.20846875,
+   "fim": 25.54596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 25.242218750000003,
+   "fim": 26.035343750000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 26.035343750000003,
+   "fim": 27.97596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 27.97596875,
+   "fim": 28.02659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 28.02659375,
+   "fim": 28.39784375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 29.039093750000003,
+   "fim": 30.22034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 30.22034375,
+   "fim": 30.23721875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 30.91221875,
+   "fim": 31.75596875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 32.24534375,
+   "fim": 32.27909375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 32.27909375,
+   "fim": 33.96659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 34.72596875,
+   "fim": 35.384093750000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 35.95784375,
+   "fim": 37.814093750000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 38.05034375,
+   "fim": 38.657843750000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 39.55221875,
+   "fim": 40.26096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 40.75034375,
+   "fim": 41.627843750000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 40.868468750000005,
+   "fim": 46.150343750000005,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 44.580968750000004,
+   "fim": 44.91846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 46.62284375,
+   "fim": 49.37346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 48.664718750000006,
+   "fim": 49.05284375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 49.66034375,
+   "fim": 52.275968750000004,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 52.799093750000004,
+   "fim": 53.47409375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 54.60471875,
+   "fim": 57.60846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 59.329718750000005,
+   "fim": 60.915968750000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 62.19846875,
+   "fim": 63.008468750000006,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 64.99971875,
+   "fim": 65.96159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 67.59846875000001,
+   "fim": 68.72909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 69.94409375000001,
+   "fim": 72.40784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 73.79159375,
+   "fim": 76.91346875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 78.76971875000001,
+   "fim": 79.76534375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 79.93409375,
+   "fim": 82.38096875000001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 83.17409375000001,
+   "fim": 85.94159375000001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 86.31284375,
+   "fim": 87.07221875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 87.78096875,
+   "fim": 90.29534375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 90.61596875000001,
+   "fim": 93.43409375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 94.96971875000001,
+   "fim": 96.72471875000001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 99.12096875,
+   "fim": 100.65659375000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 102.15846875000001,
+   "fim": 103.17096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 104.82471875,
+   "fim": 106.57971875000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 108.85784375,
+   "fim": 111.38909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 112.03034375,
+   "fim": 113.09346875000001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 113.92034375,
+   "fim": 114.22409375000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 115.45596875000001,
+   "fim": 118.40909375000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 119.18534375,
+   "fim": 121.73346875000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 122.20596875000001,
+   "fim": 122.98221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 127.33596875,
+   "fim": 127.70721875000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 129.66471875000002,
+   "fim": 130.72784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 131.31846875000002,
+   "fim": 135.19971875000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 136.02659375000002,
+   "fim": 138.42284375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 140.11034375,
+   "fim": 143.01284375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 143.28284375,
+   "fim": 146.05034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 146.57346875000002,
+   "fim": 147.24846875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 146.75909375,
+   "fim": 150.69096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 151.01159375,
+   "fim": 156.04034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 156.71534375000002,
+   "fim": 160.73159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 161.37284375000002,
+   "fim": 166.99221875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 167.73471875,
+   "fim": 169.27034375000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 170.87346875,
+   "fim": 177.16784375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 177.77534375000002,
+   "fim": 181.13346875000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 181.87596875,
+   "fim": 183.04034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 183.41159375,
+   "fim": 185.14971875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 186.60096875000002,
+   "fim": 187.46159375000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 188.28846875000002,
+   "fim": 189.80721875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 190.26284375,
+   "fim": 191.49471875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 192.32159375,
+   "fim": 195.20721875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 195.93284375000002,
+   "fim": 196.11846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 196.11846875,
+   "fim": 197.97471875000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 197.97471875000002,
+   "fim": 198.58221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 198.58221875,
+   "fim": 198.97034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 198.97034375,
+   "fim": 199.20659375000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 199.20659375000002,
+   "fim": 199.96596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 199.32471875000002,
+   "fim": 199.76346875000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 199.96596875,
+   "fim": 200.03346875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 200.84346875,
+   "fim": 201.31596875000002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 200.96159375000002,
+   "fim": 205.23096875000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 204.64034375,
+   "fim": 213.75284375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 214.25909375,
+   "fim": 216.41909375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 216.94221875000002,
+   "fim": 221.58284375000002,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 221.86971875,
+   "fim": 225.02534375000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 225.53159375,
+   "fim": 226.29096875000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 226.57784375000003,
+   "fim": 228.43409375000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 229.17659375000002,
+   "fim": 230.83034375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 231.52221875,
+   "fim": 235.67346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 235.87596875000003,
+   "fim": 237.71534375000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 237.98534375000003,
+   "fim": 238.03596875000002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 238.10346875000002,
+   "fim": 240.11159375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 240.53346875000003,
+   "fim": 243.28409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 243.90846875000003,
+   "fim": 244.97159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 244.98846875,
+   "fim": 246.18659375000001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 246.79409375,
+   "fim": 247.06409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 247.82346875000002,
+   "fim": 248.44784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 249.56159375000001,
+   "fim": 255.68721875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 256.34534375000004,
+   "fim": 263.24721875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 263.56784375,
+   "fim": 264.52971875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 265.64346875,
+   "fim": 271.34721875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 271.97159375,
+   "fim": 273.16971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 273.57471875000005,
+   "fim": 275.90346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 276.35909375,
+   "fim": 277.89471875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 279.29534375000003,
+   "fim": 279.49784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 279.49784375,
+   "fim": 279.51471875000004,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 279.51471875000004,
+   "fim": 279.54846875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 279.54846875000004,
+   "fim": 279.56534375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 279.56534375,
+   "fim": 280.03784375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 279.58221875000004,
+   "fim": 280.20659375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 280.22346875,
+   "fim": 286.90596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 287.27721875000003,
+   "fim": 291.27659375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 292.28909375,
+   "fim": 292.96409375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 293.48721875,
+   "fim": 295.84971875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 296.45721875000004,
+   "fim": 297.19971875000005,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 297.77346875,
+   "fim": 300.49034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 300.49034375,
+   "fim": 300.54096875000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 301.63784375,
+   "fim": 309.78846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 306.71721875000003,
+   "fim": 308.52284375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 310.75034375,
+   "fim": 315.54284375000003,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 316.53846875,
+   "fim": 317.60159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 317.87159375000005,
+   "fim": 323.25471875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 324.21659375,
+   "fim": 336.36659375000005,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 337.17659375,
+   "fim": 337.54784375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 337.54784375,
+   "fim": 337.91909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 337.93596875000003,
+   "fim": 338.44221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 339.04971875,
+   "fim": 339.89346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 340.36596875000004,
+   "fim": 340.97346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 341.19284375,
+   "fim": 342.71159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 343.11659375000005,
+   "fim": 344.78721875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 343.35284375000003,
+   "fim": 343.50471875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 345.32721875000004,
+   "fim": 345.61409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 345.69846875,
+   "fim": 348.82034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 349.14096875,
+   "fim": 350.15346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 350.60909375,
+   "fim": 352.46534375000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 353.10659375,
+   "fim": 357.59534375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 357.96659375,
+   "fim": 359.09721875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 360.09284375000004,
+   "fim": 360.81846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 361.20659375,
+   "fim": 363.09659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 363.51846875,
+   "fim": 365.88096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 366.52221875000004,
+   "fim": 371.90534375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 369.42471875,
+   "fim": 369.49221875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 371.11221875,
+   "fim": 377.23784375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 378.11534375,
+   "fim": 381.45659375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 381.97971875,
+   "fim": 383.70096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 385.15221875000003,
+   "fim": 385.47284375000004,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 385.47284375000004,
+   "fim": 385.48971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 385.82721875000004,
+   "fim": 388.22346875000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 390.16409375,
+   "fim": 391.56471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 391.71659375,
+   "fim": 392.40846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 392.79659375,
+   "fim": 396.98159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 397.79159375,
+   "fim": 398.60159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 398.73659375000005,
+   "fim": 401.09909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 401.41971875,
+   "fim": 402.24659375000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 403.15784375000004,
+   "fim": 406.31346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 407.47784375000003,
+   "fim": 410.83596875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 410.21159375,
+   "fim": 410.24534375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 410.24534375,
+   "fim": 410.29596875000004,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 410.29596875000004,
+   "fim": 410.71784375000004,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 412.25346875,
+   "fim": 414.21096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 414.76784375000005,
+   "fim": 415.35846875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 415.81409375000004,
+   "fim": 417.61971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 418.24409375000005,
+   "fim": 419.86409375000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 421.01159375000003,
+   "fim": 424.74096875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 425.16284375000004,
+   "fim": 426.79971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 427.15409375,
+   "fim": 430.15784375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 430.39409375,
+   "fim": 430.88346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 431.81159375000004,
+   "fim": 433.41471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 433.70159375000003,
+   "fim": 434.41034375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 434.61284375,
+   "fim": 437.75159375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 438.02159375,
+   "fim": 438.91596875000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 439.27034375000005,
+   "fim": 439.87784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 440.65409375,
+   "fim": 442.94909375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 443.50596875,
+   "fim": 444.02909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 444.53534375000004,
+   "fim": 450.54284375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 450.76221875000005,
+   "fim": 452.60159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 453.14159375,
+   "fim": 453.47909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 453.47909375,
+   "fim": 453.90096875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 455.40284375000005,
+   "fim": 456.49971875000006,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 456.83721875000003,
+   "fim": 457.95096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 458.65971875,
+   "fim": 459.87471875000006,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 460.73534375,
+   "fim": 461.22471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 461.74784375,
+   "fim": 462.52409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 463.57034375,
+   "fim": 464.22846875000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 464.65034375000005,
+   "fim": 465.44346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 465.78096875000006,
+   "fim": 470.40471875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 471.01221875000005,
+   "fim": 471.95721875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 472.27784375000005,
+   "fim": 473.44221875000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 473.81346875,
+   "fim": 474.55596875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 475.06221875000006,
+   "fim": 475.46721875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 475.73721875,
+   "fim": 476.42909375000005,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 477.00284375,
+   "fim": 478.28534375000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 479.50034375,
+   "fim": 483.44909375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 484.19159375000004,
+   "fim": 487.97159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 488.91659375,
+   "fim": 492.34221875000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 493.01721875000004,
+   "fim": 496.07159375000003,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 496.42596875000004,
+   "fim": 497.35409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 498.38346875,
+   "fim": 500.52659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 501.26909375,
+   "fim": 502.02846875000006,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 503.31096875000003,
+   "fim": 505.69034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 505.55534375,
+   "fim": 509.63909375000003,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 509.25096875,
+   "fim": 509.92596875000004,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 510.41534375000003,
+   "fim": 511.63034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 511.07346875,
+   "fim": 516.0178437500001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 516.8953437499999,
+   "fim": 517.67159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 517.0134687500001,
+   "fim": 518.51534375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 519.6797187500001,
+   "fim": 521.41784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 521.83971875,
+   "fim": 522.1772187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 522.24471875,
+   "fim": 522.73409375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 522.83534375,
+   "fim": 522.86909375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 523.12221875,
+   "fim": 523.8647187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 524.10096875,
+   "fim": 526.04159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 526.88534375,
+   "fim": 527.59409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 528.18471875,
+   "fim": 528.58971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 528.77534375,
+   "fim": 531.6609687499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 531.82971875,
+   "fim": 532.4878437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 532.9097187500001,
+   "fim": 533.7197187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 533.83784375,
+   "fim": 534.96846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 535.60971875,
+   "fim": 537.7022187499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 538.15784375,
+   "fim": 539.9297187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 540.1997187500001,
+   "fim": 543.5915937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 543.8615937500001,
+   "fim": 544.4015937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 545.0090937500001,
+   "fim": 545.5490937500001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 545.5490937500001,
+   "fim": 545.5659687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 546.19034375,
+   "fim": 546.20721875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 546.20721875,
+   "fim": 547.03409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 547.8272187499999,
+   "fim": 548.73846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 549.85221875,
+   "fim": 552.2990937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 552.53534375,
+   "fim": 555.5559687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 555.9778437500001,
+   "fim": 556.9397187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 557.69909375,
+   "fim": 561.09096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 562.1540937500001,
+   "fim": 563.33534375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 563.5378437500001,
+   "fim": 564.02721875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 564.5503437500001,
+   "fim": 565.05659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 565.46159375,
+   "fim": 566.1028437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 566.8959687500001,
+   "fim": 567.70596875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 568.3134687500001,
+   "fim": 573.4265937499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 574.2197187500001,
+   "fim": 574.7934687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 575.4853437500001,
+   "fim": 576.43034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 577.4597187500001,
+   "fim": 578.2022187499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 580.8178437500001,
+   "fim": 581.9990937499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 582.31971875,
+   "fim": 582.3872187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 582.3872187500001,
+   "fim": 583.0790937500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 583.41659375,
+   "fim": 596.24159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 595.95471875,
+   "fim": 597.67596875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 596.83221875,
+   "fim": 598.0134687500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 598.08096875,
+   "fim": 600.91596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 598.4184687500001,
+   "fim": 598.90784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 601.2365937500001,
+   "fim": 603.3459687500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 603.83534375,
+   "fim": 607.2609687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 607.53096875,
+   "fim": 613.80846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 614.50034375,
+   "fim": 616.4409687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 616.93034375,
+   "fim": 620.60909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 621.01409375,
+   "fim": 622.9040937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 623.4609687500001,
+   "fim": 624.5747187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 625.8572187500001,
+   "fim": 626.65034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 627.2578437500001,
+   "fim": 628.15221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 628.45596875,
+   "fim": 629.8059687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 630.0759687500001,
+   "fim": 631.0547187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 631.66221875,
+   "fim": 635.1553437499999,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 635.9653437500001,
+   "fim": 636.4040937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 636.89346875,
+   "fim": 637.14659375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 637.14659375,
+   "fim": 638.4965937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 639.12096875,
+   "fim": 639.67784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 640.2178437499999,
+   "fim": 641.6184687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 643.10346875,
+   "fim": 647.5078437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 648.6215937500001,
+   "fim": 649.6172187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 650.78159375,
+   "fim": 651.54096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 651.81096875,
+   "fim": 655.03409375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 655.74284375,
+   "fim": 659.64096875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 660.23159375,
+   "fim": 662.1384687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 662.30721875,
+   "fim": 663.3872187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 663.7078437499999,
+   "fim": 665.6315937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 665.6653437500001,
+   "fim": 667.52159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 667.9097187500001,
+   "fim": 668.92221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 670.79534375,
+   "fim": 672.4153437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 673.3940937500001,
+   "fim": 673.9340937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 674.59221875,
+   "fim": 676.0265937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 676.54971875,
+   "fim": 678.9797187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 679.6884687500001,
+   "fim": 681.35909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 681.46034375,
+   "fim": 682.7765937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 683.1140937499999,
+   "fim": 683.6372187500001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 684.31221875,
+   "fim": 687.11346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 685.7803437500002,
+   "fim": 686.35409375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 687.50159375,
+   "fim": 688.7165937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 689.5772187500002,
+   "fim": 690.7922187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 691.5009687500001,
+   "fim": 691.75409375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 691.9734687499999,
+   "fim": 692.32784375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 692.9015937500001,
+   "fim": 693.69471875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 694.3022187500001,
+   "fim": 694.84221875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 695.41596875,
+   "fim": 697.60971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 698.45346875,
+   "fim": 700.8159687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 701.86221875,
+   "fim": 703.7522187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 704.1572187500001,
+   "fim": 705.20346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 705.7097187500001,
+   "fim": 705.7434687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 705.7434687500001,
+   "fim": 705.96284375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 705.96284375,
+   "fim": 706.1653437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 706.5872187500001,
+   "fim": 707.1440937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 707.61659375,
+   "fim": 710.70471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 711.14346875,
+   "fim": 711.95346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 712.15596875,
+   "fim": 712.7465937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 713.11784375,
+   "fim": 716.79659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 717.45471875,
+   "fim": 718.0959687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 718.3490937500001,
+   "fim": 730.1953437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 730.8872187500001,
+   "fim": 731.52846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 732.0347187500001,
+   "fim": 732.3215937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 732.49034375,
+   "fim": 733.9753437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 734.65034375,
+   "fim": 736.43909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 737.45159375,
+   "fim": 738.5147187500002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 739.24034375,
+   "fim": 739.94909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 741.48471875,
+   "fim": 742.5478437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 743.4084687500001,
+   "fim": 745.29846875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 745.6528437500001,
+   "fim": 749.4665937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 750.12471875,
+   "fim": 751.9809687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 752.7065937500001,
+   "fim": 754.5122187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 756.13221875,
+   "fim": 758.91659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 759.7434687500001,
+   "fim": 760.1315937500001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 761.49846875,
+   "fim": 764.43471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 766.08846875,
+   "fim": 768.40034375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 769.8178437500001,
+   "fim": 770.61096875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 771.6740937500001,
+   "fim": 775.0322187500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 775.65659375,
+   "fim": 776.63534375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 775.7409687500001,
+   "fim": 776.66909375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 776.66909375,
+   "fim": 776.68596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 776.68596875,
+   "fim": 776.7197187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 777.25971875,
+   "fim": 777.3103437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 777.3103437500001,
+   "fim": 777.3272187500002,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 777.3272187500002,
+   "fim": 780.49971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 779.75721875,
+   "fim": 780.19596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 780.73596875,
+   "fim": 780.8203437500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 780.8203437500001,
+   "fim": 781.1072187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 781.76534375,
+   "fim": 785.93346875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 787.0134687500001,
+   "fim": 797.0034687500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 797.76284375,
+   "fim": 801.4753437500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 798.15096875,
+   "fim": 798.2859687500002,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 801.98159375,
+   "fim": 805.5590937500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 806.0147187500002,
+   "fim": 807.04409375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 807.76971875,
+   "fim": 808.88346875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 809.98034375,
+   "fim": 810.97596875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 811.9040937500001,
+   "fim": 815.4309687500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 816.1059687500001,
+   "fim": 818.13096875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 818.9409687500001,
+   "fim": 820.81409375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 822.4509687500001,
+   "fim": 822.77159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 822.51846875,
+   "fim": 822.90659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 824.50971875,
+   "fim": 825.72471875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 824.77971875,
+   "fim": 825.5222187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 826.2478437500001,
+   "fim": 827.46284375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 827.46284375,
+   "fim": 829.3190937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 827.58096875,
+   "fim": 830.07846875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 830.1797187500001,
+   "fim": 830.1965937500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 830.1965937500001,
+   "fim": 830.97284375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 830.97284375,
+   "fim": 831.05721875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 831.05721875,
+   "fim": 831.79971875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 831.79971875,
+   "fim": 832.3059687500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 832.3059687500001,
+   "fim": 832.32284375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 832.32284375,
+   "fim": 832.33971875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 832.33971875,
+   "fim": 832.35659375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 832.35659375,
+   "fim": 832.49159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 833.2678437500001,
+   "fim": 833.3015937500002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 833.3015937500002,
+   "fim": 833.31846875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 833.31846875,
+   "fim": 836.0522187500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 836.3897187500002,
+   "fim": 842.3803437500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 836.44034375,
+   "fim": 838.3640937500002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 845.31659375,
+   "fim": 846.7847187500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 845.82284375,
+   "fim": 845.9578437500002,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 845.9578437500002,
+   "fim": 846.0759687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 846.0759687500001,
+   "fim": 846.0928437500002,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 846.0928437500002,
+   "fim": 846.5990937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 846.7847187500001,
+   "fim": 846.83534375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 846.83534375,
+   "fim": 849.23159375,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 850.34534375,
+   "fim": 857.55096875,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 858.12471875,
+   "fim": 858.68159375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 859.1203437500001,
+   "fim": 859.8290937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 860.7234687500002,
+   "fim": 863.42346875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 864.5034687500001,
+   "fim": 864.87471875,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 865.41471875,
+   "fim": 866.8659687500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 867.3047187500001,
+   "fim": 867.9965937500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 868.48596875,
+   "fim": 868.8403437500001,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 868.7390937500002,
+   "fim": 869.19471875,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 868.8572187500001,
+   "fim": 868.8740937500002,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 870.2747187500001,
+   "fim": 871.00034375,
+   "falante": "SPEAKER_01"
+  },
+  {
+   "inicio": 871.8103437500001,
+   "fim": 874.57784375,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 874.57784375,
+   "fim": 874.7297187500001,
+   "falante": "SPEAKER_00"
+  },
+  {
+   "inicio": 874.7297187500001,
+   "fim": 874.8984687500001,
+   "falante": "SPEAKER_02"
+  },
+  {
+   "inicio": 876.92346875,
+   "fim": 876.9909687500001,
+   "falante": "SPEAKER_01"
+  }
+ ]
+}
