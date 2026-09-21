@@ -19,6 +19,15 @@ TAXA = 16000
 JANELA, PASSO = 10.0, 1.0
 LOTE = 32
 
+#: forma esperada da saída do ONNX por janela: 589 quadros, 7 classes
+#: powerset (combinações de até 2 entre 3 falantes locais). Conferida antes
+#: do argmax — um `.onnx` velho ou mal exportado com outra contagem de
+#: classes indexaria `MAPA_POWERSET` fora da linha certa (ou estouraria)
+#: sem levantar exceção nenhuma até aqui.
+QUADROS_SEG = 589
+CLASSES_POWERSET = 7
+FALANTES_LOCAIS = 3
+
 #: powerset → multirrótulo, `(7, 3)`. Extraído do `Powerset(3, 2).mapping` em
 #: 18/09/2026. A ordem importa: é ela que diz qual classe é "1 e 2 juntos".
 MAPA_POWERSET = np.array([
@@ -45,11 +54,25 @@ class Segmentador:
 
         # `mode="pad"`: a última janela é completada com zeros em vez de
         # descartada. Descartá-la perderia até 10 s do fim da reunião.
+        #
+        # O início dela é o próximo passo natural (`inicios[-1] + passo`),
+        # **não** `len(onda) - n`. O `Inference.slide` do pyannote não
+        # desliza a última janela para terminar exatamente no fim do áudio —
+        # ele mantém o passo regular e completa com zeros o que sobra depois
+        # da última janela cheia. Alinhar pelo fim, em vez disso, desalinha
+        # os quadros da janela final com o gabarito (medido: só a última
+        # janela diverge, com diferença até 1.0 nos rótulos).
         if len(onda) < n:
             onda = np.pad(onda, (0, n - len(onda)))
         inicios = list(range(0, max(1, len(onda) - n + 1), passo))
         if inicios[-1] + n < len(onda):
-            inicios.append(len(onda) - n)
+            inicios.append(inicios[-1] + passo)
+
+        # a última janela pode ir além do fim do áudio agora que o início
+        # dela segue o passo regular em vez do fim; o resto é zero.
+        fim = inicios[-1] + n
+        if fim > len(onda):
+            onda = np.pad(onda, (0, fim - len(onda)))
 
         janelas = np.stack([onda[i:i + n] for i in inicios])[:, None, :]
 
@@ -58,6 +81,14 @@ class Segmentador:
             saidas.append(self.sessao.run(
                 None, {"audio": janelas[i:i + LOTE].astype(np.float32)})[0])
         powerset = np.concatenate(saidas)      # (n_janelas, 589, 7)
+
+        if powerset.shape[1:] != (QUADROS_SEG, CLASSES_POWERSET):
+            raise ValueError(
+                f"saída do ONNX na forma errada: esperado (*, {QUADROS_SEG}, "
+                f"{CLASSES_POWERSET}), veio {powerset.shape} — modelo trocado "
+                f"ou exportado com outra contagem de classes/quadros"
+            )
+        assert MAPA_POWERSET.shape == (CLASSES_POWERSET, FALANTES_LOCAIS)
 
         # argmax sobre as 7 classes, depois a matriz: é o que o
         # `Powerset.to_multilabel` faz quando o modelo já é powerset.
