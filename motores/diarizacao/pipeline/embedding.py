@@ -11,6 +11,10 @@ from fbank import JANELA as JANELA_FBANK
 from sessao import abrir
 
 TAXA = 16000
+#: a largura do vetor que `cabeca.onnx` devolve por (janela, falante) — não
+#: usada em nenhuma conta aqui (a forma real vem do ONNX), é a documentação
+#: do contrato de saída que a Tarefa 6 (e quem mais consumir `Extrator`)
+#: pode citar sem abrir o `.onnx`.
 DIMENSAO = 256
 LOTE = 32
 
@@ -25,6 +29,15 @@ LOTE = 32
 #: maior que o do pyannote, e trocava a máscara escolhida (limpa vs. suja)
 #: em boa parte das janelas — medido: 37 de 153 pares (janela, falante)
 #: com diferença > 1e-2 antes desta correção, zero depois.
+#:
+#: **Se o modelo de embedding for trocado, remeça esta constante.** Ela é o
+#: `min_num_samples` do modelo de embedding — hoje coincide com
+#: `JANELA_FBANK` porque o gargalo é o fbank, não o modelo, mas isso é uma
+#: coincidência deste modelo, não uma garantia geral. Para medir de novo:
+#: instancie o pipeline do pyannote com o modelo novo e leia
+#: `pipe._embedding.min_num_samples` (a busca binária está em
+#: `PyannoteAudioPretrainedSpeakerEmbedding.min_num_samples`, em
+#: `pyannote/audio/pipelines/speaker_verification.py`).
 MIN_AMOSTRAS_EMBEDDING = JANELA_FBANK
 
 
@@ -102,6 +115,18 @@ class Extrator:
         n = int(janela.duration * TAXA)
         ondas, mascaras = [], []
         for j in range(n_jan):
+            # `a = j * passo` assume que TODAS as janelas seguem o mesmo
+            # passo regular, inclusive a última — reconstruímos o áudio a
+            # partir só do índice `j`, sem olhar onde a janela realmente
+            # começa. Isso só é verdade porque a Tarefa 4 (`e4bb503`, "a
+            # janela final segue o passo, não o fim do áudio") corrigiu o
+            # `Segmentador` para nunca alinhar a última janela pelo fim do
+            # áudio. Se o `Segmentador` voltar a fazer isso, ou se algum
+            # chamador passar uma `SlidingWindowFeature` montada à mão com
+            # passo irregular, esta linha fatia o trecho de áudio errado
+            # para a última janela — o mesmo tipo de contaminação silenciosa
+            # que a máscara (acima) e o NaN (abaixo) existem para evitar,
+            # só que na fatia de áudio em vez da máscara.
             a = int(j * janela.step * TAXA)
             pedaco = onda[a:a + n]
             if len(pedaco) < n:                       # mode="pad"
