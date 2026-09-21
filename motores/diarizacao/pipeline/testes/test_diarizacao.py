@@ -11,6 +11,7 @@ inteira (14,6 min). Encurtar o áudio para o teste ficar rápido é justamente
 desligar a régua.
 """
 import json
+import subprocess
 import sys
 import wave
 from pathlib import Path
@@ -37,18 +38,20 @@ def _grade(trechos, dur, passo=0.01):
 
 
 def test_V1_mesma_decisao_de_falante_em_99_por_cento_do_tempo():
-    # antes de tudo: os outros testes desta pasta importam torch de
-    # propósito (é contra ele que eles medem), e a ordem em que o pytest
-    # os roda não é garantia nenhuma. O que se afirma aqui é que **este**
-    # caminho não importa torch, e isso é a diferença entre antes e depois.
-    tinha_torch = "torch" in sys.modules
-
     from diarizacao import Diarizador
 
+    # As mesmas conferências que o `ler_wav` do
+    # `tools/conferir_diarizacao_onnx.py` faz — ele é quem gerou o gabarito, e
+    # os dois têm de ler o arquivo do mesmo jeito. Hoje o `mix.wav` é mono 16
+    # bits; se um dia ele vier estéreo, o gerador faria o downmix e esta régua
+    # compararia dois áudios diferentes sem dizer nada.
     with wave.open(WAV, "rb") as w:
-        taxa = w.getframerate()
+        assert w.getsampwidth() == 2, f"{WAV} não é PCM 16 bits"
+        taxa, canais = w.getframerate(), w.getnchannels()
         q = w.readframes(w.getnframes())
     onda = np.frombuffer(q, np.int16).astype(np.float32) / 32768.0
+    if canais > 1:                                   # mono="downmix"
+        onda = onda.reshape(-1, canais).mean(axis=1)
     dur = len(onda) / taxa
 
     esperado = json.loads(GABARITO.read_text(encoding="utf-8"))["trechos"]
@@ -71,14 +74,64 @@ def test_V1_mesma_decisao_de_falante_em_99_por_cento_do_tempo():
     mapa = {ro[j]: re_[i] for i, j in zip(li, lj)}
     go_map = np.array([mapa.get(x, x) for x in go], dtype=object)
 
-    falado = ge != ""
+    # A UNIÃO, e não só o que o gabarito chama de fala. Comparar apenas sobre
+    # `ge != ""` mede o que o ONNX **deixa de ouvir** e é cego ao que ele ouve
+    # a mais: no gabarito, 672,7 s dos 878,4 s são fala (76,6%), e um pipeline
+    # que carimbasse um falante nos ~205 s de silêncio ainda marcaria 1,0000.
+    # Com a união, cada quadro em que só um dos dois diz "alguém fala" conta
+    # como discordância — que é o que ele é.
+    falado = (ge != "") | (go_map != "")
     acordo = np.sum((ge == go_map) & falado) / np.sum(falado)
-    # o número aparece mesmo quando passa (`pytest -s`): um acordo que cai de
-    # 0,999 para 0,991 continua passando, e é assim que se vê a queda antes de
-    # ela virar reprovação
+
+    # Só sobre o que o gabarito chama de fala, para o relatório: é o número
+    # antigo, e a diferença entre os dois é o alarme falso.
+    so_gabarito = ge != ""
+    acordo_antigo = np.sum((ge == go_map) & so_gabarito) / np.sum(so_gabarito)
+
+    # os números aparecem mesmo quando passa (`pytest -s`): um acordo que cai
+    # de 0,999 para 0,991 continua passando, e é assim que se vê a queda antes
+    # de ela virar reprovação
     print(f"\nV1: {len(obtido)} trechos × {len(esperado)} do gabarito, "
-          f"acordo {acordo:.4f}")
+          f"acordo (união) {acordo:.4f}, "
+          f"acordo (só o falado do gabarito) {acordo_antigo:.4f}")
     assert acordo >= 0.99, f"acordo de apenas {acordo:.4f}"
 
-    # 3. e nada de torch no caminho — é o ponto inteiro do porte
-    assert ("torch" in sys.modules) == tinha_torch
+    # 3. e a mesma fragmentação. Duas saídas podem concordar sobre quem fala em
+    #    cada quadro e ainda assim partir a linha do tempo de formas muito
+    #    diferentes — e é a contagem de trechos que revela isso, porque nenhum
+    #    quadro individual revela.
+    #
+    #    A folga é de 10%: o gabarito tem 404 trechos, e uma diferença dentro
+    #    de ~40 é o que a granularidade do `Binarize` pode produzir entre duas
+    #    implementações que decidem o mesmo. Acima disso a reconstrução está
+    #    agrupando de outro jeito, e isso é notícia mesmo com o acordo alto.
+    folga = 0.1 * len(esperado)
+    assert abs(len(obtido) - len(esperado)) <= folga, (
+        f"{len(obtido)} trechos contra {len(esperado)} do gabarito — "
+        f"a fragmentação mudou mais que os {folga:.0f} de folga"
+    )
+
+
+def test_o_Diarizador_nao_importa_torch():
+    """Em interpretador limpo, porque só ali a resposta é determinística.
+
+    Ler `sys.modules` dentro da suíte não serve: os outros testes desta pasta
+    importam torch de propósito (é contra ele que eles medem), e basta um deles
+    rodar antes para a conferência passar a valer nada. A ordem alfabética
+    salva hoje, e ordem alfabética não é garantia — `pytest -k`, um arquivo
+    passado à mão ou uma rodada do repositório inteiro já a desfazem.
+
+    Um processo novo não tem essa dúvida: se `diarizacao.py` importar torch,
+    direta ou indiretamente, ele aparece.
+    """
+    codigo = (
+        "import sys; "
+        f"sys.path.insert(0, {str(Path(__file__).resolve().parents[1])!r}); "
+        "import diarizacao; "
+        "print('torch' in sys.modules)"
+    )
+    saida = subprocess.run([sys.executable, "-c", codigo],
+                           capture_output=True, text=True, check=True)
+    assert saida.stdout.strip() == "False", (
+        f"importar `diarizacao` puxou torch: {saida.stdout!r} {saida.stderr!r}"
+    )

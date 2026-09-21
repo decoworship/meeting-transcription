@@ -251,9 +251,13 @@ def conferir(args) -> int:
     if args.contra_gemini:
         arquivo = pasta / "gemini.md"
         if not arquivo.exists():
+            # e não `return 1`: a comparação com o Gemini é opcional, e os
+            # motores já rodaram e já imprimiram. Só quatro das gravações têm
+            # `gemini.md`, e uma rodada boa não vira rodada falha por causa de
+            # um arquivo que ninguém prometeu.
             print(f"\n{arquivo} não existe — sem comparação com o Gemini",
                   file=sys.stderr)
-            return 1
+            return 0
         deles = falantes_do_gemini(arquivo)
         total = sum(n for n, _ in deles.values()) or 1
         # Um turno só é um título em negrito do resumo, não uma pessoa
