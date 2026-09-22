@@ -43,10 +43,10 @@ internal static class Pipeline
         var transcritor = new Transcritor(motores);
 
         // Não é argumento de linha de comando: lida do mesmo app.json que o app
-        // usa, para o dono do produto testar o motor_de_diarizacao (torch ou
-        // onnx, docs/DIARIZACAO-ONNX.md) editando a chave e rodando de novo,
-        // sem precisar de mais uma flag. A mesma leitura de ModeloDeAta, dois
-        // parâmetros abaixo.
+        // usa, sem precisar de mais uma flag. A mesma leitura de ModeloDeAta,
+        // dois parâmetros abaixo. O motor_de_diarizacao tem um valor só desde
+        // 22/09/2026 (docs/DIARIZACAO-ONNX.md) — a leitura fica porque a chave
+        // fica, e quem tem "torch" escrito cai no padrão em silêncio.
         var cfg = ConfiguracoesDoApp.Carregar();
 
         var resultado = await transcritor.ExecutarAsync(

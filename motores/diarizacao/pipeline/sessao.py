@@ -62,16 +62,19 @@ def _preparar_path_cuda_windows() -> None:
     candidatas = [capi]
     if motores is not None:
         candidatas.append(motores / "ata" / "bin")
-        candidatas.append(
-            motores / "python" / "Lib" / "site-packages" / "ctranslate2"
-        )
-        # Transitório: cufft64_11.dll e as sublibs do cuDNN só existem hoje
-        # dentro de torch/lib (docs/DIARIZACAO-ONNX.md §5.2, achado de
-        # 22/09/2026). Quando o torch sair, essas DLLs precisam vir de outro
-        # lugar, ou o CUDA EP volta a cair para CPU em silêncio.
-        candidatas.append(
-            motores / "python" / "Lib" / "site-packages" / "torch" / "lib"
-        )
+        site = motores / "python" / "Lib" / "site-packages"
+        candidatas.append(site / "ctranslate2")
+        # **Aqui moravam os 3,6 GB de torch, e não moram mais.** Até
+        # 22/09/2026 o `cufft64_11.dll` e as sublibs do cuDNN só existiam
+        # dentro de `torch/lib` (docs/DIARIZACAO-ONNX.md §5.2), e era aquela
+        # pasta que entrava nesta lista. Com o torch fora do empacotamento,
+        # elas vêm dos wheels `nvidia-cudnn-cu12`, `nvidia-cufft-cu12`,
+        # `nvidia-cublas-cu12` e `nvidia-cuda-runtime-cu12`, que o
+        # `tools/empacotar_motores.sh` instala — cada um em `nvidia/<x>/bin`.
+        # O glob é de propósito: os nomes das pastas são de quem publica os
+        # wheels, e uma pasta a mais é barata; uma a menos derruba o CUDA EP
+        # para CPU em silêncio.
+        candidatas.extend(sorted((site / "nvidia").glob("*/bin")))
 
     pastas = [str(p) for p in candidatas if p.is_dir()]
     for pasta in pastas:

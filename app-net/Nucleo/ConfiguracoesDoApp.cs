@@ -94,33 +94,38 @@ public sealed class ConfiguracoesDoApp
     public string MotorDeTranscricao { get; set; } = Vozes.MotorClassico;
 
     /// <summary>
-    /// Qual motor separa falantes: <c>"torch"</c> ou <c>"onnx"</c>.
+    /// Qual motor separa falantes. <b>Um valor só desde 22/09/2026:</b>
+    /// <c>"onnx"</c>.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>O padrão é o <c>torch</c>, e ele não se troca sozinho.</b> É o
-    /// pyannote como sempre foi, desde a Fase 2. O <c>onnx</c> é o porte de
-    /// 18/09/2026 (<c>docs/DIARIZACAO-ONNX.md</c>) para ONNX Runtime + numpy, e
-    /// as réguas fecharam com as decisões de falante idênticas ao torch
-    /// (acordo 1,0000) e mais rápido nos dois lados: 11,80x o tempo real na GPU
-    /// contra 5,17x do torch, e roda também sem GPU nenhuma.
+    /// <b>A chave nasceu com dois valores e ficou com um.</b> O <c>torch</c>
+    /// era o pyannote como sempre foi, desde a Fase 2; o <c>onnx</c> é o porte
+    /// de 18/09/2026 (<c>docs/DIARIZACAO-ONNX.md</c>) para ONNX Runtime +
+    /// numpy. As réguas fecharam com as decisões de falante idênticas ao torch
+    /// (acordo 1,0000 na gravação de referência e nas quatro do acervo) e mais
+    /// rápido: 7,91x o tempo real na GPU contra 5,17x do torch, e roda também
+    /// sem GPU nenhuma.
     /// </para>
     /// <para>
-    /// <b>Ganhar na régua não é motivo para virar padrão</b> — a chave existe
-    /// para o dono do produto testar o caminho novo numa reunião de verdade
-    /// antes de decidir trocar o que todo mundo usa sem pedir.
+    /// <b>O que fechou a questão foi o tamanho.</b> Com a voz também portada,
+    /// nada mais no app importava torch — e carregar 3,6 GB para não usá-los
+    /// não se defende. O torch saiu do <c>tools/empacotar_motores.sh</c>, e com
+    /// ele o ramo <c>torch</c> deixou de ter como rodar.
     /// </para>
     /// <para>
-    /// Valor desconhecido cai no <c>torch</c>, e não levanta erro: esta chave é
-    /// editável à mão num arquivo, e um <c>app.json</c> com um typo não pode
-    /// impedir alguém de separar falantes numa reunião que já aconteceu. A
-    /// mesma decisão do <see cref="MotorDeTranscricao"/> quando o MOSS saiu — só
-    /// que aqui quem confere é o próprio motor Python (<c>escolher_motor</c> em
+    /// Valor desconhecido cai no <c>onnx</c>, e não levanta erro — e isso
+    /// inclui um <c>"torch"</c> deixado para trás por quem testou o porte.
+    /// Esta chave é editável à mão num arquivo, e um <c>app.json</c> com um
+    /// valor que já existiu não pode impedir alguém de separar falantes numa
+    /// reunião que já aconteceu. A mesma decisão do
+    /// <see cref="MotorDeTranscricao"/> quando o MOSS saiu — só que aqui quem
+    /// confere é o próprio motor Python (<c>escolher_motor</c> em
     /// <c>motores/diarizacao/motor.py</c>), e não este lado.
     /// </para>
     /// </remarks>
     [JsonPropertyName("motor_de_diarizacao")]
-    public string MotorDeDiarizacao { get; set; } = "torch";
+    public string MotorDeDiarizacao { get; set; } = "onnx";
 
     /// <summary>
     /// Mostrar a transcrição na tela durante a própria reunião.

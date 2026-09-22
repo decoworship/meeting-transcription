@@ -14,34 +14,62 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import sys
 
 # ANTES de qualquer import pesado — ver a mesma nota em motores/diarizacao.
-# ctranslate2 e torch escrevem no stdout, e uma linha delas corrompe o protocolo.
+# ctranslate2 escreve no stdout, e uma linha dele corrompe o protocolo.
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
 
+def _pastas_de_cuda() -> list:
+    """As pastas do empacotamento que contêm as DLLs de CUDA, em ordem.
+
+    **Quem as tinha era o torch, e ele saiu em 22/09/2026.** Até então tudo
+    vivia em ``torch/lib``, e bastava registrar aquela pasta. Agora as mesmas
+    DLLs vêm de wheels próprios — ``nvidia-cublas-cu12``, ``nvidia-cudnn-cu12``,
+    ``nvidia-cufft-cu12`` e ``nvidia-cuda-runtime-cu12`` —, que o
+    ``tools/empacotar_motores.sh`` instala, e cada um põe as suas em
+    ``nvidia/<pacote>/bin``.
+
+    As pastas saem da própria instalação, e não de caminho fixo: este arquivo
+    está em ``motores/asr/``, e o ``site-packages`` é
+    ``motores/python/Lib/site-packages``. Pasta que não existe é só pulada.
+    """
+    aqui = pathlib.Path(os.path.abspath(__file__)).parent
+    site = aqui.parent / "python" / "Lib" / "site-packages"
+    candidatas = [site / "ctranslate2", site / "onnxruntime" / "capi"]
+    candidatas += sorted((site / "nvidia").glob("*/bin"))
+    return [str(c) for c in candidatas if c.is_dir()]
+
+
 def _achar_cuda() -> None:
-    """Deixa o ctranslate2 encontrar as DLLs de CUDA que vêm com o torch.
+    """Deixa o ctranslate2 encontrar as DLLs de CUDA do empacotamento.
 
     No Windows o ctranslate2 procura ``cublas64_12.dll`` e ``cudnn*.dll`` no
-    caminho de busca do processo, e não as traz consigo. Quem as tem, no nosso
-    empacotamento, é o torch — que instala tudo em ``torch/lib``. Sem este
-    registro o faster-whisper cai para CPU **em silêncio**: não há erro, só
-    lentidão, que é o pior tipo de falha para diagnosticar.
+    caminho de busca do processo, e traz consigo só o ``cudnn64_9.dll``
+    principal. Sem este registro o faster-whisper cai para CPU **em silêncio**:
+    não há erro, só lentidão, que é o pior tipo de falha para diagnosticar.
+
+    **`os.add_dll_directory` sozinho não basta, e a razão está medida** em
+    ``motores/diarizacao/pipeline/sessao.py``: o ``cudnn64_9.dll`` carrega as
+    próprias sublibs (``cudnn_graph64_9``, ``cudnn_cnn64_9``, ``cudnn_ops64_9``,
+    ...) procurando no ``PATH`` do processo, e não nas pastas que o loader
+    registrou. Por isso as pastas vão para os dois lugares.
     """
     if sys.platform != "win32":
         return
     try:
-        import importlib.util
-
-        spec = importlib.util.find_spec("torch")
-        if spec is None or not spec.submodule_search_locations:
-            return
-        lib = os.path.join(list(spec.submodule_search_locations)[0], "lib")
-        if os.path.isdir(lib):
-            os.add_dll_directory(lib)
+        pastas = _pastas_de_cuda()
+        for pasta in pastas:
+            try:
+                os.add_dll_directory(pasta)
+            except (OSError, AttributeError):
+                pass
+        if pastas:
+            os.environ["PATH"] = (os.pathsep.join(pastas) + os.pathsep
+                                  + os.environ.get("PATH", ""))
     except Exception as e:                                   # nunca fatal
         print(f"[asr] não foi possível registrar as DLLs de CUDA: {e!r}",
               file=sys.stderr, flush=True)
@@ -70,50 +98,141 @@ class Modelo:
         self.dispositivo = "?"
         self.motivo: str | None = None
 
+    @staticmethod
+    def _versao_do_cuda() -> str | None:
+        """A versão do runtime de CUDA que ESTE processo conseguiu carregar.
+
+        ``None`` quando o ``cudart`` não carrega — o que, no nosso
+        empacotamento, quer dizer DLL faltando e não máquina sem placa.
+        """
+        import ctypes
+
+        nomes = (("cudart64_12.dll",) if sys.platform == "win32"
+                 else ("libcudart.so.12", "libcudart.so"))
+        for nome in nomes:
+            try:
+                lib = ctypes.CDLL(nome)
+            except OSError:
+                continue
+            try:
+                v = ctypes.c_int()
+                if lib.cudaRuntimeGetVersion(ctypes.byref(v)) == 0 and v.value:
+                    return f"{v.value // 1000}.{(v.value % 1000) // 10}"
+            except AttributeError:
+                pass
+        return None
+
+    @staticmethod
+    def _nome_da_placa() -> str | None:
+        """O nome da placa, perguntado ao driver — não ao nvidia-smi.
+
+        É a API de driver do CUDA (``nvcuda.dll``), que é justamente a camada
+        que o ctranslate2 usa: se ela responde, a placa existe para quem vai
+        transcrever. ``None`` é só falta de nome, nunca falta de placa — quem
+        decide isso é o ``diagnostico``.
+        """
+        import ctypes
+
+        nomes = (("nvcuda.dll",) if sys.platform == "win32"
+                 else ("libcuda.so.1", "libcuda.so"))
+        for nome in nomes:
+            try:
+                lib = ctypes.CDLL(nome)
+            except OSError:
+                continue
+            try:
+                if lib.cuInit(0) != 0:
+                    return None
+                dev = ctypes.c_int()
+                if lib.cuDeviceGet(ctypes.byref(dev), 0) != 0:
+                    return None
+                buf = ctypes.create_string_buffer(256)
+                if lib.cuDeviceGetName(buf, 256, dev) != 0:
+                    return None
+                return buf.value.decode("utf-8", "replace") or None
+            except (AttributeError, OSError):
+                return None
+        return None
+
     def diagnostico(self) -> dict:
-        """O que o torch enxerga da placa — e, quando não enxerga, por quê.
+        """O que o motor de transcrição enxerga da placa — e, quando não
+        enxerga, por quê.
 
         Existe porque o app tinha duas opiniões sobre a mesma pergunta. O bloco
         de diagnóstico da tela pergunta ao ``nvidia-smi``, que responde pela
-        presença do driver; quem decide o dispositivo da transcrição é o
-        ``torch.cuda.is_available()``, que depende também das DLLs de CUDA
-        estarem alcançáveis. Os dois discordaram na máquina de um usuário em
-        18/08/2026: a tela dizia "RTX 4050" e o modelo rodava na CPU.
+        presença do driver; quem decide o dispositivo da transcrição é esta
+        função, que depende também das DLLs de CUDA estarem alcançáveis. Os
+        dois discordaram na máquina de um usuário em 18/08/2026: a tela dizia
+        "RTX 4050" e o modelo rodava na CPU.
 
         "Rodar na CPU" não é só lento: o ``large-v3`` em CPU come RAM por horas,
         e na máquina dele **derrubou o Windows**. Então a resposta desta função é
         o que permite o app parar antes, em vez de descobrir no fim.
-        """
-        import torch
 
-        cuda = torch.cuda.is_available()
+        **Quem responde é o ctranslate2 desde 22/09/2026, e não mais o torch.**
+        Era ``torch.cuda.is_available()`` — e o torch saiu do empacotamento com
+        a diarização em ONNX (``docs/DIARIZACAO-ONNX.md``). Perguntar ao
+        ctranslate2 não é só o que sobrou: é a biblioteca que **de fato roda o
+        ASR**, então a resposta dela é sobre o caminho que vai ser usado, e não
+        sobre um vizinho que também tem CUDA. A pergunta continua **medida**:
+        ``get_cuda_device_count()`` conta placas pelo runtime de CUDA, e
+        ``get_supported_compute_types("cuda", 0)`` consulta a placa de verdade —
+        e é conferido o ``float16``, que é exatamente o ``compute_type`` que o
+        ``carregar`` pede. Pedir e não poder é a falha muda que este app já
+        pagou duas vezes.
+
+        A forma do retorno não mudou, porque é contrato de fio com o C#
+        (``Sidecar/Protocolo.cs``): ``cuda``, ``nome``, ``cuda_do_torch`` e
+        ``motivo``. O ``cuda_do_torch`` guarda o nome antigo e passou a valer a
+        versão do runtime de CUDA carregado; renomeá-lo trocaria a chave no
+        JSON e o campo chegaria nulo no registro, que é onde ele é lido.
+        """
+        import ctranslate2
+
+        versao_cuda = self._versao_do_cuda()
         info = {
-            "cuda": cuda,
-            "torch": getattr(torch, "__version__", "?"),
-            # None aqui significa build de CPU do torch — é o caso em que nenhuma
-            # configuração da máquina do usuário resolveria.
-            "cuda_do_torch": torch.version.cuda,
-            "placas": torch.cuda.device_count() if cuda else 0,
+            "cuda": False,
+            "runtime": f"ctranslate2 {getattr(ctranslate2, '__version__', '?')}",
+            # None aqui significa que nem o cudart carregou — DLL faltando no
+            # empacotamento, e não configuração da máquina de quem instalou.
+            "cuda_do_torch": versao_cuda,
+            "placas": 0,
         }
-        if cuda:
-            try:
-                info["nome"] = torch.cuda.get_device_name(0)
-            except Exception:                                # nunca fatal
-                pass
+
+        try:
+            info["placas"] = ctranslate2.get_cuda_device_count()
+        except Exception as e:                               # nunca fatal
+            info["motivo"] = (f"o ctranslate2 não conseguiu contar as placas: {e}")
             return info
 
-        # Sem CUDA, a pergunta que importa é qual das três causas é a desta
+        if info["placas"] > 0:
+            try:
+                tipos = ctranslate2.get_supported_compute_types("cuda", 0)
+            except Exception as e:
+                info["motivo"] = (f"a placa foi contada, mas o ctranslate2 não "
+                                  f"conseguiu consultá-la: {e}")
+                return info
+            if "float16" in tipos:
+                info["cuda"] = True
+                nome = self._nome_da_placa()
+                if nome:
+                    info["nome"] = nome
+                return info
+            info["motivo"] = ("a placa não oferece float16, que é o compute_type "
+                              f"da transcrição (oferece: {sorted(tipos)})")
+            return info
+
+        # Sem placa contada, a pergunta que importa é qual das causas é a desta
         # máquina — e cada uma tem uma saída diferente.
-        if torch.version.cuda is None:
-            info["motivo"] = ("o torch empacotado é a versão de CPU; nenhuma "
-                              "configuração desta máquina faria a placa funcionar")
-        elif torch.cuda.device_count() == 0:
-            info["motivo"] = ("o torch tem CUDA " + str(torch.version.cuda)
-                              + ", mas não encontrou placa nenhuma — driver antigo "
-                                "demais para esta versão de CUDA, ou DLL de CUDA "
-                                "faltando ao lado do torch")
+        if versao_cuda is None:
+            info["motivo"] = ("as DLLs de CUDA não foram encontradas ao lado do "
+                              "motor; o empacotamento está incompleto e nenhuma "
+                              "configuração desta máquina resolveria")
         else:
-            info["motivo"] = "o torch não conseguiu iniciar o CUDA nesta máquina"
+            info["motivo"] = ("o runtime de CUDA " + versao_cuda
+                              + " carregou, mas não encontrou placa nenhuma — "
+                                "driver antigo demais para esta versão de CUDA, "
+                                "ou não há placa NVIDIA nesta máquina")
         return info
 
     def carregar(self, id_req: int) -> None:

@@ -72,11 +72,13 @@ na mesma sessão devolveria a saída do primeiro nas duas medições. Um nome co
 separador ou `..` é recusado antes de virar caminho: ele vem de arquivo de
 configuração editável à mão.
 
-`motor_de_diarizacao` também é opcional em `diarizar` — `"torch"` (padrão) ou
-`"onnx"` (docs/DIARIZACAO-ONNX.md), e um valor desconhecido cai no padrão em
-silêncio, como `modelo`. **O núcleo C# já envia este campo**, lido da chave
-`motor_de_diarizacao` do `app.json` (`ConfiguracoesDoApp.MotorDeDiarizacao`,
-padrão `"torch"`). Fica ausente só quando quem chama o `MotorSidecar` não passa
+`motor_de_diarizacao` também é opcional em `diarizar` e **tem um valor só
+desde 22/09/2026**: `"onnx"` (docs/DIARIZACAO-ONNX.md). O `"torch"` existiu até
+o torch sair do empacotamento, e hoje é um valor desconhecido como qualquer
+outro — cai no padrão em silêncio, como `modelo`, porque quem testou o porte
+tem a chave escrita no `app.json`. **O núcleo C# já envia este campo**, lido da
+chave `motor_de_diarizacao` do `app.json` (`ConfiguracoesDoApp.MotorDeDiarizacao`,
+padrão `"onnx"`). Fica ausente só quando quem chama o `MotorSidecar` não passa
 nada — a `Requisicao` omite o campo em vez de escrever `null`, e é esse
 caminho, não o app.json, que mantém o comportamento de hoje bit a bit para
 quem chama o sidecar direto.

@@ -140,8 +140,12 @@ Source: "{#Payload}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; O que **não** dá para cortar, e foi tentado: cudnn_engines_precompiled64_9.dll
 ; (589 MB) é obrigatório — sem ele a diarização morre com "Could not locate
 ; cudnn_engines_precompiled64_9.dll", sem cair para o compilado em runtime. E
-; cufft, cusparse, cusolver e cublas estão na tabela de importações do
-; torch_cuda.dll: sem qualquer um deles o torch não carrega.
+; cublas, cublasLt, cudart, cufft e o cuDNN inteiro estão na tabela de
+; importações do onnxruntime_providers_cuda.dll e do ctranslate2.dll: sem
+; qualquer um deles o provedor CUDA não carrega, e a queda para CPU é muda.
+; (Até 22/09/2026 quem os importava era o torch_cuda.dll; o torch saiu, as DLLs
+; ficaram — hoje vêm dos wheels nvidia-*, e o exclude de curand/cusolverMg
+; abaixo só sobrevive porque não custa nada: eram do torch e não existem mais.)
 Source: "{#Motores}\*"; DestDir: "{app}\motores"; \
   Excludes: "*.gguf,ata\bin,curand64_10.dll,cusolverMg64_11.dll,tests,test,*.pyi,.cache,__pycache__"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
