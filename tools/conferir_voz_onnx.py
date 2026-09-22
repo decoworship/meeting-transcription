@@ -25,7 +25,23 @@ contexto, e a régua é outra:
    sobre o banco de vetores *torch* com o vetor de cada caminho. Se nenhuma
    decisão muda, um app recém-atualizado reconhece exatamente quem reconhecia;
 3. **contexto** — o cosseno contra o vetor guardado, pelos dois caminhos lado a
-   lado, que é onde se vê que a diferença é do áudio e não do runtime.
+   lado, que é onde se vê que a diferença é do áudio e não do runtime;
+4. **custo** — quanto tempo cada caminho leva, em CPU;
+5. **reconstrução ponta a ponta** — a régua que fecha o que a 1–4 não alcançam:
+   elas rodam CPU↔CPU (torch em CPU contra onnxruntime em CPU), enquanto os
+   160 vetores do banco saíram de **CUDA torch** e os próximos sairão de
+   **CUDA onnxruntime** — nenhum dos dois endpoints reais está em 1–4. Para as
+   amostras em que ``duracao_s == origem.t1 - origem.t0`` houve um único
+   trecho usado, então o vetor guardado veio exatamente de
+   ``<gravacao>/<faixa>.wav[t0:t1]`` — sem a truncagem em 4 s do trecho de
+   auditoria (ver acima). Reextrair esse recorte da gravação de origem com
+   ``ExtratorDeVoz(..., preferir_gpu=True)`` e comparar contra o vetor já
+   guardado testa a mudança de runtime **e** a mudança de GPU ao mesmo tempo,
+   sem o confundidor de tamanho que virou o item 3 em "contexto". O provedor
+   efetivo (``sessao.abrir`` devolve o que a sessão realmente usou, não o que
+   foi pedido) é conferido e impresso — um retorno silencioso para CPU
+   mediria de novo exatamente o que o item 3 já mede, e pareceria a régua
+   certa sem ser.
 
 O torch aqui é referência, como no S1; o caminho medido é numpy + onnxruntime.
 
@@ -33,6 +49,22 @@ Uso::
 
     uv run python tools/conferir_voz_onnx.py
     uv run python tools/conferir_voz_onnx.py --json saida.json
+
+O item 5 pede CUDAExecutionProvider de verdade. Neste WSL de desenvolvimento
+o ``onnxruntime`` do ``uv.lock`` é a build CPU-only (é o que ``faster-whisper``
+pede) — sem o provedor CUDA compilado dentro, nenhum PATH ou LD_LIBRARY_PATH
+o traz de volta. Para medir o item 5 aqui, é preciso o pacote GPU e as libs
+CUDA/cuDNN que o torch já trouxe como dependências::
+
+    LD_LIBRARY_PATH="/usr/local/lib/ollama/cuda_v13:$(uv run python -c \\
+      'import nvidia.cudnn as m,os;print(os.path.dirname(m.__file__))')/lib:\\
+      $(uv run python -c 'import nvidia.cufft as m,os;print(os.path.dirname(m.__file__))')/lib:\\
+      $(uv run python -c 'import nvidia.curand as m,os;print(os.path.dirname(m.__file__))')/lib" \\
+      uv run --with onnxruntime-gpu python tools/conferir_voz_onnx.py
+
+Na instalação real (Windows, ``onnxruntime-gpu`` 1.23.2 fixado à mão, ver
+docs/DIARIZACAO-ONNX.md) isto não é necessário — ``sessao.abrir`` já resolve
+sozinho.
 """
 
 from __future__ import annotations
@@ -56,12 +88,20 @@ from voz import ExtratorDeVoz  # noqa: E402
 BANCO = Path("/mnt/c/Users/andre/.meeting-transcription/vozes")
 MODELO = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
               "/diarizacao/modelos/wespeaker-voxceleb-resnet34-LM")
+#: onde o núcleo grava as reuniões — a fonte para a reconstrução do item 5.
+GRAVACOES = Path("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings")
 
 #: Vozes.LimiarDeReconhecimento
 LIMIAR = 0.70
 #: Vozes.ModeloDeVozPadrao — amostras antigas não carimbaram o modelo
 MODELO_PADRAO = "pyannote/wespeaker-voxceleb-resnet34-LM"
 TAXA = 16000
+#: Folga para "duracao_s == t1 - t0" (item 5). T0, T1 e DuracaoS cada um sai
+#: de um Math.Round(_, 2) independente no C# (AprendizadoDeVozes.cs), então o
+#: erro de arredondamento acumulado no pior caso é ~0,015 s; testado de 0,005
+#: a 0,1 no banco real, a contagem de amostras que qualificam não muda (44) —
+#: não é um limiar que está cortando no meio de alguma coisa.
+TOLERANCIA_DURACAO = 0.02
 
 
 def _ler_wav(caminho: Path) -> np.ndarray:
@@ -69,6 +109,22 @@ def _ler_wav(caminho: Path) -> np.ndarray:
         if w.getsampwidth() != 2 or w.getnchannels() != 1:
             raise RuntimeError(f"{caminho}: esperado WAV mono de 16 bits")
         bruto = w.readframes(w.getnframes())
+    return np.frombuffer(bruto, np.int16).astype(np.float32) / 32768.0
+
+
+def _ler_wav_trecho(caminho: Path, t0: float, t1: float) -> np.ndarray:
+    """O recorte [t0:t1] de um WAV, sem carregar o arquivo inteiro — algumas
+    gravações passam de 3000 s."""
+    with wave.open(str(caminho), "rb") as w:
+        if w.getsampwidth() != 2 or w.getnchannels() != 1:
+            raise RuntimeError(f"{caminho}: esperado WAV mono de 16 bits")
+        taxa = w.getframerate()
+        ini = max(0, int(round(t0 * taxa)))
+        fim = min(w.getnframes(), int(round(t1 * taxa)))
+        if fim <= ini:
+            return np.zeros(0, np.float32)
+        w.setpos(ini)
+        bruto = w.readframes(fim - ini)
     return np.frombuffer(bruto, np.int16).astype(np.float32) / 32768.0
 
 
@@ -226,6 +282,80 @@ def main() -> int:
     if sem_trecho:
         print(f"\n   {sem_trecho} amostras sem trecho em disco, fora da conta")
 
+    print(f"\n5. RECONSTRUÇÃO PONTA A PONTA — a gravação de origem, com CUDA, "
+          f"contra o vetor guardado\n")
+    print("   1–4 rodam CPU↔CPU (torch e onnx em CPU); os vetores do banco "
+          "saíram de CUDA torch\n   e os próximos sairão de CUDA onnxruntime "
+          "— nenhum dos dois endpoints reais está em 1–4.\n")
+    candidatas = []
+    for am in todas:
+        dur = am.get("duracao_s")
+        o = am.get("origem") or {}
+        t0, t1 = o.get("t0"), o.get("t1")
+        if dur is None or t0 is None or t1 is None:
+            continue
+        if abs(dur - (t1 - t0)) < TOLERANCIA_DURACAO:
+            candidatas.append(am)
+    print(f"   {len(candidatas)}/{len(todas)} amostras com duracao_s == t1 - t0 "
+          f"(±{TOLERANCIA_DURACAO}s — um único trecho usado, sem a truncagem "
+          f"em 4 s do item 3)")
+
+    extrator_gpu = None
+    linhas5, sem_gravacao = [], 0
+    for am in candidatas:
+        o = am["origem"]
+        wav = GRAVACOES / o["gravacao"] / f"{o['faixa']}.wav"
+        if not wav.is_file():
+            sem_gravacao += 1
+            continue
+        if extrator_gpu is None:
+            extrator_gpu = ExtratorDeVoz(MODELO, preferir_gpu=True)
+            print(f"   onnx (item 5) pedindo GPU, efetivo: "
+                  f"{extrator_gpu.provedor}")
+            if extrator_gpu.provedor != "CUDAExecutionProvider":
+                print("   ATENÇÃO — caiu para CPU: isto mede de novo o que o "
+                      "item 3 já mede (torch-CPU vs onnx-CPU), não fecha o "
+                      "Finding 1.")
+        onda = _ler_wav_trecho(wav, o["t0"], o["t1"])
+        vg = np.asarray(extrator_gpu(onda), dtype=np.float64).ravel()
+        linhas5.append((am, vg))
+
+    print(f"\n   {len(linhas5)}/{len(candidatas)} com a gravação de origem em "
+          f"disco ({sem_gravacao} sem)")
+
+    resumo5 = None
+    if not linhas5:
+        print("   nenhuma amostra reconstruível — item 5 fica sem número")
+    else:
+        cos5 = [_cos(am["_v"], vg) for am, vg in linhas5]
+        print(f"\n   cosseno mínimo   {min(cos5):.9f}")
+        print(f"   cosseno mediano  {float(np.median(cos5)):.9f}")
+
+        mudou5 = []
+        for am, vg in linhas5:
+            fora = am["_i"]
+            n_guardado, _ = _reconhecer(am["_v"], pessoas, fora)
+            n_novo, _ = _reconhecer(vg, pessoas, fora)
+            if n_guardado != n_novo:
+                mudou5.append((am, n_guardado, n_novo))
+        print(f"   decisões do Reconhecer (limiar {LIMIAR:.2f}) que mudariam: "
+              f"{len(mudou5)}/{len(linhas5)}")
+        for am, ng, nn in mudou5[:10]:
+            print(f"     MUDOU {am['_pessoa']}: guardado={ng} novo={nn}")
+
+        if min(cos5) < 0.999:
+            print("\n   ATENÇÃO — cosseno mínimo longe de 1. Isto é sobre o "
+                  "banco precisar de re-extração, decisão do dono do "
+                  "produto — nada aqui foi ajustado por causa disto.")
+
+        resumo5 = {
+            "candidatas": len(candidatas), "reconstruidas": len(linhas5),
+            "sem_gravacao": sem_gravacao,
+            "cos_min": min(cos5), "cos_mediano": float(np.median(cos5)),
+            "decisoes_mudariam": len(mudou5),
+            "provedor": extrator_gpu.provedor if extrator_gpu else None,
+        }
+
     ok = min(prop) > 0.9999 and not mudou
     print("\n" + "=" * 72)
     print("VEREDITO:", "equivalente — nenhuma decisão muda, nada a re-extrair" if ok
@@ -242,6 +372,7 @@ def main() -> int:
                 "onnx_min": min(co), "onnx_mediano": float(np.median(co))},
             "audio_s": segundos, "seg": gasto,
             "provedor": extrator.provedor, "ok": ok,
+            "reconstrucao_e2e": resumo5,
         }, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"\nescrito em {a.json}")
     return 0

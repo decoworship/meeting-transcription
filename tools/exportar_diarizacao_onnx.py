@@ -14,6 +14,12 @@ import sys, warnings
 from pathlib import Path
 warnings.filterwarnings("ignore")
 import numpy as np, torch
+# TracerWarning fica de fora do "ignore" acima: com dynamo=False ela é o
+# único sinal de que uma forma ficou cravada no grafo enquanto dynamic_axes
+# promete dinâmico. Suprimi-la esconderia esse defeito só no próximo export —
+# os artefatos de hoje foram conferidos limpos (22/09/2026), então isto é
+# para a próxima exportação, não para esta.
+warnings.filterwarnings("default", category=torch.jit.TracerWarning)
 
 MODELOS = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
                "/diarizacao/modelos")
@@ -24,7 +30,7 @@ RAIZ = MODELOS / "community-1"
 RAIZ_VOZ = MODELOS / "wespeaker-voxceleb-resnet34-LM"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]
                        / "motores/diarizacao/pipeline"))
-from fbank import banco_mel  # noqa: E402
+from fbank import banco_mel, TAXA as TAXA_FBANK, N_MEL, JANELA, PASSO  # noqa: E402
 
 from pyannote.audio import Model
 
@@ -145,6 +151,38 @@ def exportar_voz():
         )
     if getattr(m.resnet, "two_emb_layer", False):
         raise RuntimeError("este modelo tem two_emb_layer=True; ver exportar_embedding().")
+
+    # As duas checagens acima cobrem fbank_centering_span e two_emb_layer.
+    # Sobram outros oito hparams que pipeline/fbank.py não lê do checkpoint —
+    # crava como constante. Hoje batem porque o checkpoint não carrega
+    # hyper_parameters nenhum (conferido em 22/09/2026: cada um destes vem do
+    # default de BaseWeSpeakerResNet.__init__), e por isso ``.get(nome)`` sem
+    # sentinela não serviria — ele não distingue "ausente do checkpoint, usa
+    # o default" de "presente e valendo None", que para fbank_centering_span
+    # acima é justamente o caso que passa. Aqui um hparam ausente é aceito
+    # (o default já é o que fbank.py assume); um hparam presente e diferente
+    # do esperado é erro.
+    _AUSENTE = object()
+    _ESPERADOS = {
+        "num_mel_bins": N_MEL,
+        "frame_length": JANELA / TAXA_FBANK * 1000,
+        "frame_shift": PASSO / TAXA_FBANK * 1000,
+        "dither": 0.0,
+        "snip_edges": True,
+        "window_type": "hamming",
+        "round_to_power_of_two": True,
+        "sample_rate": TAXA_FBANK,
+    }
+    for nome, esperado in _ESPERADOS.items():
+        visto = m.hparams.get(nome, _AUSENTE)
+        if visto is _AUSENTE:
+            continue
+        if visto != esperado:
+            raise RuntimeError(
+                f"o checkpoint tem {nome}={visto!r}, mas pipeline/fbank.py "
+                f"crava {esperado!r} fixo. O fbank em numpy ficaria errado "
+                "em silêncio — ver pipeline/fbank.py."
+            )
 
     class SoResNet(torch.nn.Module):
         """fbank → embedding. A mesma forma do wrapper do S1."""
