@@ -119,12 +119,32 @@ public sealed class TranscritorTests : IDisposable
     }
 
     [Fact]
-    public void MotorDeDiarizacaoPadraoEOTorch()
+    public void MotorDeDiarizacaoPadraoEOOnnx()
     {
-        // O porte para ONNX (docs/DIARIZACAO-ONNX.md) não pode mudar quem
-        // não mexeu no app.json: quem não escreveu a chave continua no
-        // pyannote de sempre.
-        Assert.Equal("torch", new ConfiguracoesDoApp().MotorDeDiarizacao);
+        // O torch saiu do empacotamento em 22/09/2026 (docs/DIARIZACAO-ONNX.md):
+        // as réguas fecharam com acordo 1,0000 contra o pyannote, e carregar
+        // 3,6 GB para não usá-los não se defende mais. Quem não mexeu no
+        // app.json cai no onnx, não no torch de antes.
+        Assert.Equal("onnx", new ConfiguracoesDoApp().MotorDeDiarizacao);
+    }
+
+    [Fact]
+    public void AppJsonComTorchCarregaSemLevantarErro()
+    {
+        // O cenário real: alguém experimentou o porte, o app.json ficou com
+        // "torch" escrito, e o torch saiu do empacotamento em 22/09/2026. A
+        // chave é editável à mão, e um valor que já existiu não pode impedir
+        // ninguém de abrir o app nem de separar falantes numa reunião que já
+        // aconteceu — quem de fato recusa "torch" e cai no onnx é o motor
+        // Python (escolher_motor em motores/diarizacao/motor.py), não este
+        // lado; aqui só se garante que a leitura do arquivo não lança e que o
+        // valor atravessa intacto até a chamada ao sidecar.
+        string caminho = Path.Combine(_pasta, "app.json");
+        File.WriteAllText(caminho, "{ \"motor_de_diarizacao\": \"torch\" }");
+
+        var cfg = ConfiguracoesDoApp.Carregar(caminho);
+
+        Assert.Equal("torch", cfg.MotorDeDiarizacao);
     }
 
     [Fact]

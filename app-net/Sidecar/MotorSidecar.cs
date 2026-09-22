@@ -143,8 +143,8 @@ public sealed class MotorSidecar : IDisposable
     /// padrão do motor.
     /// </param>
     /// <param name="motorDeDiarizacao">
-    /// <c>"torch"</c> ou <c>"onnx"</c>. Nulo usa o padrão do motor,
-    /// <c>"torch"</c>. Ver docs/DIARIZACAO-ONNX.md.
+    /// <c>"onnx"</c>, o único motor desde 22/09/2026. Nulo usa o padrão do
+    /// motor, <c>"onnx"</c>. Ver docs/DIARIZACAO-ONNX.md.
     /// </param>
     public async Task<IReadOnlyList<SegmentoDeFalante>> DiarizarAsync(
         string caminhoDoAudio, Action<double, string>? progresso = null,
