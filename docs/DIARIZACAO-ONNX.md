@@ -421,6 +421,20 @@ app publicado, mesmo com `preferir_gpu=True` no código — não porque o CUDA E
 não funcione (o V5 mostra que funciona, a 11,80x), mas porque o pacote que o
 habilita ainda não está na instalação.
 
+**Achado de 22/09/2026, para quem planejar a limpeza: apagar `torch/lib` quebra
+o CUDA EP do ONNX, do jeito que ele está hoje.** Medido na instalação real,
+tentando fazer o CUDA EP funcionar sem tocar em `torch`: `cublas64_12.dll`,
+`cublasLt64_12.dll` e `cudart64_12.dll` sobrevivem sem torch (vêm de
+`motores/ata/bin`), e o `ctranslate2` traz o `cudnn64_9.dll` principal. Mas
+`cufft64_11.dll` e o conjunto completo das sublibs do cuDNN
+(`cudnn_graph64_9.dll`, `cudnn_cnn64_9.dll`, `cudnn_ops64_9.dll`, ...) **só
+existem, na instalação de hoje, dentro de `torch/lib`** — nenhum outro pacote
+embarcado os traz. Isto é o oposto do que a tabela do §5 conta com: apagar
+`torch/lib` na ordem ali descrita derrubaria de volta para CPU o motor que este
+porte inteiro existe para acelerar. **Não é para consertar agora** — é decisão
+e trabalho do dono do produto, mas quem planejar a limpeza não pode descobrir
+isso depois de já ter apagado a pasta.
+
 ---
 
 ## 6. O que este porte NÃO resolve
