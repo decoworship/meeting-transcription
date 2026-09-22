@@ -455,6 +455,56 @@ CPU **em silêncio** — é o mesmo tipo de queda muda que motivou este arquivo
 existir (ver o topo). A 1.23.2 é uma build CUDA 12 e é a que bate com o que o
 app já embarca; fixar a versão no empacotamento não é opcional.
 
+## 5.2 — a remoção, feita
+
+O que as seções acima mediam e planejavam saiu do Python embarcado em
+22/09/2026 (`3a30e75`), na 0.7.1. Sai o `pyannote.audio` do empacotamento —
+que era quem arrastava torch, torchaudio, pytorch_lightning e torchmetrics —,
+e entram só as peças que `motores/diarizacao/pipeline/` de fato importa:
+`pyannote.core`, `pyannote.pipeline`, einops, scipy e scikit-learn, nenhuma
+delas com torch. 51 pacotes a menos, 2 a mais. **O `site-packages` cai de
+7,6 GB para 3,2 GB.** A conta não fecha nos 3,6 GB do torch sozinho porque
+1,3 GB do que `torch/lib` guardava eram cuDNN e cuFFT, que precisaram voltar
+explicitamente pelos wheels `nvidia-cudnn-cu12` e `nvidia-cufft-cu12` — a
+economia real fica em ~4,4 GB. O `onnxruntime-gpu` ficou pinado em 1.23.2
+(build CUDA 12), com a etapa de CUDA por último no empacotamento e
+`--no-deps`, e as réguas passaram a conferir o resultado em vez de confiar
+nele: torch/torchaudio/pyannote.audio proibidos, o `onnxruntime` conferido
+como build de CUDA 12, e as dez DLLs conferidas uma a uma.
+
+Com o torch fora, os números do §1 e do V5 deixam de ser hipotético contra
+medido: na RTX 2060, ONNX em CUDA faz **7,91x** o tempo real na instalação
+anterior a esta limpeza (ainda com torch ao lado) e **10,64x** agora, sem
+torch disputando GPU — contra os 5,17x do torch. A saída continua idêntica:
+acordo **1,0000** contra o torch na gravação de referência (404 de 404
+trechos, 3 falantes), nas quatro gravações do acervo, e entre a instalação
+antiga e a nova (99 de 99 trechos) — sobre o falado e sobre o silêncio, para
+pegar também alarme falso.
+
+**O banco de vozes não precisou ser re-extraído.** Sobre as 44 amostras
+guardadas que dá para reconstruir exatamente, o cosseno mínimo entre o vetor
+antigo e o novo é 0,9999999998 (mediano 1,0000000000), e nenhuma das 44
+decisões de reconhecimento muda — era a condição sobre a qual o porte inteiro
+se apoiava, e ela se confirmou.
+
+**`motor_de_diarizacao` voltou a ter um valor só.** Sem torch, só resta
+`"onnx"`, e um `app.json` com um valor antigo — inclusive um `"torch"`
+deixado para trás — cai no padrão em silêncio, em vez de recusar diarizar.
+
+Duas correções de reconhecimento de voz vieram junto, achadas ao levar o
+caminho de produção para ONNX + numpy: a legenda ao vivo nunca reconhecia
+ninguém, porque `ReconhecerAsync` recebia os blocos da legenda (até 90 s,
+podendo conter dois falantes) em vez dos trechos que a diarização separa; e o
+reconhecimento tomava sempre os três primeiros trechos de cada pessoa, o que
+numa reunião real deu 6,1 s e 0,581 de similaridade para alguém que deveria
+ter sido reconhecido (limiar 0,70) — trocado por um orçamento de ~15 s, que
+levou a mesma pessoa a 0,706.
+
+O instalador passou a exigir os seis artefatos ONNX antes de montar, e o
+`publicar.sh` passou a levar `pipeline/` inteiro (antes só copiava
+`motor.py`) — sem isso, o motor ONNX não subia a partir de uma instalação
+publicada.
+
 ---
 
 ## 6. O que este porte NÃO resolve

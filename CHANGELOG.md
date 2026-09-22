@@ -3,6 +3,50 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.7.1 — 22/09/2026
+
+**O torch saiu do app.** A diarização e o reconhecimento de vozes rodavam sobre
+`pyannote.audio`, que carrega torch, torchaudio, pytorch_lightning e
+torchmetrics — a maior fatia dos motores embarcados. A troca por ONNX Runtime,
+desenhada e medida nas últimas semanas, chega agora à instalação: o
+`site-packages` do Python embarcado cai de **7,6 GB para 3,2 GB**. A conta não
+fecha nos 3,6 GB que o torch pesava sozinho porque o cuDNN e o cuFFT viajavam
+dentro dele e passam a chegar à parte, como wheels da NVIDIA — a economia real
+fica em torno de **4,4 GB**.
+
+**E ficou mais rápida, não só mais leve.** Numa RTX 2060, o torch em CUDA fazia
+5,17x o tempo real; o ONNX em CUDA já fazia 7,91x na instalação anterior a esta
+versão, e faz **10,64x** agora, sem o torch disputando GPU com mais nada. A
+saída não muda: acordo de 1,0000 contra o torch na gravação de referência (404
+de 404 trechos, 3 falantes), nas quatro gravações do acervo, e entre a
+instalação antiga e a nova (99 de 99 trechos) — medido sobre o falado e sobre o
+silêncio, para pegar também alarme falso.
+
+**O banco de vozes não precisa ser re-extraído** — era a condição sobre a qual
+o porte inteiro se apoiava. Sobre as 44 amostras guardadas que dá para
+reconstruir exatamente, o cosseno mínimo entre o vetor antigo e o novo é
+0,9999999998 (mediano 1,0000000000), e nenhuma das 44 decisões de
+reconhecimento muda.
+
+**Duas coisas que estavam quebradas por baixo, e este porte esbarrou nelas.** A
+legenda ao vivo nunca reconhecia ninguém pelo nome, desde que a legenda existe:
+o reconhecimento recebia os blocos inteiros da legenda — até 90 s, às vezes com
+duas pessoas dentro — em vez dos trechos que a diarização já separa. Agora usa
+os trechos. E o reconhecimento de voz, na legenda e na transcrição do fim,
+olhava sempre os três primeiros trechos de cada pessoa: numa reunião real isso
+dava 6,1 s e similaridade 0,581 para uma pessoa conhecida do banco, abaixo do
+limiar de 0,70 apesar de ser a melhor candidata por larga margem. Agora ele
+acumula até ~15 s, e a mesma pessoa chega a 0,706.
+
+**`motor_de_diarizacao` voltou a ter um valor só.** Sem torch só resta o motor
+ONNX, e um `app.json` com um valor antigo — inclusive um `"torch"` deixado para
+trás — cai no padrão em silêncio, em vez de recusar diarizar.
+
+**O instalador passou a exigir os seis artefatos ONNX, e o `publicar.sh` agora
+leva o pacote inteiro do motor.** Antes só o `motor.py` era copiado para a
+instalação publicada, e o motor ONNX não tinha como rodar a partir de um app
+instalado por essa via.
+
 ## 0.7.0 — 18/09/2026
 
 A versão da **reunião ao vivo**: o app deixou de ser só um gravador que
