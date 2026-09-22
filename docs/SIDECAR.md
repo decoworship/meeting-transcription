@@ -74,9 +74,12 @@ configuração editável à mão.
 
 `motor_de_diarizacao` também é opcional em `diarizar` — `"torch"` (padrão) ou
 `"onnx"` (docs/DIARIZACAO-ONNX.md), e um valor desconhecido cai no padrão em
-silêncio, como `modelo`. **O núcleo C# ainda não envia este campo**: a chave
-existe hoje só dentro do sidecar (`escolher_motor` em `motores/diarizacao/motor.py`)
-enquanto a régua de saída do porte não fecha.
+silêncio, como `modelo`. **O núcleo C# já envia este campo**, lido da chave
+`motor_de_diarizacao` do `app.json` (`ConfiguracoesDoApp.MotorDeDiarizacao`,
+padrão `"torch"`). Fica ausente só quando quem chama o `MotorSidecar` não passa
+nada — a `Requisicao` omite o campo em vez de escrever `null`, e é esse
+caminho, não o app.json, que mantém o comportamento de hoje bit a bit para
+quem chama o sidecar direto.
 
 > **O `modelo` não é o modelo de voz.** O mesmo motor carrega duas coisas: o
 > pipeline que separa falantes, que se escolhe, e o modelo que transforma voz em

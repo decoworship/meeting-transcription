@@ -286,6 +286,21 @@ internal sealed class Requisicao
     [JsonPropertyName("modelo")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Modelo { get; init; }
+
+    /// <summary>
+    /// Qual motor de diarização usar: <c>"torch"</c> (pyannote) ou
+    /// <c>"onnx"</c>.
+    /// </summary>
+    /// <remarks>
+    /// Nulo é o padrão do motor, <c>"torch"</c>. Só a operação
+    /// <c>diarizar</c> olha, e um valor desconhecido cai no padrão em
+    /// silêncio — quem confere é o próprio motor Python
+    /// (<c>escolher_motor</c> em <c>motores/diarizacao/motor.py</c>), não
+    /// este lado. Ver docs/DIARIZACAO-ONNX.md.
+    /// </remarks>
+    [JsonPropertyName("motor_de_diarizacao")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? MotorDeDiarizacao { get; init; }
 }
 
 internal sealed class TrechoJson

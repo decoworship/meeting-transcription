@@ -322,6 +322,12 @@ public sealed class Transcritor(Motores motores)
     /// algum precisar mudar, a bifurcação vazou para baixo.
     /// </para>
     /// </param>
+    /// <param name="motorDeDiarizacao">
+    /// <c>"torch"</c> (pyannote, o de sempre) ou <c>"onnx"</c>, o porte de
+    /// 18/09/2026 (docs/DIARIZACAO-ONNX.md). Nulo é <c>"torch"</c>. Valor
+    /// desconhecido não é conferido aqui — quem confere é o próprio motor
+    /// Python, e cai no padrão em silêncio.
+    /// </param>
     /// <remarks>
     /// O <c>try/finally</c> existe pelo marcador de etapa: sair por exceção
     /// **tratada** é o app sabendo que falhou, e aí o marcador tem de ir embora
@@ -337,14 +343,16 @@ public sealed class Transcritor(Motores motores)
         bool diarizar = true, bool corrigirFonetica = true,
         bool usarHotwords = false, string? modeloDeDiarizacao = null,
         bool revisarComModelo = false, CaminhosDoMotorDeAta? motorDeAta = null,
-        CancellationToken ct = default, string? motorDeTranscricao = null)
+        CancellationToken ct = default, string? motorDeTranscricao = null,
+        string? motorDeDiarizacao = null)
     {
         try
         {
             return await ExecutarInternoAsync(
                 pastaDaGravacao, vocabulario, idioma, filtrarSilencio, progresso,
                 modelo, cliente, projeto, diarizar, corrigirFonetica, usarHotwords,
-                modeloDeDiarizacao, revisarComModelo, motorDeAta, ct, motorDeTranscricao);
+                modeloDeDiarizacao, revisarComModelo, motorDeAta, ct, motorDeTranscricao,
+                motorDeDiarizacao);
         }
         finally
         {
@@ -359,7 +367,7 @@ public sealed class Transcritor(Motores motores)
         bool diarizar, bool corrigirFonetica,
         bool usarHotwords, string? modeloDeDiarizacao,
         bool revisarComModelo, CaminhosDoMotorDeAta? motorDeAta,
-        CancellationToken ct, string? motorDeTranscricao)
+        CancellationToken ct, string? motorDeTranscricao, string? motorDeDiarizacao)
     {
         string motorEscolhido = ConfiguracoesDoApp.MotorAceito(
             motorDeTranscricao ?? ConfiguracoesDoApp.Carregar().MotorDeTranscricao);
@@ -405,7 +413,8 @@ public sealed class Transcritor(Motores motores)
         Registro.Escrever("pipeline",
             $"transcrever {Path.GetFileName(pastaDaGravacao)} · motor {motorEscolhido} · "
             + $"modelo {escolhido} · "
-            + $"diarizar={diarizar} ({modeloDeDiarizacao ?? "padrão"}) · "
+            + $"diarizar={diarizar} ({modeloDeDiarizacao ?? "padrão"}, "
+            + $"{motorDeDiarizacao ?? "torch"}) · "
             + $"hotwords={usarHotwords}");
 
         // O marcador de etapa, e a marca órfã que ele encontrou. Uma órfã prova
@@ -489,7 +498,7 @@ public sealed class Transcritor(Motores motores)
             diar.AoRegistrar += l => Registro.Escrever("diarizacao", l);
             diarizacao = await diar.DiarizarAsync(sistema,
                 (pct, texto) => progresso?.Invoke(new Progresso("diarizacao", pct, texto)),
-                modeloDeDiarizacao, ct);
+                modeloDeDiarizacao, ct, motorDeDiarizacao);
         }
         else
         {

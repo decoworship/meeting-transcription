@@ -42,14 +42,21 @@ internal static class Pipeline
         var relogio = Stopwatch.StartNew();
         var transcritor = new Transcritor(motores);
 
+        // Não é argumento de linha de comando: lida do mesmo app.json que o app
+        // usa, para o dono do produto testar o motor_de_diarizacao (torch ou
+        // onnx, docs/DIARIZACAO-ONNX.md) editando a chave e rodando de novo,
+        // sem precisar de mais uma flag. A mesma leitura de ModeloDeAta, dois
+        // parâmetros abaixo.
+        var cfg = ConfiguracoesDoApp.Carregar();
+
         var resultado = await transcritor.ExecutarAsync(
             pasta, vocabulario, idioma, filtrarSilencio,
             p => Console.Write($"\r  {p.Etapa}: {p.Fracao,6:P0} {p.Texto}          "),
             cliente: cliente, projeto: projeto,
             usarHotwords: usarHotwords, modeloDeDiarizacao: modeloDeDiarizacao,
             revisarComModelo: revisarComModelo,
-            motorDeAta: CaminhosDoMotorDeAta.AoLadoDoExecutavel(
-                ConfiguracoesDoApp.Carregar().ModeloDeAta),
+            motorDeAta: CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta),
+            motorDeDiarizacao: cfg.MotorDeDiarizacao,
             ct: ct);
 
         Console.WriteLine($"\n\n{resultado.Segments.Count} segmentos, "

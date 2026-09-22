@@ -119,6 +119,15 @@ public sealed class TranscritorTests : IDisposable
     }
 
     [Fact]
+    public void MotorDeDiarizacaoPadraoEOTorch()
+    {
+        // O porte para ONNX (docs/DIARIZACAO-ONNX.md) não pode mudar quem
+        // não mexeu no app.json: quem não escreveu a chave continua no
+        // pyannote de sempre.
+        Assert.Equal("torch", new ConfiguracoesDoApp().MotorDeDiarizacao);
+    }
+
+    [Fact]
     public void ATelemetriaDoPyannoteSaiDesligadaEmTodoSidecar()
     {
         // A chave NÃO tem valor padrão do lado do pyannote: sem ela o

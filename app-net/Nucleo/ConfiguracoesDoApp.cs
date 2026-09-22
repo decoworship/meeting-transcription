@@ -94,6 +94,35 @@ public sealed class ConfiguracoesDoApp
     public string MotorDeTranscricao { get; set; } = Vozes.MotorClassico;
 
     /// <summary>
+    /// Qual motor separa falantes: <c>"torch"</c> ou <c>"onnx"</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O padrão é o <c>torch</c>, e ele não se troca sozinho.</b> É o
+    /// pyannote como sempre foi, desde a Fase 2. O <c>onnx</c> é o porte de
+    /// 18/09/2026 (<c>docs/DIARIZACAO-ONNX.md</c>) para ONNX Runtime + numpy, e
+    /// as réguas fecharam com as decisões de falante idênticas ao torch
+    /// (acordo 1,0000) e mais rápido nos dois lados: 11,80x o tempo real na GPU
+    /// contra 5,17x do torch, e roda também sem GPU nenhuma.
+    /// </para>
+    /// <para>
+    /// <b>Ganhar na régua não é motivo para virar padrão</b> — a chave existe
+    /// para o dono do produto testar o caminho novo numa reunião de verdade
+    /// antes de decidir trocar o que todo mundo usa sem pedir.
+    /// </para>
+    /// <para>
+    /// Valor desconhecido cai no <c>torch</c>, e não levanta erro: esta chave é
+    /// editável à mão num arquivo, e um <c>app.json</c> com um typo não pode
+    /// impedir alguém de separar falantes numa reunião que já aconteceu. A
+    /// mesma decisão do <see cref="MotorDeTranscricao"/> quando o MOSS saiu — só
+    /// que aqui quem confere é o próprio motor Python (<c>escolher_motor</c> em
+    /// <c>motores/diarizacao/motor.py</c>), e não este lado.
+    /// </para>
+    /// </remarks>
+    [JsonPropertyName("motor_de_diarizacao")]
+    public string MotorDeDiarizacao { get; set; } = "torch";
+
+    /// <summary>
     /// Mostrar a transcrição na tela durante a própria reunião.
     /// </summary>
     /// <remarks>

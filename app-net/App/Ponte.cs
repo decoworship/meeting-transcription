@@ -1534,6 +1534,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     // eram guardados e nunca lidos — ver Pedido.DiarModel.
                     modeloDeDiarizacao: p.DiarModel is { Length: > 0 } doProjeto
                         ? doProjeto : cfgDaTranscricao.DiarizacaoPadrao,
+                    motorDeDiarizacao: cfgDaTranscricao.MotorDeDiarizacao,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);

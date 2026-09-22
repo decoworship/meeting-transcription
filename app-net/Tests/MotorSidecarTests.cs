@@ -46,6 +46,31 @@ public sealed class MotorSidecarTests
     }
 
     [Fact]
+    public async Task MotorDeDiarizacaoChegaNaRequisicaoQuandoPedido()
+    {
+        // O porte para ONNX Runtime (docs/DIARIZACAO-ONNX.md) só é alcançável
+        // se o valor pedido pelo C# realmente sair no JSON da requisição.
+        using var m = await Subir("eco-diarizacao");
+
+        var segs = await m.DiarizarAsync("qualquer.wav", motorDeDiarizacao: "onnx");
+
+        Assert.Equal("onnx", segs.Single().Falante);
+    }
+
+    [Fact]
+    public async Task MotorDeDiarizacaoAusenteNaoVaiNaRequisicao()
+    {
+        // O contrato promete o campo ausente, e não "torch" escrito, quando
+        // ninguém pede um motor — bit a bit o comportamento de hoje, para quem
+        // não tocou na chave nova. Ver docs/SIDECAR.md.
+        using var m = await Subir("eco-diarizacao");
+
+        var segs = await m.DiarizarAsync("qualquer.wav");
+
+        Assert.Equal("ausente", segs.Single().Falante);
+    }
+
+    [Fact]
     public async Task TranscricaoDevolveTextoIdiomaEDuracao()
     {
         using var m = await Subir();
