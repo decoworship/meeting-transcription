@@ -36,6 +36,9 @@ VERSAO = "4"
 # modelos diferentes não são comparáveis — e a comparação não falha, ela só passa
 # a errar em silêncio. São duas coisas no mesmo motor, e só uma delas se troca.
 MODELO_DE_VOZ = "pyannote/wespeaker-voxceleb-resnet34-LM"
+#: A taxa em que o modelo de voz foi treinado, e a única que o fbank em numpy
+#: de pipeline/fbank.py sabe calcular.
+TAXA_DA_VOZ = 16000
 PIPELINE_DE_DIARIZACAO = "pyannote/speaker-diarization-community-1"
 
 # Os pesos ao lado deste arquivo, montados por
@@ -116,9 +119,20 @@ def _modelo_onnx_local(nome: str = PADRAO) -> str | None:
 
 
 def _voz_local() -> str | None:
-    """A pasta do modelo de voz embarcado, ou ``None``."""
+    """A pasta do modelo de voz, ou ``None`` quando um dos dois artefatos falta.
+
+    São os artefatos **onnx** (``voz.onnx`` e ``mel.npy``) desde 22/09/2026, e
+    não mais o ``pytorch_model.bin``: o caminho da voz é o último que carregava
+    torch, e é o que faz os 3,6 GB saírem (docs/DIARIZACAO-ONNX.md). Os pesos
+    do torch continuam ao lado — são eles que o exportador lê —, mas ninguém
+    em produção os abre.
+
+    Ao contrário do modelo de diarização, este **não é escolhível**: uma pasta
+    só, sem parâmetro, porque trocá-lo invalidaria toda voz já aprendida.
+    """
     pasta = os.path.join(_LOCAIS, "wespeaker-voxceleb-resnet34-LM")
-    return pasta if os.path.isfile(os.path.join(pasta, "pytorch_model.bin")) else None
+    artefatos = (os.path.join(pasta, "voz.onnx"), os.path.join(pasta, "mel.npy"))
+    return pasta if all(os.path.isfile(a) for a in artefatos) else None
 
 
 def _enviar(**campos) -> None:
@@ -243,6 +257,12 @@ class Pipeline:
     #: mesmos bytes e produzem o mesmo espaço vetorial. É esta identidade que o
     #: núcleo carimba em cada voz aprendida, para nunca comparar vetores de
     #: modelos diferentes (docs/VOZES.md §7).
+    #:
+    #: **O runtime mudou em 22/09/2026 e esta string não.** É de propósito: o
+    #: que o carimbo protege é o espaço vetorial, e ele é dos pesos — o ONNX
+    #: executa os mesmos. Renomear aqui para "…-onnx" marcaria todo vetor novo
+    #: como incomparável com os 160 já guardados e apagaria na prática o banco
+    #: de vozes inteiro, por uma diferença que a régua mostra não existir.
     def modelo_de_voz(self) -> str:
         return MODELO_DE_VOZ
 
@@ -252,32 +272,56 @@ class Pipeline:
         Recebe intervalos e não um arquivo recortado porque quem escolhe os
         trechos é o núcleo, que sabe quais são limpos: fala sem sobreposição,
         na faixa certa, somando o mínimo de segundos. Ver VOZES.md §2.
+
+        **Sem torch desde 22/09/2026.** Até então este era o único caminho do
+        app que ainda subia o pyannote (``Inference(modelo, window="whole")``),
+        e era ele que segurava os 3,6 GB. Os vetores continuam os mesmos —
+        ``pipeline/testes/test_voz.py`` mede este caminho contra aquele
+        ``Inference``, e ``tools/conferir_voz_onnx.py`` o mede contra o banco
+        de vozes já gravado —, e por isso ``modelo_de_voz()`` não mudou: mudar
+        a identidade jogaria fora toda voz aprendida por uma diferença que não
+        existe.
         """
         _enviar(id=id_req, tipo="progresso", pct=0.1, texto="carregando o modelo de voz")
 
-        from pyannote.audio import Model, Inference
         import numpy as np
-        import torch
 
         if self._voz is None:
-            import torch as _t
-            if self.dispositivo == "?":
-                self.dispositivo = "cuda" if _t.cuda.is_available() else "cpu"
-            # Mesma ordem do pipeline: a pasta ao lado primeiro. O modelo de voz
-            # não tem portão no HuggingFace, mas ele viaja junto pelo ganho que
-            # não é de segredo — a primeira reunião de uma instalação nova não
-            # depende de rede.
             local = _voz_local()
-            modelo = (Model.from_pretrained(local) if local
-                      else Model.from_pretrained(MODELO_DE_VOZ,
-                                                 token=os.environ.get("HF_TOKEN")))
-            if torch.cuda.is_available():
-                modelo = modelo.to(torch.device("cuda"))
-            self._voz = Inference(modelo, window="whole")
-            _log(f"modelo de voz carregado em {self.dispositivo}")
+            if local is None:
+                raise RuntimeError(
+                    f"o modelo de voz onnx não está completo em {_LOCAIS} "
+                    "(faltam wespeaker-voxceleb-resnet34-LM/voz.onnx ou mel.npy). "
+                    "Rode tools/exportar_diarizacao_onnx.py."
+                )
+            # pipeline/ tem imports próprios sem prefixo de pacote, então ele
+            # entra no sys.path — mesma razão que em `_carregar_onnx`.
+            pipeline_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
+            if pipeline_dir not in sys.path:
+                sys.path.append(pipeline_dir)
+            from voz import ExtratorDeVoz
 
-        audio = self._ler_wav(caminho)
-        onda, taxa = audio["waveform"], audio["sample_rate"]
+            self._voz = ExtratorDeVoz(local, preferir_gpu=True)
+            # Só quando ninguém disse ainda: `dispositivo` é o rótulo do motor
+            # de diarização, e a voz não pode sobrescrever o dele — os dois
+            # rodam em sessões independentes e podem cair para provedores
+            # diferentes.
+            if self.dispositivo == "?":
+                self.dispositivo = ("cuda" if self._voz.provedor == "CUDAExecutionProvider"
+                                    else "cpu")
+            _log(f"modelo de voz onnx carregado: {local} ({self._voz.provedor})")
+
+        onda, taxa = self._ler_onda(caminho)
+        # O fbank de pipeline/fbank.py tem 16 kHz na tabela mel e nos passos de
+        # janela; o caminho antigo reamostrava sozinho dentro do `model.audio`
+        # do pyannote, e este não. O nosso gravador só produz 16 kHz, então
+        # isto é uma rede de proteção — mas sem ela um WAV de outra taxa sairia
+        # com um vetor errado e nenhum aviso, que é o modo de falha que este
+        # porte mais teme.
+        if taxa != TAXA_DA_VOZ:
+            raise RuntimeError(
+                f"o modelo de voz espera {TAXA_DA_VOZ} Hz, o áudio veio a {taxa} Hz"
+            )
 
         # Concatenar os trechos limpos em vez de embedar o mais longo: o piso
         # de duração é sobre o total de fala da pessoa, e um único trecho curto
@@ -286,14 +330,14 @@ class Pipeline:
         for t in trechos:
             a, b = int(t["inicio"] * taxa), int(t["fim"] * taxa)
             if b > a:
-                pedacos.append(onda[:, a:b])
+                pedacos.append(onda[a:b])
         if not pedacos:
             raise RuntimeError("nenhum trecho utilizável para extrair a voz")
 
-        junto = torch.cat(pedacos, dim=1)
+        junto = np.concatenate(pedacos)
         _enviar(id=id_req, tipo="progresso", pct=0.6, texto="extraindo a voz")
 
-        vetor = self._voz({"waveform": junto, "sample_rate": taxa})
+        vetor = self._voz(junto)
         return np.asarray(vetor).astype(float).ravel().tolist()
 
     def diarizar(self, caminho: str, id_req: int, modelo: str | None = None,
