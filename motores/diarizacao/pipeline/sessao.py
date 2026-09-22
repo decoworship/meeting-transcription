@@ -56,13 +56,21 @@ def _preparar_path_cuda_windows() -> None:
 
     capi = Path(ort.__file__).resolve().parent / "capi"
     # .../motores/python/Lib/site-packages/onnxruntime/capi -> .../motores
-    motores = capi.parents[4] if len(capi.parents) >= 4 else None
+    # parents[4] pede len(parents) >= 5 (parents[0] já conta como o primeiro).
+    motores = capi.parents[4] if len(capi.parents) >= 5 else None
 
     candidatas = [capi]
     if motores is not None:
         candidatas.append(motores / "ata" / "bin")
         candidatas.append(
             motores / "python" / "Lib" / "site-packages" / "ctranslate2"
+        )
+        # Transitório: cufft64_11.dll e as sublibs do cuDNN só existem hoje
+        # dentro de torch/lib (docs/DIARIZACAO-ONNX.md §5.2, achado de
+        # 22/09/2026). Quando o torch sair, essas DLLs precisam vir de outro
+        # lugar, ou o CUDA EP volta a cair para CPU em silêncio.
+        candidatas.append(
+            motores / "python" / "Lib" / "site-packages" / "torch" / "lib"
         )
 
     pastas = [str(p) for p in candidatas if p.is_dir()]
@@ -93,7 +101,21 @@ def abrir(caminho: str | Path, preferir_gpu: bool = True):
         pedidos.append("CUDAExecutionProvider")
     pedidos.append("CPUExecutionProvider")
 
-    sessao = ort.InferenceSession(caminho, providers=pedidos)
+    try:
+        sessao = ort.InferenceSession(caminho, providers=pedidos)
+    except Exception as e:
+        # A queda graciosa (provedor pedido, ORT usa outro) é tratada abaixo,
+        # pelo get_providers(). Isto aqui é a queda que NÃO é graciosa: o CUDA
+        # EP chega a começar a carregar e morre no meio, ex.
+        # "Cannot load symbol cudnnCreate" quando falta alguma DLL — visto na
+        # máquina do segundo usuário (SUP-2). Se CUDA foi pedido, tenta de
+        # novo só com CPU; se não foi, ou a CPU também falhar, propaga.
+        if "CUDAExecutionProvider" not in pedidos:
+            raise
+        print(f"[diarizacao] falha ao carregar o provedor CUDA: {e}. "
+              f"Continuando em CPUExecutionProvider.", file=sys.stderr, flush=True)
+        sessao = ort.InferenceSession(caminho, providers=["CPUExecutionProvider"])
+
     efetivo = sessao.get_providers()[0]
 
     if preferir_gpu and efetivo != "CUDAExecutionProvider":

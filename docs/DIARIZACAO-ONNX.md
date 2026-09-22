@@ -421,19 +421,39 @@ app publicado, mesmo com `preferir_gpu=True` no código — não porque o CUDA E
 não funcione (o V5 mostra que funciona, a 11,80x), mas porque o pacote que o
 habilita ainda não está na instalação.
 
-**Achado de 22/09/2026, para quem planejar a limpeza: apagar `torch/lib` quebra
-o CUDA EP do ONNX, do jeito que ele está hoje.** Medido na instalação real,
-tentando fazer o CUDA EP funcionar sem tocar em `torch`: `cublas64_12.dll`,
-`cublasLt64_12.dll` e `cudart64_12.dll` sobrevivem sem torch (vêm de
-`motores/ata/bin`), e o `ctranslate2` traz o `cudnn64_9.dll` principal. Mas
-`cufft64_11.dll` e o conjunto completo das sublibs do cuDNN
-(`cudnn_graph64_9.dll`, `cudnn_cnn64_9.dll`, `cudnn_ops64_9.dll`, ...) **só
-existem, na instalação de hoje, dentro de `torch/lib`** — nenhum outro pacote
-embarcado os traz. Isto é o oposto do que a tabela do §5 conta com: apagar
-`torch/lib` na ordem ali descrita derrubaria de volta para CPU o motor que este
-porte inteiro existe para acelerar. **Não é para consertar agora** — é decisão
-e trabalho do dono do produto, mas quem planejar a limpeza não pode descobrir
-isso depois de já ter apagado a pasta.
+**Achado de 22/09/2026, para quem planejar a limpeza: o CUDA EP do ONNX precisa
+de cinco famílias de DLL, e nem todas sobrevivem sem `torch/lib`.** Medido na
+instalação real: `cublas64_12.dll`, `cublasLt64_12.dll` e `cudart64_12.dll`
+vêm de `motores/ata/bin`, e o `cudnn64_9.dll` principal vem do `ctranslate2` —
+essas três famílias sobrevivem à remoção do torch. Mas `cufft64_11.dll` e o
+conjunto completo das sublibs do cuDNN (`cudnn_graph64_9.dll`,
+`cudnn_cnn64_9.dll`, `cudnn_ops64_9.dll`, ...) **hoje não têm outra fonte na
+instalação além de `torch/lib`** — nenhum outro pacote embarcado os traz.
+Apagar `torch/lib` na ordem que a tabela do §5 conta com derrubaria de volta
+para CPU o motor que este porte inteiro existe para acelerar, a menos que a
+limpeza empacote essas duas famílias explicitamente antes de tirar o torch.
+**Não é para consertar agora** — é decisão e trabalho do dono do produto, mas
+quem planejar a limpeza não pode descobrir isso depois de já ter apagado a
+pasta.
+
+**E os 7,91x medidos hoje não saem de uma instalação que os scripts do repo
+produzem.** Para medir no runtime real, o `onnxruntime` 1.29.0 (CPU) que o
+Python embarcado tinha foi substituído à mão pelo `onnxruntime-gpu` 1.23.2 —
+o wheel `onnxruntime_gpu-1.23.2-cp312-cp312-win_amd64.whl`, uma build CUDA 12
+(o backup do pacote CPU ficou em `C:\Users\andre\ort-cpu-backup`); e as DLLs
+acima (`cublas64_12.dll`, `cublasLt64_12.dll`, `cudart64_12.dll`,
+`cufft64_11.dll` e o conjunto de cuDNN) foram copiadas à mão para
+`site-packages/onnxruntime/capi/`, vindas de `motores/ata/bin/` e de
+`torch/lib`. Nenhum dos dois passos está em `tools/empacotar_motores.sh` nem
+em `tools/montar_instalador.sh` hoje — a medição é real, mas um instalador
+gerado pelo repo como está não chega a este estado sozinho.
+
+**Armadilha à parte, para quem for empacotar o `onnxruntime-gpu`:** a versão
+que `pip`/`uv` resolvem por padrão hoje é a 1.30, que pede CUDA 13. Ela falha
+ao carregar (`libcublasLt.so.13: cannot open shared object file`) e cai para
+CPU **em silêncio** — é o mesmo tipo de queda muda que motivou este arquivo
+existir (ver o topo). A 1.23.2 é uma build CUDA 12 e é a que bate com o que o
+app já embarca; fixar a versão no empacotamento não é opcional.
 
 ---
 

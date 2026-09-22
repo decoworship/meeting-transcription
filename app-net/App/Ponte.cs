@@ -1688,7 +1688,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         _transcricoes.Progredir(pasta, "falantes", f, t);
                         EmpurrarTranscricoes();
                     },
-                    cfg.DiarizacaoPadrao, trabalho.Token);
+                    cfg.DiarizacaoPadrao, trabalho.Token,
+                    motorDeDiarizacao: cfg.MotorDeDiarizacao);
 
                 var comFalante = FalantesDaLegenda.Atribuir(legenda.Trechos, diarizacao);
 
