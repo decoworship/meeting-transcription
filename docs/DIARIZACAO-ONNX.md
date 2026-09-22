@@ -316,12 +316,14 @@ quatro, nos dois motores.
 | 2026-08-27_15-28-37 | 48,5 min | 805 | 3 | 1433 s | 2566 s |
 
 **Os tempos desta tabela não são comparáveis entre si.** O torch rodou em
-**CUDA** e o ONNX em **CPU** — o usuário recusou instalar o `onnxruntime-gpu`
-(Ruling C5 do pré-voo), e o `sessao.py` avisou a queda para CPU no stderr em
-cada execução. Ler 170 s contra 684 s como "o porte é 4x mais lento" é uma
-leitura enganada pela tabela: os dois lados não estão na mesma pista. A única
-comparação de velocidade honesta que este porte tem é a da V3 abaixo, onde os
-dois lados rodam em CPU — e lá quem ganha é o ONNX.
+**CUDA** e o ONNX em **CPU** — nesta rodada de 21/09/2026 o `onnxruntime-gpu`
+ainda não tinha sido medido (Ruling C5 do pré-voo fixava CPU por cautela), e o
+`sessao.py` avisou a queda para CPU no stderr em cada execução. Ler 170 s
+contra 684 s como "o porte é 4x mais lento" era uma leitura enganada pela
+tabela: os dois lados não estavam na mesma pista. **Isso mudou em 22/09/2026**
+— a V5 abaixo mede os dois lados em CUDA, e é essa a comparação honesta de
+velocidade hoje; a V3, com os dois lados em CPU, continua valendo para o que
+mede (o banco de vozes).
 
 **V3 — as decisões de voz, 49 vozes, 1176 pares.** **0 discordâncias** nos
 três limiares 0,55 · 0,60 · 0,70. Cosseno mínimo torch × ONNX
@@ -347,6 +349,49 @@ medido — mas a decisão de começar a limpeza continua sendo do dono do
 produto, e este documento não a toma (ver "O que este plano NÃO faz, de
 propósito", no fim do plano de implementação).
 
+**V5 — o CUDA EP, medido, e a fixação em CPU revogada.** A revisão de ponta a
+ponta apontou que `preferir_gpu=True` estava fixo no `motor.py` sem nenhuma
+régua ter exercitado o provedor CUDA do onnxruntime, e a resposta cautelosa
+foi fixar `preferir_gpu=False`. O dono do produto então trouxe um requisito
+que não estava no plano — o pipeline inteiro precisa rodar mais rápido que o
+tempo real — e lembrou que o objetivo sempre foi "substituir o torch pelo
+ONNX Runtime **com provedor CUDA**": CPU era o caminho de cautela, não a
+arquitetura. Medido em 22/09/2026, mesma gravação de 14,6 min e mesmo
+gabarito do V1:
+
+| caminho | tempo | x tempo real | acordo |
+|---|---:|---:|---:|
+| ONNX CPU | 684 s | 1,28x | 1,0000 |
+| torch CUDA | 170 s | 5,17x | (é o gabarito) |
+| **ONNX CUDA** | **74,4 s** | **11,80x** | **1,0000** |
+
+Carregar o pipeline em GPU levou 1,1 s. 404/404 trechos, 3 falantes, acordo
+**1,0000** — a preocupação de reprodutibilidade que motivou a fixação em CPU
+(o torch desliga TF32; o onnxruntime não tem o equivalente documentado) não
+se confirmou neste modelo. **Como nos outros três, o provedor efetivo foi
+conferido com `get_providers()`, não só pedido** — é a mesma disciplina que
+evitou registrar o falso 32,11x de 18/09/2026 (§1).
+
+**A armadilha de CUDA 12 contra CUDA 13 continua valendo, e quase repetiu a
+de 18/09.** O CUDA EP só carrega com um build **CUDA 12** do
+`onnxruntime-gpu` — `1.23.2` funciona. A versão `1.30`, que `uv`/`pip`
+resolvem por padrão, exige **CUDA 13**, falha com
+`libcublasLt.so.13: cannot open shared object file` e **cai para CPU em
+silêncio**. É a mesma armadilha do §1, e é a razão inteira de o `sessao.py`
+existir: ele anunciou a queda no stderr em vez de deixar esta medição cronometrar
+CPU achando que era GPU.
+
+**O custo de ligar isto é o wheel, não o runtime.** A instalação Windows do
+app já embarca as bibliotecas CUDA 12 de que o EP precisa —
+`cublas64_12.dll` e `cublasLt64_12.dll` (do motor de ata) e `cudnn64_9.dll`
+(do CTranslate2, o ASR). O que falta acrescentar é o `onnxruntime-gpu`
+(~250 MB, já contado no orçamento do §5), não ~2 GB de runtime CUDA novo.
+
+Isto revoga a fixação em CPU: `preferir_gpu` volta a `True` no `motor.py`.
+`motor_de_diarizacao` continua em `"torch"` por padrão — trocar o padrão para
+`"onnx"` é decisão do dono do produto, e depende da limpeza (instalar o
+`onnxruntime-gpu` no Python embarcado, fora do escopo desta medição).
+
 **Um risco em aberto: nenhum número desta seção rodou no runtime que o app usa.**
 V1, V2 e V3 rodaram todos no venv de desenvolvimento (WSL), não no Python
 embarcado que o instalador entrega. Medido em 21/09/2026:
@@ -367,12 +412,14 @@ do escopo** (a medição foi restrita ao venv do WSL), e por isso fica escrito
 aqui: é o risco mais barato que continua aberto antes de aprovar a remoção do
 torch.
 
-Uma segunda consequência da mesma tabela: o onnxruntime embarcado é
-**CPU-only**. No runtime de destino, o motor onnx roda sempre em CPU,
-enquanto o torch tem CUDA — então, dos números da tabela de V2 acima, os
-2566 s da gravação de 48,5 min são a figura que uma pessoa realmente
-experimentaria, não uma comparação teórica entre dois caminhos igualmente
-disponíveis.
+Uma segunda consequência da mesma tabela: o Python embarcado só tem o
+onnxruntime **CPU-only** instalado hoje — o `onnxruntime-gpu` que o V5 mediu
+não foi empacotado nele, e empacotá-lo é a limpeza, fora do escopo desta
+medição. Até lá, dos números da tabela de V2 acima, os 2566 s da gravação de
+48,5 min continuam sendo a figura que uma pessoa realmente experimentaria no
+app publicado, mesmo com `preferir_gpu=True` no código — não porque o CUDA EP
+não funcione (o V5 mostra que funciona, a 11,80x), mas porque o pacote que o
+habilita ainda não está na instalação.
 
 ---
 

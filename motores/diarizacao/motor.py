@@ -224,15 +224,15 @@ class Pipeline:
             sys.path.append(pipeline_dir)
         from diarizacao import Diarizador
 
-        # preferir_gpu=False: o motor onnx só foi medido no CPU EP (V1, V2,
-        # V3 — docs/DIARIZACAO-ONNX.md §5.1). O torch desliga TF32 para ser
-        # reprodutível; aqui não existe o equivalente para o CUDA EP do
-        # onnxruntime, e ligar isso sem uma régua sobre ele seria trocar a
-        # matemática medida por uma não medida. O runtime embarcado do app
-        # também não tem provedor CUDA hoje, então isto não custa nada agora
-        # — só evita a armadilha da primeira máquina que instalar
-        # onnxruntime-gpu.
-        self._onnx = Diarizador(pasta, preferir_gpu=False)
+        # preferir_gpu=True: o CUDA EP do onnxruntime foi medido (V5 —
+        # docs/DIARIZACAO-ONNX.md §5.1) na mesma gravação e gabarito do V1,
+        # com o provedor efetivo conferido (não só pedido): 11,80x o tempo
+        # real, acordo 1,0000 — a preocupação de reprodutibilidade que
+        # justificava fixar CPU não se confirmou neste modelo. O
+        # `sessao.abrir` cai para CPU sozinho quando o provedor CUDA não
+        # está disponível ou falha ao carregar, avisando alto no stderr; o
+        # caminho CPU continua utilizável, a ~1,28x o tempo real.
+        self._onnx = Diarizador(pasta, preferir_gpu=True)
         _log(f"pipeline onnx carregado: {pasta} "
              f"(segmentação em {self._onnx.seg.provedor}, "
              f"embedding em {self._onnx.emb.provedor})")

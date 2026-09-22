@@ -35,7 +35,8 @@ def abrir(caminho: str | Path, preferir_gpu: bool = True):
 
     if preferir_gpu and efetivo != "CUDAExecutionProvider":
         # não é erro — a máquina pode não ter NVIDIA. Mas é caro e tem de
-        # aparecer: a diarização em CPU roda a 0,57x o tempo real.
+        # aparecer: a diarização em CPU roda a ~1,28x o tempo real (V1,
+        # docs/DIARIZACAO-ONNX.md §5.1), contra 11,80x no CUDA EP (V5).
         print(f"[diarizacao] CUDA indisponível, rodando em {efetivo}. "
               f"Disponíveis: {disponiveis}", file=sys.stderr, flush=True)
 
