@@ -542,60 +542,37 @@ public sealed class Transcritor(Motores motores)
 
         if (filtrarSilencio) FiltroDeSilencio.Filtrar(segmentos, faixas.Mix());
 
-        if (vocabulario is { Length: > 0 } && corrigirFonetica)
-        {
-            var termos = vocabulario.Split(',', StringSplitOptions.TrimEntries
-                                                | StringSplitOptions.RemoveEmptyEntries);
-            foreach (var seg in segmentos)
-            {
-                var (texto, trocas) = CorrecaoFonetica.Corrigir(seg.Text, termos);
-                if (trocas.Count > 0)
-                {
-                    seg.Text = texto;
-                    // A lista vai junto para o arquivo: é o que permite à tela
-                    // mostrar o que foi trocado e desfazer o que estiver errado.
-                    // Antes ela era descartada aqui, e a correção acontecia sem
-                    // deixar rastro.
-                    Anotar(seg, trocas);
-                }
-            }
-        }
-
-        // Depois da fonética, e não no lugar dela: as duas pegam coisas
-        // diferentes. A fonética recupera grafia de som parecido ("Jimmy" por
-        // "Dimi"); esta recupera sigla e nome próprio por distância de edição
-        // ("G6CB" por "GCCB"), que é onde a fonética acerta zero — medido nos
-        // dez casos de AuditoriaCorrecaoFonetica. Ver Nucleo/RevisaoDeTermos.cs.
-        //
-        // Rodar depois evita que as duas disputem a mesma palavra: o que a
-        // fonética já consertou vira termo conhecido e esta nem olha.
         if (corrigirFonetica)
         {
-            var entidades = EntidadesConhecidas(pastaDaGravacao, vocabulario, cliente, projeto);
-            var cruas = new List<Proposta>(
-                RevisaoDeTermos.Propor(segmentos.Select(s => s.Text), entidades));
+            var foneticos = CorrecaoDeTermos.Fonetica(
+                [.. segmentos.Select(s => s.Text)], vocabulario);
+            for (int i = 0; i < segmentos.Count; i++)
+            {
+                if (foneticos[i].Trocas.Count == 0) continue;
+                segmentos[i].Text = foneticos[i].Texto;
+                // A lista vai junto para o arquivo: é o que permite à tela
+                // mostrar o que foi trocado e desfazer o que estiver errado.
+                // Antes ela era descartada aqui, e a correção acontecia sem
+                // deixar rastro.
+                Anotar(segmentos[i], foneticos[i].Trocas);
+            }
 
-            // A grafia entra junto, e não no lugar: as duas pegam coisas
-            // diferentes. A de cima recupera o termo que o motor ouviu errado
-            // ("G6CB" por "GCCB"); esta recupera o que ele ouviu certo e
-            // escreveu com o espaço no lugar errado ("next best" por
-            // "NextBest"). É o que fecha boa parte da distância medida no §12
-            // da docs/FASE7-RESULTADOS.md, e vale para os dois motores.
-            cruas.AddRange(
-                RevisaoDeTermos.ProporGrafia(segmentos.Select(s => s.Text), entidades));
+            var entidades = CorrecaoDeTermos.Entidades(
+                pastaDaGravacao, vocabulario, cliente, projeto);
+            var textos = segmentos.Select(s => s.Text).ToList();
 
             // O segundo propositor, quando ligado. Ele nunca substitui o
             // primeiro: as duas listas se somam e passam pela mesma porta.
             // Falhar aqui não pode derrubar a transcrição — a revisão é
             // acabamento, e o texto já está pronto.
+            var doModelo = new List<Proposta>();
             if (revisarComModelo && motorDeAta is not null && entidades.Count > 0)
             {
                 try
                 {
                     progresso?.Invoke(new Progresso("montagem", 0.7, "revisando os termos"));
-                    cruas.AddRange(await PropositorDeModelo.ProporAsync(
-                        new MotorDeAta(motorDeAta), segmentos.Select(s => s.Text),
-                        entidades, ct: ct));
+                    doModelo.AddRange(await PropositorDeModelo.ProporAsync(
+                        new MotorDeAta(motorDeAta), textos, entidades, ct: ct));
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception e)
@@ -605,8 +582,7 @@ public sealed class Transcritor(Motores motores)
                 }
             }
 
-            var propostas = RevisaoDeTermos.Validar(cruas, entidades);
-
+            var propostas = CorrecaoDeTermos.Propostas(textos, entidades, doModelo);
             if (propostas.Count > 0)
             {
                 int mexidos = 0;
@@ -703,42 +679,6 @@ public sealed class Transcritor(Motores motores)
     {
         seg.Swaps ??= [];
         seg.Swaps.AddRange(trocas.Select(t => new TrocaFeita { De = t.De, Para = t.Para }));
-    }
-
-    /// <summary>
-    /// Os termos que esta reunião conhece: vocabulário, cliente, projeto e quem
-    /// a agenda convidou.
-    /// </summary>
-    /// <remarks>
-    /// <b>Os nomes da agenda são de graça e são os que mais aparecem.</b> Numa
-    /// ata medida, o nome do cliente saiu errado no corpo enquanto o cabeçalho,
-    /// três linhas acima, o escrevia certo — porque o cabeçalho lê o meta.json e
-    /// o corpo lia o que o ASR ouviu. Aqui as duas fontes passam a ser a mesma.
-    /// </remarks>
-    private static IReadOnlyList<string> EntidadesConhecidas(
-        string pasta, string? vocabulario, string? cliente, string? projeto)
-    {
-        var (nomes, emails) = ConvidadosDaAgenda.Ler(pasta);
-        var pessoas = Atas.Organizacoes.Classificar(nomes, emails, []);
-
-        // **Nome de uma palavra só não vira alvo.** Quando a agenda não traz o
-        // nome de exibição, sobra o local-part do e-mail — e ele entra na lista
-        // como se fosse gente: "Felipeof", "Emalina", "Tomole",
-        // "Johnmartinez01". Medido em 25/08 sobre as 37 gravações: com eles
-        // dentro, a regra propunha reescrever "Felipe" (pessoa real, dita na
-        // reunião) para "Felipeof" (lixo da agenda), e "Emilia" para "Emalina".
-        //
-        // O corte custa pouco: alvo de uma palavra só quase nunca é o que a
-        // regra precisa, porque ela compara token contra token e nome de
-        // verdade vem com sobrenome. E o que se perde é uma correção; o que se
-        // evita é reescrever o nome certo de alguém.
-        var comNomeDeVerdade = pessoas
-            .Select(p => p.Nome)
-            .Where(n => n.Contains(' '));
-
-        return [.. new[] { vocabulario, cliente, projeto }
-            .Where(x => x is { Length: > 0 })
-            .Concat(comNomeDeVerdade)!];
     }
 
     /// <summary>
