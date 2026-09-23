@@ -1662,7 +1662,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             // Sem separação, e a legenda não fica prometendo: marca como feita,
             // sem falante. O registro diz por quê.
-            LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+            LegendaAoVivo.Gravar(
+                pasta, legenda.Turnos, CorrigirTermos(pasta, legenda.Trechos), prontos: true);
             Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
             return;
         }
@@ -1728,6 +1729,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Registro.Escrever("legenda", $"vozes conhecidas: {e.Message}");
                 }
 
+                // Depois do reconhecimento, e não antes: a fala é agrupada por
+                // falante, e o falante com nome é o definitivo.
+                comFalante = CorrigirTermos(pasta, comFalante);
                 LegendaAoVivo.Gravar(pasta, legenda.Turnos, comFalante, prontos: true);
 
                 _transcricoes.Terminar(pasta);
@@ -1748,7 +1752,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // prometendo um resultado que não vem.
                 try
                 {
-                    LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+                    LegendaAoVivo.Gravar(
+                        pasta, legenda.Turnos, CorrigirTermos(pasta, legenda.Trechos),
+                        prontos: true);
                 }
                 catch (Exception) { /* disco: o aviso fica, e é o menor dos males */ }
 
@@ -1757,6 +1763,41 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             EmpurrarTranscricoes();
         });
+    }
+
+    /// <summary>
+    /// A correção de termos da passada final, sobre a legenda, com o
+    /// vocabulário do projeto da reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nunca levanta.</b> É acabamento: se falhar, a legenda sai como saía.
+    /// Roda nos três desfechos da separação — feita, recusada e falha —,
+    /// porque corrigir texto não usa placa e não depende de haver falante.
+    /// </remarks>
+    private List<TrechoDaLegenda> CorrigirTermos(string pasta, List<TrechoDaLegenda> trechos)
+    {
+        try
+        {
+            // O mesmo acesso que IniciarTranscricao usa para corrigirFonetica.
+            var cfg = ConfiguracoesDoApp.Carregar();
+            if (!cfg.CorrecaoFonetica) return trechos;
+
+            var vinculo = DadosDaReuniao.Ler(pasta);
+            string? vocabulario = _projetos.Preferencias(
+                vinculo.Cliente ?? "", vinculo.Projeto ?? "")?.InitialPrompt;
+            var entidades = CorrecaoDeTermos.Entidades(
+                pasta, vocabulario, vinculo.Cliente, vinculo.Projeto);
+
+            var r = CorrecaoDaLegenda.Corrigir(trechos, vocabulario, entidades);
+            Registro.Escrever("legenda",
+                $"termos corrigidos: {r.Trocas} troca(s), {r.Fundidos} trecho(s) fundido(s)");
+            return r.Trechos;
+        }
+        catch (Exception e)
+        {
+            Registro.Escrever("legenda", $"correção de termos ignorada: {e.Message}");
+            return trechos;
+        }
     }
 
     /// <summary>
