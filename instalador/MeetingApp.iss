@@ -146,8 +146,18 @@ Source: "{#Payload}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; (Até 22/09/2026 quem os importava era o torch_cuda.dll; o torch saiu, as DLLs
 ; ficaram — hoje vêm dos wheels nvidia-*, e o exclude de curand/cusolverMg
 ; abaixo só sobrevive porque não custa nada: eram do torch e não existem mais.)
+; `sklearn\datasets` sai por duas razões, e a segunda é a que obriga.
+; O app importa `sklearn.cluster` e nada mais — os datasets de exemplo
+; (espécies, faces, textos) são peso morto. Mas o que forçou a exclusão foi a
+; régua de privacidade: `_species_distributions.py` e o `.rst` ao lado citam um
+; pesquisador chamado **Anderson**, que colide com o nome de uma pessoa com voz
+; aprendida neste banco, e a régua — corretamente — não distingue os dois.
+; Enfraquecer a régua para caber um falso positivo é o começo de ela deixar de
+; proteger; tirar 1,7 MB que ninguém importa não custa nada. Conferido em
+; 23/09/2026: sem a pasta, `sklearn.cluster.KMeans` e o pipeline de diarização
+; importam e rodam.
 Source: "{#Motores}\*"; DestDir: "{app}\motores"; \
-  Excludes: "*.gguf,ata\bin,curand64_10.dll,cusolverMg64_11.dll,tests,test,*.pyi,.cache,__pycache__"; \
+  Excludes: "*.gguf,ata\bin,curand64_10.dll,cusolverMg64_11.dll,sklearn\datasets,tests,test,*.pyi,.cache,__pycache__"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\INSTALAR.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "{#Payload}\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion

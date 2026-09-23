@@ -1,6 +1,6 @@
 {
   "versao": "0.7.1",
-  "publicada": "2026-09-22",
-  "notas": "O torch saiu do app: a diarização e o reconhecimento de vozes passam a rodar em ONNX Runtime. O Python embarcado encolhe de 7,6 GB para 3,2 GB de site-packages, a diarização fica mais rápida (10,64x o tempo real em GPU, contra 5,17x), e o banco de vozes não precisa ser re-extraído. De quebra, dois defeitos de reconhecimento de voz na legenda ao vivo foram corrigidos.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.0"
+  "publicada": "2026-09-23",
+  "notas": "O torch saiu do app: a diarização e o reconhecimento de vozes passam a rodar em ONNX Runtime. O Python embarcado encolhe de 7,6 GB para 3,2 GB de site-packages, a diarização fica mais rápida (10,64x o tempo real em GPU, contra 5,17x), e o banco de vozes não precisa ser re-extraído. Conserta também a tela Ajustes › Modelos, que não abria desde a 0.7.0, e dois defeitos de reconhecimento de voz na legenda ao vivo.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.7.1"
 }
