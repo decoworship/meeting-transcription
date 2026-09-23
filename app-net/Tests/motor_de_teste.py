@@ -50,6 +50,19 @@ for linha in sys.stdin:
         # Longo o bastante para o cancelamento chegar no meio.
         time.sleep(60)
 
+    if modo == "eco-diarizacao":
+        # Não altera o modo "feliz" de propósito: aquele já tem asserções
+        # presas ao rótulo do falante, e este modo existe só para provar que o
+        # motor_de_diarizacao pedido pelo C# chega na requisição do sidecar —
+        # devolvido como se fosse o próprio rótulo, e "ausente" quando a chave
+        # não veio (o padrão "torch" cai no clássico, sem mandar a chave).
+        enviar(id=id_req, tipo="progresso", pct=0.3, texto="analisando falantes")
+        enviar(id=id_req, tipo="resultado", segmentos=[
+            {"inicio": 0.5, "fim": 3.25,
+             "falante": req.get("motor_de_diarizacao") or "ausente"},
+        ])
+        continue
+
     if req.get("op") == "transcrever":
         enviar(id=id_req, tipo="progresso", pct=0.5, texto="transcrevendo")
         enviar(id=id_req, tipo="resultado", idioma="pt", duracao=7.0, segmentos=[

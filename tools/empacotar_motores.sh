@@ -7,7 +7,7 @@
 # O resultado é:
 #
 #   motores/python/python.exe        Python embeddable, sem instalação
-#   motores/python/Lib/site-packages faster-whisper, pyannote e dependências
+#   motores/python/Lib/site-packages faster-whisper, onnxruntime-gpu, CUDA
 #   motores/asr/motor.py             o sidecar de transcrição
 #   motores/diarizacao/motor.py      o sidecar de diarização
 #   motores/modelos/motor.py         o sidecar que baixa modelo sob controle
@@ -31,6 +31,34 @@ PLATAFORMA="x86_64-pc-windows-msvc"
 # `transcribe.cpp` ainda está em 0.x — onde a compatibilidade não é promessa.
 TRANSCRIBE_CPP_VERSAO="0.2.3"
 
+# **1.23.2 e não "a mais nova", e isto não é conservadorismo.** O que o
+# `uv`/`pip` resolvem por padrão hoje é a 1.30, que é um build de **CUDA 13**:
+# ela não carrega contra as nossas DLLs de CUDA 12 (`cublasLt64_13.dll` /
+# `libcublasLt.so.13` ausentes) e **cai para CPU em silêncio** — foi assim que
+# uma medição de 18/09/2026 devolveu 32,11x o tempo real e quase entrou no
+# registro como resultado de GPU (ver o cabeçalho de
+# motores/diarizacao/pipeline/sessao.py). A 1.23.2 é build de CUDA 12.2 e é a
+# versão em que o porte inteiro foi medido: acordo 1,0000 na diarização e
+# cosseno mínimo 0,9999999998 nos vetores de voz.
+ONNXRUNTIME_VERSAO="1.23.2"
+
+# As DLLs de CUDA que o torch trazia e agora vêm de wheels próprios. As versões
+# são cravadas pela mesma razão que a do onnxruntime: um build novo pode trocar
+# de major de CUDA sem avisar, e a falha é muda.
+#
+# **São estas quatro e não mais**, e não é chute: o
+# `onnxruntime_providers_cuda.dll` da 1.23.2 importa exatamente
+# `cublas64_12`, `cublasLt64_12`, `cudart64_12`, `cudnn64_9` e `cufft64_11`
+# (mais o `nvcuda.dll` do driver, que é da máquina), e o `ctranslate2.dll`
+# importa `cublas64_12` mais o `cudnn64_9` que ele já embarca — e esse, por sua
+# vez, procura as sublibs `cudnn_*64_9.dll` no PATH. O `nvidia-curand-cu12` e o
+# `nvidia-cuda-nvrtc-cu12`, que o extra `[cuda]` do onnxruntime traria, não
+# aparecem em nenhum dos dois: ficam de fora, e são ~180 MB.
+CUBLAS_VERSAO="12.9.2.10"
+CUDART_VERSAO="12.9.79"
+CUDNN_VERSAO="9.8.0.87"
+CUFFT_VERSAO="11.4.1.4"
+
 echo "empacotando em $DESTINO"
 rm -rf "$DESTINO"
 mkdir -p "$DESTINO/python"
@@ -53,26 +81,31 @@ import site
 PTH
 mkdir -p "$DESTINO/python/Lib/site-packages"
 
+# **O `pyannote.audio` não está aqui, e é a mudança inteira de 22/09/2026.**
+# Era ele que arrastava torch, torchaudio, pytorch_lightning e torchmetrics —
+# 3,6 GB só de `torch/` —, e o app não usava nada disso desde que a diarização
+# e o vetor de voz passaram a rodar em ONNX Runtime + numpy
+# (docs/DIARIZACAO-ONNX.md). O que `motores/diarizacao/` de fato importa são as
+# peças abaixo, levantadas import a import: `pyannote.core` (Annotation,
+# SlidingWindow) e `pyannote.pipeline` (o `Pipeline` que o clustering herda) —
+# nenhuma das duas tem torch —, mais numpy, scipy, scikit-learn e einops.
+#
+# O `pyannote.metrics` fica de fora de propósito: ele aparece só dentro de
+# `pipeline/vendor/diarizacao_utils.py:optimal_mapping`, atrás de um import
+# adiado, e nenhum caminho deste app chama aquele método.
 echo "==> pacotes (wheels de Windows, baixados daqui)"
 uv pip install \
   --target "$DESTINO/python/Lib/site-packages" \
   --python-platform "$PLATAFORMA" \
   --python-version 3.12 \
   --only-binary=:all: \
-  faster-whisper "pyannote.audio>=4.0"
+  faster-whisper \
+  "pyannote.core" "pyannote.pipeline" einops scipy scikit-learn
 
-# O torch do PyPI para Windows é CPU-only (torch+cpu, cuda: False). Medido com
-# o modelo `tiny`: 12,9x tempo real em CPU — e o `large-v3`, que é o de
-# produção, é ~40x maior. Para a GPU servir, o torch tem que vir do índice do
-# PyTorch, e é ele que traz as DLLs de CUDA (cublas, cudnn) que o ctranslate2
-# do faster-whisper também usa.
-#
-# **Ele vem ANTES do torch, e isso não é arrumação.** O `uv pip install` num
-# `--target` re-resolve o ambiente inteiro: rodá-lo depois da etapa do torch faz
-# o torch **cu124 ser substituído pelo do PyPI, que é CPU-only** — medido em
-# 04/09/2026, quando esta etapa nasceu depois e o instalador saiu 660 MB menor
-# com `torch 2.14.0+cpu` no lugar do `2.6.0+cu124`. A etapa do torch é a última
-# a falar sobre o torch, e é isso que a mantém correta. A régua no fim confere.
+# **Ele vem ANTES da etapa do CUDA, e isso não é arrumação.** O
+# `uv pip install` num `--target` re-resolve o ambiente inteiro, então qualquer
+# etapa posterior pode desfazer o que a anterior cravou. Até 22/09/2026 quem
+# vinha por último era o torch, pela mesma razão; hoje é o onnxruntime-gpu.
 #
 # **São duas instalações, e a ordem importa.** O `transcribe-cpp` declara
 # `Requires-Dist: transcribe-cpp-native==0.2.3.*` — o backend de CPU —, e é ele
@@ -101,75 +134,63 @@ uv pip install \
   --only-binary=:all: \
   "$TCPP/transcribe_cpp_native_cu12-$TRANSCRIBE_CPP_VERSAO-py3-none-win_amd64.whl"
 
-echo "==> torch com CUDA (~2,4 GiB de download)"
+# ── o CUDA, e ele é a ÚLTIMA palavra sobre o assunto ─────────────────────────
 #
-# **O `--reinstall-package` não é zelo: sem ele esta etapa não faz nada.**
-# O passo anterior já instalou um `torch` — o pyannote o traz do PyPI, e o do
-# PyPI para Windows é CPU-only. Com o requisito `torch` sem versão, o uv o
-# considera satisfeito e responde "Checked 2 packages in 45ms" sem baixar coisa
-# alguma: o índice do PyTorch nunca é consultado, e o ambiente sai com
-# `torch+cpu`. Medido em 04/09/2026, com uv 0.11.3 — a instalação que está em
-# produção tem `2.6.0+cu124` e foi montada quando o uv ainda substituía.
+# **Esta etapa é a última de propósito, e isso não é arrumação.** O
+# `uv pip install` num `--target` re-resolve o ambiente inteiro: qualquer etapa
+# depois desta pode trocar o `onnxruntime-gpu` cravado pelo `onnxruntime` de
+# CPU que o faster-whisper pede, ou subir o cravado para a 1.30 de CUDA 13. Foi
+# exatamente assim que, em 04/09/2026, uma etapa nova no fim trocou o
+# `torch 2.6.0+cu124` por um `2.14.0+cpu` e o instalador saiu 660 MB menor com
+# a transcrição em CPU. A régua no fim confere o resultado.
 #
-# O sintoma é mudo por dois caminhos: a transcrição cai para CPU (~40x mais
-# lenta no large-v3) e o ctranslate2 perde as DLLs de CUDA que ele também usa.
-# A régua no fim deste script existe por causa disto.
+# **`--no-deps` é o que torna esta etapa determinística.** Sem ele o uv
+# re-resolveria tudo e reinstalaria o `onnxruntime` de CPU junto — os dois
+# wheels escrevem na MESMA pasta `onnxruntime/`, e quem ganha é quem o uv
+# copiar por último, que não é nossa escolha. Com ele, instalamos só o que está
+# nomeado aqui; as dependências de import do onnxruntime (numpy, protobuf,
+# flatbuffers, coloredlogs, sympy, packaging) já vieram da etapa anterior, pelo
+# `onnxruntime` de CPU que o faster-whisper arrasta.
+echo "==> onnxruntime-gpu $ONNXRUNTIME_VERSAO e as DLLs de CUDA (~2 GiB)"
+
+# O de CPU sai inteiro antes, pasta e dist-info: sobrescrever arquivo a arquivo
+# deixaria para trás os que só a versão de CPU tem, e o `onnxruntime` passaria a
+# ser uma mistura das duas.
+rm -rf "$DESTINO/python/Lib/site-packages/onnxruntime" \
+       "$DESTINO/python/Lib/site-packages"/onnxruntime-*.dist-info
+
 uv pip install \
   --target "$DESTINO/python/Lib/site-packages" \
   --python-platform "$PLATAFORMA" \
   --python-version 3.12 \
   --only-binary=:all: \
-  --reinstall-package torch \
-  --reinstall-package torchaudio \
-  --index-url https://download.pytorch.org/whl/cu124 \
-  torch torchaudio
+  --no-deps \
+  "onnxruntime-gpu==$ONNXRUNTIME_VERSAO" \
+  "nvidia-cublas-cu12==$CUBLAS_VERSAO" \
+  "nvidia-cuda-runtime-cu12==$CUDART_VERSAO" \
+  "nvidia-cudnn-cu12==$CUDNN_VERSAO" \
+  "nvidia-cufft-cu12==$CUFFT_VERSAO"
 
-# ~780 MB de coisas que só servem para compilar C++ contra o torch: os .lib são
-# import libraries do MSVC e os headers idem. Nada disso é usado em runtime por
-# um app que só chama Python. As DLLs ficam todas.
-# **O torchcodec sai, e não é economia de disco.**
-#
-# Ele vem como dependência do pyannote.audio e **nunca foi usado por este app**:
-# o motores/diarizacao/motor.py lê o WAV ele mesmo e entrega
-# `{"waveform", "sample_rate"}` ao pipeline — nunca um caminho de arquivo —, que
-# é exatamente o caminho que dispensa o decodificador. Ele nunca funcionou aqui,
-# nas duas instalações que existiram.
-#
-# **O que ele causa é pior que não existir.** As DLLs dele são compiladas contra
-# uma versão exata do torch, e o nosso vem do índice do PyTorch, então as duas
-# não casam. Em 09/09/2026 isso apareceu na tela do dono do produto como uma
-# **caixa modal do Windows** — "Entry Point Not Found: torch_get_const_data_ptr"
-# — que trava o python.exe até alguém clicar em OK. O `try/except` do pyannote
-# captura o erro, mas só DEPOIS do clique: quem mostra a caixa é o carregador do
-# Windows, antes de o Python ver qualquer coisa.
-#
-# Um sidecar que abre diálogo é um sidecar que pendura a transcrição.
-echo "==> tirando o torchcodec (não é usado, e as DLLs não casam com o torch)"
-rm -rf "$DESTINO/python/Lib/site-packages/torchcodec" \
-       "$DESTINO/python/Lib/site-packages"/torchcodec-*.dist-info
-
-echo "==> tirando o que é de build"
-find "$DESTINO/python/Lib/site-packages/torch/lib" -name "*.lib" -delete
-rm -rf "$DESTINO/python/Lib/site-packages/torch/include" \
-       "$DESTINO/python/Lib/site-packages/torch/test"
-
-# O motor opcional da Fase 7: texto e falante numa passada só. ~200 MB de
-# nativo, e é a única dependência nova do empacotamento desde a Fase 4.
-#
-# **O wheel nativo vem do release do GitHub, e não do PyPI.** O do PyPI instala
-# um stub de versão 0.0.0 que **não registra o backend de CUDA** — e a falha é
-# muda: o modelo carrega, roda em CPU, e a reunião leva a tarde. Medido em
-# 02/09/2026 (docs/FASE7-RESULTADOS.md §7.1).
-#
-# **E é o win_amd64**, não o manylinux que as ferramentas de medição usam: as
-# medições rodaram no WSL, o app é Windows, e o mesmo release publica os dois.
 echo "==> os sidecars"
-mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos"
+# **A legenda estava na régua e não estava na cópia** desde 18/09/2026, quando
+# o MOSS saiu e levou junto a linha que criava a pasta: o script reprovava a si
+# mesmo no fim. Corrigido em 22/09/2026, na mesma varredura que tirou o torch.
+mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos" "$DESTINO/legenda"
 cp "$RAIZ/motores/asr/motor.py" "$DESTINO/asr/"
 cp "$RAIZ/motores/diarizacao/motor.py" "$DESTINO/diarizacao/"
 # O motor de modelos não traz dependência nova: a huggingface_hub já vem
-# junto do faster-whisper e do pyannote, que a baixam por conta própria.
+# junto do faster-whisper, que a usa para baixar por conta própria.
 cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
+cp "$RAIZ/motores/legenda/motor.py" "$DESTINO/legenda/"
+
+# A diarização é o único motor com pacote próprio: o `motor.py` importa de
+# `pipeline/` (fbank, sessao, segmentacao, embedding, diarizacao, vendor/), e
+# sem ele o motor não sobe — imports quebrados. Desde 22/09/2026 não há mais o
+# ramo pyannote para cair, então isto deixou de ser opcional. Mesma cópia que o
+# tools/publicar.sh faz, com as mesmas exclusões: `testes/` é gabarito de
+# desenvolvimento e `__pycache__` é bytecode de outra máquina.
+rsync -a --exclude='__pycache__' --exclude='testes' \
+  "$RAIZ/motores/diarizacao/pipeline/" "$DESTINO/diarizacao/pipeline/"
 
 # **O GGUF não vem aqui, e isso é decisão e não esquecimento.** São
 # 0,70 GB, e o instalador exclui `*.gguf` por decisão registrada
@@ -185,23 +206,55 @@ cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
 # ── as réguas ────────────────────────────────────────────────────────────────
 #
 # **A que faltava, e custou um instalador.** Este script sempre dependeu da
-# ORDEM para o torch sair com CUDA: instala o do PyPI junto do pyannote e depois
-# o do índice do PyTorch por cima. Nada conferia o resultado — e quando uma
-# etapa nova entrou no fim, em 04/09/2026, ela re-resolveu o ambiente e trocou o
-# `2.6.0+cu124` por um `2.14.0+cpu`. Compilou, empacotou, e só o tamanho do
-# instalador denunciou. Sem a régua de tamanho, teria chegado ao usuário como
-# "a transcrição ficou lenta".
+# ORDEM para o CUDA sair certo, e nada conferia o resultado — em 04/09/2026 uma
+# etapa nova no fim re-resolveu o ambiente e trocou o `torch 2.6.0+cu124` por um
+# `2.14.0+cpu`. Compilou, empacotou, e só o tamanho do instalador denunciou. Sem
+# régua, teria chegado ao usuário como "a transcrição ficou lenta". O torch saiu
+# em 22/09/2026, a dependência da ordem não — só mudou de pacote.
 echo "==> conferindo as réguas"
 reprovar() { echo "ERRO: $1" >&2; exit 1; }
+SITE="$DESTINO/python/Lib/site-packages"
 
-TORCH_V=$(grep -oP "__version__ = '\K[^']+" \
-  "$DESTINO/python/Lib/site-packages/torch/version.py" 2>/dev/null || true)
-[[ "$TORCH_V" == *"+cu"* ]] \
-  || reprovar "o torch empacotado é '${TORCH_V:-nenhum}' — precisa ser um build +cuXXX.
-      Sem CUDA a transcrição roda em CPU: ~40x mais lenta no large-v3, e o app
-      não tem como perceber. Alguma etapa depois da do torch re-resolveu o
-      ambiente; ela tem de vir ANTES."
-echo "    torch: $TORCH_V"
+# **O torch não pode voltar, e ele volta sozinho.** Basta alguém acrescentar
+# `pyannote.audio` — ou qualquer pacote que o peça — para os 3,6 GB e as duas
+# horas de download voltarem sem ninguém decidir nada. E o app não usa mais uma
+# linha dele: a diarização, o vetor de voz e o diagnóstico de placa do ASR são
+# todos ONNX Runtime, numpy ou ctranslate2.
+for proibido in torch torchaudio pyannote/audio; do
+  [[ -e "$SITE/$proibido" ]] \
+    && reprovar "o $proibido voltou ao empacotamento.
+      São 3,6 GB que o app não usa desde o porte de 18-22/09/2026
+      (docs/DIARIZACAO-ONNX.md). Algum pacote novo o arrastou de volta —
+      provavelmente o pyannote.audio, que é de onde ele sempre veio."
+done
+echo "    torch: fora"
+
+# **O build de CUDA, e não só "tem onnxruntime".** A 1.30, que é o que o
+# resolvedor entrega sem pino, é CUDA 13: ela instala, importa, e o CUDA EP não
+# carrega — a sessão cai para CPU em silêncio.
+ORT_V=$(grep -oP "^__version__ = '\K[^']+" "$SITE/onnxruntime/capi/build_and_package_info.py" 2>/dev/null || true)
+ORT_PKG=$(grep -oP "^package_name = '\K[^']+" "$SITE/onnxruntime/capi/build_and_package_info.py" 2>/dev/null || true)
+ORT_CUDA=$(grep -oP "^cuda_version = '\K[^']+" "$SITE/onnxruntime/capi/build_and_package_info.py" 2>/dev/null || true)
+[[ "$ORT_PKG" == "onnxruntime-gpu" && "$ORT_CUDA" == 12.* ]] \
+  || reprovar "o onnxruntime empacotado é '${ORT_PKG:-nenhum} ${ORT_V:-?}' com CUDA '${ORT_CUDA:-nenhum}'.
+      Precisa ser o onnxruntime-gpu de CUDA 12. Com o de CPU, ou com um de
+      CUDA 13, a diarização e o vetor de voz rodam em CPU sem dizer nada:
+      ~1,28x o tempo real contra 7,91x, e nenhuma mensagem de erro."
+echo "    onnxruntime: $ORT_PKG $ORT_V (CUDA $ORT_CUDA)"
+
+# As DLLs que o CUDA EP e o ctranslate2 carregam pelo nome. Cada uma que falta
+# é uma queda para CPU em silêncio — ou, no caso das sublibs do cuDNN, um
+# "Cannot load symbol cudnnCreate" no meio da reunião.
+for dll in cublas64_12 cublasLt64_12 cudart64_12 cufft64_11 \
+           cudnn64_9 cudnn_graph64_9 cudnn_cnn64_9 cudnn_ops64_9 \
+           cudnn_adv64_9 cudnn_heuristic64_9; do
+  compgen -G "$SITE/nvidia/*/bin/$dll.dll" >/dev/null \
+    || compgen -G "$SITE/ctranslate2/$dll.dll" >/dev/null \
+    || reprovar "falta a DLL $dll.dll no empacotamento.
+      Ela vinha de torch/lib até 22/09/2026 e agora vem dos wheels nvidia-*.
+      Sem ela o provedor CUDA não carrega, e a queda para CPU é muda."
+done
+echo "    DLLs de CUDA: as dez no lugar"
 
 # O backend de CUDA é um pacote separado, e é o que o PyPI entrega como
 # stub 0.0.0. Se ele sumir, a legenda carrega e roda em CPU — mesma falha muda.
@@ -214,12 +267,15 @@ for m in asr diarizacao modelos legenda; do
 done
 echo "    os quatro sidecars: no lugar"
 
-# Ele volta sozinho se alguém acrescentar um pacote que o puxe, e o sintoma é
-# uma caixa modal na máquina de quem instalou — longe daqui.
-compgen -G "$DESTINO/python/Lib/site-packages/torchcodec*" >/dev/null \
+# O torchcodec vinha do pyannote.audio, e as DLLs dele nunca casaram com o
+# torch do índice do PyTorch: em 09/09/2026 o carregador do Windows abriu uma
+# caixa "Entry Point Not Found" na tela do dono do produto, que trava o
+# python.exe até alguém clicar. A régua do torch acima já o impede de voltar —
+# ele não tem outro caminho de entrada —, e esta o nomeia por ser o sintoma que
+# a pessoa vê.
+compgen -G "$SITE/torchcodec*" >/dev/null \
   && reprovar "o torchcodec voltou ao empacotamento.
-      Ele não é usado (o motor entrega waveform em memória) e as DLLs dele não
-      casam com o torch do índice do PyTorch: o carregador do Windows abre uma
+      Ele não é usado (o motor lê o WAV em numpy) e as DLLs dele abrem uma
       caixa 'Entry Point Not Found' que trava o python.exe até alguém clicar."
 echo "    torchcodec: fora"
 

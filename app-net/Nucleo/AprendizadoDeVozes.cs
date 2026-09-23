@@ -43,6 +43,22 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     public const string DonoDoMicrofone = "You";
 
     /// <summary>
+    /// Quanto áudio acumular por falante ao reconhecer, em <see cref="ReconhecerAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// Até 22/09/2026 eram os três trechos mais longos, um número fixo de
+    /// blocos e não de segundos. Medido numa reunião real (46 pessoas no
+    /// banco, limiar 0,70): três trechos deram 6,1 s e similaridade 0,581 para
+    /// uma pessoa que o banco conhecia — abaixo do limiar, apesar de ela ser a
+    /// melhor candidata por larga margem (a segunda colocada ficou em 0,492).
+    /// Chegar a ~15 s levou a mesma pessoa a 0,706, acima do limiar. O ganho
+    /// veio de ter mais áudio, não de um trecho ruim ter saído: o filtro de
+    /// contaminação de <see cref="TrechosDe"/> já correu antes, e é o que torna
+    /// este orçamento maior tolerável em vez de arriscado.
+    /// </remarks>
+    public const double SegundosDoOrcamentoDeReconhecimento = 15.0;
+
+    /// <summary>
     /// Os trechos de um falante que servem para aprender a voz dele.
     /// </summary>
     /// <param name="mic">
@@ -230,7 +246,20 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
 
             try
             {
-                var voz = await ExtrairAsync(audio, [.. trechos.Take(3)], ct);
+                // Acumula até o orçamento em segundos, não um número fixo de
+                // blocos — ver SegundosDoOrcamentoDeReconhecimento. Se sobrar
+                // menos trechos limpos que o orçamento, usa o que há: o
+                // orçamento é teto, não exigência.
+                var usados = new List<TrechoLimpo>();
+                double soma = 0;
+                foreach (var t in trechos)
+                {
+                    usados.Add(t);
+                    soma += t.Duracao;
+                    if (soma >= SegundosDoOrcamentoDeReconhecimento) break;
+                }
+
+                var voz = await ExtrairAsync(audio, usados, ct);
                 // O modelo vai junto: com um modelo novo ninguém é reconhecido,
                 // e todo mundo se reinscreve. É o resultado certo — comparar
                 // entre modelos não devolve "não sei", devolve um nome errado.

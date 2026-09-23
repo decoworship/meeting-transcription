@@ -282,6 +282,36 @@ for m in asr diarizacao modelos legenda; do
   mkdir -p "$DESTINO/motores/$m"
   cp "$RAIZ/motores/$m/motor.py" "$DESTINO/motores/$m/"
   echo "    motores/$m/motor.py"
+
+  # A diarização é o único motor com pacote próprio: motor.py importa de
+  # pipeline/ (fbank, sessao, segmentacao, embedding, diarizacao, vendor/), e
+  # sem ele o motor ONNX não sobe — imports quebrados. É cópia de verdade, como
+  # os motor.py acima, pela mesma razão: uma publicação de teste não pode
+  # reescrever o sidecar do app que grava reunião por junção.
+  #
+  # pipeline/testes/ fica de fora: são os testes e um gabarito de 40 KB, e não
+  # servem a uma instalação — só ao desenvolvimento deste branch.
+  # __pycache__/ fica de fora porque é lixo de bytecode de outra máquina, que
+  # o próprio interpretador reconstrói sozinho quando faltar.
+  if [[ "$m" == "diarizacao" && -d "$RAIZ/motores/diarizacao/pipeline" ]]; then
+    rsync -a --delete \
+      --exclude='__pycache__' --exclude='testes' \
+      "$RAIZ/motores/diarizacao/pipeline/" "$DESTINO/motores/diarizacao/pipeline/"
+    echo "    motores/diarizacao/pipeline/ (sem __pycache__, sem testes/)"
+
+    # Régua: sem estes arquivos o motor.py importa e falha, mas só na hora em
+    # que alguém trocar motor_de_diarizacao para "onnx" — silencioso até lá,
+    # porque torch continua sendo o padrão. Falhar aqui, na hora de publicar,
+    # é mais barato que descobrir isso na máquina do usuário.
+    for arquivo in __init__.py fbank.py sessao.py segmentacao.py embedding.py \
+                   diarizacao.py vendor/__init__.py; do
+      if [[ ! -f "$DESTINO/motores/diarizacao/pipeline/$arquivo" ]]; then
+        echo "ERRO: motores/diarizacao/pipeline/$arquivo não foi publicado — o" >&2
+        echo "      motor ONNX de diarização não vai subir." >&2
+        exit 1
+      fi
+    done
+  fi
 done
 
 echo

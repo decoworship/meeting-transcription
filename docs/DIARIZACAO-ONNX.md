@@ -213,10 +213,13 @@ saem do mesmo arquivo e o `tools/empacotar_modelos_de_diarizacao.sh` já sabe
 montar a pasta.
 
 **As duas implementações convivem atrás de uma chave**, `motor_de_diarizacao`
-no `app.json`, com `"torch"` como padrão até a régua fechar. Um `app.json` com
-valor desconhecido cai no padrão **em silêncio**, pela mesma razão que o
-`MotorAceito` do MOSS sobreviveu com um valor só: recusar a diarização por causa
-de uma chave é pior que ignorá-la.
+na requisição do sidecar (`escolher_motor` em `motor.py`), com `"torch"` como
+padrão até a régua fechar. Um valor desconhecido cai no padrão **em
+silêncio**, pela mesma razão que o `MotorAceito` do MOSS sobreviveu com um
+valor só: recusar a diarização por causa de uma chave é pior que ignorá-la.
+**Ela ainda não está ligada ao núcleo**: a chave existe só dentro do sidecar
+hoje — `grep -r motor_de_diarizacao` não encontra nada em `.cs`, `app.json`
+ou `web/` — e não vive "no `app.json`" até o C# passá-la adiante.
 
 ### O que o porte preserva por construção
 
@@ -286,6 +289,221 @@ nvrtc64_120_0.dll     42,7 MB (torch)    85,7 MB (nvidia/)
 
 Deduplicar por link nunca foi possível. **Mas sem o `torch/lib`, a terceira
 cópia simplesmente deixa de existir** — e é a maior delas que sai.
+
+---
+
+## 5.1 — as réguas, medidas
+
+Medido em 21/09/2026. A tabela do §5 dizia o que se pretendia medir; esta
+seção diz o que se mediu. As quatro fecharam.
+
+**V1 — o RTTM da gravação de 14,6 min, contra a saída torch+CUDA de
+18/09/2026.** Acordo **1,0000**, nos dois cálculos: só sobre o falado do
+gabarito, e sobre a união que inclui os ~205 s de silêncio. 404 trechos × 404,
+3 falantes × 3. O segundo número é o que importa mais: ele diz que o ONNX
+também não carimba falante onde o torch não ouve ninguém. 836 s em CPU.
+
+**V2 — as quatro gravações do acervo com `gemini.md`.** Acordo **1,0000 nas
+quatro**, contagem de trechos idêntica e tempo por falante idêntico ao décimo
+de segundo entre torch e onnx. Contagem de falantes contra o Gemini, igual nas
+quatro, nos dois motores.
+
+| gravação | duração | trechos | falantes | torch | onnx |
+|---|---:|---:|---:|---:|---:|
+| 2026-08-21_11-00-33 | 7,7 min | 137 | 6 | 270 s | 703 s |
+| 2026-08-25_08-59-22 | 14,6 min | 404 | 3 | 170 s | 684 s |
+| 2026-08-20_15-59-20 | 32,1 min | 889 | 3 | 652 s | 1500 s |
+| 2026-08-27_15-28-37 | 48,5 min | 805 | 3 | 1433 s | 2566 s |
+
+**Os tempos desta tabela não são comparáveis entre si.** O torch rodou em
+**CUDA** e o ONNX em **CPU** — nesta rodada de 21/09/2026 o `onnxruntime-gpu`
+ainda não tinha sido medido (Ruling C5 do pré-voo fixava CPU por cautela), e o
+`sessao.py` avisou a queda para CPU no stderr em cada execução. Ler 170 s
+contra 684 s como "o porte é 4x mais lento" era uma leitura enganada pela
+tabela: os dois lados não estavam na mesma pista. **Isso mudou em 22/09/2026**
+— a V5 abaixo mede os dois lados em CUDA, e é essa a comparação honesta de
+velocidade hoje; a V3, com os dois lados em CPU, continua valendo para o que
+mede (o banco de vozes).
+
+**V3 — as decisões de voz, 49 vozes, 1176 pares.** **0 discordâncias** nos
+três limiares 0,55 · 0,60 · 0,70. Cosseno mínimo torch × ONNX
+**0,999999992** (mediano 0,999999999984), maior diferença **2,19e-05**.
+Velocidade sobre 2664 s de áudio, os dois lados em CPU: torch 573,42 s (4,6x o
+tempo real), numpy+onnx 206,64 s (12,9x) — o ONNX é 2,8x mais rápido nesta
+comparação, que é justa porque ninguém está em GPU.
+
+Esta é a régua que decide se o banco de vozes precisa ser re-extraído — era o
+item que o plano marcava como "pare e leve ao dono do produto" se desse
+diferente. **Deu zero, e o banco não precisa ser re-extraído.**
+
+**V4 — a suíte do C#.** **626 passed**, e o número importa menos que o fato
+por trás dele: este branch **não toca um único arquivo `.cs`**. O `628` que o
+brief e o `CLAUDE.md` citam está desatualizado em relação à base deste branch
+— conferido por `git stash` e por `git diff --name-only main...HEAD` (Tarefa
+7). Não é regressão: é a mesma régua do `C0`, na forma mais forte possível —
+nenhum teste C# mudou porque nenhum arquivo C# mudou.
+
+**As quatro réguas fecharam. Nenhuma reprovou.** O que o §5 pedia como
+critério de saída para começar a limpeza está, hoje, satisfeito pelo número
+medido — mas a decisão de começar a limpeza continua sendo do dono do
+produto, e este documento não a toma (ver "O que este plano NÃO faz, de
+propósito", no fim do plano de implementação).
+
+**V5 — o CUDA EP, medido, e a fixação em CPU revogada.** A revisão de ponta a
+ponta apontou que `preferir_gpu=True` estava fixo no `motor.py` sem nenhuma
+régua ter exercitado o provedor CUDA do onnxruntime, e a resposta cautelosa
+foi fixar `preferir_gpu=False`. O dono do produto então trouxe um requisito
+que não estava no plano — o pipeline inteiro precisa rodar mais rápido que o
+tempo real — e lembrou que o objetivo sempre foi "substituir o torch pelo
+ONNX Runtime **com provedor CUDA**": CPU era o caminho de cautela, não a
+arquitetura. Medido em 22/09/2026, mesma gravação de 14,6 min e mesmo
+gabarito do V1:
+
+| caminho | tempo | x tempo real | acordo |
+|---|---:|---:|---:|
+| ONNX CPU | 684 s | 1,28x | 1,0000 |
+| torch CUDA | 170 s | 5,17x | (é o gabarito) |
+| **ONNX CUDA** | **74,4 s** | **11,80x** | **1,0000** |
+
+Carregar o pipeline em GPU levou 1,1 s. 404/404 trechos, 3 falantes, acordo
+**1,0000** — a preocupação de reprodutibilidade que motivou a fixação em CPU
+(o torch desliga TF32; o onnxruntime não tem o equivalente documentado) não
+se confirmou neste modelo. **Como nos outros três, o provedor efetivo foi
+conferido com `get_providers()`, não só pedido** — é a mesma disciplina que
+evitou registrar o falso 32,11x de 18/09/2026 (§1).
+
+**A armadilha de CUDA 12 contra CUDA 13 continua valendo, e quase repetiu a
+de 18/09.** O CUDA EP só carrega com um build **CUDA 12** do
+`onnxruntime-gpu` — `1.23.2` funciona. A versão `1.30`, que `uv`/`pip`
+resolvem por padrão, exige **CUDA 13**, falha com
+`libcublasLt.so.13: cannot open shared object file` e **cai para CPU em
+silêncio**. É a mesma armadilha do §1, e é a razão inteira de o `sessao.py`
+existir: ele anunciou a queda no stderr em vez de deixar esta medição cronometrar
+CPU achando que era GPU.
+
+**O custo de ligar isto é o wheel, não o runtime.** A instalação Windows do
+app já embarca as bibliotecas CUDA 12 de que o EP precisa —
+`cublas64_12.dll` e `cublasLt64_12.dll` (do motor de ata) e `cudnn64_9.dll`
+(do CTranslate2, o ASR). O que falta acrescentar é o `onnxruntime-gpu`
+(~250 MB, já contado no orçamento do §5), não ~2 GB de runtime CUDA novo.
+
+Isto revoga a fixação em CPU: `preferir_gpu` volta a `True` no `motor.py`.
+`motor_de_diarizacao` continua em `"torch"` por padrão — trocar o padrão para
+`"onnx"` é decisão do dono do produto, e depende da limpeza (instalar o
+`onnxruntime-gpu` no Python embarcado, fora do escopo desta medição).
+
+**Um risco em aberto: nenhum número desta seção rodou no runtime que o app usa.**
+V1, V2 e V3 rodaram todos no venv de desenvolvimento (WSL), não no Python
+embarcado que o instalador entrega. Medido em 21/09/2026:
+
+| | venv de dev (onde V1/V2/V3 rodaram) | Python embarcado (o que é distribuído) |
+|---|---|---|
+| Python | 3.13.12 | 3.12 |
+| onnxruntime | 1.23.2 | 1.29.0 |
+| numpy | 2.2.6 | 2.5.2 |
+| scikit-learn | 1.8.0 | 1.9.0 |
+| provedor CUDA | ausente | ausente |
+| SO | Linux/WSL | Windows |
+
+Recorrer a V1 no Python embarcado é o item mais barato desta lista que ainda
+pode mudar a resposta — ~15 min, sem precisar de torch, com os artefatos já
+na pasta do modelo instalado. **Este plano deliberadamente deixou isso fora
+do escopo** (a medição foi restrita ao venv do WSL), e por isso fica escrito
+aqui: é o risco mais barato que continua aberto antes de aprovar a remoção do
+torch.
+
+Uma segunda consequência da mesma tabela: o Python embarcado só tem o
+onnxruntime **CPU-only** instalado hoje — o `onnxruntime-gpu` que o V5 mediu
+não foi empacotado nele, e empacotá-lo é a limpeza, fora do escopo desta
+medição. Até lá, dos números da tabela de V2 acima, os 2566 s da gravação de
+48,5 min continuam sendo a figura que uma pessoa realmente experimentaria no
+app publicado, mesmo com `preferir_gpu=True` no código — não porque o CUDA EP
+não funcione (o V5 mostra que funciona, a 11,80x), mas porque o pacote que o
+habilita ainda não está na instalação.
+
+**Achado de 22/09/2026, para quem planejar a limpeza: o CUDA EP do ONNX precisa
+de cinco famílias de DLL, e nem todas sobrevivem sem `torch/lib`.** Medido na
+instalação real: `cublas64_12.dll`, `cublasLt64_12.dll` e `cudart64_12.dll`
+vêm de `motores/ata/bin`, e o `cudnn64_9.dll` principal vem do `ctranslate2` —
+essas três famílias sobrevivem à remoção do torch. Mas `cufft64_11.dll` e o
+conjunto completo das sublibs do cuDNN (`cudnn_graph64_9.dll`,
+`cudnn_cnn64_9.dll`, `cudnn_ops64_9.dll`, ...) **hoje não têm outra fonte na
+instalação além de `torch/lib`** — nenhum outro pacote embarcado os traz.
+Apagar `torch/lib` na ordem que a tabela do §5 conta com derrubaria de volta
+para CPU o motor que este porte inteiro existe para acelerar, a menos que a
+limpeza empacote essas duas famílias explicitamente antes de tirar o torch.
+**Não é para consertar agora** — é decisão e trabalho do dono do produto, mas
+quem planejar a limpeza não pode descobrir isso depois de já ter apagado a
+pasta.
+
+**E os 7,91x medidos hoje não saem de uma instalação que os scripts do repo
+produzem.** Para medir no runtime real, o `onnxruntime` 1.29.0 (CPU) que o
+Python embarcado tinha foi substituído à mão pelo `onnxruntime-gpu` 1.23.2 —
+o wheel `onnxruntime_gpu-1.23.2-cp312-cp312-win_amd64.whl`, uma build CUDA 12
+(o backup do pacote CPU ficou em `C:\Users\andre\ort-cpu-backup`); e as DLLs
+acima (`cublas64_12.dll`, `cublasLt64_12.dll`, `cudart64_12.dll`,
+`cufft64_11.dll` e o conjunto de cuDNN) foram copiadas à mão para
+`site-packages/onnxruntime/capi/`, vindas de `motores/ata/bin/` e de
+`torch/lib`. Nenhum dos dois passos está em `tools/empacotar_motores.sh` nem
+em `tools/montar_instalador.sh` hoje — a medição é real, mas um instalador
+gerado pelo repo como está não chega a este estado sozinho.
+
+**Armadilha à parte, para quem for empacotar o `onnxruntime-gpu`:** a versão
+que `pip`/`uv` resolvem por padrão hoje é a 1.30, que pede CUDA 13. Ela falha
+ao carregar (`libcublasLt.so.13: cannot open shared object file`) e cai para
+CPU **em silêncio** — é o mesmo tipo de queda muda que motivou este arquivo
+existir (ver o topo). A 1.23.2 é uma build CUDA 12 e é a que bate com o que o
+app já embarca; fixar a versão no empacotamento não é opcional.
+
+## 5.2 — a remoção, feita
+
+O que as seções acima mediam e planejavam saiu do Python embarcado em
+22/09/2026 (`3a30e75`), na 0.7.1. Sai o `pyannote.audio` do empacotamento —
+que era quem arrastava torch, torchaudio, pytorch_lightning e torchmetrics —,
+e entram só as peças que `motores/diarizacao/pipeline/` de fato importa:
+`pyannote.core`, `pyannote.pipeline`, einops, scipy e scikit-learn, nenhuma
+delas com torch. 51 pacotes a menos, 2 a mais. **O `site-packages` cai de
+7,6 GB para 3,2 GB.** A conta não fecha nos 3,6 GB do torch sozinho porque
+1,3 GB do que `torch/lib` guardava eram cuDNN e cuFFT, que precisaram voltar
+explicitamente pelos wheels `nvidia-cudnn-cu12` e `nvidia-cufft-cu12` — a
+economia real fica em ~4,4 GB. O `onnxruntime-gpu` ficou pinado em 1.23.2
+(build CUDA 12), com a etapa de CUDA por último no empacotamento e
+`--no-deps`, e as réguas passaram a conferir o resultado em vez de confiar
+nele: torch/torchaudio/pyannote.audio proibidos, o `onnxruntime` conferido
+como build de CUDA 12, e as dez DLLs conferidas uma a uma.
+
+Com o torch fora, os números do §1 e do V5 deixam de ser hipotético contra
+medido: na RTX 2060, ONNX em CUDA faz **7,91x** o tempo real na instalação
+anterior a esta limpeza (ainda com torch ao lado) e **10,64x** agora, sem
+torch disputando GPU — contra os 5,17x do torch. A saída continua idêntica:
+acordo **1,0000** contra o torch na gravação de referência (404 de 404
+trechos, 3 falantes), nas quatro gravações do acervo, e entre a instalação
+antiga e a nova (99 de 99 trechos) — sobre o falado e sobre o silêncio, para
+pegar também alarme falso.
+
+**O banco de vozes não precisou ser re-extraído.** Sobre as 44 amostras
+guardadas que dá para reconstruir exatamente, o cosseno mínimo entre o vetor
+antigo e o novo é 0,9999999998 (mediano 1,0000000000), e nenhuma das 44
+decisões de reconhecimento muda — era a condição sobre a qual o porte inteiro
+se apoiava, e ela se confirmou.
+
+**`motor_de_diarizacao` voltou a ter um valor só.** Sem torch, só resta
+`"onnx"`, e um `app.json` com um valor antigo — inclusive um `"torch"`
+deixado para trás — cai no padrão em silêncio, em vez de recusar diarizar.
+
+Duas correções de reconhecimento de voz vieram junto, achadas ao levar o
+caminho de produção para ONNX + numpy: a legenda ao vivo nunca reconhecia
+ninguém, porque `ReconhecerAsync` recebia os blocos da legenda (até 90 s,
+podendo conter dois falantes) em vez dos trechos que a diarização separa; e o
+reconhecimento tomava sempre os três primeiros trechos de cada pessoa, o que
+numa reunião real deu 6,1 s e 0,581 de similaridade para alguém que deveria
+ter sido reconhecido (limiar 0,70) — trocado por um orçamento de ~15 s, que
+levou a mesma pessoa a 0,706.
+
+O instalador passou a exigir os seis artefatos ONNX antes de montar, e o
+`publicar.sh` passou a levar `pipeline/` inteiro (antes só copiava
+`motor.py`) — sem isso, o motor ONNX não subia a partir de uma instalação
+publicada.
 
 ---
 

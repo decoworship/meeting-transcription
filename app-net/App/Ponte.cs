@@ -1534,6 +1534,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     // eram guardados e nunca lidos — ver Pedido.DiarModel.
                     modeloDeDiarizacao: p.DiarModel is { Length: > 0 } doProjeto
                         ? doProjeto : cfgDaTranscricao.DiarizacaoPadrao,
+                    motorDeDiarizacao: cfgDaTranscricao.MotorDeDiarizacao,
                     progresso: e =>
                     {
                         _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
@@ -1687,7 +1688,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         _transcricoes.Progredir(pasta, "falantes", f, t);
                         EmpurrarTranscricoes();
                     },
-                    cfg.DiarizacaoPadrao, trabalho.Token);
+                    cfg.DiarizacaoPadrao, trabalho.Token,
+                    motorDeDiarizacao: cfg.MotorDeDiarizacao);
 
                 var comFalante = FalantesDaLegenda.Atribuir(legenda.Trechos, diarizacao);
 
@@ -1708,7 +1710,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
                     var faixas = Faixas.Ler(Path.Combine(pasta, "mic.wav"), sistema);
                     var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
-                        .ReconhecerAsync(pasta, ComoSegmentos(comFalante), faixas.Mic,
+                        .ReconhecerAsync(pasta, ComoSegmentos(diarizacao), faixas.Mic,
                                          trabalho.Token);
 
                     if (conhecidos.Count > 0)
@@ -1806,21 +1808,53 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     }
 
     /// <summary>
-    /// Os trechos da legenda como o reconhecimento de vozes os espera.
+    /// A diarização como o reconhecimento de vozes a espera.
     /// </summary>
     /// <remarks>
-    /// <b>Conversão e não cópia de regra.</b> O <c>ReconhecerAsync</c> trabalha
-    /// sobre <see cref="SegmentoFinal"/> porque é o que a passada final produz;
-    /// dar a ele a mesma forma é o que permite os dois caminhos usarem o
-    /// <b>mesmo</b> banco de vozes, em vez de dois que divergem.
+    /// <para>
+    /// <b>A diarização, e não os blocos da legenda.</b> Os blocos são a unidade
+    /// da transcrição ao vivo — na reunião medida, 4,2 s em média e até 90,3 s
+    /// — e um bloco desses pode conter os dois falantes: os três primeiros
+    /// blocos do rótulo "SPEAKER_00" daquela reunião mediam 89,8 s, 90,3 s e
+    /// 43,7 s, e a maioria dentro de cada um discordava (75/25, depois 69/31,
+    /// depois 84/16 — nem consistente entre si). O <c>TrechosDe</c> já
+    /// descarta um trecho sujo pelos <b>vizinhos</b>
+    /// (<c>antesSujo</c>/<c>depoisSujo</c>); com um bloco desse tamanho a
+    /// contaminação está <b>dentro</b> dele, onde aquela guarda não enxerga. O
+    /// resultado medido foi zero reconhecimentos em duas reuniões, uma antes e
+    /// uma depois de uma troca de motor não relacionada — não era regressão,
+    /// era o vetor de ambos sendo construído da voz de ninguém.
+    /// </para>
+    /// <para>
+    /// Os segmentos de diarização são um falante só por construção — é
+    /// exatamente o que a passada final faz ao cortar segmentos mistos antes
+    /// de extrair (ver o log "tinham mais de um falante dentro e foram
+    /// cortados"). Aqui não há o que cortar: o pyannote já entrega o segmento
+    /// no tamanho certo.
+    /// </para>
+    /// <para>
+    /// <b>Mesmo espaço de rótulo que os blocos.</b> O <see cref="TrechoDaLegenda.Falante"/>
+    /// de quem não é o dono vem de <see cref="Montagem.DonoDoIntervalo"/> sobre
+    /// estes mesmos segmentos (ver <see cref="FalantesDaLegenda.Atribuir"/>), e
+    /// o dicionário devolvido por <c>ReconhecerAsync</c> é aplicado depois
+    /// casando por <c>Falante</c> — por isso os rótulos crus do pyannote têm
+    /// que ser os mesmos dos dois lados, e são: nenhum aqui vale
+    /// <c>DonoDoMicrofone</c> ("You") ou "Unknown", que é como o dono chega
+    /// pela faixa do microfone e não pelo pyannote.
+    /// </para>
+    /// <para>
+    /// <b>Sem texto</b>: <c>TrechosDe</c> só lê <c>Speaker</c>, <c>Start</c> e
+    /// <c>End</c> — o texto de cada trecho não influencia qual amostra vira
+    /// vetor, e inventar um aqui seria custo sem uso.
+    /// </para>
     /// </remarks>
-    private static List<SegmentoFinal> ComoSegmentos(IEnumerable<TrechoDaLegenda> trechos) =>
-        [.. trechos.Select(t => new SegmentoFinal
+    private static List<SegmentoFinal> ComoSegmentos(IEnumerable<SegmentoDeFalante> diarizacao) =>
+        [.. diarizacao.Select(s => new SegmentoFinal
         {
-            Start = t.InicioMs / 1000.0,
-            End = t.FimMs / 1000.0,
-            Text = t.Texto,
-            Speaker = t.Falante,
+            Start = s.Inicio,
+            End = s.Fim,
+            Text = "",
+            Speaker = s.Falante,
         })];
 
     /// <summary>

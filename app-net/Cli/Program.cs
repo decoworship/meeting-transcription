@@ -96,7 +96,8 @@ if (audio is null)
         + "     [--filtrar-silencio] [--hotwords] [--idioma pt] [--saida x.json]\n"
         + "     [--diarizacao community-1] [--revisao-modelo]\n"
         + "ou:  --audio <arquivo.wav> [--motor python3] [--script motor.py] "
-        + "[--cancelar-em <segundos>]");
+        + "[--cancelar-em <segundos>] [--diarizacao <modelo>] "
+        + "[--motor-diarizacao torch|onnx]");
     return 2;
 }
 
@@ -133,7 +134,10 @@ using (sidecar)
         // "System.Threading.CancellationToken".
         var segmentos = await sidecar.DiarizarAsync(audio,
             (pct, texto) => Console.WriteLine($"  [{pct,4:P0}] {texto}"),
-            modelo: arg.GetValueOrDefault("diarizacao"), ct: cancelamento.Token);
+            modelo: arg.GetValueOrDefault("diarizacao"), ct: cancelamento.Token,
+            // "torch" ou "onnx" — sem isto o modo --audio nunca conseguia
+            // exercitar o motor ONNX sozinho. Ver docs/DIARIZACAO-ONNX.md.
+            motorDeDiarizacao: arg.GetValueOrDefault("motor-diarizacao"));
 
         Console.WriteLine($"\n{segmentos.Count} segmentos em {relogio.Elapsed.TotalSeconds:F1} s, "
                           + $"{segmentos.Select(x => x.Falante).Distinct().Count()} falantes");

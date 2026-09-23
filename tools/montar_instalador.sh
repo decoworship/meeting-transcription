@@ -183,6 +183,28 @@ grep -q 'ata\\bin' "$RAIZ/instalador/MeetingApp.iss" \
 [[ -f "$MOTORES/diarizacao/modelos/ATRIBUICAO.md" ]] \
   || reprovar "falta a ATRIBUICAO.md dos pesos de diarização."
 
+# Os artefatos ONNX (diarizacao-onnx): desde o porte, é isto que o motor.py
+# carrega em produção — não mais os pytorch_model.bin acima, que agora só
+# alimentam o exportador e o pyannote-3.1. Sem eles a diarização e o
+# reconhecimento de vozes falham 100% na máquina de quem instalou, e a
+# régua pertence aqui: é este script que produz o artefato entregue, e o
+# comentário do topo do arquivo diz por quê. Cada um tem seu próprio comando
+# porque a mensagem precisa nomear qual falta — os seis vêm juntos do mesmo
+# tools/exportar_diarizacao_onnx.py, então quando um falta os outros cinco
+# costumam faltar também, mas não custa nada ser exato.
+ONNX_BASE="$MOTORES/diarizacao/modelos"
+for f in community-1/segmentation/model.onnx \
+         community-1/embedding/codificador.onnx \
+         community-1/embedding/cabeca.onnx \
+         community-1/embedding/mel.npy \
+         wespeaker-voxceleb-resnet34-LM/voz.onnx \
+         wespeaker-voxceleb-resnet34-LM/mel.npy; do
+  [[ -f "$ONNX_BASE/$f" ]] \
+    || reprovar "falta $f — rode tools/empacotar_modelos_de_diarizacao.sh
+      (e, se ele reclamar que não encontra a fonte, antes
+      tools/exportar_diarizacao_onnx.py, no venv do WSL)."
+done
+
 echo "    (gguf, ata\\bin, curand, cusolverMg, tests e .pyi ficam de fora por Excludes)"
 
 # ── privacidade ──────────────────────────────────────────────────────────────

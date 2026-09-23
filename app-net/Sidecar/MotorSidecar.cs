@@ -142,14 +142,20 @@ public sealed class MotorSidecar : IDisposable
     /// O pipeline a usar, pelo nome da pasta em <c>modelos/</c>. Nulo usa o
     /// padrão do motor.
     /// </param>
+    /// <param name="motorDeDiarizacao">
+    /// <c>"onnx"</c>, o único motor desde 22/09/2026. Nulo usa o padrão do
+    /// motor, <c>"onnx"</c>. Ver docs/DIARIZACAO-ONNX.md.
+    /// </param>
     public async Task<IReadOnlyList<SegmentoDeFalante>> DiarizarAsync(
         string caminhoDoAudio, Action<double, string>? progresso = null,
-        string? modelo = null, CancellationToken ct = default)
+        string? modelo = null, CancellationToken ct = default,
+        string? motorDeDiarizacao = null)
     {
         var m = await ExecutarAsync(
             new Requisicao
             {
                 Id = _proximoId++, Op = "diarizar", Audio = caminhoDoAudio, Modelo = modelo,
+                MotorDeDiarizacao = motorDeDiarizacao,
             },
             progresso, ct);
 

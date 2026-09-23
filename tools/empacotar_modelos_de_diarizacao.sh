@@ -29,6 +29,19 @@
 # CC-BY-4.0 exige crédito. Ele é escrito em ATRIBUICAO.md junto dos pesos, e o
 # arquivo viaja com eles — é o que torna a redistribuição regular.
 #
+# ── artefatos ONNX (diarizacao-onnx) ────────────────────────────────────────
+#
+# Desde o porte para ONNX, o motor.py em produção não abre mais os
+# pytorch_model.bin do community-1 e do wespeaker — abre model.onnx,
+# codificador.onnx, cabeca.onnx e voz.onnx, mais um mel.npy ao lado de cada
+# embedding. Esses seis arquivos não são baixados: são exportados dos pesos
+# pytorch por tools/exportar_diarizacao_onnx.py, que precisa de torch e roda
+# no venv do WSL — o oposto do que este script, que só usa curl e cp, pode
+# fazer sozinho. Por isso este script COPIA os artefatos ONNX de dentro da
+# instalação oficial (onde o exportador os escreve) para o destino do pacote,
+# e se não os achar lá, para com a régua pedindo para rodar o exportador
+# primeiro — nunca tenta exportar sozinho. Ver pegar_onnx() abaixo.
+#
 # Uso:
 #   tools/empacotar_modelos_de_diarizacao.sh
 #   tools/empacotar_modelos_de_diarizacao.sh --destino dist/payload
@@ -45,6 +58,13 @@ while [[ $# -gt 0 ]]; do
     *) echo "argumento desconhecido: $1" >&2; exit 2 ;;
   esac
 done
+
+# Onde tools/exportar_diarizacao_onnx.py escreve os artefatos ONNX — ele tem
+# esse caminho cravado (constante MODELOS), porque precisa ler os
+# pytorch_model.bin já instalados para exportar, e só a instalação oficial os
+# tem de forma confiável. Não é configurável por --destino: exportar é uma
+# operação sobre a instalação oficial, empacotar é que pode mirar outro lugar.
+FONTE_ONNX="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/diarizacao/modelos"
 
 ALVO="$DESTINO/motores/diarizacao/modelos"
 PIPELINE="$ALVO/community-1"
@@ -105,6 +125,39 @@ pegar() {
     }
 }
 
+# Copia um artefato ONNX de FONTE_ONNX para dentro do pacote. Diferente de
+# pegar(): não há download possível — o exportador precisa de torch, roda no
+# venv do WSL, e não faz sentido reimplementá-lo aqui em bash. Se a fonte
+# também não tem o artefato, o jeito de resolver é rodar o exportador, e a
+# mensagem de erro diz exatamente o comando.
+pegar_onnx() {
+  local relativo="$1" saida="$2"
+
+  if [[ -f "$saida" ]]; then
+    echo "    já está: ${saida#$ALVO/}"
+    return
+  fi
+
+  local origem="$FONTE_ONNX/$relativo"
+  if [[ -f "$origem" ]]; then
+    # Quando ALVO é a própria instalação oficial, origem e saida já são o
+    # mesmo caminho, e o "-f \"$saida\"" acima já teria retornado. Este cp só
+    # roda quando são pastas diferentes (--destino, ou instalação nova).
+    cp "$origem" "$saida"
+    echo "    da instalação oficial: ${saida#$ALVO/}"
+    return
+  fi
+
+  echo "ERRO: falta $relativo, e não achei em $origem." >&2
+  echo "      Este arquivo não se baixa — ele é exportado do checkpoint" >&2
+  echo "      pytorch com tools/exportar_diarizacao_onnx.py, que roda no" >&2
+  echo "      venv do WSL (precisa de torch) contra a instalação oficial:" >&2
+  echo "        uv run --with onnx --with onnxscript --with onnxruntime \\" >&2
+  echo "          python tools/exportar_diarizacao_onnx.py" >&2
+  echo "      Rode-o e depois este script de novo." >&2
+  exit 1
+}
+
 echo "==> pipeline de diarização (community-1)"
 pegar pyannote/speaker-diarization-community-1 config.yaml                 "$PIPELINE/config.yaml"
 pegar pyannote/speaker-diarization-community-1 segmentation/pytorch_model.bin "$PIPELINE/segmentation/pytorch_model.bin"
@@ -114,6 +167,21 @@ pegar pyannote/speaker-diarization-community-1 plda/xvec_transform.npz        "$
 
 echo "==> modelo de voz (wespeaker)"
 pegar pyannote/wespeaker-voxceleb-resnet34-LM pytorch_model.bin "$VOZ/pytorch_model.bin"
+
+# ── artefatos ONNX (docs/DIARIZACAO-ONNX.md) ────────────────────────────────
+#
+# O motor.py não abre mais os pytorch_model.bin acima em produção — eles ficam
+# só como insumo do exportador (e do pyannote-3.1, que ainda é torch puro). O
+# que o motor carrega em tempo de execução é isto aqui, e desde 583fb1d o
+# reconhecimento de vozes (voz.onnx + mel.npy) também depende disso, sem
+# fallback para torch se faltar.
+echo "==> artefatos ONNX (segmentação, embedding, voz)"
+pegar_onnx community-1/segmentation/model.onnx        "$PIPELINE/segmentation/model.onnx"
+pegar_onnx community-1/embedding/codificador.onnx     "$PIPELINE/embedding/codificador.onnx"
+pegar_onnx community-1/embedding/cabeca.onnx          "$PIPELINE/embedding/cabeca.onnx"
+pegar_onnx community-1/embedding/mel.npy              "$PIPELINE/embedding/mel.npy"
+pegar_onnx wespeaker-voxceleb-resnet34-LM/voz.onnx    "$VOZ/voz.onnx"
+pegar_onnx wespeaker-voxceleb-resnet34-LM/mel.npy     "$VOZ/mel.npy"
 
 # ── o pyannote 3.1, como segunda opção ──────────────────────────────────────
 #
@@ -215,9 +283,21 @@ for f in "$PIPELINE/config.yaml" \
          "$PIPELINE31/segmentation/pytorch_model.bin" \
          "$PIPELINE31/embedding/pytorch_model.bin" \
          "$PIPELINE31/LICENSE-segmentation-3.0" \
-         "$VOZ/pytorch_model.bin"; do
+         "$VOZ/pytorch_model.bin" \
+         "$PIPELINE/segmentation/model.onnx" \
+         "$PIPELINE/embedding/codificador.onnx" \
+         "$PIPELINE/embedding/cabeca.onnx" \
+         "$PIPELINE/embedding/mel.npy" \
+         "$VOZ/voz.onnx" \
+         "$VOZ/mel.npy"; do
   [[ -f "$f" ]] || { echo "ERRO: falta $f" >&2; exit 1; }
 done
+
+# Os ONNX não passam pela régua de tamanho abaixo: eles não vêm de download,
+# então não há risco de "página de erro do portão salva como se fosse peso" —
+# o torch.onnx.export levanta exceção e pegar_onnx já teria falhado antes de
+# chegar aqui. A régua de presença acima já é a proteção que faz sentido para
+# eles.
 
 # Um HTML de erro do portão tem uns 2 KB e passaria por "arquivo presente". Os
 # pesos têm dezenas de MB; o config.yaml tem centenas de bytes e é o único que
