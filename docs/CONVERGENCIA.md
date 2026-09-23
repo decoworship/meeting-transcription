@@ -161,6 +161,9 @@ têm Gemini em paralelo.
 **Termina quando:** cada linha da tabela tem um vencedor, ou um empate declarado
 com o peso como desempate.
 
+**O eixo texto já tem um passo medido, antes do bake-off:** ver `S4` — o
+`VIVO-3` fecha parte da distância entre o Nemotron e o `large-v3`.
+
 ### Fase C — a limpeza, em degraus por risco
 
 Só depois da Fase B, e nesta ordem — **do que não pode dar errado para o que
@@ -616,6 +619,19 @@ Se o Nemotron em streaming empatar com o `large-v3` na régua — e a
 bloco —, o `large-v3` deixa de ser necessário **e a passada final fica mais
 barata que a de hoje**. É a inversão que o §6 da carta chamaria de irônica: o
 estudo do tempo real barateando o offline.
+
+**23/09/2026, um passo medido nessa direção.** O `VIVO-3` do
+[BACKLOG.md](BACKLOG.md) pôs a correção de termos da passada final — fonética,
+regra e grafia — para rodar também sobre a legenda ao vivo, por fala e fundida
+por trecho. Numa reunião real, "Wifi" subiu de 2 para 11 ocorrências na legenda
+corrigida (a passada final tem 14). É a mesma classificação do `VIVO-4`: fecha
+a fatia do erro que é "ouviu certo, escreveu diferente" — fronteira e quase, na
+tabela de lá —, porque devolve ao Nemotron a grafia que ele já tinha ouvido, só
+separada errado (`Wi Fi`, `pra da`, `web hook`). **O que sobra é o que ele não
+ouviu**: sem gancho de vocabulário na entrada, essa fatia — o "conteúdo" da
+tabela do `VIVO-4` — não tem conserto por pós-processamento; só a passada final
+recupera. A distância do eixo texto encolheu na parte que dava para encolher
+sem mexer no modelo, não fechou inteira.
 
 ### S5 · A fala sobreposta
 
