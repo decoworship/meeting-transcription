@@ -97,4 +97,38 @@ public sealed class CorrecaoDaLegendaTests
 
         Assert.Equal("chega pelo Webhook", Assert.Single(r.Trechos).Texto);
     }
+
+    [Fact]
+    public void PalavraCorrigidaNoComecoDeUmTrechoQueNaoEOPrimeiroDaFalaAindaTroca()
+    {
+        // A palavra cabe inteira no segundo trecho, sem atravessar fronteira —
+        // então a fusão não entra em ação. Mas rodar a fonética de novo só
+        // sobre "Tania hoje" isolado veria texto vazio antes dela e recusaria
+        // a troca (a regra exige "meio de frase"). O contexto vem da fala.
+        var r = CorrecaoDaLegenda.Corrigir(
+            [T(0, "a pedido da"), T(1120, "Tania hoje")], Vocabulario, Entidades);
+
+        Assert.Equal(2, r.Trechos.Count);
+        Assert.Equal(0, r.Fundidos);
+        Assert.Null(r.Trechos[0].Swaps);
+        Assert.Equal("a pedido da", r.Trechos[0].Texto);
+        Assert.Equal("Tânia hoje", r.Trechos[1].Texto);
+        Assert.Contains(r.Trechos[1].Swaps!, s => s is { De: "Tania", Para: "Tânia" });
+    }
+
+    [Fact]
+    public void PalavraFundidaQueComecaOTrechoTambemTroca()
+    {
+        // "Ta" funde com "nia" (colado) e forma "Tania" no começo do trecho
+        // fundido — o mesmo defeito acima, mas depois da fusão.
+        var r = CorrecaoDaLegenda.Corrigir(
+            [T(0, "a"), T(1120, "Ta"), T(2240, "nia pediu", colado: true)],
+            Vocabulario, Entidades);
+
+        Assert.Equal(2, r.Trechos.Count);
+        Assert.Equal(1, r.Fundidos);
+        Assert.Equal("a", r.Trechos[0].Texto);
+        Assert.Null(r.Trechos[0].Swaps);
+        Assert.Equal("Tânia pediu", r.Trechos[1].Texto);
+    }
 }
