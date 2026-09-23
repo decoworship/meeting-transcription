@@ -101,7 +101,7 @@ public sealed class TrechoDaLegenda
     /// <remarks>
     /// Mesmo formato do <see cref="SegmentoFinal.Swaps"/> da passada final, e
     /// pelo mesmo motivo: correção que não deixa rastro não se desfaz. Ver
-    /// <c>CorrecaoDaLegenda</c>.
+    /// <see cref="CorrecaoDaLegenda"/>.
     /// </remarks>
     [JsonPropertyName("swaps")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
