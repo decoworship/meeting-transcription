@@ -1717,11 +1717,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     {
                         comFalante = [.. comFalante.Select(t =>
                             t.Falante is { } r && conhecidos.TryGetValue(r, out string? nome)
-                                ? new TrechoDaLegenda
-                                {
-                                    InicioMs = t.InicioMs, FimMs = t.FimMs,
-                                    Dono = t.Dono, Texto = t.Texto, Falante = nome,
-                                }
+                                ? t.ComFalante(nome)
                                 : t)];
                         nomeados = conhecidos.Count;
                     }
