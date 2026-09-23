@@ -22,10 +22,12 @@ A segunda é a que vale, e ela só funciona **nesta máquina**: os termos saem d
 seus próprios dados. Rodá-la numa máquina sem histórico não prova nada, e ela
 avisa quando isso acontece em vez de passar em silêncio.
 
-Um achado da régua 2 é perdoado em dois casos, os dois declarados em voz alta no
-relatório: um ``HOMONIMO`` registrado à mão, e o termo que **já está no
-código-fonte do repositório** -- aí a presença dele no que viaja está explicada
-por nós. Ver ``explicado_pela_fonte``.
+Um achado da régua 2 é perdoado em três casos, os três declarados em voz alta no
+relatório: um ``HOMONIMO`` registrado à mão, o arquivo que **ainda é byte a byte
+o que a roda instalou** (``intacto_do_pacote``, conferido pelo hash do
+``dist-info/RECORD`` -- se os bytes já vinham do upstream, não são seus), e o
+termo que **já está no código-fonte do repositório** -- aí a presença dele no que
+viaja está explicada por nós. Ver ``explicado_pela_fonte``.
 
 O que ela **não** verifica, e está registrado de propósito: o segredo OAuth do
 Google vai embutido no binário, por decisão (docs/FASE4.md §4). Ele é a
@@ -41,6 +43,9 @@ Uso::
 from __future__ import annotations
 
 import argparse
+import base64
+import csv
+import hashlib
 import json
 import os
 import re
@@ -207,6 +212,111 @@ def explicado_pela_fonte(termo: str, raiz: Path) -> Path | None:
         except OSError:
             continue
     return None
+
+
+# ── o que veio do pacote não é vazamento ─────────────────────────────────────
+#
+# Achado em 23/09/2026, montando a 0.7.1: a régua reprovou 'Anderson' em nove
+# arquivos do scipy e do sklearn. Não era vazamento -- 'Anderson' entrou no banco
+# de vozes na véspera, e é também o estatístico do **teste de Anderson-Darling**
+# (`scipy.stats.anderson`) e um pesquisador citado na descrição de um dataset do
+# sklearn. Aqueles bytes viajam nessas rodas desde muito antes de a pessoa
+# existir no banco.
+#
+# O critério, escolhido pelo dono do produto: **se os mesmos bytes já estão no
+# pacote como ele foi publicado, o achado não é dado seu.** E o jeito mais barato
+# de saber se um arquivo ainda é o que a roda instalou está dentro da própria
+# instalação: o `*.dist-info/RECORD` lista cada arquivo com o hash dele. Hash que
+# confere = arquivo intocado desde a instalação = upstream. Sem rede, sem baixar
+# roda nenhuma, sem dependência nova.
+#
+# **Ele falha fechado, e isso é a metade que importa.** Sem `site-packages` no
+# caminho, sem entrada no RECORD, sem hash, hash diferente ou arquivo ilegível, a
+# resposta é `None` e o achado **reprova**. Uma régua que passa em silêncio quando
+# a própria verificação dela quebra é pior do que uma que grita.
+#
+# O que ele NÃO perdoa, de propósito: nada fora de `site-packages`. O
+# `MeetingApp.exe`, os `motor.py`, os modelos, a pasta web -- tudo o que esta
+# árvore produziu continua sendo julgado como antes.
+_RECORDS: dict[Path, dict[str, tuple[str, str]]] = {}
+
+
+def _indice_do_record(site_packages: Path) -> dict[str, tuple[str, str]]:
+    """Caminho relativo → hash declarado, lendo todos os RECORD de uma vez.
+
+    Um índice só, e não um RECORD por pacote: o diretório de topo nem sempre diz
+    de qual roda ele veio (`sklearn` mora em `scikit_learn-1.9.1.dist-info`), e
+    procurar pelo nome erraria justamente o caso que motivou isto. São ~8.600
+    entradas e 1,5 s, lidos uma vez e guardados.
+    """
+    if site_packages in _RECORDS:
+        return _RECORDS[site_packages]
+
+    indice: dict[str, tuple[str, str]] = {}
+    for record in sorted(site_packages.glob("*.dist-info/RECORD")):
+        try:
+            # `newline=""` é o que o csv pede, e `open` o aceita em toda versão
+            # do Python -- `Path.read_text(newline=...)` só existe do 3.13 em
+            # diante, e o Python daqui é mais velho.
+            with record.open(encoding="utf-8", newline="") as f:
+                campos_todos = list(csv.reader(f))
+        except OSError:
+            continue
+        for campos in campos_todos:
+            # Sem hash (o próprio RECORD, o .whl) não serve de prova: fica de
+            # fora do índice e o achado reprova.
+            if len(campos) >= 2 and campos[0] and campos[1]:
+                indice[campos[0]] = (campos[1], record.parent.name)
+
+    _RECORDS[site_packages] = indice
+    return indice
+
+
+def _site_packages(caminho: Path) -> Path | None:
+    """O ``site-packages`` que contém este arquivo, se houver."""
+    for pai in caminho.parents:
+        if pai.name == "site-packages":
+            return pai
+    return None
+
+
+def intacto_do_pacote(caminho: Path) -> str | None:
+    """A roda que instalou este arquivo, se ele ainda for byte a byte o dela.
+
+    ``None`` em qualquer dúvida -- e "qualquer dúvida" inclui não conseguir
+    verificar. Ver o comentário acima.
+    """
+    sp = _site_packages(caminho)
+    if sp is None:
+        return None
+
+    try:
+        relativo = caminho.relative_to(sp).as_posix()
+    except ValueError:
+        return None
+
+    entrada = _indice_do_record(sp).get(relativo)
+    if entrada is None:
+        return None
+    declarado, roda = entrada
+
+    algoritmo, _, digest = declarado.partition("=")
+    if not digest:
+        return None
+
+    try:
+        h = hashlib.new(algoritmo)
+        with caminho.open("rb") as f:
+            for bloco in iter(lambda: f.read(1 << 20), b""):
+                h.update(bloco)
+    except (OSError, ValueError):
+        return None
+
+    if base64.urlsafe_b64encode(h.digest()).rstrip(b"=").decode() != digest:
+        return None
+
+    # O nome da roda, para o relatório dizer de quem são os bytes.
+    return roda.removesuffix(".dist-info")
 
 
 def arquivos_que_viajam(payload: Path, motores: Path | None) -> list[Path]:
@@ -432,10 +542,18 @@ def main() -> int:
     else:
         achados = procurar(arquivos, todos)
         vazamentos = 0
+        upstream: dict[str, int] = {}
         for caminho, termo in achados:
             if (motivo := homonimo(caminho, termo)) is not None:
                 print(f"  ignorado: {termo!r} em {caminho.name}")
                 print(f"            {motivo}")
+                continue
+            if (roda := intacto_do_pacote(caminho)) is not None:
+                # Uma linha por achado, e não duas: são nove só do 'Anderson', e
+                # o motivo é sempre o mesmo. O resumo abaixo fecha a conta.
+                print(f"  upstream: {termo!r} em {caminho.name} — "
+                      f"byte a byte o que {roda} instalou")
+                upstream[termo] = upstream.get(termo, 0) + 1
                 continue
             if (fonte := explicado_pela_fonte(termo, RAIZ)) is not None:
                 print(f"  explicado: {termo!r} em {caminho.name}")
@@ -445,6 +563,9 @@ def main() -> int:
                 continue
             reprovas.append(f"vazamento: {termo!r} dentro de {caminho}")
             vazamentos += 1
+        if upstream:
+            resumo = ", ".join(f"{t!r} ({n})" for t, n in sorted(upstream.items()))
+            print(f"  perdoados por virem intactos do pacote: {resumo}")
         print(f"  régua 2 (conteúdo, {len(todos)} termos): "
               f"{'reprovou' if vazamentos else 'passou'}")
 
