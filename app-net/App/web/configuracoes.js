@@ -730,23 +730,6 @@ function abaModelos(catalogo, config, gravar) {
     painel.appendChild(b);
   }
 
-  // O motor opcional da Fase 7. Bloco próprio, e não mais uma volta do laço
-  // acima, porque **não há o que escolher**: a família tem um GGUF só, e um
-  // seletor de uma opção é ruído. É a mesma forma do bloco da diarização logo
-  // abaixo — informa, e não oferece.
-  //
-  // Ele precisa existir mesmo estando a chave que o liga fora desta tela: sem
-  // cartão, o modelo não teria como ser baixado, e o motor subiria sem ele. Um
-  // teste guarda esse par — ver CatalogoTests.TodoPacoteTemIdUnicoEFamiliaConhecida.
-  if (doMoss.length > 0) {
-    const b = bloco("Transcrição em uma passada (opcional)",
-      "Um modelo que transcreve e separa os falantes ao mesmo tempo. "
-      + "Baixe-o antes de escolhê-lo como motor de transcrição; enquanto não "
-      + "for escolhido, nada muda.");
-    for (const i of doMoss) b.appendChild(cartaoDeModelo(i));
-    painel.appendChild(b);
-  }
-
   // O modelo da legenda ao vivo. Mesma forma e mesma razão do bloco acima: sem
   // cartão o modelo não teria como ser baixado, e o motor subiria sem ele.
   const daLegenda = catalogo.filter((i) => i.pacote.familia === "legenda");
