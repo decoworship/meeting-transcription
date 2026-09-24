@@ -321,6 +321,16 @@ export function textoDeBusca(g, rodando = null) {
 }
 
 /**
+ * Os estados de mais de uma palavra, como a busca os reconhece: escritos
+ * inteiros, valem como estado, e não como palavras soltas. Soltas, "sem ata"
+ * achava a "Semanal" com a ata pronta — o "sem" do título, o "ata" do estado.
+ * Do mais longo ao mais curto, para "escrevendo a ata" não virar "a ata".
+ */
+const FRASES_DE_ESTADO = ["Não transcrita", "Sem ata", "Ata desatualizada", "Ata pronta",
+                          "Escrevendo a ata", "Separando falantes", "Somando as faixas"]
+  .map((f) => normalizar(f)).sort((a, b) => b.length - a.length);
+
+/**
  * As gravações que passam em todos os critérios.
  *
  * A busca casa **todas** as palavras, em qualquer campo: "algar rafael" é a
@@ -331,7 +341,14 @@ export function textoDeBusca(g, rodando = null) {
  */
 export function filtrar(gravacoes, criterios = {}, { hoje = null, rodandoDe = () => null } = {}) {
   const { texto = "", cliente = "", periodo = "tudo", data = "", estado = "" } = criterios;
-  const palavras = normalizar(texto).split(/\s+/).filter(Boolean);
+  let resto = ` ${normalizar(texto).split(/\s+/).join(" ")} `;
+  const estadosPedidos = [];
+  for (const frase of FRASES_DE_ESTADO) {
+    if (!resto.includes(` ${frase} `)) continue;
+    estadosPedidos.push(frase);
+    resto = resto.replace(` ${frase} `, " ");
+  }
+  const palavras = resto.split(" ").filter(Boolean);
   const faixa = intervaloDoPeriodo(periodo, data, hoje);
 
   return gravacoes.filter((g) => {
@@ -351,6 +368,11 @@ export function filtrar(gravacoes, criterios = {}, { hoje = null, rodandoDe = ()
       if (!(g.tem_ata && g.pendencias > 0)) return false;
     } else if (estado && estadoDe(g, rodandoDe(g.caminho)).chave !== estado) {
       return false;
+    }
+
+    if (estadosPedidos.length > 0) {
+      const rotulo = normalizar(estadoDe(g, rodandoDe(g.caminho)).rotulo).replace(/…$/, "");
+      if (!estadosPedidos.every((f) => f === rotulo)) return false;
     }
 
     if (palavras.length > 0) {

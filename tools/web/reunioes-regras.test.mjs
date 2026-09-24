@@ -246,3 +246,20 @@ test("somarMeses fica no mesmo dia, e cai no último quando o mês é mais curto
   assert.equal(R.somarMeses("2026-12-15", 1), "2027-01-15");
   assert.equal(R.somarMeses("2026-01-31", -2), "2025-11-30");
 });
+
+test("um estado escrito inteiro na busca vale como estado, e não como palavras soltas", () => {
+  // "sem ata" achava a "Semanal" com ata pronta: "sem" do título, "ata" do estado.
+  const acervo = [
+    G("2026-09-24_09-00-00", { titulo: "Sherlock Diário" }),
+    G("2026-09-23_10-30-00", { titulo: "Semanal — Beegol", tem_ata: true }),
+    G("2026-09-22_10-30-00", { titulo: "Update Squad", tem_ata: true, nomes: ["Renata Lima"] }),
+    G("2026-09-21_10-30-00", { titulo: "Semanal — Uberlândia", transcrita: false }),
+  ];
+  const titulos = (texto) => R.filtrar(acervo, { texto }).map((g) => g.titulo);
+  assert.deepEqual(titulos("sem ata"), ["Sherlock Diário"]);
+  assert.deepEqual(titulos("Sem ata"), ["Sherlock Diário"]);
+  assert.deepEqual(titulos("semanal ata pronta"), ["Semanal — Beegol"]);
+  assert.deepEqual(titulos("não transcrita"), ["Semanal — Uberlândia"]);
+  // Palavra solta continua solta: "ata" acha tudo o que tem "ata" em algum lugar.
+  assert.deepEqual(titulos("ata"), ["Sherlock Diário", "Semanal — Beegol", "Update Squad"]);
+});
