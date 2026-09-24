@@ -524,10 +524,57 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .revisao { display: grid; gap: var(--espaco-3); }
 
 /* O .aa-pagina do design system respira 64px em cima, que é o certo para uma
- * página de documento. A revisão não é uma: a barra de ferramentas gruda no
- * topo logo abaixo do cabeçalho, e esses 64px só empurram a transcrição para
+ * página de documento. A reunião aberta não é uma: na Transcrição, a barra de
+ * ferramentas gruda no topo logo abaixo das abas, e esses 64px só empurram a transcrição para
  * fora da janela — na tela em que mais se lê do app inteiro. */
-.aa-pagina:has(> .revisao) { padding-top: var(--espaco-5); }
+/* A reunião ocupa a largura da página inteira em qualquer aba. Sem o width, a
+ * .aa-pagina (margin auto num item de grade) encolhe até o conteúdo: a aba Ata
+ * ficava com 390 px no meio da tela, e a página pulava de largura a cada troca
+ * de aba. O border-box impede o padding de somar aos 100%. */
+.aa-pagina:has(> .reuniao-aberta) {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: var(--espaco-5);
+}
+
+/* ─────────────────────────────────────────────────── a reunião aberta
+ *
+ * Transcrição · Ata · Notas (reuniao.js). A aba escolhida tem o fio embaixo
+ * e o texto forte; as outras, o texto suave. Ver o mockup, prancha "Reunião ·
+ * transcrição, ata e notas". */
+.reuniao-aberta { display: grid; gap: var(--espaco-4); }
+
+.reuniao-aberta__abas {
+  display: flex;
+  gap: var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.reuniao-aberta__aba {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-1);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: 600 var(--texto-corpo) / 1.2 var(--fonte-ui);
+  cursor: pointer;
+}
+.reuniao-aberta__aba:hover { color: var(--cor-texto-forte); }
+.reuniao-aberta__aba[aria-selected="true"] { color: var(--cor-texto-forte); border-bottom-color: var(--cor-acao); }
+.reuniao-aberta__aba:focus-visible { outline: none; box-shadow: var(--anel-foco); border-radius: var(--raio-pequeno); }
+
+.reuniao-aberta__conta {
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+  color: var(--cor-texto-suave);
+  background: var(--cor-superficie-2);
+  border-radius: var(--raio-pilula);
+  padding: 2px var(--espaco-2);
+}
 
 /* Busca, estado e botões ficam colados no topo junto com os filtros: são as
  * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
@@ -1393,6 +1440,13 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__topo > .aa-btn { width: 100%; }
 
 .ata__tipo { min-width: 14rem; margin: 0; }
+
+/* A ata na aba da reunião: sem título à esquerda, o tipo e o botão encostados. */
+.ata--aba .ata__topo { grid-template-columns: auto 9.5rem; justify-content: start; }
+/* Na coluna do texto, para Copiar e Exportar não irem parar na outra ponta da tela. */
+.ata--aba .ata__corpo { max-width: 68ch; }
+.ata__cabeca { display: flex; align-items: center; gap: var(--espaco-2); flex-wrap: wrap; }
+.ata__estado { margin: 0 auto 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 
 /* A ata lida: coluna estreita de propósito. Linha de 100 caracteres cansa, e
  * este é o texto que se lê inteiro, ao contrário da transcrição, que se

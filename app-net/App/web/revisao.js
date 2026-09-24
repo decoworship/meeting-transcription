@@ -13,7 +13,6 @@
 import { pedir } from "/ponte.js";
 import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
          campoComSugestoes, preencherSugestoes, confirmar } from "/pecas.js";
-import { blocoDeNotas } from "/notas.js";
 import { listaDeTrechos } from "/lista-de-trechos.js";
 
 let estado = null;
@@ -80,7 +79,6 @@ function marcarEstado(texto, erro = false) {
 
 export function abrirPainel(qual) {
   if (qual === "falantes") abrirFalantes();
-  else if (qual === "notas") abrirNotas();
   else if (qual === "exportar") abrirExportacao();
   else if (qual.startsWith("editar")) editar(Number(qual.split(":")[1] ?? 0));
 }
@@ -145,18 +143,6 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   botaoFalantes.textContent = "Falantes";
   botaoFalantes.addEventListener("click", abrirFalantes);
 
-  // As notas escritas na reunião, ao lado da transcrição dela.
-  //
-  // Em gaveta pelo mesmo motivo dos falantes: mexer nelas sem perder o lugar no
-  // texto. Quem lê a transcrição dias depois quer conferir o que anotou na hora
-  // — e, quando a ata por LLM chegar, é este texto que vale mais que o que o
-  // modelo ouviu (FASE3.md §3).
-  const botaoNotas = document.createElement("button");
-  botaoNotas.className = "aa-btn aa-btn-secundario";
-  botaoNotas.type = "button";
-  botaoNotas.textContent = "Notas";
-  botaoNotas.addEventListener("click", abrirNotas);
-
   const botaoExportar = document.createElement("button");
   botaoExportar.className = "aa-btn aa-btn-primario";
   botaoExportar.type = "button";
@@ -174,7 +160,9 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   estadoSalvo.className = "campo__dica";
   estadoSalvo.id = "estado-salvo";
 
-  ferramentas.append(busca, parar, estadoSalvo, botaoNotas, botaoFalantes, botaoExportar);
+  // As notas não têm botão aqui desde que viraram a aba Notas da reunião
+  // (reuniao.js): a aba não tira o lugar no texto, que era o motivo da gaveta.
+  ferramentas.append(busca, parar, estadoSalvo, botaoFalantes, botaoExportar);
 
   // As duas que destroem trabalho vão para um invólucro próprio, e o CSS o
   // empurra para a direita atrás de um fio. Antes elas eram apenas o sétimo e o
@@ -478,22 +466,6 @@ modal.addEventListener("close", () => {
 });
 
 // ───────────────────────────────────────────────────── falantes
-
-/**
- * A gaveta de notas.
- *
- * Monta um editor novo a cada abertura e o joga fora ao fechar: o bloco carrega
- * do disco ao montar e grava ao perder o foco, então guardá-lo entre aberturas
- * só criaria a chance de mostrar um texto velho depois de alguém editar o
- * arquivo por fora.
- */
-function abrirNotas() {
-  const corpo = document.getElementById("corpo-notas");
-  const bloco = blocoDeNotas(estado.gravacao.caminho, { linhas: 18 });
-  corpo.replaceChildren(bloco.raiz);
-  abrirGaveta("gaveta-notas");
-  bloco.campo.focus();
-}
 
 function abrirFalantes() {
   const corpo = document.getElementById("corpo-falantes");

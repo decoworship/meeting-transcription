@@ -11,7 +11,7 @@
 import { pedir } from "/ponte.js";
 import { alerta, anunciar } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado } from "/transcricoes.js";
-import { duracao, quando, tituloDe, abrirGravacao, abrirGravador, abrirAtas } from "/app.js";
+import { duracao, quando, tituloDe, abrirGravacao, abrirGravador } from "/app.js";
 import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proximoPasso,
          ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
 
@@ -576,13 +576,11 @@ function textoDaAta(g, rodando) {
 }
 
 /**
- * O botão do próximo passo leva aonde o passo se dá.
- *
- * A ata ainda mora em Atas; o plano 2 a traz para dentro da reunião, e aí
- * esta função é o único lugar a mudar.
+ * O botão do próximo passo leva aonde o passo se dá: transcrever na tela de
+ * transcrever, e tudo o que é da ata na aba Ata da reunião.
  */
 function seguir(g, acao) {
   if (acao === "transcrever" || acao === "acompanhar-transcricao") return abrirGravacao(g);
-  return abrirAtas({ foco: g.caminho });
+  return abrirGravacao(g, { aba: "ata" });
 }
 

@@ -1,5 +1,5 @@
 import { pedir } from "/ponte.js";
-import { telaDeRevisao, abrirPainel } from "/revisao.js";
+import { telaDaReuniao, abrirPainel } from "/reuniao.js";
 import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
@@ -625,7 +625,7 @@ async function abrirResultado(g) {
     const r = await pedir("transcricao", { gravacao: g.caminho });
     if (!r.transcricao) throw new Error("a transcrição não foi encontrada");
     g.transcrita = true;
-    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+    telaDaReuniao(g, JSON.parse(r.transcricao), { cabecalho, tela });
   } catch (e) {
     tela.replaceChildren(alerta(e.message, "erro"));
   }
@@ -694,7 +694,14 @@ async function transcrever(g, botao, painel, modeloDeDiarizacao = null) {
   }
 }
 
-export async function abrirGravacao(g) {
+/**
+ * Abre uma gravação: a reunião com abas, se ela já foi transcrita, ou a tela de
+ * transcrever, se não foi.
+ *
+ * @param aba qual aba da reunião abrir — "transcricao" (o padrão), "ata" ou
+ *   "notas". O painel de Reuniões pede "ata" para o próximo passo da ata.
+ */
+export async function abrirGravacao(g, { aba = "transcricao" } = {}) {
   fecharGavetas();
   if (!g.transcrita) return telaDePreparo(g);
 
@@ -706,8 +713,8 @@ export async function abrirGravacao(g) {
     if (r.transcricao) {
       cabecalho(tituloDe(g), "carregando…", true);
       tela.replaceChildren();
-      telaDeRevisao(g, JSON.parse(r.transcricao), {
-        cabecalho, tela,
+      telaDaReuniao(g, JSON.parse(r.transcricao), {
+        cabecalho, tela, aba,
         aoRefazer: () => { g.transcrita = false; telaDePreparo(g); },
         aoApagar: botaoApagarGravacao(g),
       });
@@ -722,8 +729,8 @@ export async function abrirGravacao(g) {
     tela.replaceChildren(alerta("A transcrição não foi encontrada.", "erro"));
     return;
   }
-  telaDeRevisao(g, JSON.parse(r.transcricao), {
-    cabecalho, tela, aoApagar: botaoApagarGravacao(g),
+  telaDaReuniao(g, JSON.parse(r.transcricao), {
+    cabecalho, tela, aba, aoApagar: botaoApagarGravacao(g),
   });
 }
 

@@ -127,7 +127,7 @@ function cartaoDeAta(g, tipos, ctx, emFoco = false) {
     botao.disabled = true;
     try {
       await pedir("gerar-ata", { gravacao: g.caminho, modelo: idDoTipo() });
-      acompanhar(g, botao, painel, corpo);
+      acompanhar(g, botao, painel, () => mostrarAtaExistente(g, corpo, botao, true));
     } catch (e) {
       botao.disabled = false;
       painel.replaceChildren(alerta(e.message, "erro"));
@@ -140,7 +140,7 @@ function cartaoDeAta(g, tipos, ctx, emFoco = false) {
   // "Refazer ata", que um Enter logo depois refaria sem perguntar.
   mostrarAtaExistente(g, corpo, botao, emFoco, emFoco);
 
-  if (emCurso(g.caminho)) acompanhar(g, botao, painel, corpo);
+  if (emCurso(g.caminho)) acompanhar(g, botao, painel, () => mostrarAtaExistente(g, corpo, botao, true));
 
   return raiz;
 }
@@ -258,6 +258,160 @@ function desenharAta(corpo, markdown, velha, abrir, gravacao) {
 }
 
 /**
+ * Copiar e exportar a ata — o que se faz com ela depois de lida.
+ *
+ * @param depois onde pôr o caminho do arquivo exportado, ou o erro: logo
+ *   depois deste elemento.
+ */
+function botoesDaAta(markdown, gravacao, depois) {
+  const copiar = document.createElement("button");
+  copiar.className = "aa-btn aa-btn-texto";
+  copiar.type = "button";
+  copiar.textContent = "Copiar";
+  copiar.addEventListener("click", async () => {
+    // A ata existe para ser colada num e-mail. Markdown puro, e não o texto
+    // renderizado: é o que o Teams, o Slack e o e-mail entendem.
+    await navigator.clipboard.writeText(markdown);
+    copiar.textContent = "Copiado";
+    setTimeout(() => { copiar.textContent = "Copiar"; }, 1500);
+  });
+
+  // Exportar leva a ata para a pasta das atas, que é configurada à parte da de
+  // transcrições — a ata é o que sai para o cliente.
+  const exportar = document.createElement("button");
+  exportar.className = "aa-btn aa-btn-texto";
+  exportar.type = "button";
+  exportar.textContent = "Exportar";
+  exportar.addEventListener("click", async () => {
+    exportar.disabled = true;
+    try {
+      const r = await pedir("exportar-ata", { gravacao: gravacao.caminho,
+                                              nome: tituloDe(gravacao) });
+      exportar.textContent = "Exportada";
+      // O caminho fica na tela: exportar sem dizer onde obriga a procurar.
+      const onde = document.createElement("p");
+      onde.className = "campo__dica";
+      onde.textContent = r.arquivo;
+      depois.after(onde);
+    } catch (e) {
+      depois.after(alerta(e.message, "erro"));
+    } finally {
+      exportar.disabled = false;
+      setTimeout(() => { exportar.textContent = "Exportar"; }, 2000);
+    }
+  });
+
+  return [copiar, exportar];
+}
+
+// ───────────────────────────────────────── a ata na aba da reunião
+
+/**
+ * A ata de uma reunião, na aba Ata da reunião aberta (reuniao.js).
+ *
+ * É o que era o cartão da tela de Atas, sem a dobra e sem o título: numa aba
+ * que é só a ata, dobrá-la esconderia a única coisa que a aba mostra, e o
+ * título da reunião já está na barra do topo.
+ *
+ * @param aoContar recebe o número de pendências a cada vez que a ata é lida —
+ *   ao abrir e depois de cada geração. É o que mantém certo o selo da aba, que
+ *   nasceu do resumo da lista, lido antes de a ata nova existir.
+ */
+export async function montarAta(painel, g, { aoContar } = {}) {
+  let tipos;
+  try {
+    ({ tipos } = await pedir("modelos-de-ata"));
+  } catch (e) {
+    painel.replaceChildren(alerta(e.message, "erro"));
+    return;
+  }
+
+  const raiz = document.createElement("div");
+  raiz.className = "ata ata--aba";
+  raiz.dataset.gravacao = g.caminho;
+
+  const topo = document.createElement("div");
+  topo.className = "ata__topo";
+  const escolha = campo("Tipo de ata", "select", {
+    id: `tipo-${g.nome}`,
+    opcoes: tipos.map((t) => t.nome),
+  });
+  escolha.classList.add("ata__tipo");
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-primario";
+  botao.type = "button";
+  botao.textContent = "Gerar ata";
+  botao.dataset.acao = "ata";
+  topo.append(escolha, botao);
+
+  const andamento = document.createElement("div");
+  andamento.className = "ata__painel";
+  const corpo = document.createElement("div");
+  corpo.className = "ata__corpo";
+  raiz.append(topo, andamento, corpo);
+  painel.replaceChildren(raiz);
+
+  const idDoTipo = () => {
+    const nome = escolha.querySelector("select").value;
+    return (tipos.find((t) => t.nome === nome) ?? tipos[0]).id;
+  };
+  const carregar = () => carregarAta(g, corpo, botao, aoContar);
+
+  botao.addEventListener("click", async () => {
+    botao.disabled = true;
+    try {
+      await pedir("gerar-ata", { gravacao: g.caminho, modelo: idDoTipo() });
+      acompanhar(g, botao, andamento, carregar);
+    } catch (e) {
+      botao.disabled = false;
+      andamento.replaceChildren(alerta(e.message, "erro"));
+    }
+  });
+
+  await carregar();
+  if (emCurso(g.caminho)) acompanhar(g, botao, andamento, carregar);
+}
+
+/** Lê a ata do disco e a desenha aberta. Sem ata, o corpo fica vazio e o botão diz gerar. */
+async function carregarAta(g, corpo, botao, aoContar) {
+  let r;
+  try {
+    r = await pedir("ata", { gravacao: g.caminho });
+  } catch {
+    return;   // sem ata é o estado normal de quem nunca gerou
+  }
+  if (!r.ata) {
+    corpo.replaceChildren();
+    return;
+  }
+  botao.textContent = "Refazer ata";
+  botao.className = "aa-btn aa-btn-secundario";
+
+  const cabeca = document.createElement("div");
+  cabeca.className = "ata__cabeca";
+  const estado = document.createElement("p");
+  estado.className = "ata__estado";
+  const linhas = r.ata.split("\n").filter((l) => l.trim().length > 0).length;
+  const pendencias = (r.ata.match(/^- \[ \]/gm) ?? []).length;
+  aoContar?.(pendencias);
+  estado.textContent = pendencias > 0
+    ? `${pendencias} pendência${pendencias > 1 ? "s" : ""} · ${linhas} linhas`
+    : `${linhas} linhas`;
+  cabeca.append(estado, ...botoesDaAta(r.ata, g, cabeca));
+
+  const texto = document.createElement("div");
+  texto.className = "ata__texto";
+  texto.append(...renderizar(r.ata));
+
+  corpo.replaceChildren(cabeca);
+  if (r.ata_velha) {
+    corpo.appendChild(alerta(
+      "A transcrição foi corrigida depois que esta ata foi escrita. Vale refazer.", "aviso"));
+  }
+  corpo.appendChild(texto);
+}
+
+/**
  * Markdown suficiente para uma ata, sem biblioteca.
  *
  * São seis construções — título, item de lista, checkbox, negrito, parágrafo e
@@ -333,8 +487,13 @@ function comNegrito(texto) {
   return nos;
 }
 
-/** A geração em curso, desenhada do registro do núcleo — como a transcrição. */
-function acompanhar(g, botao, painel, corpo) {
+/**
+ * A geração em curso, desenhada do registro do núcleo — como a transcrição.
+ *
+ * @param aoTerminar o que fazer quando a ata fica pronta: reler e desenhar.
+ *   Quem sabe onde a ata aparece é quem chamou — a aba ou o cartão.
+ */
+function acompanhar(g, botao, painel, aoTerminar) {
   botao.disabled = true;
   botao.textContent = "Escrevendo…";
 
@@ -387,6 +546,6 @@ function acompanhar(g, botao, painel, corpo) {
     }
     if (fim.erro) { painel.replaceChildren(alerta(fim.erro, "erro")); return; }
 
-    mostrarAtaExistente(g, corpo, botao, true);
+    aoTerminar();
   });
 }

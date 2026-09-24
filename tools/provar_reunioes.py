@@ -90,7 +90,8 @@ PONTE_FALSA = r"""
       case "prefs": return { prefs: null };
       case "notas": return { notas: "" };
       case "modelos-de-ata": return { tipos: [{ id: "geral", nome: "Reunião geral" }] };
-      case "ata": return q.gravacao.includes("13-59") ? { ata, ata_velha: false } : { ata: null };
+      case "ata": return window.__atas[q.gravacao] ? { ata: window.__atas[q.gravacao], ata_velha: false }
+        : q.gravacao.includes("13-59") ? { ata, ata_velha: false } : { ata: null };
       default: return {};
     }
   };
@@ -105,6 +106,7 @@ PONTE_FALSA = r"""
     },
   } };
   window.__gravacoes = gravacoes;
+  window.__atas = {};
   window.__emitir = (ev) => {
     for (const f of window.chrome.webview._ouvintes)
       f({ data: JSON.stringify(Object.assign({ id: 0 }, ev)) });
@@ -332,34 +334,158 @@ prova_janela_estreita.janela = (860, 700)
 
 
 
+def abrir_reuniao(pagina, inicio: str) -> None:
+    """Abre a reunião cuja linha começa por `inicio`, pelo duplo clique da lista."""
+    linha_por_titulo(pagina, inicio)
+    pagina.evaluate("() => window.__linha.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+
+
+ABA_ESCOLHIDA = """() => {
+  const a = document.querySelector(".reuniao-aberta [role='tab'][aria-selected='true']");
+  return a ? a.dataset.aba : null;
+}"""
+
+# Um evento de fim de tarefa, como o núcleo empurra.
+FIM_DE_TAREFA = ("([c, t]) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo: "
+                 "{ gravacao: c, nome: 'x', tarefa: t, etapa: 'montagem', fracao: 1, texto: '', "
+                 "comecou_em: '', terminou: true, erro: null, cancelada: false } } })")
+TAREFA_EM_CURSO = ("([c, t, e]) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: "
+                   "{ gravacao: c, nome: 'x', tarefa: t, etapa: e, fracao: 0.5, texto: 'lendo', "
+                   "comecou_em: '', terminou: false, erro: null, cancelada: false }, ultimo: null } })")
+
+
 def prova_ata_na_reuniao_pedida(pagina) -> None:
     linha_por_titulo(pagina, "Comunicação")
     pagina.evaluate("() => window.__linha.click()")
     pagina.click(".reunioes__painel [data-acao='abrir-ata']")
-    pagina.wait_for_selector(".ata", timeout=5000)
-    pagina.wait_for_timeout(100)
-    aberta = pagina.evaluate("""() => {
-        const c = [...document.querySelectorAll('.ata')]
-          .find((x) => x.dataset.gravacao.includes('13-59'));
-        const d = c && c.querySelector('details.ata__dobra');
-        return Boolean(d && d.open);
-    }""")
-    conferir(aberta, "'Abrir a ata' leva a Atas com a ata daquela reunião aberta")
-    foco = pagina.evaluate("() => document.activeElement && document.activeElement.tagName")
-    conferir(foco == "SUMMARY",
-             f"e o foco vai para a ata aberta, não para 'Refazer ata', que um Enter dispararia ({foco!r})")
-    conferir(pagina.evaluate(FOCO_A_VISTA), "e o que tem o foco está à vista, e não debaixo da barra do topo")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "ata", "'Abrir a ata' abre a reunião na aba Ata")
+    foco = pagina.evaluate("() => document.activeElement && document.activeElement.dataset.aba")
+    conferir(foco == "ata", f"com o foco na aba, e não num botão que um Enter dispararia ({foco!r})")
+    conferir(pagina.evaluate(FOCO_A_VISTA), "e a aba com o foco está à vista, e não debaixo da barra do topo")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    conferir("tom passa a ser separado" in pagina.text_content("#painel-ata .ata__texto"),
+             "e a ata daquela reunião está ali, aberta")
 
 
 def prova_gerar_ata_na_reuniao_pedida(pagina) -> None:
     linha_por_titulo(pagina, "Sherlock")
     pagina.evaluate("() => window.__linha.click()")
     pagina.click(".reunioes__painel [data-acao='gerar-ata']")
-    pagina.wait_for_selector(".ata", timeout=5000)
-    pagina.wait_for_timeout(100)
-    foco = pagina.evaluate("() => document.activeElement && document.activeElement.dataset.acao")
-    conferir(foco == "ata", f"'Gerar a ata' leva ao botão de gerar daquela reunião ({foco!r})")
-    conferir(pagina.evaluate(FOCO_A_VISTA), "e o botão está à vista, e não debaixo da barra do topo")
+    pagina.wait_for_selector("#painel-ata [data-acao='ata']", timeout=5000)
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "ata", "'Gerar a ata' abre a reunião na aba Ata")
+    conferir(pagina.text_content("#painel-ata [data-acao='ata']") == "Gerar ata",
+             "que oferece gerar, porque ainda não há ata")
+
+
+def prova_reuniao_abas(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    abas = pagina.eval_on_selector_all(".reuniao-aberta [role='tab']", "els => els.map((e) => e.dataset.aba)")
+    conferir(abas == ["transcricao", "ata", "notas"], f"a reunião tem as três abas ({abas})")
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "transcricao", "e abre na Transcrição")
+    conferir(pagina.is_visible(".revisao"), "que é a revisão de sempre")
+    em_cima = pagina.evaluate("""() => {
+        const abas = document.querySelector("[role='tablist']").getBoundingClientRect();
+        const painel = document.querySelector("#painel-transcricao").getBoundingClientRect();
+        return abas.bottom <= painel.top + 1 && painel.width >= abas.width - 1;
+    }""")
+    conferir(em_cima, "as abas ficam em cima do conteúdo, e o conteúdo tem a largura delas")
+    conferir(pagina.text_content("#titulo") == "Comunicação Beegol + App", "a barra do topo diz a reunião")
+    # A revisão não se remonta ao trocar de aba: ela guarda na memória nomes de
+    # falante e edições que gravam com atraso.
+    pagina.fill(".revisao input[type='search']", "começar")
+    pagina.evaluate("() => { window.__revisao = document.querySelector('.revisao'); }")
+    pagina.click(".reuniao-aberta [data-aba='notas']")
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "notas", "clicar em Notas troca de aba")
+    conferir(pagina.is_visible("#painel-notas .notas"), "e mostra o bloco de notas")
+    conferir(not pagina.is_visible(".revisao"), "a revisão fica escondida")
+    pagina.click(".reuniao-aberta [data-aba='transcricao']")
+    conferir(pagina.evaluate("() => window.__revisao === document.querySelector('.revisao') "
+                             "&& window.__revisao.isConnected"),
+             "voltar à Transcrição traz a MESMA revisão, sem remontar")
+    conferir(pagina.input_value(".revisao input[type='search']") == "começar", "com a busca como estava")
+    notas_na_revisao = pagina.eval_on_selector_all(
+        ".revisao .ferramentas button", "els => els.filter((e) => e.textContent.trim() === 'Notas').length")
+    conferir(notas_na_revisao == 0, "a revisão não tem mais o botão Notas: as notas são uma aba")
+
+
+def prova_reuniao_teclado(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.focus(".reuniao-aberta [data-aba='transcricao']")
+    pagina.keyboard.press("ArrowRight")
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "ata", "a seta para a direita vai à próxima aba")
+    conferir(pagina.evaluate("() => document.activeElement.dataset.aba") == "ata", "e leva o foco junto")
+    pagina.keyboard.press("End")
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "notas", "End vai à última")
+    pagina.keyboard.press("ArrowRight")
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "transcricao", "e a seta dá a volta")
+    paradas = pagina.eval_on_selector_all(".reuniao-aberta [role='tab']",
+                                          "els => els.filter((e) => e.tabIndex === 0).length")
+    conferir(paradas == 1, f"as abas são uma parada de Tab só ({paradas})")
+
+
+def prova_reuniao_ata(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    largura = "() => Math.round(document.querySelector('.reuniao-aberta').getBoundingClientRect().width)"
+    na_transcricao = pagina.evaluate(largura)
+    pagina.click(".reuniao-aberta [data-aba='ata']")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    na_ata = pagina.evaluate(largura)
+    conferir(na_ata == na_transcricao,
+             f"a página não muda de largura ao trocar de aba ({na_transcricao} → {na_ata} px)")
+    conferir("tom passa a ser separado" in pagina.text_content("#painel-ata .ata__texto"),
+             "a aba Ata mostra a ata da reunião")
+    conferir(pagina.locator("#painel-ata details").count() == 0, "aberta, sem dobra: a aba é a ata")
+    conferir(pagina.locator("#painel-ata .ata__tipo select").count() == 1, "com o tipo, para refazer")
+    botao = pagina.text_content("#painel-ata [data-acao='ata']")
+    conferir(botao == "Refazer ata", f"e o botão diz refazer, porque a ata existe ({botao!r})")
+    conferir(pagina.locator("#painel-ata >> text=Copiar").count() == 1, "dá para copiar")
+    conferir(pagina.locator("#painel-ata >> text=Exportar").count() == 1, "e para exportar")
+
+
+def prova_reuniao_gerar_ata(pagina) -> None:
+    # Gerar na aba, sair dela no meio, e a ata chegar mesmo assim.
+    abrir_reuniao(pagina, "Sherlock")
+    pagina.click(".reuniao-aberta [data-aba='ata']")
+    pagina.wait_for_selector("#painel-ata [data-acao='ata']", timeout=5000)
+    caminho = pagina.evaluate("() => document.querySelector('#painel-ata .ata').dataset.gravacao")
+    pagina.click("#painel-ata [data-acao='ata']")
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "ata", "lendo"])
+    pagina.wait_for_timeout(50)
+    conferir(pagina.is_visible("#painel-ata .aa-progresso"), "gerar mostra o andamento na aba")
+    pagina.click(".reuniao-aberta [data-aba='notas']")
+    pagina.evaluate("(c) => { window.__atas[c] = '# Ata\\n\\n## Resumo\\n\\nO NOC assume o sábado.\\n\\n"
+                    "## Pendências\\n\\n- [ ] Escalar o sábado — **Dimi** — sexta\\n'; }", caminho)
+    pagina.evaluate(FIM_DE_TAREFA, [caminho, "ata"])
+    pagina.wait_for_timeout(80)
+    pagina.click(".reuniao-aberta [data-aba='ata']")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    conferir("NOC assume" in pagina.text_content("#painel-ata .ata__texto"),
+             "a ata que terminou com a aba escondida está lá quando se volta")
+    conferir(pagina.text_content("#painel-ata [data-acao='ata']") == "Refazer ata", "e o botão vira refazer")
+    # O selo da aba vem do resumo da lista, lido antes de a ata existir: ele
+    # tem de acompanhar a ata escrita aqui, e não o disco de quando se abriu.
+    selo = lambda: pagina.locator("#aba-ata .reuniao-aberta__conta")  # noqa: E731
+    conferir(selo().count() == 1 and selo().text_content() == "1 pendência",
+             f"a aba Ata passa a contar a pendência da ata nova ({selo().all_text_contents()})")
+    pagina.click("#painel-ata [data-acao='ata']")
+    # O clique é assíncrono: o fim só é ouvido depois que o pedido volta e o
+    # andamento aparece.
+    pagina.wait_for_selector("#painel-ata .aa-progresso", timeout=5000)
+    pagina.evaluate("(c) => { window.__atas[c] = '# Ata\\n\\n## Resumo\\n\\nNada ficou pendente.\\n'; }",
+                    caminho)
+    pagina.evaluate(FIM_DE_TAREFA, [caminho, "ata"])
+    pagina.wait_for_function("() => document.querySelector('#painel-ata .ata__texto')"
+                             "?.textContent.includes('Nada ficou')", timeout=5000)
+    conferir(selo().count() == 0, "e refeita sem pendência, o selo some")
+
+
+def prova_reuniao_pelo_endereco(pagina) -> None:
+    # O --tela do app (e as fotos de documentação) abrem uma reunião numa aba.
+    pagina.evaluate("() => { location.hash = 'revisao=4&notas'; location.reload(); }")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+    conferir(pagina.evaluate(ABA_ESCOLHIDA) == "notas", "'#revisao=4&notas' abre a reunião na aba Notas")
 
 
 def prova_troca_de_etapa(pagina) -> None:
@@ -458,8 +584,8 @@ def prova_data_nao_rouba_o_foco(pagina) -> None:
 
 
 
-# A tela de Atas com a janela baixa: o cartão pedido precisa de rolagem, e é
-# aí que a barra fixa do topo o cobriria.
+# Com a janela baixa, que é onde a barra fixa do topo cobriria o que recebe o
+# foco. Era o cartão rolado da tela de Atas; é a aba Ata desde que ela existe.
 prova_ata_na_reuniao_pedida.janela = (1280, 520)
 prova_gerar_ata_na_reuniao_pedida.janela = (1280, 520)
 
@@ -474,7 +600,9 @@ FOCO_A_VISTA = """() => {
 PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem,
           prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida,
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
-          prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco]
+          prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
+          prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
+          prova_reuniao_pelo_endereco]
 
 
 
