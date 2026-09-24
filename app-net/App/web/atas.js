@@ -12,6 +12,12 @@ import { alerta, campo } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado, cancelar } from "/transcricoes.js";
 import { tituloDe } from "/app.js";
 
+// A transcrição e a separação de falantes dividem o registro com a ata. A aba
+// Ata só acompanha o que é dela: tomar a separação de falantes por uma ata
+// escrevendo mostrava "Escrevendo…", e o Parar daqui a cancelava.
+const ataEmCurso = (caminho) => (emCurso(caminho)?.tarefa === "ata" ? emCurso(caminho) : null);
+const fimDaAta = (caminho) => (ultimoResultado(caminho)?.tarefa === "ata" ? ultimoResultado(caminho) : null);
+
 const ETAPAS = {
   modelo: "Carregando o modelo",
   lendo: "Lendo a reunião",
@@ -130,7 +136,7 @@ export async function montarAta(painel, g, { aoContar } = {}) {
   });
 
   await carregar();
-  if (emCurso(g.caminho)) acompanhar(g, botao, andamento, carregar);
+  if (ataEmCurso(g.caminho)) acompanhar(g, botao, andamento, carregar);
 }
 
 /** Lê a ata do disco e a desenha aberta. Sem ata, o corpo fica vazio e o botão diz gerar. */
@@ -281,16 +287,16 @@ function acompanhar(g, botao, painel, aoTerminar) {
     estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
     preenchimento.style.width = `${t.fracao >= 0 ? Math.round(t.fracao * 100) : 0}%`;
   };
-  const atual = emCurso(g.caminho);
+  const atual = ataEmCurso(g.caminho);
   if (atual) pintar(atual);
 
   const cancelarAssinatura = assinarTranscricoes(() => {
     if (!painel.isConnected) { cancelarAssinatura(); return; }
 
-    const rodando = emCurso(g.caminho);
+    const rodando = ataEmCurso(g.caminho);
     if (rodando) { pintar(rodando); return; }
 
-    const fim = ultimoResultado(g.caminho);
+    const fim = fimDaAta(g.caminho);
     if (!fim) return;
 
     cancelarAssinatura();

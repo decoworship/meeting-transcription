@@ -9,10 +9,15 @@
 
 /* A altura da barra do topo, num lugar só.
  *
- * Dois blocos grudam abaixo dela — os controles da revisão e as abas dos
- * ajustes —, e cada um chutava o próprio valor. Um chute errado não quebra
- * nada visivelmente: o bloco só desliza para trás da barra e some, que foi
- * exatamente o defeito das abas em 12/08. */
+ * Os blocos que grudam abaixo dela — os controles da revisão, as abas da
+ * reunião e as dos ajustes, o painel de Reuniões — leem esta variável, e cada
+ * um chutava o próprio valor. Um chute errado não quebra nada visivelmente: o
+ * bloco só desliza para trás da barra e some, que foi exatamente o defeito das
+ * abas em 12/08 — e voltou em 24/09, quando a tipografia da Fase 5 fez a barra
+ * da reunião aberta medir 90 px contra estes 76.
+ *
+ * Por isso o valor daqui é só o da primeira pintura: o app.js mede a barra
+ * (ResizeObserver) e reescreve a variável sempre que ela muda de altura. */
 :root { --altura-da-barra: 4.75rem; }
 
 /* A cor do falante, legível como TEXTO nos dois temas.
@@ -513,13 +518,24 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * Transcrição · Ata · Notas (reuniao.js). A aba escolhida tem o fio embaixo
  * e o texto forte; as outras, o texto suave. Ver o mockup, prancha "Reunião ·
  * transcrição, ata e notas". */
-.reuniao-aberta { display: grid; gap: var(--espaco-4); }
+.reuniao-aberta { display: grid; gap: var(--espaco-4); --altura-das-abas: 2.5rem; }
 
+/* As abas grudam abaixo da barra do topo, como as de Ajustes: no minuto 50 de
+ * uma reunião de duas horas, anotar ou conferir a ata não pode custar rolar até
+ * o topo. A altura é fixa porque a barra da revisão gruda logo abaixo delas —
+ * são dois sticky irmãos, e sem a conta um cobre o outro (ver .controles). */
 .reuniao-aberta__abas {
   display: flex;
   gap: var(--espaco-5);
   border-bottom: 1px solid var(--cor-borda);
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: calc(var(--z-suspenso) - 1);
+  box-sizing: border-box;
+  height: var(--altura-das-abas);
+  background: var(--cor-fundo);
 }
+.reuniao-aberta .controles { top: calc(var(--altura-da-barra) + var(--altura-das-abas)); }
 
 .reuniao-aberta__aba {
   display: inline-flex;

@@ -161,7 +161,8 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   estadoSalvo.id = "estado-salvo";
 
   // As notas não têm botão aqui desde que viraram a aba Notas da reunião
-  // (reuniao.js): a aba não tira o lugar no texto, que era o motivo da gaveta.
+  // (reuniao.js). O motivo da gaveta era não tirar o lugar no texto, e a aba o
+  // mantém: cada aba guarda a própria rolagem, e as abas grudam no topo.
   ferramentas.append(busca, parar, estadoSalvo, botaoFalantes, botaoExportar);
 
   // As duas que destroem trabalho vão para um invólucro próprio, e o CSS o

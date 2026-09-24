@@ -83,7 +83,7 @@ PONTE_FALSA = r"""
                                              estado: "instalado", em_uso: true }], diarizadores: [] };
       case "atualizacao": return { atualizacao: { nova: null, versao_instalada: "0.7.1" } };
       case "config": return { config: {} };
-      case "transcricao": return { transcricao };
+      case "transcricao": return { transcricao: window.__transcricao ?? transcricao };
       case "reuniao": return { cliente: "", projeto: "" };
       case "legenda-gravada": return { legenda_gravada: [] };
       case "clientes": return { clientes: {} };
@@ -481,6 +481,76 @@ def prova_reuniao_gerar_ata(pagina) -> None:
     conferir(selo().count() == 0, "e refeita sem pendência, o selo some")
 
 
+# Uma reunião de verdade tem centenas de trechos: é nela que se perde o lugar.
+TRANSCRICAO_LONGA = """() => {
+  window.__transcricao = JSON.stringify({ language: "pt", segments: Array.from({ length: 400 }, (_, i) => ({
+    start: i * 4, end: i * 4 + 3, text: ` Trecho ${i} da reunião longa.`, speaker: i % 2 ? "Carol" : "André" })) });
+}"""
+
+A_VISTA = """(sel) => {
+  const e = document.querySelector(sel);
+  if (!e) return false;
+  const r = e.getBoundingClientRect();
+  if (r.bottom <= 0 || r.top >= innerHeight) return false;
+  const alvo = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 10));
+  return alvo === e || e.contains(alvo);
+}"""
+
+
+def prova_reuniao_rolagem(pagina) -> None:
+    # A gaveta de notas existia para "mexer nelas sem perder o lugar no texto";
+    # a aba tem de manter a promessa: as abas ficam à vista rolando, e voltar à
+    # Transcrição devolve o trecho em que se estava.
+    pagina.evaluate(TRANSCRICAO_LONGA)
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.wait_for_function("() => document.querySelectorAll('.revisao .trecho, .revisao [data-indice]').length > 60",
+                             timeout=5000)
+    rolagem = "() => Math.round(document.querySelector('.conteudo').scrollTop)"
+    pagina.evaluate("() => { document.querySelector('.conteudo').scrollTop = 3000; }")
+    pagina.wait_for_timeout(150)
+    antes = pagina.evaluate(rolagem)
+    conferir(antes > 2000, f"a transcrição longa rola ({antes} px)")
+    conferir(pagina.evaluate(A_VISTA, "#aba-notas"), "rolada a transcrição, as abas continuam à vista")
+    conferir(pagina.evaluate(A_VISTA, ".revisao input[type='search']"),
+             "e a busca da revisão também, sem ficar debaixo delas")
+    # Encostados, e não um atrás do outro: a barra do topo muda de altura com o
+    # que mostra, e um sticky que gruda na altura errada desliza para trás dela.
+    encaixe = pagina.evaluate("""() => {
+        const b = (s) => document.querySelector(s).getBoundingClientRect();
+        return [b('.barra').bottom, b('.reuniao-aberta__abas').top,
+                b('.reuniao-aberta__abas').bottom, b('.revisao .controles').top];
+    }""")
+    # Meio pixel: uma fresta de 1 px já deixa o texto rolado aparecer entre os dois.
+    conferir(abs(encaixe[0] - encaixe[1]) < 0.5 and abs(encaixe[2] - encaixe[3]) < 0.5,
+             f"as abas encostam na barra do topo, e a barra da revisão nas abas ({encaixe})")
+    pagina.click("#aba-notas")
+    pagina.click("#aba-transcricao")
+    pagina.wait_for_timeout(50)
+    depois = pagina.evaluate(rolagem)
+    conferir(abs(depois - antes) <= 1, f"voltar à Transcrição devolve o lugar no texto ({antes} → {depois} px)")
+    pagina.click("#aba-ata")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    pagina.click("#aba-transcricao")
+    pagina.wait_for_timeout(50)
+    conferir(abs(pagina.evaluate(rolagem) - antes) <= 1, "e passar pela Ata também")
+
+
+def prova_ata_so_acompanha_a_ata(pagina) -> None:
+    # A separação de falantes roda sobre a legenda de uma reunião que já abre em
+    # abas. A aba Ata não pode tomá-la por uma ata sendo escrita: diria
+    # "Escrevendo…", e o Parar dela cancelaria a separação.
+    abrir_reuniao(pagina, "Comunicação")
+    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.caminho.includes('13-59')).caminho")
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "falantes", "diarizacao"])
+    pagina.wait_for_timeout(30)
+    pagina.click("#aba-ata")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    conferir(pagina.locator("#painel-ata .aa-progresso").count() == 0,
+             "com a separação de falantes rodando, a aba Ata não mostra andamento")
+    botao = pagina.text_content("#painel-ata [data-acao='ata']")
+    conferir(botao == "Refazer ata", f"e o botão continua sendo o da ata ({botao!r})")
+
+
 def prova_trilho_sem_atas(pagina) -> None:
     conferir(pagina.locator("#ir-atas").count() == 0, "Atas saiu do trilho: a ata mora na reunião")
     ordem = pagina.eval_on_selector_all(".trilho__item", "els => els.map((e) => e.id)")
@@ -623,7 +693,8 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_c
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
-          prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas]
+          prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
+          prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata]
 
 
 

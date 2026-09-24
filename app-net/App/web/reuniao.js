@@ -46,7 +46,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     notas: ["Notas", null],
   };
 
-  /** id → { botao, painel, montada } */
+  /** id → { botao, painel, montada, rolagem } */
   const abas = new Map();
   for (const id of ABAS) {
     const [rotulo, conta] = rotulos[id];
@@ -89,8 +89,16 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18 }).raiz),
   };
 
+  // A página inteira rola num lugar só (.conteudo), e uma aba mais curta a
+  // traria de volta ao topo: cada aba guarda onde estava. Sem isto, ir anotar e
+  // voltar perdia o trecho em que se estava — o que a gaveta de notas existia
+  // para proteger.
+  const rolador = () => raiz.closest(".conteudo") ?? document.scrollingElement;
+
   function mostrar(id, { focar = false } = {}) {
     const alvo = abas.has(id) ? id : "transcricao";
+    const antes = [...abas.values()].find((a) => !a.painel.hidden);
+    if (antes) antes.rolagem = rolador().scrollTop;
     for (const [outro, a] of abas) {
       const esta = outro === alvo;
       a.botao.setAttribute("aria-selected", String(esta));
@@ -103,6 +111,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
       a.montada = true;
       montar[alvo](a.painel);
     }
+    if (antes && antes !== a) rolador().scrollTop = a.rolagem ?? 0;
     if (focar) a.botao.focus();
   }
 

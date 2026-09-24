@@ -16,6 +16,18 @@ const titulo = document.getElementById("titulo");
 const subtitulo = document.getElementById("subtitulo");
 const voltar = document.getElementById("voltar");
 
+// A altura da barra do topo, medida — e não chutada no CSS. Quatro blocos
+// grudam abaixo dela (as abas da reunião e as de Ajustes, os controles da
+// revisão, o painel de Reuniões), e a barra muda de altura com o que mostra:
+// com título, subtítulo e o ← da reunião aberta ela tinha 90 px, e o chute de
+// 4.75rem (76 px) deixava 14 px de cada bloco atrás dela. Ver o :root do app.css.
+new ResizeObserver(([e]) => {
+  document.documentElement.style.setProperty(
+    // Sem arredondar: a barra tem altura fracionária, e o ceil deixava uma fresta
+    // de 1 px por onde o texto rolado aparecia.
+    "--altura-da-barra", `${e.borderBoxSize[0].blockSize}px`);
+}).observe(document.querySelector(".barra"));
+
 /** "1h 02min" ou "3min 20s" — a duração é para dar noção, não para cronometrar. */
 export function duracao(segundos) {
   const s = Math.round(segundos);
