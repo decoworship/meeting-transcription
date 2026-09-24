@@ -11,6 +11,8 @@
 
 const SEMANA = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const MESES_LONGOS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
+                      "setembro", "outubro", "novembro", "dezembro"];
 
 /** O valor do filtro de cliente que pega as gravações sem cliente. */
 export const SEM_CLIENTE = "__sem_cliente__";
@@ -86,14 +88,23 @@ function diasEntre(de, ate) {
   return Math.round((utc(ate) - utc(de)) / 86_400_000);
 }
 
-function somarDias(dia, n) {
+export function somarDias(dia, n) {
   const d = utc(dia);
   d.setUTCDate(d.getUTCDate() + n);
   return iso(d);
 }
 
+/** O mesmo dia, `n` meses adiante ou atrás; no último dia, quando o mês é mais curto. */
+export function somarMeses(dia, n) {
+  const [a, m, d] = dia.split("-").map(Number);
+  const alvo = new Date(Date.UTC(a, m - 1 + n, 1));
+  const ultimo = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  alvo.setUTCDate(Math.min(d, ultimo));
+  return iso(alvo);
+}
+
 /** A segunda-feira da semana de um dia. A semana vai de segunda a domingo. */
-function segundaDe(dia) {
+export function segundaDe(dia) {
   return somarDias(dia, -((utc(dia).getUTCDay() + 6) % 7));
 }
 
@@ -156,6 +167,100 @@ export function agruparPorDia(gravacoes, hoje) {
   }
   const todos = [...grupos.values()];
   return [...todos.filter((x) => x.dia), ...todos.filter((x) => !x.dia)];
+}
+
+// ─────────────────────────────────────────── a semana e o calendário
+
+/** "21 a 27 set", "28 set a 4 out"; o ano entra quando não é o de hoje. */
+export function rotuloDaSemana(segunda, hoje) {
+  const fim = somarDias(segunda, 6);
+  const [a1, m1, d1] = segunda.split("-").map(Number);
+  const [a2, m2, d2] = fim.split("-").map(Number);
+  const anoDeHoje = hoje ? Number(hoje.slice(0, 4)) : a2;
+  if (a1 !== a2) return `${d1} ${MESES[m1 - 1]} ${a1} a ${d2} ${MESES[m2 - 1]} ${a2}`;
+  const ano = a2 !== anoDeHoje ? ` ${a2}` : "";
+  if (m1 === m2) return `${d1} a ${d2} ${MESES[m2 - 1]}${ano}`;
+  return `${d1} ${MESES[m1 - 1]} a ${d2} ${MESES[m2 - 1]}${ano}`;
+}
+
+/**
+ * O que o botão do filtro de data diz: o atalho, o dia ou a semana escolhida.
+ * Um dia ou uma semana sem o dia escolhido não filtra (intervaloDoPeriodo), e
+ * o botão diz isso.
+ */
+export function rotuloDoFiltroDeData(periodo, data, hoje) {
+  if ((periodo === "dia" || periodo === "semana") && !data) return "Qualquer data";
+  if (periodo === "dia") {
+    const [a, m, d] = data.split("-").map(Number);
+    const ano = hoje && data.slice(0, 4) !== hoje.slice(0, 4) ? ` de ${a}` : "";
+    return `${d} de ${MESES_LONGOS[m - 1]}${ano}`;
+  }
+  if (periodo === "semana") return `Semana de ${rotuloDaSemana(segundaDe(data), hoje)}`;
+  return (PERIODOS.find(([v]) => v === periodo) ?? PERIODOS[0])[1];
+}
+
+/** "setembro de 2026". `mes` vai de 1 a 12. */
+export function rotuloDoMes(ano, mes) {
+  return `${MESES_LONGOS[mes - 1]} de ${ano}`;
+}
+
+/** "quinta, 24 de setembro de 2026" — o dia inteiro, para o leitor de tela. */
+export function rotuloLongoDoDia(dia) {
+  const [a, m, d] = dia.split("-").map(Number);
+  return `${SEMANA[utc(dia).getUTCDay()]}, ${d} de ${MESES_LONGOS[m - 1]} de ${a}`;
+}
+
+/**
+ * O mês em semanas de segunda a domingo, inteiras: os dias de fora do mês
+ * completam as pontas e vêm marcados. Quatro a seis semanas.
+ *
+ * @param mes de 1 a 12.
+ * @returns [[{ dia: "AAAA-MM-DD", n, fora }, …7], …]
+ */
+export function gradeDoMes(ano, mes) {
+  const p = (n) => String(n).padStart(2, "0");
+  const primeiro = `${ano}-${p(mes)}-01`;
+  const ultimo = iso(new Date(Date.UTC(ano, mes, 0)));
+  const semanas = [];
+  for (let s = segundaDe(primeiro); s <= ultimo; s = somarDias(s, 7)) {
+    semanas.push(Array.from({ length: 7 }, (_, i) => {
+      const dia = somarDias(s, i);
+      return { dia, n: Number(dia.slice(8)), fora: dia.slice(0, 7) !== primeiro.slice(0, 7) };
+    }));
+  }
+  return semanas;
+}
+
+/** Os dias que têm gravação, para o ponto do calendário. */
+export function diasComGravacao(gravacoes) {
+  return new Set(gravacoes.map((g) => diaDe(g.nome)).filter(Boolean));
+}
+
+/**
+ * As colunas da semana: segunda a sexta sempre, e sábado e domingo juntos
+ * quando um dos dois tem gravação. Dentro do dia, em ordem de hora — é uma
+ * agenda, e não a lista, que põe a mais nova em cima.
+ *
+ * @param visiveis as gravações que passaram nos filtros: são os cartões.
+ * @param todas o acervo, que decide o fim de semana. Filtrar não pode fazer
+ *   uma coluna aparecer e sumir enquanto se digita.
+ * @returns [{ dia, rotulo: "Seg 21", hoje, itens }]
+ */
+export function colunasDaSemana(visiveis, segunda, hoje, todas = visiveis) {
+  const sabado = somarDias(segunda, 5);
+  const domingo = somarDias(segunda, 6);
+  const comFimDeSemana = todas.some((g) => [sabado, domingo].includes(diaDe(g.nome)));
+  const dias = Array.from({ length: comFimDeSemana ? 7 : 5 }, (_, i) => somarDias(segunda, i));
+  return dias.map((dia) => {
+    const nome = SEMANA[utc(dia).getUTCDay()];
+    return {
+      dia,
+      rotulo: `${nome[0].toUpperCase()}${nome.slice(1, 3)} ${Number(dia.slice(8))}`,
+      hoje: dia === hoje,
+      itens: visiveis.filter((g) => diaDe(g.nome) === dia)
+        .sort((x, y) => (x.nome < y.nome ? -1 : x.nome > y.nome ? 1 : 0)),
+    };
+  });
 }
 
 /**

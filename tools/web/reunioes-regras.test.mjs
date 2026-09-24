@@ -168,3 +168,81 @@ test("clientesDe conta e ordena em português", () => {
   assert.deepEqual(R.clientesDe(acervo),
                    [{ nome: "Algar", n: 2 }, { nome: "Beegol (interno)", n: 1 }, { nome: "Vivo", n: 1 }]);
 });
+
+// ── a semana e o calendário (plano 2a)
+
+test("segundaDe e somarDias: a semana começa na segunda, e o domingo fecha a anterior", () => {
+  assert.equal(R.segundaDe("2026-09-24"), "2026-09-21");
+  assert.equal(R.segundaDe("2026-09-27"), "2026-09-21");
+  assert.equal(R.segundaDe("2026-09-21"), "2026-09-21");
+  assert.equal(R.somarDias("2026-09-28", 7), "2026-10-05");
+  assert.equal(R.somarDias("2026-01-01", -1), "2025-12-31");
+});
+
+test("rotuloDaSemana diz o mês uma vez, os dois quando atravessa, e o ano quando não é o de hoje", () => {
+  assert.equal(R.rotuloDaSemana("2026-09-21", "2026-09-24"), "21 a 27 set");
+  assert.equal(R.rotuloDaSemana("2026-09-28", "2026-09-24"), "28 set a 4 out");
+  assert.equal(R.rotuloDaSemana("2025-12-29", "2026-01-02"), "29 dez 2025 a 4 jan 2026");
+  assert.equal(R.rotuloDaSemana("2025-09-22", "2026-09-24"), "22 a 28 set 2025");
+});
+
+test("gradeDoMes começa na segunda e fecha semanas inteiras, com os dias de fora marcados", () => {
+  const set = R.gradeDoMes(2026, 9);
+  assert.equal(set.length, 5);
+  assert.ok(set.every((s) => s.length === 7));
+  assert.deepEqual(set[0][0], { dia: "2026-08-31", n: 31, fora: true });
+  assert.deepEqual(set[0][1], { dia: "2026-09-01", n: 1, fora: false });
+  assert.deepEqual(set[4][6], { dia: "2026-10-04", n: 4, fora: true });
+  assert.equal(R.gradeDoMes(2026, 8).length, 6);   // começa no sábado, 31 dias
+  assert.equal(R.gradeDoMes(2027, 2).length, 4);   // começa na segunda, 28 dias
+  assert.deepEqual(R.gradeDoMes(2026, 2)[0][6], { dia: "2026-02-01", n: 1, fora: false });
+});
+
+test("rotuloDoMes e rotuloLongoDoDia são os que o leitor de tela lê", () => {
+  assert.equal(R.rotuloDoMes(2026, 9), "setembro de 2026");
+  assert.equal(R.rotuloLongoDoDia("2026-09-24"), "quinta, 24 de setembro de 2026");
+});
+
+test("diasComGravacao junta os dias das pastas, e o sem data fica de fora", () => {
+  const d = R.diasComGravacao([G("2026-09-23_09-00-00"), G("2026-09-23_14-00-00"), G("reuniao-importada")]);
+  assert.deepEqual([...d], ["2026-09-23"]);
+});
+
+test("colunasDaSemana: segunda a sexta sempre, em ordem de hora; o fim de semana só com gravação", () => {
+  const todas = [G("2026-09-23_14-00-00"), G("2026-09-23_09-00-00"), G("2026-09-26_10-00-00"),
+                 G("2026-09-30_10-00-00"), G("reuniao-importada")];
+  const c = R.colunasDaSemana(todas, "2026-09-21", "2026-09-23");
+  // Sábado e domingo entram juntos: um domingo sem o sábado ao lado quebraria a semana.
+  assert.deepEqual(c.map((x) => x.rotulo),
+                   ["Seg 21", "Ter 22", "Qua 23", "Qui 24", "Sex 25", "Sáb 26", "Dom 27"]);
+  assert.deepEqual(c[2].itens.map((g) => g.nome), ["2026-09-23_09-00-00", "2026-09-23_14-00-00"]);
+  assert.equal(c[2].hoje, true);
+  assert.equal(c[0].hoje, false);
+  assert.equal(c[0].dia, "2026-09-21");
+  assert.equal(c.flatMap((x) => x.itens).length, 3);   // a de 30/09 é da semana seguinte
+});
+
+test("colunasDaSemana: o fim de semana segue o acervo, e não a busca", () => {
+  // Filtrar não pode fazer uma coluna aparecer e sumir enquanto se digita.
+  const c = R.colunasDaSemana([], "2026-09-21", "2026-09-23", [G("2026-09-27_10-00-00")]);
+  assert.deepEqual(c.map((x) => x.rotulo), ["Seg 21", "Ter 22", "Qua 23", "Qui 24", "Sex 25", "Sáb 26", "Dom 27"]);
+  assert.ok(c.every((x) => x.itens.length === 0));
+});
+
+test("rotuloDoFiltroDeData diz o critério inteiro, porque o botão não tem outro rótulo", () => {
+  const hoje = "2026-09-24";
+  assert.equal(R.rotuloDoFiltroDeData("tudo", "", hoje), "Qualquer data");
+  assert.equal(R.rotuloDoFiltroDeData("esta-semana", "", hoje), "Esta semana");
+  assert.equal(R.rotuloDoFiltroDeData("dia", "2026-09-18", hoje), "18 de setembro");
+  assert.equal(R.rotuloDoFiltroDeData("dia", "2025-12-31", hoje), "31 de dezembro de 2025");
+  assert.equal(R.rotuloDoFiltroDeData("semana", "2026-09-18", hoje), "Semana de 14 a 20 set");
+  // Pela metade (um dia sem o dia) não filtra, e o botão não pode dizer que filtra.
+  assert.equal(R.rotuloDoFiltroDeData("dia", "", hoje), "Qualquer data");
+});
+
+test("somarMeses fica no mesmo dia, e cai no último quando o mês é mais curto", () => {
+  assert.equal(R.somarMeses("2026-09-24", -1), "2026-08-24");
+  assert.equal(R.somarMeses("2026-03-31", -1), "2026-02-28");
+  assert.equal(R.somarMeses("2026-12-15", 1), "2027-01-15");
+  assert.equal(R.somarMeses("2026-01-31", -2), "2025-11-30");
+});
