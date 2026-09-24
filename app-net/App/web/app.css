@@ -263,6 +263,122 @@ html {
 .reunioes__busca { flex: 1 1 18rem; }
 .reunioes__filtro { flex: 0 0 auto; width: auto; min-width: 11rem; }
 
+/* O filtro de data é um botão, e parece com os seletores ao lado — a seta
+ * inclusive, que o <select> ganha do sistema e o botão desenha aqui. Ligado,
+ * ele fica da cor de ação: é o único filtro cujo valor não se lê de relance
+ * pelo texto, porque "18 de setembro" parece rótulo. */
+.reunioes__data {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  text-align: left;
+  cursor: pointer;
+}
+.reunioes__data::after {
+  content: "";
+  flex: none;
+  width: .45em;
+  height: .45em;
+  margin-top: -.25em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+.reunioes__data--ligada { border-color: var(--cor-acao); color: var(--cor-acao); }
+.reunioes__limpar-data { padding-inline: var(--espaco-2); }
+
+/* ─────────────────────────────────────────── o painel que abre num botão
+ *
+ * popover.js. Preso à âncora, e não ao documento: rola junto com quem o abriu. */
+.popover__ancora { position: relative; display: inline-flex; }
+.popover {
+  position: absolute;
+  top: calc(100% + var(--espaco-1));
+  left: 0;
+  z-index: var(--z-suspenso);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--espaco-4));
+  padding: var(--espaco-4);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  box-shadow: var(--sombra-media);
+}
+.popover--a-direita { left: auto; right: 0; }
+
+.filtro-data { display: grid; gap: var(--espaco-3); max-width: 20rem; }
+.filtro-data__atalhos { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
+.filtro-data__modo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+}
+.filtro-data__opcoes { display: inline-flex; gap: var(--espaco-1); }
+
+/* Um botão de ligar e desligar. Não é o .filtro dos falantes: lá o desligado
+ * fica apagado, e aqui desligado é só não escolhido. */
+.atalho {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+}
+.atalho:hover { border-color: var(--cor-borda-forte); }
+.atalho[aria-pressed="true"] { background: var(--cor-acao-suave); border-color: var(--cor-acao); color: var(--cor-acao); }
+.atalho:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+/* ─────────────────────────────────────────── o calendário (calendario.js) */
+.calendario { display: grid; gap: var(--espaco-2); }
+.calendario__topo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
+.calendario__mes { text-align: center; font-weight: 600; color: var(--cor-texto-forte); }
+.calendario__anterior, .calendario__proximo { font-size: var(--texto-titulo-m); line-height: 1; }
+.calendario__grade { border-collapse: collapse; margin: 0 auto; }
+.calendario__grade th {
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+  padding-bottom: var(--espaco-1);
+}
+.calendario__grade td { padding: 1px; }
+.calendario__dia {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  cursor: pointer;
+}
+.calendario__dia:hover { background: var(--cor-superficie-2); }
+.calendario__dia--fora { color: var(--cor-texto-suave); }
+.calendario__dia--na-faixa { background: var(--cor-acao-suave); color: var(--cor-acao); }
+.calendario__dia[aria-current="date"] { font-weight: 700; box-shadow: inset 0 0 0 1px var(--cor-acao); }
+.calendario__dia:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+/* O ponto dos dias com gravação: é o que responde "em que dia foi?" sem abrir
+ * dia por dia. O leitor de tela ouve o mesmo pelo rótulo do botão. */
+.calendario__ponto {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--raio-pilula);
+  background: var(--cor-acao);
+}
+
 .reunioes__lista {
   background: var(--cor-superficie);
   border: 1px solid var(--cor-borda);

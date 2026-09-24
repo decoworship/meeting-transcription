@@ -222,15 +222,105 @@ def prova_filtros(pagina) -> None:
     pagina.select_option("#filtro-estado", "nao-transcrita")
     conferir(titulos(pagina) == ["Semanal — Beegol · Uberlândia"], "'Não transcritas' deixa só a não transcrita")
     pagina.select_option("#filtro-estado", "")
-    conferir(not pagina.is_visible("#filtro-data"), "sem 'Um dia…', o campo de data não aparece")
-    pagina.select_option("#filtro-periodo", "dia")
-    conferir(pagina.is_visible("#filtro-data"), "com 'Um dia…', o campo de data aparece")
-    conferir(len(titulos(pagina)) == 9, "e, sem o dia escolhido, a lista continua inteira")
-    ha_seis_dias = (date.today() - timedelta(days=6)).isoformat()
-    pagina.fill("#filtro-data", ha_seis_dias)
+
+
+def abrir_data(pagina) -> None:
+    pagina.click("#filtro-data")
+    pagina.wait_for_selector(".popover .calendario", timeout=2000)
+
+
+def dia_no_calendario(pagina, dia: date) -> None:
+    """Leva o calendário aberto até o mês do dia, e clica nele."""
+    alvo = f".popover .calendario__dia[data-dia='{dia.isoformat()}']"
+    for _ in range(3):
+        if pagina.locator(alvo).count():
+            break
+        pagina.click(".popover .calendario__anterior")
+    pagina.click(alvo)
     pagina.wait_for_timeout(50)
+
+
+# O acervo da ponte falsa, em dias antes de hoje — para contar o que cada
+# período deve deixar, sem copiar a regra que se está provando.
+DIAS_DO_ACERVO = [0, 0, 0, 6, 6, 7, 7, 45]
+
+
+def prova_filtro_de_data(pagina) -> None:
+    rotulo = lambda: pagina.text_content("#filtro-data").strip()  # noqa: E731
+    conferir(rotulo() == "Qualquer data", f"sem filtro, o botão diz 'Qualquer data' ({rotulo()!r})")
+    conferir(not pagina.is_visible("#filtro-data-limpar"), "e não oferece tirar o filtro")
+
+    abrir_data(pagina)
+    conferir(pagina.get_attribute("#filtro-data", "aria-expanded") == "true", "o botão diz que abriu")
+    ha_seis_dias = date.today() - timedelta(days=6)
+    dia_no_calendario(pagina, ha_seis_dias)
     conferir(titulos(pagina) == ["Comunicação Beegol + App", "Pedido Sugerido — alinhamento"],
-             f"um dia escolhido deixa só as reuniões dele ({titulos(pagina)})")
+             f"um dia escolhido no calendário deixa só as reuniões dele ({titulos(pagina)})")
+    conferir(not pagina.is_visible(".popover"), "e o calendário fecha ao escolher")
+    ativo = pagina.evaluate("() => document.activeElement.id")
+    conferir(ativo == "filtro-data", f"com o foco de volta no botão ({ativo!r})")
+    conferir(rotulo().startswith(f"{ha_seis_dias.day} de "), f"que diz o dia escolhido ({rotulo()!r})")
+    conferir(pagina.is_visible("#filtro-data-limpar"), "e oferece tirar o filtro")
+    pagina.click("#filtro-data-limpar")
+    pagina.wait_for_timeout(50)
+    conferir(len(titulos(pagina)) == 9 and rotulo() == "Qualquer data", "o ✕ tira o filtro de data")
+
+    abrir_data(pagina)
+    pagina.click(".popover .atalho >> text=Hoje")
+    pagina.wait_for_timeout(50)
+    conferir(len(titulos(pagina)) == DIAS_DO_ACERVO.count(0) and rotulo() == "Hoje",
+             f"o atalho 'Hoje' deixa só as de hoje ({titulos(pagina)})")
+
+    abrir_data(pagina)
+    pagina.click(".popover >> text=uma semana")
+    dia_no_calendario(pagina, ha_seis_dias)
+    segunda = ha_seis_dias - timedelta(days=ha_seis_dias.weekday())
+    na_semana = sum(1 for d in DIAS_DO_ACERVO
+                    if segunda <= date.today() - timedelta(days=d) <= segunda + timedelta(days=6))
+    conferir(len(titulos(pagina)) == na_semana,
+             f"com 'uma semana', o dia escolhido filtra a semana dele, de segunda a domingo "
+             f"({len(titulos(pagina))} de {na_semana})")
+    conferir(rotulo().startswith("Semana de "), f"e o botão diz a semana ({rotulo()!r})")
+
+
+def prova_calendario(pagina) -> None:
+    hoje = date.today()
+    abrir_data(pagina)
+    dia = lambda d: f".popover .calendario__dia[data-dia='{d.isoformat()}']"  # noqa: E731
+    conferir(pagina.get_attribute(dia(hoje), "aria-current") == "date", "hoje vem marcado")
+    conferir("com gravação" in (pagina.get_attribute(dia(hoje), "aria-label") or ""),
+             "e o dia com gravação diz isso, além do ponto")
+    ontem = hoje - timedelta(days=1)
+    if pagina.locator(dia(ontem)).count():
+        conferir("com gravação" not in (pagina.get_attribute(dia(ontem), "aria-label") or ""),
+                 "o dia sem gravação não diz que tem")
+    focado = lambda: pagina.evaluate("() => document.activeElement.dataset.dia || document.activeElement.className")  # noqa: E731
+    conferir(focado() == hoje.isoformat(), f"abrir leva o foco ao dia de hoje ({focado()!r})")
+    pagina.keyboard.press("ArrowLeft")
+    pagina.keyboard.press("ArrowUp")
+    esperado = hoje - timedelta(days=8)
+    conferir(focado() == esperado.isoformat(), f"as setas andam um dia e uma semana ({focado()!r})")
+    pagina.keyboard.press("PageUp")
+    ano, mes = (esperado.year, esperado.month - 1) if esperado.month > 1 else (esperado.year - 1, 12)
+    import calendar
+    esperado = date(ano, mes, min(esperado.day, calendar.monthrange(ano, mes)[1]))
+    conferir(focado() == esperado.isoformat(), f"PageUp volta um mês, no mesmo dia ({focado()!r})")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_timeout(50)
+    conferir(not pagina.is_visible(".popover") and pagina.text_content("#filtro-data").strip()
+             .startswith(f"{esperado.day} de "), "Enter escolhe o dia")
+
+    abrir_data(pagina)
+    pagina.keyboard.press("Escape")
+    conferir(not pagina.is_visible(".popover"), "Esc fecha o calendário")
+    conferir(pagina.evaluate("() => document.activeElement.id") == "filtro-data", "e devolve o foco ao botão")
+    abrir_data(pagina)
+    pagina.mouse.click(5, 790)
+    conferir(not pagina.is_visible(".popover"), "clicar fora fecha")
+    abrir_data(pagina)
+    pagina.keyboard.press("Tab")
+    conferir(not pagina.is_visible(".popover"), "e sair dele com Tab também")
+
 
 
 def prova_sem_resultado(pagina) -> None:
@@ -665,13 +755,60 @@ def prova_janela_intermediaria(pagina) -> None:
 prova_janela_intermediaria.janela = (1000, 700)
 
 
+def prova_calendario_cabe_na_janela(pagina) -> None:
+    # Na janela estreita o botão de data fica perto da borda direita, e o
+    # painel preso à esquerda dele saía da tela.
+    abrir_data(pagina)
+    cabe = pagina.evaluate("""() => {
+        const r = document.querySelector('.popover').getBoundingClientRect();
+        return [Math.round(r.left), Math.round(r.right), innerWidth];
+    }""")
+    conferir(cabe[0] >= 0 and cabe[1] <= cabe[2], f"o calendário aberto cabe inteiro na janela ({cabe})")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "e não cria rolagem lateral")
+
+
+prova_calendario_cabe_na_janela.janela = (860, 700)
+
+
+def prova_calendario_atravessa_o_mes(pagina) -> None:
+    # As setas passam da borda do mês, e a grade tem de ir junto: o dia focado
+    # sumir da tela deixaria o foco em lugar nenhum.
+    hoje = date.today()
+    abrir_data(pagina)
+    pagina.keyboard.press("Home")
+    for _ in range(hoje.day // 7 + 2):
+        pagina.keyboard.press("ArrowUp")
+    esperado = hoje - timedelta(days=hoje.weekday()) - timedelta(days=7 * (hoje.day // 7 + 2))
+    focado = pagina.evaluate("() => document.activeElement.dataset.dia")
+    conferir(focado == esperado.isoformat(), f"a seta atravessa o mês e leva o foco junto ({focado!r})")
+    mes = pagina.text_content(".popover .calendario__mes")
+    conferir(str(esperado.year) in mes and pagina.locator(f".popover [data-dia='{esperado.isoformat()}']").count() == 1,
+             f"e a grade mostra o mês do dia focado ({mes!r})")
+
+
+def prova_calendario_sobrevive_a_tarefa(pagina) -> None:
+    # Os eventos de andamento chegam várias vezes por etapa. A barra da lista não
+    # se redesenha com eles, e o calendário aberto nela também não pode fechar.
+    abrir_data(pagina)
+    pagina.keyboard.press("ArrowLeft")
+    antes = pagina.evaluate("() => document.activeElement.dataset.dia")
+    caminho = pagina.evaluate("() => window.__gravacoes[1].caminho")
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "asr", "asr"])
+    pagina.evaluate(FIM_DE_TAREFA, [caminho, "asr"])
+    pagina.wait_for_timeout(100)
+    conferir(pagina.is_visible(".popover"), "uma tarefa andando não fecha o calendário aberto")
+    depois = pagina.evaluate("() => document.activeElement.dataset.dia")
+    conferir(depois == antes, f"nem tira o foco do dia ({antes!r} → {depois!r})")
+
+
 def prova_data_nao_rouba_o_foco(pagina) -> None:
-    pagina.focus("#filtro-periodo")
-    pagina.select_option("#filtro-periodo", "dia")
-    pagina.wait_for_timeout(30)
+    # Era o campo de data que aparecia e levava o foco; o botão só abre quando
+    # se pede, e passar por ele com Tab não abre nada.
+    pagina.focus("#filtro-cliente")
+    pagina.keyboard.press("Tab")
     ativo = pagina.evaluate("() => document.activeElement.id")
-    conferir(ativo == "filtro-periodo",
-             f"escolher 'Um dia…' não tira o foco do seletor — as setas passam por ele ({ativo!r})")
+    conferir(ativo == "filtro-data" and not pagina.is_visible(".popover"),
+             f"passar pelo filtro de data com Tab não abre o calendário ({ativo!r})")
 
 
 
@@ -688,7 +825,9 @@ FOCO_A_VISTA = """() => {
   return alvo === e || e.contains(alvo);
 }"""
 
-PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem,
+PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_calendario, prova_calendario_cabe_na_janela,
+          prova_calendario_atravessa_o_mes, prova_calendario_sobrevive_a_tarefa,
+          prova_sem_resultado, prova_criterios_sobrevivem,
           prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida,
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
@@ -701,7 +840,15 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_c
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fotos", type=Path, help="pasta onde deixar as fotos das telas")
+    ap.add_argument("--so", help="só estas provas, separadas por vírgula (prova_filtros,prova_calendario)")
     args = ap.parse_args()
+    provas = PROVAS
+    if args.so:
+        pedidas = set(args.so.split(","))
+        provas = [p for p in PROVAS if p.__name__ in pedidas]
+        if len(provas) != len(pedidas):
+            print(f"prova desconhecida: {sorted(pedidas - {p.__name__ for p in PROVAS})}", file=sys.stderr)
+            return 2
 
     try:
         from playwright.sync_api import sync_playwright
@@ -717,7 +864,7 @@ def main() -> int:
 
         with sync_playwright() as pw:
             navegador = pw.chromium.launch()
-            for prova in PROVAS:
+            for prova in provas:
                 print(f"── {prova.__name__}")
                 largura, altura = getattr(prova, "janela", (1280, 800))
                 pagina, erros = abrir(navegador, porta, largura, altura)

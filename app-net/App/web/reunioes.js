@@ -12,8 +12,11 @@ import { pedir } from "/ponte.js";
 import { alerta, anunciar } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado } from "/transcricoes.js";
 import { duracao, quando, tituloDe, abrirGravacao, abrirGravador } from "/app.js";
-import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proximoPasso,
+import { agruparPorDia, clientesDe, diasComGravacao, estadoDe, filtrar, horaDe, hojeLocal,
+         intervaloDoPeriodo, proximoPasso, rotuloDoFiltroDeData,
          ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
+import { popover } from "/popover.js";
+import { calendario } from "/calendario.js";
 
 
 /**
@@ -23,7 +26,7 @@ import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proxim
  * filtrou por Algar, abriu uma reunião e clicou em ← Reuniões espera a lista
  * como a deixou.
  */
-const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "" };
+const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "", modo: "dia" };
 
 /** A gravação no painel, pelo caminho. Sobrevive a voltar, como os critérios. */
 let escolhida = null;
@@ -155,23 +158,90 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     ...clientesDe(gravacoes).map((c) => [c.nome, `${c.nome} (${c.n})`]),
     [SEM_CLIENTE, "Sem cliente"],
   ], criterios.cliente);
-  const filtroPeriodo = seletor("Data", "filtro-periodo", PERIODOS, criterios.periodo);
+  // O filtro de data: um botão que diz o critério e abre os atalhos em cima do
+  // calendário. Foi um seletor com "Um dia…" mais o campo de data do navegador
+  // (plano 1), e o nativo não marca os dias que têm gravação.
+  const botaoData = document.createElement("button");
+  botaoData.type = "button";
+  botaoData.id = "filtro-data";
+  botaoData.className = "aa-entrada reunioes__filtro reunioes__data";
+  const limparData = document.createElement("button");
+  limparData.type = "button";
+  limparData.id = "filtro-data-limpar";
+  limparData.className = "aa-btn aa-btn-texto reunioes__limpar-data";
+  limparData.setAttribute("aria-label", "Tirar o filtro de data");
+  limparData.textContent = "✕";
+  limparData.addEventListener("click", () => { escolherData("tudo"); botaoData.focus(); });
+  const comGravacao = diasComGravacao(gravacoes);
+  const { ancora: filtroData } = popover(botaoData, "Filtrar por data", painelDeData);
 
-  // O dia de "Um dia…" e "Uma semana…", no calendário do próprio navegador.
-  // Some quando o período não pede dia — um campo de data à toa na barra pede
-  // um valor que não vai ser usado.
-  const filtroData = document.createElement("input");
-  filtroData.type = "date";
-  filtroData.id = "filtro-data";
-  filtroData.className = "aa-entrada reunioes__filtro";
-  filtroData.value = criterios.data;
-  function ajustarData() {
-    const pede = criterios.periodo === "dia" || criterios.periodo === "semana";
-    filtroData.hidden = !pede;
-    filtroData.setAttribute("aria-label", criterios.periodo === "semana"
-      ? "Um dia da semana que você procura" : "O dia que você procura");
+  function pintarData() {
+    botaoData.textContent = rotuloDoFiltroDeData(criterios.periodo, criterios.data, hoje);
+    const filtra = intervaloDoPeriodo(criterios.periodo, criterios.data, hoje) !== null;
+    botaoData.classList.toggle("reunioes__data--ligada", filtra);
+    limparData.hidden = !filtra;
   }
-  ajustarData();
+  pintarData();
+
+  function escolherData(periodo, data = "") {
+    criterios.periodo = periodo;
+    criterios.data = data;
+    pintarData();
+    aoMudar();
+  }
+
+  function painelDeData(fechar) {
+    const raiz = document.createElement("div");
+    raiz.className = "filtro-data";
+
+    const atalhos = document.createElement("div");
+    atalhos.className = "filtro-data__atalhos";
+    atalhos.setAttribute("role", "group");
+    atalhos.setAttribute("aria-label", "Atalhos");
+    for (const [valor, rotulo] of PERIODOS.filter(([v]) => v !== "dia" && v !== "semana")) {
+      atalhos.appendChild(atalho(rotulo, criterios.periodo === valor, () => {
+        escolherData(valor);
+        fechar();
+      }));
+    }
+
+    // Um dia ou a semana dele: a mesma grade escolhe os dois, e o modo fica
+    // lembrado junto com os outros critérios.
+    const modo = document.createElement("div");
+    modo.className = "filtro-data__modo";
+    const legenda = document.createElement("span");
+    legenda.id = "filtro-data-modo";
+    legenda.textContent = "No calendário, escolher";
+    const opcoes = document.createElement("div");
+    opcoes.className = "filtro-data__opcoes";
+    opcoes.setAttribute("role", "group");
+    opcoes.setAttribute("aria-labelledby", legenda.id);
+    const botoesDoModo = [["dia", "um dia"], ["semana", "uma semana"]].map(([valor, rotulo]) => {
+      const b = atalho(rotulo, criterios.modo === valor, () => {
+        criterios.modo = valor;
+        for (const x of botoesDoModo) x.setAttribute("aria-pressed", String(x.dataset.modo === valor));
+      });
+      b.dataset.modo = valor;
+      return b;
+    });
+    opcoes.append(...botoesDoModo);
+    modo.append(legenda, opcoes);
+
+    const cal = calendario({
+      hoje,
+      foco: criterios.data || hoje,
+      marcados: comGravacao,
+      faixa: intervaloDoPeriodo(criterios.periodo, criterios.data, hoje),
+      aoEscolher: (dia) => { escolherData(criterios.modo, dia); fechar(); },
+    });
+
+    const dica = document.createElement("p");
+    dica.className = "campo__dica";
+    dica.textContent = "A semana vai de segunda a domingo. O ponto marca os dias com gravação.";
+
+    raiz.append(atalhos, modo, cal.raiz, dica);
+    return { raiz, focar: cal.focar };
+  }
 
   const filtroEstado = seletor("Estado", "filtro-estado", ESTADOS, criterios.estado);
 
@@ -179,7 +249,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   // silêncio: o seletor caiu em "Todos", e o critério cai junto.
   criterios.cliente = filtroCliente.value;
 
-  ferramentas.append(busca, filtroCliente, filtroPeriodo, filtroData, filtroEstado);
+  ferramentas.append(busca, filtroCliente, filtroData, limparData, filtroEstado);
 
   const lista = document.createElement("section");
   lista.className = "reunioes__lista";
@@ -412,9 +482,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       Object.assign(criterios, { texto: "", cliente: "", periodo: "tudo", data: "", estado: "" });
       busca.value = "";
       filtroCliente.value = "";
-      filtroPeriodo.value = "tudo";
-      filtroData.value = "";
-      ajustarData();
+      pintarData();
       filtroEstado.value = "";
       aoMudar();
       busca.focus();
@@ -435,15 +503,6 @@ export async function telaDeReunioes({ cabecalho, tela }) {
 
   busca.addEventListener("input", () => { criterios.texto = busca.value; aoMudar(); });
   filtroCliente.addEventListener("change", () => { criterios.cliente = filtroCliente.value; aoMudar(); });
-  filtroPeriodo.addEventListener("change", () => {
-    criterios.periodo = filtroPeriodo.value;
-    // O campo de data aparece ao lado, e o foco fica no seletor: no WebView2 as
-    // setas num seletor fechado disparam change a cada tecla, e levar o foco ao
-    // campo prendia quem só estava passando por "Um dia…" a caminho de outro.
-    ajustarData();
-    aoMudar();
-  });
-  filtroData.addEventListener("change", () => { criterios.data = filtroData.value; aoMudar(); });
   filtroEstado.addEventListener("change", () => { criterios.estado = filtroEstado.value; aoMudar(); });
 
   desenhar();
@@ -538,6 +597,17 @@ function seletor(rotulo, id, opcoes, valor) {
   }
   s.value = opcoes.some(([v]) => v === valor) ? valor : opcoes[0][0];
   return s;
+}
+
+/** Um botão de ligar e desligar, dos atalhos e do modo do filtro de data. */
+function atalho(rotulo, ligado, aoClicar) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "atalho";
+  b.textContent = rotulo;
+  b.setAttribute("aria-pressed", String(ligado));
+  b.addEventListener("click", aoClicar);
+  return b;
 }
 
 function texto(classe, conteudo) {
