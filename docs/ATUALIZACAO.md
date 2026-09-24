@@ -83,7 +83,7 @@ executa é um cliente da Microsoft, e o app continua só avisando.
   quem usa, quando quer. Quem avisa que existe versão nova continua sendo o
   `versao.json` desta página — os dois se somam, um não substitui o outro;
 - **não emagrece o download.** Cada `winget upgrade` baixa o instalador inteiro,
-  1,59 GB, mesmo quando só o `MeetingApp.exe` de 18 MB mudou. É o mesmo problema
+  1,59 GB, mesmo quando só o `PulseMeet.exe` de 18 MB mudou. É o mesmo problema
   do degrau 2, com o mesmo remédio: separar a versão do app da versão dos
   motores.
 
@@ -111,18 +111,24 @@ tools/publicar.sh                         # se algum motor.py mudou
 tools/montar_instalador.sh
 ```
 
+**A primeira versão depois de 24/09/2026 troca o nome do executável**
+(`MeetingApp.exe` → `PulseMeet.exe`, docs/MARCA.md). O CHANGELOG dela diz, para
+quem usa, que o programa passou a se chamar PulseMeet, e que um ícone fixado à
+mão na barra de tarefas é repontado pelo instalador — e, se não abrir, se fixa
+de novo pelo menu Iniciar.
+
 Até aqui é o que sempre foi. O resto existe desde 19/08/2026, e é o que põe o
 instalador ao alcance de quem não recebe arquivo na mão:
 
 ```bash
 V=0.4.0
-sha256sum dist/instalador/MeetingApp-$V-instalador.exe   # anote: vai no manifesto
+sha256sum dist/instalador/PulseMeet-$V-instalador.exe    # anote: vai no manifesto
 
 gh release create v$V \
   --target "$(git rev-parse HEAD)" \
   --title "PulseMeet $V — <o título da seção do CHANGELOG>" \
   --notes-file <um .md com as notas, o SHA256 e o aviso de SmartScreen> \
-  dist/instalador/MeetingApp-$V-instalador.exe
+  dist/instalador/PulseMeet-$V-instalador.exe
 
 cp -r instalador/winget/<versão anterior> instalador/winget/$V
 $EDITOR instalador/winget/$V/*.yaml       # PackageVersion, InstallerUrl,
@@ -157,7 +163,7 @@ nele — desde a v0.3.0 há: a página do release.
 
 ## Os degraus que ficam para depois
 
-**2 — atualizar só o app.** O aviso vira botão: baixa o `MeetingApp.exe`
+**2 — atualizar só o app.** O aviso vira botão: baixa o `PulseMeet.exe`
 (18,5 MB), confere, troca e reabre. É o degrau que mais paga, porque **os
 motores são 4,1 GB e quase nunca mudam** — a maioria das versões novas é só o
 executável. Exige assinatura de código ou conferência de hash, e o segundo sem o

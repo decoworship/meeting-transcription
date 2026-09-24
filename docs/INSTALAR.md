@@ -20,10 +20,12 @@ Não é preciso instalar Python, CUDA, .NET nem nada. Está tudo dentro.
 
 ## Instalar
 
-1. Rode o `MeetingApp-0.4.0-instalador.exe`. O arquivo ainda se chama
-   `MeetingApp` de propósito: o nome do produto mudou na 0.4.0, o do
-   executável não — é o que faz o Windows tratar a versão nova como
-   atualização, e não como um segundo programa.
+1. Rode o `PulseMeet-<versão>-instalador.exe`. Até a 0.7.1 ele se chamava
+   `MeetingApp-<versão>-instalador.exe`, e o programa, `MeetingApp.exe`: quem
+   já tem o app instalado recebe a versão nova como atualização, e os atalhos
+   passam a abrir o `PulseMeet.exe`. **Um ícone que você mesmo fixou na barra de
+   tarefas** também é repontado; se ele não abrir, fixe-o de novo pelo menu
+   Iniciar.
 
 2. **O Windows vai mostrar um aviso azul** dizendo que o editor é desconhecido.
    Isso acontece porque o instalador não é assinado — assinatura de código custa

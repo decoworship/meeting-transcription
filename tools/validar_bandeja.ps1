@@ -14,7 +14,7 @@
 #     de fazer à mão, porque exige cronometrar cliques.
 #
 # Uso:  powershell.exe -ExecutionPolicy Bypass -File validar_bandeja.ps1 `
-#           -Exe C:\Users\andre\MeetingUnificado\MeetingApp.exe -Segundos 20
+#           -Exe C:\Users\andre\AppData\Local\Programs\MeetingApp\PulseMeet.exe -Segundos 20
 
 param(
     [Parameter(Mandatory = $true)][string]$Exe,

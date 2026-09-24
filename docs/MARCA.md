@@ -1,8 +1,8 @@
 # A marca
 
 O app se chama **PulseMeet** e o símbolo é o monograma M dentro do círculo.
-Nenhum dos dois está fechado — este documento existe para que trocá-los custe
-uma edição, e não uma tarde.
+**O nome foi fechado pelo dono em 24/09/2026**; o símbolo, não. Este documento
+existe para que trocar qualquer um dos dois custe uma edição, e não uma tarde.
 
 ## Trocar o nome
 
@@ -26,8 +26,32 @@ De onde o nome sai, a partir do `Marca.Nome`:
   no campo `marca` do diagnóstico, junto da versão (`web/configuracoes.js`).
 
 E, a partir do `#define Marca`: o `AppName`, o nome do grupo no menu Iniciar, os
-dois atalhos, a tarefa "iniciar com o Windows", o botão do fim da instalação e a
-mensagem da desinstalação.
+dois atalhos, a tarefa "iniciar com o Windows", o botão do fim da instalação, a
+mensagem da desinstalação — e, desde 24/09/2026, o nome do executável que ele
+instala e o do próprio instalador.
+
+## O executável e o instalador (desde 24/09/2026)
+
+Com o nome fechado, os dois seguiram a marca: **`PulseMeet.exe`**, pelo
+`AssemblyName` do `App/MeetingApp.App.csproj` (com `AssemblyTitle` e `Product`,
+que são o que o Gerenciador de Tarefas e as propriedades do arquivo mostram), e
+**`PulseMeet-<versão>-instalador.exe`**, pelo `OutputBaseFilename`. O
+`MarcaTests` confere os três contra o `Marca.Nome`, e confere que o `.iss`, o
+`publicar.sh` e o `montar_instalador.sh` usam o nome novo.
+
+O que apontava para o `MeetingApp.exe` é repontado por
+[`tools/repontar_atalhos.ps1`](../tools/repontar_atalhos.ps1): o menu Iniciar, a
+área de trabalho, os fixados da barra de tarefas e do Iniciar, o "iniciar com
+o Windows" — levando junto a escolha do Gerenciador de Tarefas, para quem tinha
+desligado o início automático — e o ícone de "Aplicativos instalados". O instalador o roda no fim (e apaga o
+`MeetingApp.exe` e a pasta "MeetingApp" do menu Iniciar, de antes da 0.4.0); o
+`publicar.sh` o roda na primeira publicação depois da troca, e só então apaga o
+`.exe` velho. A prova dele roda numa pasta e numa chave de registro de mentira:
+[`tools/provar_repontar_atalhos.ps1`](../tools/provar_repontar_atalhos.ps1).
+
+**O que não se reponta**: um fixado da barra de tarefas pode guardar uma cópia
+do atalho que o Windows não relê. Se o ícone fixado não abrir depois da
+atualização, a pessoa o fixa de novo pelo menu Iniciar.
 
 ## O que não muda com a marca
 
@@ -37,14 +61,17 @@ deles é visto por quem usa o app; todos quebram alguma coisa se mudarem.
 | O quê | Se mudar |
 |---|---|
 | `AppId` do `.iss` | o Windows deixa de reconhecer a atualização: duas entradas em "Aplicativos Instalados" e duas pastas de 5 GB |
-| `MeetingApp.exe` e `%LOCALAPPDATA%\Programs\MeetingApp` | o atalho de quem já instalou passa a apontar para o vazio |
+| `%LOCALAPPDATA%\Programs\MeetingApp` | a atualização do Inno reaproveita a pasta anterior de qualquer jeito; mudar a das instalações novas separaria as máquinas em dois caminhos, e moveria 18 GB de motores sem ninguém ver a diferença |
+| `%LOCALAPPDATA%\MeetingApp\webview` (os dados do WebView2) | o que a página guarda some |
 | `Global\MeetingApp` (mutex) | o instalador volta a copiar por cima de um app que pode estar gravando |
-| namespaces, `AssemblyName`, `LogicalName` dos recursos | `Conteudo.cs` monta `"MeetingApp.web." + caminho` por texto — o app abre com a página em branco |
+| namespaces, `RootNamespace`, `LogicalName` dos recursos | `Conteudo.cs` monta `"MeetingApp.web." + caminho` por texto — o app abre com a página em branco. O `RootNamespace` fica escrito no `.csproj`, porque o padrão dele é o `AssemblyName`, que mudou |
+| os nomes dos arquivos de projeto e do `.iss` | nada visível; são caminhos que scripts e testes usam |
 | `PackageIdentifier` do winget | vira um pacote novo em vez de uma atualização |
 
-O `OutputBaseFilename` (`MeetingApp-<versão>-instalador.exe`) fica junto do
-`.exe` pelo mesmo motivo: é o nome do arquivo que os manifestos winget já
-publicados apontam.
+O `OutputBaseFilename` ficou no nome antigo até a 0.7.1 porque os manifestos
+winget apontam para ele — mas cada manifesto aponta para o arquivo da **sua**
+versão, que já está publicado e não muda. A versão nova sai com o nome novo, e o
+manifesto novo aponta para ele.
 
 **O winget é o único ponto com prazo.** Os manifestos em
 [`instalador/winget/`](../instalador/winget/) ainda não foram submetidos ao
