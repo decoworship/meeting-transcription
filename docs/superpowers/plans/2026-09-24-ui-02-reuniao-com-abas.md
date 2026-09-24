@@ -305,6 +305,9 @@ diff --git a/tools/provar_reunioes.py b/tools/provar_reunioes.py
 +          prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
 +          prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
 +          prova_reuniao_pelo_endereco]
+ 
+ 
+ 
 ```
 
 - [ ] **Step 3: Rodar e ver falhar**
@@ -751,6 +754,7 @@ diff --git a/app-net/App/web/app.js b/app-net/App/web/app.js
 +    cabecalho, tela, aba, aoApagar: botaoApagarGravacao(g),
    });
  }
+ 
 ```
 
 ```diff
@@ -782,6 +786,7 @@ diff --git a/app-net/App/web/reunioes.js b/app-net/App/web/reunioes.js
 -  return abrirAtas({ foco: g.caminho });
 +  return abrirGravacao(g, { aba: "ata" });
  }
+ 
 ```
 
 - [ ] **Step 7: As notas saem da gaveta (`revisao.js`, `index.html`)**
@@ -1036,6 +1041,9 @@ diff --git a/tools/provar_reunioes.py b/tools/provar_reunioes.py
            prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
 -          prova_reuniao_pelo_endereco]
 +          prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas]
+ 
+ 
+ 
 ```
 
 A seção de Atas do `checar_transcricao` passa a percorrer a aba Ata. O que ela conferia continua; mudam o caminho até a ata e a bolinha, que agora é a de Reuniões dizendo "escrevendo a ata". Saem as três conferências que eram da lista de cartões (só as transcritas, a dobra aberta, a dobra fechada ao voltar).
