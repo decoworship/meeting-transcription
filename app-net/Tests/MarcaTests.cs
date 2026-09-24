@@ -55,6 +55,44 @@ public sealed class MarcaTests
         Assert.Equal("MeetingApp", Propriedade(texto, "RootNamespace"));
     }
 
+    [Fact]
+    public void OInstaladorInstalaOExecutavelDaMarca()
+    {
+        string? iss = Achar(Path.Combine("instalador", "MeetingApp.iss"));
+        if (iss is null) return;
+        string texto = File.ReadAllText(iss);
+
+        // O que instala, atalha, inicia e desinstala o .exe usa o nome da marca.
+        Assert.Contains(@"Source: ""{#Payload}\{#Marca}.exe""", texto);
+        Assert.Contains(@"Name: ""{group}\{#Marca}""; Filename: ""{app}\{#Marca}.exe""", texto);
+        Assert.Contains(@"ValueName: ""{#Marca}""; ValueData: """"""{app}\{#Marca}.exe""""""", texto);
+        Assert.Contains(@"UninstallDisplayIcon={app}\{#Marca}.exe", texto);
+        Assert.Contains("OutputBaseFilename={#Marca}-{#Versao}-instalador", texto);
+        // O grupo do menu Iniciar de antes da marca não é reaproveitado.
+        Assert.Contains("UsePreviousGroup=no", texto);
+        // E os atalhos que a pessoa fez são repontados pelo mesmo script do publicar.sh.
+        Assert.Contains(@"-File """"{app}\repontar_atalhos.ps1"""" -Pasta """"{app}"""" -Aplicar", texto);
+
+        // O .exe velho só aparece para ser apagado.
+        var velhas = texto.Split('\n')
+            .Where(l => l.Contains("MeetingApp.exe") && !l.TrimStart().StartsWith(';'))
+            .Select(l => l.Trim()).ToList();
+        Assert.Equal(new[] { @"Type: files; Name: ""{app}\MeetingApp.exe""" }, velhas);
+    }
+
+    [Fact]
+    public void OsScriptsPublicamOExecutavelDaMarca()
+    {
+        // O publicar.sh (a máquina do dono) e o montar_instalador.sh (o
+        // instalador) copiam o .exe pelo nome, por texto.
+        foreach (string script in new[] { "publicar.sh", "montar_instalador.sh" })
+        {
+            string? caminho = Achar(Path.Combine("tools", script));
+            if (caminho is null) continue;
+            Assert.Contains($"{Marca.Nome}.exe", File.ReadAllText(caminho));
+        }
+    }
+
     private static string? Propriedade(string csproj, string nome)
     {
         var m = Regex.Match(csproj, $@"<{nome}>([^<]*)</{nome}>");
