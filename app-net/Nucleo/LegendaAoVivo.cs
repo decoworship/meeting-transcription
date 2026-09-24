@@ -94,6 +94,30 @@ public sealed class TrechoDaLegenda
     /// </para>
     /// </remarks>
     [JsonPropertyName("colado")] public bool Colado { get; init; }
+
+    /// <summary>
+    /// O que a correção de termos trocou neste trecho. Nulo quando nada.
+    /// </summary>
+    /// <remarks>
+    /// Mesmo formato do <see cref="SegmentoFinal.Swaps"/> da passada final, e
+    /// pelo mesmo motivo: correção que não deixa rastro não se desfaz. Ver
+    /// <see cref="CorrecaoDaLegenda"/>.
+    /// </remarks>
+    [JsonPropertyName("swaps")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<TrocaFeita>? Swaps { get; init; }
+
+    /// <summary>O mesmo trecho, com outro falante.</summary>
+    /// <remarks>
+    /// <b>Um lugar só para copiar o trecho.</b> Recriá-lo campo a campo no
+    /// chamador esqueceu o <see cref="Colado"/> uma vez, e esqueceria o
+    /// próximo campo também.
+    /// </remarks>
+    public TrechoDaLegenda ComFalante(string? falante) => new()
+    {
+        InicioMs = InicioMs, FimMs = FimMs, Dono = Dono, Texto = Texto,
+        Falante = falante, Colado = Colado, Swaps = Swaps,
+    };
 }
 
 /// <summary>O que a legenda deixou para ler depois da reunião.</summary>

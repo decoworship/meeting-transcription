@@ -66,11 +66,7 @@ public static class FalantesDaLegenda
                 quem ??= anterior;
             }
 
-            saida.Add(new TrechoDaLegenda
-            {
-                InicioMs = t.InicioMs, FimMs = t.FimMs, Dono = t.Dono,
-                Texto = t.Texto, Falante = quem,
-            });
+            saida.Add(t.ComFalante(quem));
             if (quem is not null) anterior = quem;
         }
 

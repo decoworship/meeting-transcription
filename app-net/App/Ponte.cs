@@ -615,6 +615,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private readonly Transcritor _transcritor = new(Motores.AoLadoDoExecutavel());
     private readonly Projetos _projetos = new();
 
+    /// <summary>Serializa as correções da legenda disparadas por salvar o vínculo.</summary>
+    private readonly object _correcaoDaLegenda = new();
+
     /// <summary>
     /// O que está sendo transcrito. Vive na ponte, e não na página, porque a
     /// página troca de tela e o pipeline não pode saber disso (FASE3.md §2).
@@ -711,6 +714,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         throw new InvalidOperationException("sem gravação");
                     new DadosDaReuniao { Cliente = p.Cliente, Projeto = p.Projeto }
                         .Salvar(onde);
+                    CorrigirLegendaDeNovo(onde);
                     Responder(new Resposta { Id = p.Id });
                     break;
                 }
@@ -1501,7 +1505,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         string? cliente = p.Cliente is { Length: > 0 } ? p.Cliente : vinculo.Cliente;
         string? projeto = p.Projeto is { Length: > 0 } ? p.Projeto : vinculo.Projeto;
         if (cliente != vinculo.Cliente || projeto != vinculo.Projeto)
+        {
             new DadosDaReuniao { Cliente = cliente, Projeto = projeto }.Salvar(pasta);
+            CorrigirLegendaDeNovo(pasta);
+        }
 
         // Lidas uma vez, aqui: dentro da tarefa elas seriam relidas do disco
         // enquanto o pipeline roda, e mudar a chave no meio de uma transcrição
@@ -1662,7 +1669,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             // Sem separação, e a legenda não fica prometendo: marca como feita,
             // sem falante. O registro diz por quê.
-            LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+            LegendaAoVivo.Gravar(
+                pasta, legenda.Turnos, CorrigirTermos(pasta, legenda.Trechos), prontos: true);
             Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
             return;
         }
@@ -1717,11 +1725,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     {
                         comFalante = [.. comFalante.Select(t =>
                             t.Falante is { } r && conhecidos.TryGetValue(r, out string? nome)
-                                ? new TrechoDaLegenda
-                                {
-                                    InicioMs = t.InicioMs, FimMs = t.FimMs,
-                                    Dono = t.Dono, Texto = t.Texto, Falante = nome,
-                                }
+                                ? t.ComFalante(nome)
                                 : t)];
                         nomeados = conhecidos.Count;
                     }
@@ -1732,6 +1736,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Registro.Escrever("legenda", $"vozes conhecidas: {e.Message}");
                 }
 
+                // Depois do reconhecimento, e não antes: a fala é agrupada por
+                // falante, e o falante com nome é o definitivo.
+                comFalante = CorrigirTermos(pasta, comFalante);
                 LegendaAoVivo.Gravar(pasta, legenda.Turnos, comFalante, prontos: true);
 
                 _transcricoes.Terminar(pasta);
@@ -1752,7 +1759,9 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // prometendo um resultado que não vem.
                 try
                 {
-                    LegendaAoVivo.Gravar(pasta, legenda.Turnos, legenda.Trechos, prontos: true);
+                    LegendaAoVivo.Gravar(
+                        pasta, legenda.Turnos, CorrigirTermos(pasta, legenda.Trechos),
+                        prontos: true);
                 }
                 catch (Exception) { /* disco: o aviso fica, e é o menor dos males */ }
 
@@ -1760,6 +1769,84 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 Registro.Escrever("legenda", $"falantes não separados: {e.Message}");
             }
             EmpurrarTranscricoes();
+        });
+    }
+
+    /// <summary>
+    /// A correção de termos da passada final, sobre a legenda, com o
+    /// vocabulário do projeto da reunião.
+    /// </summary>
+    /// <remarks>
+    /// <b>Nunca levanta.</b> É acabamento: se falhar, a legenda sai como saía.
+    /// Roda nos três desfechos da separação — feita, recusada e falha —,
+    /// porque corrigir texto não usa placa e não depende de haver falante.
+    /// </remarks>
+    private List<TrechoDaLegenda> CorrigirTermos(string pasta, List<TrechoDaLegenda> trechos)
+    {
+        try
+        {
+            // O mesmo acesso que IniciarTranscricao usa para corrigirFonetica.
+            var cfg = ConfiguracoesDoApp.Carregar();
+            if (!cfg.CorrecaoFonetica) return trechos;
+
+            var r = CorrecaoDaLegenda.CorrigirDaReuniao(pasta, trechos, _projetos);
+            Registro.Escrever("legenda", r.Resumo());
+            return r.Correcao.Trechos;
+        }
+        catch (Exception e)
+        {
+            Registro.Escrever("legenda", $"correção de termos ignorada: {e.Message}");
+            return trechos;
+        }
+    }
+
+    /// <summary>
+    /// Corrige de novo a legenda já separada, porque o vínculo da reunião
+    /// acabou de ser salvo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O vínculo chega, muitas vezes, depois da separação</b> — em 5 de 9
+    /// reuniões medidas em 23/09/2026, e quase sempre quando ela foi recusada.
+    /// A correção do fim da reunião rodou então sem vocabulário, e como
+    /// <c>falantes_prontos</c> já é <c>true</c>, nada a rodaria de novo.
+    /// </para>
+    /// <para>
+    /// <b>Só com a separação terminada.</b> Com ela em curso, é ela que lê o
+    /// vínculo quando termina. Rodar de novo é seguro: a segunda passada não
+    /// acha o que trocar, e aí nem se reescreve o arquivo. O <c>lock</c> é para
+    /// dois salvamentos seguidos, em que o mais velho gravaria por cima do novo.
+    /// </para>
+    /// <para>
+    /// <b>Nunca levanta</b>, e roda fora da thread da UI: é acabamento.
+    /// </para>
+    /// </remarks>
+    private void CorrigirLegendaDeNovo(string pasta)
+    {
+        _ = Task.Run(() =>
+        {
+            lock (_correcaoDaLegenda)
+            {
+                try
+                {
+                    if (LegendaAoVivo.Ler(pasta)
+                        is not { FalantesProntos: true, Trechos.Count: > 0 } legenda)
+                        return;
+
+                    Registro.Escrever("legenda", "vínculo salvo: corrigindo os termos de novo");
+                    var corrigidos = CorrigirTermos(pasta, legenda.Trechos);
+
+                    // O Corrigir devolve o mesmo objeto para o trecho sem troca.
+                    if (corrigidos.SequenceEqual(legenda.Trechos, ReferenceEqualityComparer.Instance))
+                        return;
+                    LegendaAoVivo.Gravar(pasta, legenda.Turnos, corrigidos, prontos: true);
+                }
+                catch (Exception e)
+                {
+                    Registro.Escrever("legenda",
+                        $"correção de termos ao salvar o vínculo ignorada: {e.Message}");
+                }
+            }
         });
     }
 

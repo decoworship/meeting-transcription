@@ -526,25 +526,90 @@ entrega falante no rascunho, e nada além.
 que a gravação para — não existe `transcrever_ao_parar`. O gancho existe
 (`Ponte.EncerrarAPrevia`), a máquina de progresso não.
 
-### VIVO-3 · O vocabulário não chega à legenda — `bug` · `espera`
+### VIVO-3 · O vocabulário não chega à legenda — `bug` · **feito em 23/09/2026**
 
 **Relatado em uso em 17/09/2026:** *"durante a reunião a legenda parece ser boa,
-errando mais em termos específicos"*. Está certo, e não tem conserto por
-configuração.
+errando mais em termos específicos"*. Estava certo, e não tinha conserto por
+configuração — na entrada.
 
-**O gancho não existe para esta família.** O `initial_prompt` do
-`transcribe_cpp` é do `WhisperRunOptions` — família Whisper, que é a da passada
-final. O Nemotron é da família Parakeet, e o `ParakeetStreamOptions` expõe **uma
-única** opção: `att_context_right`. Não há onde pôr termo.
+**O gancho não existe para esta família, e isso continua verdadeiro.** O
+`initial_prompt` do `transcribe_cpp` é do `WhisperRunOptions` — família Whisper,
+que é a da passada final. O Nemotron é da família Parakeet, e o
+`ParakeetStreamOptions` expõe **uma única** opção: `att_context_right`. Não há
+onde pôr termo na entrada, e por isso o conserto é **depois**.
 
-**As saídas conhecidas, nenhuma barata:** trocar o modelo da legenda por um de
-família que aceite prompt (e refazer o `R1` inteiro), ou corrigir o texto
-**depois** — a correção fonética já existe em `Nucleo/` e roda sobre a passada
-final; aplicá-la à legenda seria sobre texto sem carimbo, o que traz o `VIVO-1`
-de volta.
+**Fechado corrigindo depois, não trocando modelo.** A correção de termos da
+passada final — fonética, regra e grafia, agora em `Nucleo/CorrecaoDeTermos.cs`
+— passou a rodar também sobre a legenda ao vivo, no fim da reunião, junto da
+separação de falantes (`Nucleo/CorrecaoDaLegenda.cs`). Ela corrige por **fala**
+(trechos seguidos do mesmo falante, onde a troca se enxerga) e funde só os
+trechos que uma troca atravessa — o trecho tem 1,1 s, e três das quatro
+propostas medidas eram de duas palavras.
+
+**A medição, sobre a reunião real de 23/09/2026** (`2026-09-23_10-00-17`,
+101 min, projeto *Agentes (Interno)*):
+
+| termo | Whisper | legenda crua | legenda + pós |
+|---|---:|---:|---:|
+| Wifi | 14 | 2 | **11** |
+| Tânia | 2 | 0 | **2** |
+| V.TAL | 2 | 0 | **2** |
+| Webhook | 4 | 3 | **4** |
+| Prada | 13 | 7 | 8 |
+| API · Cloud | 11 · 6 | 6 · 1 | 6 · 1 |
+
+**15 trocas, 4 propostas validadas** (`Wi Fi→Wifi`, `Vital→V.TAL`,
+`pra da→Prada`, `web hook→Webhook`) + `Tania→Tânia` da fonética. O teste de
+acervo `CorrecaoDaLegendaNoAcervoTests` reproduz esta reunião e confirma:
+`15 trocas, 1 fundidos, Wifi = 11`.
+
+**Recupera o que o motor ouviu e escreveu diferente; o que ele não ouviu
+continua faltando, e só a passada final recupera.**
+
+**Duas coisas que a medição ensinou, fora do que já se sabia:**
+
+- **A fonética por trecho perdia contexto de frase.** O desenho original (plano
+  `2026-09-23-pos-processamento-da-legenda`, passo 4) recalculava a fonética
+  depois de recortar cada trecho, e `CorrecaoFonetica.Corrigir` só aceita
+  maiúscula como sinal de nome próprio quando há texto **antes** dela na mesma
+  frase — recortar apaga esse "antes" sempre que a palavra corrigida abre o
+  trecho, e o nome não era corrigido, em silêncio. O conserto roda a fonética
+  uma vez por fala inteira, e mapeia cada troca para o trecho a que pertence
+  pelo deslocamento de caractere, não por recorte.
+- **A contagem é sem diferenciar caixa, como a medição original.** Das onze
+  ocorrências de "Wifi" nesta reunião, duas já estavam certas na legenda crua —
+  uma `Wifi` e uma `wifi`, em minúscula — e as outras nove eram `Wi Fi`, que a
+  cadeia converteu: 2 + 9 = 11. Ela não normaliza a caixa de uma palavra já bem
+  grafada, e não tenta: `RevisaoDeTermos.Propor` só considera candidato uma
+  palavra que **começa maiúscula**, e `RevisaoDeTermos.ProporGrafia` exige um
+  lado com espaço ou hífen. Nenhuma das duas foi feita para consertar caixa
+  isolada, só nome/sigla por distância e espaçamento errado — o `wifi` entra na
+  contagem, mas não é obra da correção.
+
+**Depende do vínculo da reunião com o projeto**, porque é dele que vem o
+vocabulário. E o vínculo muitas vezes chega **depois** da separação de falantes:
+em 5 de 9 reuniões recentes o `reuniao.json` foi escrito depois de ela
+terminar, e quase sempre quando ela foi recusada. A correção rodava então sem
+vocabulário, com 0 trocas, em silêncio — e não rodava de novo, porque
+`falantes_prontos` já era `true`. **Por isso ela roda outra vez quando o vínculo
+é salvo** (`salvar-reuniao` e o início de uma transcrição que muda o vínculo),
+se a separação já terminou; a segunda passada sobre o mesmo texto não acha o
+que trocar, então repetir é seguro. E o `registro.log` diz quando faltou
+vocabulário (`termos: sem vocabulário (reunião sem projeto)`), em vez de um
+zero mudo. **O que não se reaplica:** editar o vocabulário do projeto depois
+não corrige as legendas de reuniões passadas — isso pediria varrer todas as
+reuniões do projeto, e fica até alguém salvar o vínculo daquela reunião de
+novo.
+
+**Ainda falta:** a tela não mostra as trocas da legenda — o `swaps` fica só no
+`legenda.json`, para quem abrir o arquivo.
+
+**Faz parte da convergência para o Nemotron alcançar paridade com o
+`large-v3`** no eixo texto — ver [docs/CONVERGENCIA.md](CONVERGENCIA.md), `S4`.
 
 **Não confundir com defeito:** a passada final continua recebendo o vocabulário
-normalmente. O que erra é o rascunho.
+normalmente. O que errava era só o rascunho, ao vivo, e agora a legenda gravada
+também recebe a correção depois que a reunião termina.
 
 ### VIVO-4 · A legenda contra a passada final — `débito` · **medido em 17/09/2026**
 
@@ -612,6 +677,9 @@ dois motores**. Saber quem erra exige gabarito humano, e isso é outro trabalho.
 **O que isto decide sobre o `TRA-1`:** nada ainda. 26% de distância é longe
 demais para a legenda poupar a passada final como os blocos do MOSS poupam — lá
 o texto **empatava**. Para reabrir, seria preciso o gabarito.
+
+**Relacionado:** o `VIVO-3` fecha uma fatia pequena e específica desta
+distância — a que é "ouviu certo, escreveu diferente" —, não os 26% inteiros.
 
 ### VIVO-5 · O Sortformer está no pacote, e o `T4.1` não sabe — `feature` · `espera`
 

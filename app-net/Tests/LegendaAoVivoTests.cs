@@ -466,4 +466,63 @@ public sealed class LegendaAoVivoTests
 
         Assert.False(trechos[1].Colado);
     }
+
+    // ──────────────────── as trocas da correção de termos
+
+    [Fact]
+    public void AsTrocasDoTrechoSobrevivemAoArquivo()
+    {
+        string pasta = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var trecho = new TrechoDaLegenda
+            {
+                InicioMs = 0, FimMs = 1120, Dono = false, Texto = "Wifi",
+                Swaps = [new TrocaFeita { De = "Wi Fi", Para = "Wifi" }],
+            };
+
+            LegendaAoVivo.Gravar(pasta, [], [trecho], prontos: true);
+            var lida = LegendaAoVivo.Ler(pasta)!;
+
+            var troca = Assert.Single(lida.Trechos[0].Swaps!);
+            Assert.Equal(("Wi Fi", "Wifi"), (troca.De, troca.Para));
+        }
+        finally { Directory.Delete(pasta, true); }
+    }
+
+    [Fact]
+    public void TrechoSemTrocaNaoEscreveOCampo()
+    {
+        // Os sete legenda.json antigos do acervo não têm o campo, e o arquivo
+        // novo sem troca tem de continuar igual a eles.
+        string pasta = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            LegendaAoVivo.Gravar(pasta, [],
+                [new TrechoDaLegenda { InicioMs = 0, FimMs = 1, Dono = false, Texto = "oi" }],
+                prontos: false);
+
+            Assert.DoesNotContain("swaps", File.ReadAllText(Path.Combine(pasta, "legenda.json")));
+        }
+        finally { Directory.Delete(pasta, true); }
+    }
+
+    [Fact]
+    public void TrocarOFalantePreservaAColagemEAsTrocas()
+    {
+        // Até 23/09/2026 o reconhecimento de vozes recriava o trecho campo a
+        // campo e esquecia o Colado: "Palo" + "ma" voltava a sair "Palo ma".
+        var t = new TrechoDaLegenda
+        {
+            InicioMs = 10, FimMs = 20, Dono = false, Texto = "ma", Colado = true,
+            Falante = "SPEAKER_00", Swaps = [new TrocaFeita { De = "a", Para = "b" }],
+        };
+
+        var n = t.ComFalante("Paloma Santos");
+
+        Assert.Equal("Paloma Santos", n.Falante);
+        Assert.True(n.Colado);
+        Assert.Same(t.Swaps, n.Swaps);
+        Assert.Equal((10L, 20L, "ma"), (n.InicioMs, n.FimMs, n.Texto));
+    }
 }

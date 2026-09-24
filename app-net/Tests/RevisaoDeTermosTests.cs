@@ -84,7 +84,7 @@ public sealed class RevisaoDeTermosTests
         // "Felipeof" e "Emalina" são local-parts que a agenda devolveu como se
         // fossem nome. Com eles na lista, a regra reescrevia "Felipe" — pessoa
         // real, dita na reunião — para o lixo da agenda. O filtro está em
-        // Transcritor.EntidadesConhecidas; aqui fica a prova de que, se algum
+        // CorrecaoDeTermos.Entidades; aqui fica a prova de que, se algum
         // escapar, uma edição não basta para alcançá-lo.
         Assert.Empty(Propor("o Felipe vai mandar o arquivo", "Felipeof, Algar"));
     }
