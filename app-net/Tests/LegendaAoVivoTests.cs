@@ -473,17 +473,21 @@ public sealed class LegendaAoVivoTests
     public void AsTrocasDoTrechoSobrevivemAoArquivo()
     {
         string pasta = Directory.CreateTempSubdirectory().FullName;
-        var trecho = new TrechoDaLegenda
+        try
         {
-            InicioMs = 0, FimMs = 1120, Dono = false, Texto = "Wifi",
-            Swaps = [new TrocaFeita { De = "Wi Fi", Para = "Wifi" }],
-        };
+            var trecho = new TrechoDaLegenda
+            {
+                InicioMs = 0, FimMs = 1120, Dono = false, Texto = "Wifi",
+                Swaps = [new TrocaFeita { De = "Wi Fi", Para = "Wifi" }],
+            };
 
-        LegendaAoVivo.Gravar(pasta, [], [trecho], prontos: true);
-        var lida = LegendaAoVivo.Ler(pasta)!;
+            LegendaAoVivo.Gravar(pasta, [], [trecho], prontos: true);
+            var lida = LegendaAoVivo.Ler(pasta)!;
 
-        var troca = Assert.Single(lida.Trechos[0].Swaps!);
-        Assert.Equal(("Wi Fi", "Wifi"), (troca.De, troca.Para));
+            var troca = Assert.Single(lida.Trechos[0].Swaps!);
+            Assert.Equal(("Wi Fi", "Wifi"), (troca.De, troca.Para));
+        }
+        finally { Directory.Delete(pasta, true); }
     }
 
     [Fact]
@@ -492,11 +496,15 @@ public sealed class LegendaAoVivoTests
         // Os sete legenda.json antigos do acervo não têm o campo, e o arquivo
         // novo sem troca tem de continuar igual a eles.
         string pasta = Directory.CreateTempSubdirectory().FullName;
-        LegendaAoVivo.Gravar(pasta, [],
-            [new TrechoDaLegenda { InicioMs = 0, FimMs = 1, Dono = false, Texto = "oi" }],
-            prontos: false);
+        try
+        {
+            LegendaAoVivo.Gravar(pasta, [],
+                [new TrechoDaLegenda { InicioMs = 0, FimMs = 1, Dono = false, Texto = "oi" }],
+                prontos: false);
 
-        Assert.DoesNotContain("swaps", File.ReadAllText(Path.Combine(pasta, "legenda.json")));
+            Assert.DoesNotContain("swaps", File.ReadAllText(Path.Combine(pasta, "legenda.json")));
+        }
+        finally { Directory.Delete(pasta, true); }
     }
 
     [Fact]

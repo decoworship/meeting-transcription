@@ -52,14 +52,18 @@ public sealed class CorrecaoDeTermosTests
         // O corte do EntidadesConhecidas, de 25/08: "Felipeof" (local-part de
         // e-mail) não pode virar alvo.
         string pasta = Directory.CreateTempSubdirectory().FullName;
-        File.WriteAllText(Path.Combine(pasta, "meta.json"), """
-            { "meeting": { "attendees": ["Felipeof", "Daniel Prada"] } }
-            """);
+        try
+        {
+            File.WriteAllText(Path.Combine(pasta, "meta.json"), """
+                { "meeting": { "attendees": ["Felipeof", "Daniel Prada"] } }
+                """);
 
-        var entidades = CorrecaoDeTermos.Entidades(pasta, "KPI", "Agentes", "Interno");
+            var entidades = CorrecaoDeTermos.Entidades(pasta, "KPI", "Agentes", "Interno");
 
-        Assert.Contains("Daniel Prada", entidades);
-        Assert.DoesNotContain("Felipeof", entidades);
-        Assert.Equal(["KPI", "Agentes", "Interno"], entidades.Take(3));
+            Assert.Contains("Daniel Prada", entidades);
+            Assert.DoesNotContain("Felipeof", entidades);
+            Assert.Equal(["KPI", "Agentes", "Interno"], entidades.Take(3));
+        }
+        finally { Directory.Delete(pasta, true); }
     }
 }

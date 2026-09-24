@@ -44,10 +44,11 @@ public sealed class CorrecaoDaLegendaNoAcervoTests(ITestOutputHelper saida)
         var r = CorrecaoDaLegenda.Corrigir(legenda.Trechos, voc, entidades);
 
         // Contagem sem diferenciar caixa, como o runner de 23/09: das onze
-        // ocorrências de "wifi" na reunião, uma já estava certa na legenda
-        // crua em minúscula ("wifi") — a cadeia não normaliza caixa de uma
-        // palavra já bem grafada, só corrige o que ouviu errado. As outras
-        // nove eram "Wi Fi" separado, e a cadeia converteu as nove.
+        // ocorrências de "wifi" na reunião, duas já estavam certas na legenda
+        // crua — uma "Wifi" e uma "wifi", em minúscula, que a cadeia deixa
+        // como está: ela não normaliza caixa de uma palavra já bem grafada, só
+        // corrige o que ouviu errado. As outras nove eram "Wi Fi" separado, e
+        // a cadeia converteu as nove: 2 + 9 = 11.
         int wifi = r.Trechos.Sum(t =>
             Regex.Matches(t.Texto, @"(?<!\w)Wifi(?!\w)", RegexOptions.IgnoreCase).Count);
         saida.WriteLine($"{r.Trocas} trocas, {r.Fundidos} fundidos, Wifi = {wifi}");

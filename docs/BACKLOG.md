@@ -577,13 +577,29 @@ continua faltando, e só a passada final recupera.**
   uma vez por fala inteira, e mapeia cada troca para o trecho a que pertence
   pelo deslocamento de caractere, não por recorte.
 - **A contagem é sem diferenciar caixa, como a medição original.** Das onze
-  ocorrências de "Wifi" nesta reunião, uma já estava certa na legenda crua em
-  minúscula (`wifi`) — a cadeia não normaliza a caixa de uma palavra já bem
+  ocorrências de "Wifi" nesta reunião, duas já estavam certas na legenda crua —
+  uma `Wifi` e uma `wifi`, em minúscula — e as outras nove eram `Wi Fi`, que a
+  cadeia converteu: 2 + 9 = 11. Ela não normaliza a caixa de uma palavra já bem
   grafada, e não tenta: `RevisaoDeTermos.Propor` só considera candidato uma
   palavra que **começa maiúscula**, e `RevisaoDeTermos.ProporGrafia` exige um
   lado com espaço ou hífen. Nenhuma das duas foi feita para consertar caixa
-  isolada, só nome/sigla por distância e espaçamento errado — essa ocorrência
-  entra na contagem, mas não é obra da correção.
+  isolada, só nome/sigla por distância e espaçamento errado — o `wifi` entra na
+  contagem, mas não é obra da correção.
+
+**Depende do vínculo da reunião com o projeto**, porque é dele que vem o
+vocabulário. E o vínculo muitas vezes chega **depois** da separação de falantes:
+em 5 de 9 reuniões recentes o `reuniao.json` foi escrito depois de ela
+terminar, e quase sempre quando ela foi recusada. A correção rodava então sem
+vocabulário, com 0 trocas, em silêncio — e não rodava de novo, porque
+`falantes_prontos` já era `true`. **Por isso ela roda outra vez quando o vínculo
+é salvo** (`salvar-reuniao` e o início de uma transcrição que muda o vínculo),
+se a separação já terminou; a segunda passada sobre o mesmo texto não acha o
+que trocar, então repetir é seguro. E o `registro.log` diz quando faltou
+vocabulário (`termos: sem vocabulário (reunião sem projeto)`), em vez de um
+zero mudo. **O que não se reaplica:** editar o vocabulário do projeto depois
+não corrige as legendas de reuniões passadas — isso pediria varrer todas as
+reuniões do projeto, e fica até alguém salvar o vínculo daquela reunião de
+novo.
 
 **Ainda falta:** a tela não mostra as trocas da legenda — o `swaps` fica só no
 `legenda.json`, para quem abrir o arquivo.

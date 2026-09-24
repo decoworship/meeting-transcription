@@ -624,14 +624,15 @@ estudo do tempo real barateando o offline.
 [BACKLOG.md](BACKLOG.md) pôs a correção de termos da passada final — fonética,
 regra e grafia — para rodar também sobre a legenda ao vivo, por fala e fundida
 por trecho. Numa reunião real, "Wifi" subiu de 2 para 11 ocorrências na legenda
-corrigida (a passada final tem 14). É a mesma classificação do `VIVO-4`: fecha
-a fatia do erro que é "ouviu certo, escreveu diferente" — fronteira e quase, na
-tabela de lá —, porque devolve ao Nemotron a grafia que ele já tinha ouvido, só
-separada errado (`Wi Fi`, `pra da`, `web hook`). **O que sobra é o que ele não
-ouviu**: sem gancho de vocabulário na entrada, essa fatia — o "conteúdo" da
-tabela do `VIVO-4` — não tem conserto por pós-processamento; só a passada final
-recupera. A distância do eixo texto encolheu na parte que dava para encolher
-sem mexer no modelo, não fechou inteira.
+corrigida (a passada final tem 14). **É uma fatia pequena e específica**, e o
+que se mediu foi só ela: a tabela de termos do `VIVO-3`, numa reunião só, a de
+23/09. A correção só toca termo do vocabulário e nome da agenda — devolve ao
+Nemotron a grafia de um termo que ele já tinha ouvido, só separado ou grafado
+errado (`Wi Fi`, `pra da`, `web hook`) — e não mexe no resto do texto. **A
+distância do `VIVO-4` não foi medida de novo**: quanto dos 26% isto encolhe não
+se sabe, e pela natureza da correção deve ser pouco. **O que ele não ouviu
+continua faltando**: sem gancho de vocabulário na entrada, essa parte
+não tem conserto por pós-processamento; só a passada final recupera.
 
 ### S5 · A fala sobreposta
 
