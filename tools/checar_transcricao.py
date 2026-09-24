@@ -262,6 +262,16 @@ window.__terminar = (erro) => {
 FALHAS: list[str] = []
 
 
+def abrir_da_lista(pagina, caminho: str) -> None:
+    """Abre uma reunião a partir da lista de Reuniões.
+
+    Duplo clique, e não clique: desde a lista nova (docs/superpowers/plans/
+    2026-09-23-ui-01-reunioes-lista.md) o clique escolhe a linha e mostra o
+    painel ao lado, e quem abre é o duplo clique, o Enter ou o "Abrir" do painel.
+    """
+    pagina.dispatch_event(f'[data-gravacao="{caminho}"]', "dblclick")
+
+
 def conferir(nome: str, condicao: bool, detalhe: str = "") -> None:
     print(f'{"ok  " if condicao else "FALHA"} {nome}' + (f"  ({detalhe})" if detalhe else ""))
     if not condicao:
@@ -290,7 +300,7 @@ def main() -> int:
             pagina.on("pageerror", lambda e: print(f"  js: {e}", file=sys.stderr))
             pagina.add_init_script(PONTE_FALSA)
             pagina.goto(f"http://127.0.0.1:{porta}/index.html", wait_until="load")
-            pagina.wait_for_selector(".gravacao")
+            pagina.wait_for_selector(".reuniao-linha")
 
             ponto = "#ir-reunioes"
             estado = lambda: pagina.get_attribute(ponto, "data-ocupado")  # noqa: E731
@@ -298,7 +308,7 @@ def main() -> int:
             conferir("a bolinha começa apagada", estado() == "false")
 
             # ---- o vínculo com cliente/projeto, que é anterior a transcrever
-            pagina.click('[data-gravacao="C:/g/a"]')
+            abrir_da_lista(pagina, "C:/g/a")
             pagina.wait_for_selector("#vocabulario")
             pagina.fill("#cliente", "Vivo")
             pagina.dispatch_event("#cliente", "change")
@@ -307,12 +317,12 @@ def main() -> int:
             pagina.wait_for_timeout(80)
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            meta = pagina.inner_text('[data-gravacao="C:/g/a"] .gravacao__meta')
-            conferir("o cartão mostra cliente e projeto", "Vivo · Faturamento B2B" in meta,
+            pagina.wait_for_selector(".reuniao-linha")
+            meta = pagina.inner_text('[data-gravacao="C:/g/a"] .reuniao-linha__meta')
+            conferir("a linha mostra cliente e projeto", "Vivo › Faturamento B2B" in meta,
                      meta.replace("\n", " | "))
 
-            pagina.click('[data-gravacao="C:/g/a"]')
+            abrir_da_lista(pagina, "C:/g/a")
             pagina.wait_for_selector("#vocabulario")
             voltou = pagina.input_value("#cliente"), pagina.input_value("#projeto")
             conferir("sair da tela e voltar não apaga cliente/projeto",
@@ -341,11 +351,11 @@ def main() -> int:
             conferir("a bolinha continua acesa fora de Reuniões", estado() == "true")
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
+            pagina.wait_for_selector(".reuniao-linha")
             etiqueta = pagina.inner_text('[data-gravacao="C:/g/a"] .aa-etiqueta')
             conferir("a lista diz que está transcrevendo", etiqueta == "Transcrevendo…", etiqueta)
 
-            pagina.click('[data-gravacao="C:/g/a"]')
+            abrir_da_lista(pagina, "C:/g/a")
             pagina.wait_for_selector(".aa-progresso")
             texto_de_volta = pagina.inner_text(".progresso__linha .campo__dica")
             largura_de_volta = pagina.evaluate(
@@ -357,8 +367,8 @@ def main() -> int:
 
             # ---- critério C: a segunda é recusada
             pagina.click("#voltar")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/b")
             pagina.wait_for_selector("#vocabulario")
             pagina.click("text=Transcrever")
             pagina.wait_for_selector(".aa-alerta, .alerta")
@@ -374,16 +384,16 @@ def main() -> int:
             conferir("critério B: a bolinha apaga ao terminar", estado() == "false")
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/a"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/a")
             pagina.wait_for_selector(".revisao", timeout=5000)
             conferir("a reunião pronta abre na revisão",
                      pagina.locator(".revisao .trecho").count() > 0)
 
             # ---- o erro sobrevive a ninguém estar olhando
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/b")
             pagina.wait_for_selector("#vocabulario")
             pagina.click("text=Transcrever")
             pagina.wait_for_selector(".aa-progresso")
@@ -394,8 +404,8 @@ def main() -> int:
             conferir("critério B: a bolinha apaga também quando falha", estado() == "false")
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/b"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/b")
             pagina.wait_for_selector("#vocabulario")
             pagina.wait_for_timeout(100)
             texto = pagina.inner_text(".aa-pagina")
@@ -414,8 +424,8 @@ def main() -> int:
 
             # ---- parar a transcrição: o comando funcionando não é um erro
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/c"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/c")
             pagina.wait_for_selector("#vocabulario")
             pagina.click("text=Transcrever")
             pagina.wait_for_selector(".aa-progresso")
@@ -466,8 +476,8 @@ def main() -> int:
             pagina.evaluate(
                 "window.chrome.webview._notas['C:/g/c'] = 'combinado com a Vanessa: subir o CSV'")
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
-            pagina.click('[data-gravacao="C:/g/c"]')
+            pagina.wait_for_selector(".reuniao-linha")
+            abrir_da_lista(pagina, "C:/g/c")
             pagina.wait_for_selector(".notas__texto")
             pagina.wait_for_timeout(150)
             conferir("a reunião mostra as notas escritas na gravação",
@@ -515,7 +525,7 @@ def main() -> int:
                      pagina.inner_text(".ata__resumo"))
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
+            pagina.wait_for_selector(".reuniao-linha")
             pagina.click("#ir-atas")
             pagina.wait_for_selector(".ata__dobra")
             conferir("ao voltar, a ata vem fechada",
@@ -563,7 +573,7 @@ def main() -> int:
             conferir("gravação e ata convivem", ocupado("ir-gravador") == "true")
 
             pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".gravacao")
+            pagina.wait_for_selector(".reuniao-linha")
             etiqueta = pagina.inner_text('[data-gravacao="C:/g/a"] .aa-etiqueta')
             conferir("a lista diz que está escrevendo a ata, não transcrevendo",
                      etiqueta == "Escrevendo a ata…", etiqueta)

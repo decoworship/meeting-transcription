@@ -43,13 +43,21 @@ function acender(id, ligado, rotuloBase, oQue = "") {
   else botao.removeAttribute("aria-label");
 }
 
-/** Reuniões e Atas: só uma das duas acende, porque só uma das duas roda. */
+/**
+ * Reuniões e Atas: só uma das duas acende, porque só uma das duas roda.
+ *
+ * **Por destino, e não por tarefa.** Transcrição e falantes acendem a MESMA
+ * bolinha, e pintar tarefa a tarefa apagava na segunda o que a primeira
+ * acendera: de 17/09 a 24/09/2026 a bolinha de Reuniões não acendia com uma
+ * transcrição rodando. O tools/checar_transcricao.py pegou, depois de portado
+ * para a lista nova.
+ */
 function pintarTrabalhos() {
   const atual = transcricoes().atual;
-  for (const [tarefa, id] of Object.entries(DESTINO_DA_TAREFA)) {
-    const minha = atual?.tarefa === tarefa;
+  for (const id of new Set(Object.values(DESTINO_DA_TAREFA))) {
+    const minha = DESTINO_DA_TAREFA[atual?.tarefa] === id;
     acender(id, minha, id === "ir-atas" ? "Atas" : "Reuniões",
-            minha ? `${ROTULO_DA_TAREFA[tarefa]} ${atual.nome}` : "");
+            minha ? `${ROTULO_DA_TAREFA[atual.tarefa]} ${atual.nome}` : "");
   }
 }
 
