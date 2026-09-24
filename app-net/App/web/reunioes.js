@@ -146,7 +146,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   busca.type = "search";
   busca.id = "busca-reunioes";
   busca.className = "aa-entrada reunioes__busca";
-  busca.placeholder = "Buscar por título, cliente, projeto, convidado ou data…";
+  busca.placeholder = "Buscar por título, cliente, projeto, convidado, data ou estado…";
   busca.setAttribute("aria-label", "Buscar reuniões");
   busca.value = criterios.texto;
 

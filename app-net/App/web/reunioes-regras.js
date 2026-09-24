@@ -201,9 +201,17 @@ function dataCurta(nome) {
   return `${d}/${m}/${a}`;
 }
 
-/** Tudo o que a busca olha numa gravação, normalizado. */
-export function textoDeBusca(g) {
-  return normalizar([g.titulo, g.cliente, g.projeto, dataCurta(g.nome), ...(g.nomes ?? [])]
+/**
+ * Tudo o que a busca olha numa gravação, normalizado.
+ *
+ * O estado entra pelo mesmo rótulo da etiqueta, e as pendências pela mesma
+ * contagem da linha: quem digita "ata pronta" ou "pendências" está lendo a
+ * tela, e a busca tem de achar o que a tela mostra.
+ */
+export function textoDeBusca(g, rodando = null) {
+  const pendencias = g.tem_ata && g.pendencias > 0 ? `${g.pendencias} pendências` : null;
+  return normalizar([g.titulo, g.cliente, g.projeto, dataCurta(g.nome), ...(g.nomes ?? []),
+                     estadoDe(g, rodando).rotulo, pendencias]
     .filter(Boolean).join(" "));
 }
 
@@ -241,7 +249,7 @@ export function filtrar(gravacoes, criterios = {}, { hoje = null, rodandoDe = ()
     }
 
     if (palavras.length > 0) {
-      const alvo = textoDeBusca(g);
+      const alvo = textoDeBusca(g, rodandoDe(g.caminho));
       if (!palavras.every((p) => alvo.includes(p))) return false;
     }
     return true;

@@ -102,6 +102,20 @@ test("a busca ignora acento, casa todas as palavras, e olha projeto, convidado e
                    ["Comunicação Beegol + App"]);
 });
 
+test("a busca também acha pelo estado que a etiqueta mostra, e pelas pendências", () => {
+  // Achado no percurso do dono em 24/09/2026: digitar "ata pronta" não achava
+  // nada, embora a etiqueta estivesse ali na linha.
+  assert.deepEqual(titulos(R.filtrar(acervo, { texto: "ata pronta" }, opcoes)),
+                   ["Comunicação Beegol + App", "Kickoff"]);
+  assert.deepEqual(titulos(R.filtrar(acervo, { texto: "nao transcrita" }, opcoes)),
+                   ["Semanal — Uberlândia"]);
+  assert.deepEqual(titulos(R.filtrar(acervo, { texto: "pendencias" }, opcoes)),
+                   ["Comunicação Beegol + App"]);
+  const rodandoDe = (c) => (c === acervo[1].caminho ? { tarefa: "transcricao", etapa: "asr" } : null);
+  assert.deepEqual(titulos(R.filtrar(acervo, { texto: "transcrevendo" }, { ...opcoes, rodandoDe })),
+                   ["Semanal — Uberlândia"]);
+});
+
 test("o filtro de cliente separa, e 'sem cliente' pega os que não têm", () => {
   assert.deepEqual(titulos(R.filtrar(acervo, { cliente: "Algar" }, opcoes)),
                    ["Comunicação Beegol + App", "Kickoff"]);
