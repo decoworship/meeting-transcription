@@ -257,6 +257,94 @@ html {
 
 .vazio { color: var(--cor-texto-suave); }
 
+/* ─────────────────────────────────────────────────────── reuniões
+ *
+ * Uma linha por gravação, agrupadas por dia, com busca e filtros por cima.
+ * O desenho está em docs/superpowers/specs/2026-09-23-ui-ux.md §3.3. */
+
+/* A página de documento do design system centraliza em 980 px e respira 64 px
+ * em cima; a lista com painel precisa da largura da janela. O width é o que
+ * conta: a .aa-pagina tem margin auto dentro da grade do .conteudo, e item de
+ * grade com margem automática encolhe até o conteúdo — tirar só o max-width
+ * deixava a lista em 896 px. E o border-box é o que impede o padding da página
+ * de somar aos 100% e empurrar os filtros para fora da janela. Mesmo remendo
+ * que a revisão já usa; a correção de fundo é o UI-8. */
+.aa-pagina:has(> .reunioes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}
+
+.reunioes { display: grid; gap: var(--espaco-4); }
+
+.reunioes__ferramentas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  align-items: center;
+}
+.reunioes__busca { flex: 1 1 18rem; }
+.reunioes__filtro { flex: 0 0 auto; width: auto; min-width: 11rem; }
+
+.reunioes__lista {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  overflow: hidden;
+}
+
+.reunioes__dia {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4) var(--espaco-2);
+  font: 700 var(--texto-rotulo) / 1.2 var(--fonte-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.reuniao-linha {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: var(--espaco-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.reuniao-linha:last-child { border-bottom: 0; }
+.reuniao-linha:hover { background: var(--cor-linha-hover); }
+/* Por dentro, e não por fora: a lista tem overflow hidden, e um anel por fora
+ * seria cortado nas bordas. */
+.reuniao-linha:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+
+.reuniao-linha__hora {
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-rotulo);
+  color: var(--cor-texto-suave);
+}
+.reuniao-linha__textos { display: grid; gap: 2px; min-width: 0; }
+.reuniao-linha__titulo,
+.reuniao-linha__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reuniao-linha__titulo { font-weight: 600; color: var(--cor-texto-forte); }
+.reuniao-linha__meta { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+
+.reunioes__vazio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+  padding: var(--espaco-5) var(--espaco-4);
+  color: var(--cor-texto-suave);
+}
+.reunioes__vazio p { margin: 0; }
+
 /* ──────────────────────────────────────────── preparar a transcrição */
 
 .secao { display: grid; gap: var(--espaco-4); }

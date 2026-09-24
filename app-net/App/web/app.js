@@ -9,6 +9,7 @@ import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
 import { telaDeAtas } from "/atas.js";
+import { telaDeReunioes } from "/reunioes.js";
 import { ligarBolinhas } from "/trilho.js";
 
 const tela = document.getElementById("tela");
@@ -98,178 +99,15 @@ function destino(qual) {
 
 // ─────────────────────────────────────────────────────────── lista
 
-function cartao(g) {
-  const botao = document.createElement("button");
-  botao.className = "aa-cartao gravacao";
-  botao.type = "button";
-  botao.dataset.gravacao = g.caminho;
-  botao.addEventListener("click", () => abrirGravacao(g));
-
-  const esquerda = document.createElement("div");
-
-  const t = document.createElement("p");
-  t.className = "gravacao__titulo";
-  t.textContent = tituloDe(g);
-  esquerda.appendChild(t);
-
-  // Cliente e projeto na frente da duração: é por eles que se procura uma
-  // reunião de duas semanas atrás, e é o que prova que a escolha feita na tela
-  // de preparo ficou guardada — antes ela sumia de vista assim que se saía da
-  // tela, e parecia perdida mesmo estando salva.
-  const meta = document.createElement("p");
-  meta.className = "gravacao__meta";
-  const partes = [];
-  if (g.cliente || g.projeto)
-    partes.push([g.cliente, g.projeto].filter(Boolean).join(" · "));
-  partes.push(duracao(g.duracao_s));
-  if (g.titulo) partes.push(quando(g.nome));
-  // "convidados" e não "participantes": o número vem da lista da agenda, que
-  // diz quem foi chamado e não quem apareceu.
-  if (g.convidados > 0) partes.push(`${g.convidados} convidados`);
-  if (g.com_notas) partes.push("com notas");
-  for (const p of partes) {
-    const span = document.createElement("span");
-    span.textContent = p;
-    meta.appendChild(span);
-  }
-  esquerda.appendChild(meta);
-
-  if (g.avisos.length > 0) {
-    const caixa = document.createElement("div");
-    caixa.className = "gravacao__avisos";
-    for (const aviso of g.avisos) caixa.appendChild(alerta(aviso));
-    esquerda.appendChild(caixa);
-  }
-
-  botao.append(esquerda, etiquetaDe(g));
-  return botao;
-}
-
 /**
- * O estado da gravação em uma palavra.
- *
- * "Transcrevendo…" tem precedência sobre "Não transcrita" porque a lista é o
- * lugar onde se procura a reunião de novo depois de sair da tela dela — e ali
- * "Não transcrita" ao lado de uma transcrição que está rodando é mentira.
+ * A lista mora em reunioes.js, pelo mesmo motivo dos outros destinos: o
+ * app.js é o único lugar que sabe da moldura, e a tela recebe o que precisa
+ * dela.
  */
-function etiquetaDe(g) {
-  const etiqueta = document.createElement("span");
-  const rodando = emCurso(g.caminho);
-  if (rodando) {
-    etiqueta.className = "aa-etiqueta";
-    // A ata usa o mesmo registro da transcrição, e dizer "Transcrevendo…"
-    // enquanto se escreve a ata de uma reunião já transcrita é mentira — foi o
-    // que o dono do produto viu no primeiro uso.
-    etiqueta.textContent = rodando.tarefa === "ata" ? "Escrevendo a ata…"
-      : rodando.tarefa === "falantes" ? "Separando falantes…"
-      : "Transcrevendo…";
-  } else {
-    etiqueta.className = g.transcrita ? "aa-etiqueta aa-etiqueta--sucesso" : "aa-etiqueta";
-    etiqueta.textContent = g.transcrita ? "Transcrita" : "Não transcrita";
-  }
-  return etiqueta;
-}
-
-/**
- * Uma linha, no alto da lista, quando saiu versão nova.
- *
- * **Por que aqui e não só nos Ajustes.** O aviso existe para chegar a quem não
- * é quem compila o app — e essa pessoa não abre Ajustes por esporte. A tela de
- * Reuniões é a que ela vê todo dia; um aviso que ninguém encontra é o mesmo que
- * aviso nenhum.
- *
- * Uma linha, dispensável com um clique, e nunca um diálogo por cima: quem abriu
- * o app queria ver as reuniões, não conversar sobre versões.
- *
- * Assíncrono e à prova de falha: sem rede, sem GitHub, sem nada — a lista
- * aparece igual e ninguém fica sabendo que houve uma tentativa.
- */
-let avisoDeVersaoDispensado = false;
-
-function avisarDeVersaoNova() {
-  if (avisoDeVersaoDispensado) return;
-
-  pedir("atualizacao").then((r) => {
-    const a = r.atualizacao;
-    if (!a?.nova || avisoDeVersaoDispensado) return;
-
-    const linha = document.createElement("div");
-    linha.className = "aa-alerta aa-alerta--atencao";
-
-    const ponto = document.createElement("span");
-    ponto.className = "aa-alerta__ponto";
-
-    const texto = document.createElement("span");
-    texto.textContent = `Saiu a versão ${a.nova.versao}`
-      + (a.nova.notas ? ` — ${a.nova.notas}` : ".")
-      + " A sua é a " + a.versao_instalada + ".";
-
-    const dispensar = document.createElement("button");
-    dispensar.className = "aa-btn aa-btn-texto";
-    dispensar.type = "button";
-    dispensar.textContent = "Dispensar";
-    dispensar.addEventListener("click", () => {
-      avisoDeVersaoDispensado = true;
-      linha.remove();
-    });
-
-    linha.append(ponto, texto, dispensar);
-    tela.prepend(linha);
-  }).catch(() => {
-    // Sem rede não é assunto de quem só queria ver as reuniões.
-  });
-}
-
-export async function telaDeLista() {
+export function telaDeLista() {
   fecharGavetas();
   destino("ir-reunioes");
-  cabecalho("Reuniões", "", false);
-  tela.setAttribute("aria-busy", "true");
-  tela.replaceChildren();
-
-  try {
-    const { gravacoes } = await pedir("gravacoes");
-    tela.setAttribute("aria-busy", "false");
-    tela.replaceChildren();
-    avisarDeVersaoNova();
-
-    if (gravacoes.length === 0) {
-      cabecalho("Reuniões", "Nenhuma gravação encontrada", false);
-      const vazio = document.createElement("p");
-      vazio.className = "vazio";
-      // Não fala mais em "o MeetingRecorder": desde a Fase 2.5 o gravador é
-      // este mesmo app, e mandar a pessoa procurar outro programa era mandá-la
-      // procurar algo que não existe mais.
-      vazio.textContent = "Nenhuma gravação ainda. Comece uma em Gravador.";
-      const ir = document.createElement("button");
-      ir.className = "aa-btn aa-btn-primario";
-      ir.type = "button";
-      ir.textContent = "Ir para o Gravador";
-      ir.addEventListener("click", abrirGravador);
-      tela.append(vazio, ir);
-      return;
-    }
-
-    cabecalho("Reuniões",
-      gravacoes.length === 1 ? "1 gravação" : `${gravacoes.length} gravações`, false);
-    for (const g of gravacoes) tela.appendChild(cartao(g));
-
-    // A etiqueta acompanha: quem fica parado na lista enquanto uma transcrição
-    // termina vê "Transcrita" aparecer sozinha, sem precisar recarregar nada.
-    const cancelar = assinarTranscricoes(() => {
-      if (!tela.isConnected || !tela.querySelector(".gravacao")) { cancelar(); return; }
-      for (const g of gravacoes) {
-        const cartaoDela = tela.querySelector(`[data-gravacao="${CSS.escape(g.caminho)}"]`);
-        if (!cartaoDela) continue;
-        const fim = ultimoResultado(g.caminho);
-        if (!emCurso(g.caminho) && fim && !fim.erro) g.transcrita = true;
-        cartaoDela.lastElementChild.replaceWith(etiquetaDe(g));
-      }
-    });
-  } catch (e) {
-    tela.setAttribute("aria-busy", "false");
-    tela.replaceChildren(alerta(e.message, "erro"));
-  }
+  return telaDeReunioes({ cabecalho, tela });
 }
 
 /**
