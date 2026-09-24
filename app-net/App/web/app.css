@@ -308,15 +308,21 @@ html {
 
 /* ─────────────────────────────────────────── a semana
  *
- * Colunas de cartões (reunioes.js, desenharSemana). As colunas se ajeitam na
- * largura: cinco ou sete lado a lado na janela cheia, e quebram em duas linhas
- * na estreita, em vez de rolar para o lado. */
+ * Colunas de cartões (reunioes.js, desenharSemana). O número de colunas é dito,
+ * e não deixado ao auto-fit: com ele, a 1200 px — a janela a 100% — o domingo
+ * caía sozinho na linha de baixo, e sábado e domingo entram juntos. Sem
+ * largura para sete, a grade fica em cinco, e os dois descem lado a lado. */
 .semana {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--espaco-3);
   align-items: start;
 }
+.semana--sete { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+@media (max-width: 1099px) {
+  .semana--sete { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.semana__sem-resultado { grid-column: 1 / -1; }
 .semana__dia {
   display: grid;
   gap: var(--espaco-2);

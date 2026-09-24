@@ -147,10 +147,15 @@ def conferir(condicao: bool, o_que: str) -> None:
         falhas.append(o_que)
 
 
-def abrir(navegador, porta: int, largura: int = 1280, altura: int = 800, tema: str | None = None):
+def abrir(navegador, porta: int, largura: int = 1280, altura: int = 800, tema: str | None = None,
+          relogio: str | None = None):
     pagina = navegador.new_page(viewport={"width": largura, "height": altura})
     erros: list[str] = []
     pagina.on("pageerror", lambda e: erros.append(str(e)))
+    # O relógio falso antes da ponte falsa: ela monta o acervo a partir de
+    # "hoje", e instalado depois o acervo nasce da data de verdade.
+    if relogio:
+        pagina.clock.install(time=relogio)
     pagina.add_init_script(PONTE_FALSA)
     # Antes da primeira pintura, como o núcleo faz ao servir a página. Trocar
     # depois fotografa os botões no meio da transição de cor do design system.
@@ -779,8 +784,14 @@ def segunda_de(d: date) -> date:
     return d - timedelta(days=d.weekday())
 
 
-def no_acervo(de: date, ate: date) -> int:
-    return sum(1 for d in DIAS_DO_ACERVO if de <= date.today() - timedelta(days=d) <= ate)
+def no_acervo(de: date, ate: date, hoje: date | None = None) -> int:
+    hoje = hoje or date.today()
+    return sum(1 for d in DIAS_DO_ACERVO if de <= hoje - timedelta(days=d) <= ate)
+
+
+# O dia desta semana em que uma prova com `relogio` roda: a suíte não pode
+# depender do dia em que é rodada, e o que quebra num domingo tem de quebrar hoje.
+DOMINGO = lambda: segunda_de(date.today()) + timedelta(days=6)  # noqa: E731
 
 
 def cartoes(pagina) -> list[str]:
@@ -841,7 +852,8 @@ def prova_semana_abre_e_volta(pagina) -> None:
     pagina.click(".semana-nav [aria-label='Semana anterior']")
     pagina.wait_for_timeout(50)
     antes = pagina.text_content(".semana-nav__escolher").strip()
-    pagina.click(".semana__cartao >> text=Comunicação Beegol + App")
+    # Sete dias atrás é sempre a semana anterior; seis, no domingo, ainda é esta.
+    pagina.click(".semana__cartao >> text=Agente de Crédito — kickoff")
     pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
     conferir(True, "um clique no cartão abre a reunião")
     pagina.click("#voltar")
@@ -852,6 +864,96 @@ def prova_semana_abre_e_volta(pagina) -> None:
     pagina.wait_for_selector(".reuniao-linha", timeout=3000)
     conferir(pagina.is_visible("#filtro-data") and not pagina.is_visible(".semana-nav"),
              "Lista devolve a lista, com o filtro de data, e tira a navegação da semana")
+
+
+def prova_semana_abre_e_volta_no_domingo(pagina) -> None:
+    # A mesma prova, com o relógio num domingo: ela falhava um dia em sete.
+    prova_semana_abre_e_volta(pagina)
+
+
+prova_semana_abre_e_volta_no_domingo.relogio = lambda: f"{DOMINGO().isoformat()}T12:00:00"
+
+
+def prova_semana_hoje_vira_a_semana(pagina) -> None:
+    # A bandeja fica aberta dias a fio — fechar a janela só esconde —, e a tela
+    # não se remonta. Na segunda de manhã, Hoje tem de ir à semana nova.
+    domingo = DOMINGO()
+    segunda = domingo + timedelta(days=1)
+    ir_para_semana(pagina)
+    primeira = lambda: pagina.evaluate("() => document.querySelector('.semana__dia').dataset.dia")  # noqa: E731
+    conferir(primeira() == (domingo - timedelta(days=6)).isoformat(), "no domingo à noite, a semana é a que acaba nele")
+    pagina.clock.set_system_time(f"{segunda.isoformat()}T08:00:00")
+    pagina.click(".semana-nav >> text=Hoje")
+    pagina.wait_for_timeout(50)
+    conferir(primeira() == segunda.isoformat(), f"na segunda de manhã, Hoje vai à semana nova ({primeira()!r})")
+    hoje_marcado = pagina.evaluate("() => document.querySelector('.semana__dia--hoje')?.dataset.dia")
+    conferir(hoje_marcado == segunda.isoformat(), f"e marca a segunda como hoje ({hoje_marcado!r})")
+    conferir("semana-nav__hoje--agora" in (pagina.get_attribute(".semana-nav__hoje", "class") or ""),
+             "e o Hoje diz que está na semana de hoje")
+    # Quem estava na semana de hoje continua nela ao voltar pelo trilho.
+    pagina.clock.set_system_time(f"{(segunda + timedelta(days=7)).isoformat()}T08:00:00")
+    pagina.click("#ir-reunioes")
+    pagina.wait_for_selector(".semana .semana__dia", timeout=5000)
+    conferir(primeira() == (segunda + timedelta(days=7)).isoformat(),
+             f"e remontar a tela na outra segunda abre a semana dela ({primeira()!r})")
+
+
+prova_semana_hoje_vira_a_semana.relogio = lambda: f"{DOMINGO().isoformat()}T23:58:00"
+
+
+def prova_semana_fim_de_semana_numa_linha(pagina) -> None:
+    # 1200 px é a largura da janela a 100%. Sábado e domingo entram juntos, e
+    # juntos ficam: lado a lado com a semana, ou os dois na linha de baixo.
+    ir_para_semana(pagina)
+    topos = lambda: pagina.eval_on_selector_all(".semana__dia", "els => els.map((e) => Math.round(e.getBoundingClientRect().top))")  # noqa: E731
+    t = topos()
+    conferir(len(t) == 7 and len(set(t)) == 1, f"a 1200 px, as sete colunas numa linha só ({t})")
+    pagina.set_viewport_size({"width": 1000, "height": 800})
+    pagina.wait_for_timeout(100)
+    t = topos()
+    conferir(t[5] == t[6] and t[5] > t[4], f"a 1000 px, sábado e domingo descem juntos ({t})")
+
+
+prova_semana_fim_de_semana_numa_linha.janela = (1200, 800)
+# Num sábado, as reuniões de "hoje" do acervo caem no fim de semana.
+prova_semana_fim_de_semana_numa_linha.relogio = lambda: f"{(DOMINGO() - timedelta(days=1)).isoformat()}T12:00:00"
+
+
+def prova_semana_filtro_esconde(pagina) -> None:
+    # Os critérios ficam na memória do módulo: um filtro deixado ontem na lista
+    # continua valendo na semana de hoje, e ela não pode dizer que não houve nada.
+    ir_para_semana(pagina)
+    seg = segunda_de(date.today())
+    total = no_acervo(seg, seg + timedelta(days=6))
+    buscar(pagina, "zzzz")
+    sub = pagina.text_content("#subtitulo")
+    conferir(f"0 de {total}" in sub, f"o subtítulo diz quantas a semana tem, e quantas sobraram ({sub!r})")
+    de_hoje = pagina.text_content(".semana__dia--hoje")
+    conferir("Nenhuma com esses filtros" in de_hoje, f"o dia que tinha reuniões diz que o filtro as escondeu ({de_hoje!r})")
+    conferir(pagina.is_visible(".semana .reunioes__vazio button"), "e a semana oferece limpar os filtros")
+    pagina.click(".semana .reunioes__vazio button")
+    pagina.wait_for_timeout(50)
+    conferir(len(cartoes(pagina)) == total, "Limpar filtros devolve a semana inteira")
+
+
+def prova_popover_fecha_com_shift_tab(pagina) -> None:
+    # Voltar com Shift+Tab passa pelo botão que abriu; o painel tem de fechar
+    # quando o foco sai dos dois, como fecha com Tab para a frente.
+    for abrir_painel, gatilho in [(lambda: abrir_data(pagina), "#filtro-data"),
+                                  (None, ".semana-nav__escolher")]:
+        if abrir_painel is None:
+            ir_para_semana(pagina)
+            pagina.click(gatilho)
+            pagina.wait_for_selector(".popover .calendario", timeout=2000)
+        else:
+            abrir_painel()
+        for _ in range(20):
+            if pagina.evaluate(f"() => document.activeElement === document.querySelector('{gatilho}')"):
+                break
+            pagina.keyboard.press("Shift+Tab")
+        pagina.keyboard.press("Shift+Tab")
+        conferir(not pagina.is_visible(".popover"), f"Shift+Tab para fora fecha o painel de {gatilho}")
+        conferir(pagina.get_attribute(gatilho, "aria-expanded") == "false", "e o botão diz que fechou")
 
 
 def prova_semana_etiqueta(pagina) -> None:
@@ -970,7 +1072,10 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata,
           prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,
-          prova_semana_a_125, prova_semana_barra_troca_de_tela]
+          prova_semana_a_125, prova_semana_barra_troca_de_tela,
+          prova_semana_abre_e_volta_no_domingo, prova_semana_hoje_vira_a_semana,
+          prova_semana_fim_de_semana_numa_linha, prova_semana_filtro_esconde,
+          prova_popover_fecha_com_shift_tab]
 
 
 
@@ -1004,7 +1109,8 @@ def main() -> int:
             for prova in provas:
                 print(f"── {prova.__name__}")
                 largura, altura = getattr(prova, "janela", (1280, 800))
-                pagina, erros = abrir(navegador, porta, largura, altura)
+                relogio = getattr(prova, "relogio", lambda: None)()
+                pagina, erros = abrir(navegador, porta, largura, altura, relogio=relogio)
                 # Uma prova que estoura (um seletor que nunca aparece) conta como
                 # falha, e as outras continuam: parar na primeira esconderia o
                 # resto do que quebrou.

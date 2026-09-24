@@ -12,7 +12,7 @@ import { pedir } from "/ponte.js";
 import { alerta, anunciar } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado } from "/transcricoes.js";
 import { duracao, quando, tituloDe, abrirGravacao, abrirGravador, acoesDaBarra } from "/app.js";
-import { agruparPorDia, clientesDe, colunasDaSemana, diasComGravacao, estadoDe, filtrar, horaDe,
+import { agruparPorDia, clientesDe, colunasDaSemana, diaDe, diasComGravacao, estadoDe, filtrar, horaDe,
          hojeLocal, intervaloDoPeriodo, proximoPasso, rotuloDaSemana, rotuloDoFiltroDeData,
          rotuloLongoDoDia, segundaDe, somarDias, ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
 import { popover } from "/popover.js";
@@ -35,8 +35,15 @@ let escolhida = null;
  * Lista ou semana, e a semana na tela (a segunda-feira dela). Sobrevive a
  * voltar, como os critérios: quem abriu uma reunião da semana passada volta à
  * semana passada.
+ *
+ * **`segunda: null` é "a semana de hoje"**, resolvida a cada desenho pelo
+ * relógio (semanaNaTela), e não uma data guardada. A bandeja fica aberta dias
+ * a fio — fechar a janela só esconde —, e uma segunda-feira guardada no
+ * domingo deixava o Hoje da segunda de manhã na semana passada.
  */
 const vista = { modo: "lista", segunda: null };
+
+const semanaNaTela = () => vista.segunda ?? segundaDe(hojeLocal());
 
 /**
  * Abaixo disto o painel não cabe, o CSS o esconde, e o clique na linha volta
@@ -145,7 +152,6 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   }
 
   const hoje = hojeLocal();
-  vista.segunda ??= segundaDe(hoje);
   const raiz = document.createElement("div");
   raiz.className = "reunioes";
 
@@ -301,7 +307,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   const nav = document.createElement("div");
   nav.className = "semana-nav";
   const antes = botao("‹", "aa-btn aa-btn-secundario semana-nav__seta",
-                      () => irParaSemana(somarDias(vista.segunda, -7)));
+                      () => irParaSemana(somarDias(semanaNaTela(), -7)));
   antes.setAttribute("aria-label", "Semana anterior");
   const escolherSemana = document.createElement("button");
   escolherSemana.type = "button";
@@ -309,11 +315,12 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   const { ancora: calendarioDaSemana } = popover(escolherSemana, "Escolher a semana", (fechar) => {
     const caixa = document.createElement("div");
     caixa.className = "filtro-data";
+    const agora = hojeLocal();
     const cal = calendario({
-      hoje,
-      foco: vista.segunda === segundaDe(hoje) ? hoje : vista.segunda,
+      hoje: agora,
+      foco: vista.segunda ?? agora,
       marcados: comGravacao,
-      faixa: [vista.segunda, somarDias(vista.segunda, 6)],
+      faixa: [semanaNaTela(), somarDias(semanaNaTela(), 6)],
       aoEscolher: (dia) => { irParaSemana(segundaDe(dia)); fechar(); },
     });
     const dica = document.createElement("p");
@@ -323,10 +330,9 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     return { raiz: caixa, focar: cal.focar };
   });
   const depois = botao("›", "aa-btn aa-btn-secundario semana-nav__seta",
-                       () => irParaSemana(somarDias(vista.segunda, 7)));
+                       () => irParaSemana(somarDias(semanaNaTela(), 7)));
   depois.setAttribute("aria-label", "Próxima semana");
-  const irHoje = botao("Hoje", "aa-btn aa-btn-secundario semana-nav__hoje",
-                       () => irParaSemana(segundaDe(hoje)));
+  const irHoje = botao("Hoje", "aa-btn aa-btn-secundario semana-nav__hoje", () => irParaSemana(null));
   nav.append(antes, calendarioDaSemana, depois, irHoje);
   acoesDaBarra(nav, vistas);
 
@@ -340,8 +346,8 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     filtroData.hidden = semana;
     if (semana) limparData.hidden = true;
     else pintarData();
-    escolherSemana.textContent = rotuloDaSemana(vista.segunda, hoje);
-    irHoje.classList.toggle("semana-nav__hoje--agora", vista.segunda === segundaDe(hoje));
+    escolherSemana.textContent = rotuloDaSemana(semanaNaTela(), hojeLocal());
+    irHoje.classList.toggle("semana-nav__hoje--agora", vista.segunda === null);
   }
 
   function trocarDeVista(modo) {
@@ -350,8 +356,9 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     aoMudar();
   }
 
+  /** `null` é a semana de hoje; chegar nela por ‹ › ou pelo calendário também. */
   function irParaSemana(segunda) {
-    vista.segunda = segunda;
+    vista.segunda = segunda === segundaDe(hojeLocal()) ? null : segunda;
     pintarVista();
     aoMudar();
   }
@@ -399,13 +406,29 @@ export async function telaDeReunioes({ cabecalho, tela }) {
 
   /** A semana na tela, com os filtros de agora — menos o de data, que é ela. */
   function desenharSemana() {
-    visiveis = filtrar(gravacoes, { ...criterios, periodo: "semana", data: vista.segunda },
+    // O relógio de agora, e não o da montagem: é o que decide a coluna de hoje.
+    const hoje = hojeLocal();
+    const segunda = semanaNaTela();
+    visiveis = filtrar(gravacoes, { ...criterios, periodo: "semana", data: segunda },
                        { hoje, rodandoDe: emCurso });
-    cabecalho("Reuniões", `semana de ${rotuloDaSemana(vista.segunda, hoje)} · ${contagem(visiveis.length)}`,
-              false);
+    // A semana sem os outros filtros, para dizer o que eles esconderam. Os
+    // critérios ficam na memória: um cliente deixado ontem na lista continua
+    // valendo aqui, e "Nenhuma gravação" num dia que teve três seria mentira.
+    const daSemana = filtrar(gravacoes, { periodo: "semana", data: segunda }, { hoje });
+    const escondidos = new Set(daSemana.map((g) => diaDe(g.nome)));
+    cabecalho("Reuniões", `semana de ${rotuloDaSemana(segunda, hoje)} · ${
+      visiveis.length === daSemana.length
+        ? contagem(daSemana.length) : `${visiveis.length} de ${contagem(daSemana.length)}`}`, false);
     linhas.clear();
     grade.replaceChildren();
-    for (const coluna of colunasDaSemana(visiveis, vista.segunda, hoje, gravacoes)) {
+    if (visiveis.length === 0 && daSemana.length > 0) {
+      const nada = semResultado();
+      nada.classList.add("semana__sem-resultado");
+      grade.appendChild(nada);
+    }
+    const colunas = colunasDaSemana(visiveis, segunda, hoje, gravacoes);
+    grade.classList.toggle("semana--sete", colunas.length === 7);
+    for (const coluna of colunas) {
       const dia = document.createElement("section");
       dia.className = "semana__dia" + (coluna.hoje ? " semana__dia--hoje" : "");
       dia.dataset.dia = coluna.dia;
@@ -428,7 +451,10 @@ export async function telaDeReunioes({ cabecalho, tela }) {
         linhas.set(g.caminho, c);
         dia.appendChild(c);
       }
-      if (coluna.itens.length === 0) dia.appendChild(texto("semana__vazio", "Nenhuma gravação"));
+      if (coluna.itens.length === 0) {
+        dia.appendChild(texto("semana__vazio", escondidos.has(coluna.dia)
+          ? "Nenhuma com esses filtros" : "Nenhuma gravação"));
+      }
       grade.appendChild(dia);
     }
   }

@@ -30,7 +30,16 @@ export function popover(gatilho, rotulo, montar) {
     painel = null;
     gatilho.setAttribute("aria-expanded", "false");
     document.removeEventListener("pointerdown", aoApontar, true);
+    document.removeEventListener("focusin", aoFocar, true);
     if (devolverFoco) gatilho.focus();
+  }
+
+  // O foco entrando em qualquer coisa fora do painel e do botão fecha. Para a
+  // frente, o Tab sai direto do painel; para trás, o Shift+Tab passa pelo
+  // botão antes — e um ouvinte só de saída do painel deixava o painel aberto
+  // dali em diante, com o Esc surdo.
+  function aoFocar(e) {
+    if (!ancora.contains(e.target)) fechar({ devolverFoco: false });
   }
 
   // Na captura: um clique fora que caísse num botão da lista chegaria lá antes
@@ -54,12 +63,6 @@ export function popover(gatilho, rotulo, montar) {
       e.stopPropagation();
       fechar();
     });
-    // Sair com Tab fecha. Sem relatedTarget é o foco se perdendo dentro dele —
-    // o calendário redesenha a grade ao trocar de mês —, e isso não é sair.
-    painel.addEventListener("focusout", (e) => {
-      const para = e.relatedTarget;
-      if (painel && para && !painel.contains(para) && para !== gatilho) fechar({ devolverFoco: false });
-    });
 
     ancora.appendChild(painel);
     // Preso à esquerda do botão, ele sai da tela quando o botão está perto da
@@ -69,6 +72,9 @@ export function popover(gatilho, rotulo, montar) {
       painel.classList.add("popover--a-direita");
     gatilho.setAttribute("aria-expanded", "true");
     document.addEventListener("pointerdown", aoApontar, true);
+    // O calendário redesenha a grade ao trocar de mês, e o foco se perde no
+    // corpo por um instante: isso não entra em nada, e não fecha.
+    document.addEventListener("focusin", aoFocar, true);
     focar();
   }
 
