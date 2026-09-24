@@ -9,10 +9,15 @@
 
 /* A altura da barra do topo, num lugar só.
  *
- * Dois blocos grudam abaixo dela — os controles da revisão e as abas dos
- * ajustes —, e cada um chutava o próprio valor. Um chute errado não quebra
- * nada visivelmente: o bloco só desliza para trás da barra e some, que foi
- * exatamente o defeito das abas em 12/08. */
+ * Os blocos que grudam abaixo dela — os controles da revisão, as abas da
+ * reunião e as dos ajustes, o painel de Reuniões — leem esta variável, e cada
+ * um chutava o próprio valor. Um chute errado não quebra nada visivelmente: o
+ * bloco só desliza para trás da barra e some, que foi exatamente o defeito das
+ * abas em 12/08 — e voltou em 24/09, quando a tipografia da Fase 5 fez a barra
+ * da reunião aberta medir 90 px contra estes 76.
+ *
+ * Por isso o valor daqui é só o da primeira pintura: o app.js mede a barra
+ * (ResizeObserver) e reescreve a variável sempre que ela muda de altura. */
 :root { --altura-da-barra: 4.75rem; }
 
 /* A cor do falante, legível como TEXTO nos dois temas.
@@ -197,8 +202,8 @@ html {
   top: 0;
   z-index: var(--z-suspenso);
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "voltar titulo" "voltar sub";
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "voltar titulo acoes" "voltar sub acoes";
   align-items: center;
   gap: 0 var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-6);
@@ -222,38 +227,27 @@ html {
   font-size: var(--texto-pequeno);
 }
 
+.barra__acoes {
+  grid-area: acoes;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espaco-3);
+}
+.barra__acoes:empty { display: none; }
+
+/* Sem largura, as ações descem para uma linha própria, em vez de espremer o
+ * título. A barra muda de altura, e os blocos que grudam abaixo dela seguem —
+ * a altura é medida (app.js). */
+@media (max-width: 899px) {
+  .barra { grid-template-columns: auto 1fr; grid-template-areas: "voltar titulo" "voltar sub" "acoes acoes"; }
+  .barra__acoes { justify-content: flex-start; margin-top: var(--espaco-2); }
+}
+
 /* ─────────────────────────────────────────────────────── lista */
 
 #tela { display: grid; gap: var(--espaco-3); align-content: start; }
-
-.gravacao {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--espaco-4);
-  align-items: center;
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  font: inherit;
-  color: inherit;
-  border: 1px solid var(--cor-borda);
-}
-
-.gravacao:hover { border-color: var(--cor-borda-forte); }
-.gravacao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
-
-.gravacao__titulo { font-weight: 600; margin: 0 0 var(--espaco-1); }
-
-.gravacao__meta {
-  color: var(--cor-texto-suave);
-  font-size: var(--texto-pequeno);
-  margin: 0;
-  display: flex;
-  gap: var(--espaco-3);
-  flex-wrap: wrap;
-}
-
-.gravacao__avisos { margin-top: var(--espaco-3); display: grid; gap: var(--espaco-2); }
 
 .vazio { color: var(--cor-texto-suave); }
 
@@ -286,6 +280,210 @@ html {
 }
 .reunioes__busca { flex: 1 1 18rem; }
 .reunioes__filtro { flex: 0 0 auto; width: auto; min-width: 11rem; }
+
+/* O filtro de data é um botão, e parece com os seletores ao lado — a seta
+ * inclusive, que o <select> ganha do sistema e o botão desenha aqui. Ligado,
+ * ele fica da cor de ação: é o único filtro cujo valor não se lê de relance
+ * pelo texto, porque "18 de setembro" parece rótulo. */
+.reunioes__data {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  text-align: left;
+  cursor: pointer;
+}
+.reunioes__data::after {
+  content: "";
+  flex: none;
+  width: .45em;
+  height: .45em;
+  margin-top: -.25em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+.reunioes__data--ligada { border-color: var(--cor-acao); color: var(--cor-acao); }
+.reunioes__limpar-data { padding-inline: var(--espaco-2); }
+
+/* ─────────────────────────────────────────── a semana
+ *
+ * Colunas de cartões (reunioes.js, desenharSemana). O número de colunas é dito,
+ * e não deixado ao auto-fit: com ele, a 1200 px — a janela a 100% — o domingo
+ * caía sozinho na linha de baixo, e sábado e domingo entram juntos. Sem
+ * largura para sete, a grade fica em cinco, e os dois descem lado a lado. */
+.semana {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--espaco-3);
+  align-items: start;
+}
+.semana--sete { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+@media (max-width: 1099px) {
+  .semana--sete { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.semana__sem-resultado { grid-column: 1 / -1; }
+
+/* O painel da reunião, por cima das colunas, à direita (reunioes.js). O
+ * display vem explícito: na janela estreita o painel da lista some, e este
+ * não é o da lista. */
+.semana__detalhe {
+  position: fixed;
+  top: calc(var(--altura-da-barra) + var(--espaco-4));
+  right: var(--espaco-6);
+  z-index: calc(var(--z-suspenso) - 1);
+  width: min(24rem, calc(100vw - 2 * var(--espaco-4)));
+  border-radius: var(--raio-grande);
+  box-shadow: var(--sombra-grande);
+}
+.semana__detalhe .reunioes__painel {
+  display: grid;
+  position: static;
+  max-height: calc(100vh - var(--altura-da-barra) - 2 * var(--espaco-4));
+}
+.semana__detalhe .reunioes__painel-titulo { padding-right: var(--espaco-6); }
+.semana__fechar { position: absolute; top: var(--espaco-2); right: var(--espaco-2); z-index: 1; }
+.semana__cartao[aria-pressed="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+.semana__dia {
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-3);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+}
+.semana__dia--hoje { border-color: var(--cor-acao); }
+.semana__rotulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-1);
+  font-size: var(--texto-corpo);
+  font-weight: 700;
+  color: var(--cor-texto-forte);
+}
+.semana__cartao {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-width: 0;
+  width: 100%;
+  padding: var(--espaco-2) var(--espaco-3);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+  cursor: pointer;
+}
+.semana__cartao:hover { border-color: var(--cor-borda-forte); }
+.semana__cartao:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.semana__hora { font-family: var(--fonte-mono); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.semana__titulo { font-weight: 600; color: var(--cor-texto-forte); overflow-wrap: anywhere; }
+.semana__vinculo { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); overflow-wrap: anywhere; }
+.semana__aviso { font-size: var(--texto-rotulo); color: var(--cor-atencao); }
+.semana__cartao > .aa-etiqueta { margin-top: var(--espaco-1); }
+.semana__vazio { margin: 0; padding: var(--espaco-1); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+
+/* Lista e Semana, e a navegação da semana, na barra do topo. */
+.vistas { display: inline-flex; gap: var(--espaco-1); }
+.semana-nav { display: inline-flex; align-items: center; gap: var(--espaco-1); }
+.semana-nav__seta { padding-inline: var(--espaco-3); }
+.semana-nav__hoje--agora { border-color: var(--cor-acao); color: var(--cor-acao); }
+
+/* ─────────────────────────────────────────── o painel que abre num botão
+ *
+ * popover.js. Preso à âncora, e não ao documento: rola junto com quem o abriu. */
+.popover__ancora { position: relative; display: inline-flex; }
+.popover {
+  position: absolute;
+  top: calc(100% + var(--espaco-1));
+  left: 0;
+  z-index: var(--z-suspenso);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--espaco-4));
+  padding: var(--espaco-4);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  box-shadow: var(--sombra-media);
+}
+.popover--a-direita { left: auto; right: 0; }
+
+.filtro-data { display: grid; gap: var(--espaco-3); max-width: 20rem; }
+.filtro-data__atalhos { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
+.filtro-data__modo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+}
+.filtro-data__opcoes { display: inline-flex; gap: var(--espaco-1); }
+
+/* Um botão de ligar e desligar. Não é o .filtro dos falantes: lá o desligado
+ * fica apagado, e aqui desligado é só não escolhido. */
+.atalho {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+}
+.atalho:hover { border-color: var(--cor-borda-forte); }
+.atalho[aria-pressed="true"] { background: var(--cor-acao-suave); border-color: var(--cor-acao); color: var(--cor-acao); }
+.atalho:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+/* ─────────────────────────────────────────── o calendário (calendario.js) */
+.calendario { display: grid; gap: var(--espaco-2); }
+.calendario__topo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
+.calendario__mes { text-align: center; font-weight: 600; color: var(--cor-texto-forte); }
+.calendario__anterior, .calendario__proximo { font-size: var(--texto-titulo-m); line-height: 1; }
+.calendario__grade { border-collapse: collapse; margin: 0 auto; }
+.calendario__grade th {
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+  padding-bottom: var(--espaco-1);
+}
+.calendario__grade td { padding: 1px; }
+.calendario__dia {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  cursor: pointer;
+}
+.calendario__dia:hover { background: var(--cor-superficie-2); }
+.calendario__dia--fora { color: var(--cor-texto-suave); }
+.calendario__dia--na-faixa { background: var(--cor-acao-suave); color: var(--cor-acao); }
+.calendario__dia[aria-current="date"] { font-weight: 700; box-shadow: inset 0 0 0 1px var(--cor-acao); }
+.calendario__dia:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+/* O ponto dos dias com gravação: é o que responde "em que dia foi?" sem abrir
+ * dia por dia. O leitor de tela ouve o mesmo pelo rótulo do botão. */
+.calendario__ponto {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--raio-pilula);
+  background: var(--cor-acao);
+}
 
 .reunioes__lista {
   background: var(--cor-superficie);
@@ -366,9 +564,17 @@ html {
 
 /* Gruda logo abaixo da barra do topo, que também é sticky — pela mesma
  * variável que as abas dos ajustes e os controles da revisão já usam. */
+/* O painel rola sozinho quando o que ele mostra é mais alto que a janela.
+ * Sticky sem teto, o fim dele só aparecia quando a lista inteira rolava até o
+ * fim (percurso do dono, 24/09/2026). O teto parte de onde o painel começa com
+ * a lista no topo (--topo-do-painel, medido em reunioes.js), e não da barra:
+ * assim ele cabe inteiro antes e depois de grudar. */
 .reunioes__painel {
   position: sticky;
   top: calc(var(--altura-da-barra) + var(--espaco-4));
+  box-sizing: border-box;
+  max-height: calc(100vh - var(--topo-do-painel, 12rem) - var(--espaco-4));
+  overflow-y: auto;
   display: grid;
   gap: var(--espaco-3);
   align-content: start;
@@ -524,10 +730,68 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .revisao { display: grid; gap: var(--espaco-3); }
 
 /* O .aa-pagina do design system respira 64px em cima, que é o certo para uma
- * página de documento. A revisão não é uma: a barra de ferramentas gruda no
- * topo logo abaixo do cabeçalho, e esses 64px só empurram a transcrição para
+ * página de documento. A reunião aberta não é uma: na Transcrição, a barra de
+ * ferramentas gruda no topo logo abaixo das abas, e esses 64px só empurram a transcrição para
  * fora da janela — na tela em que mais se lê do app inteiro. */
-.aa-pagina:has(> .revisao) { padding-top: var(--espaco-5); }
+/* A reunião ocupa a largura da página inteira em qualquer aba. Sem o width, a
+ * .aa-pagina (margin auto num item de grade) encolhe até o conteúdo: a aba Ata
+ * ficava com 390 px no meio da tela, e a página pulava de largura a cada troca
+ * de aba. O border-box impede o padding de somar aos 100%. */
+.aa-pagina:has(> .reuniao-aberta) {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: var(--espaco-5);
+}
+
+/* ─────────────────────────────────────────────────── a reunião aberta
+ *
+ * Transcrição · Ata · Notas (reuniao.js). A aba escolhida tem o fio embaixo
+ * e o texto forte; as outras, o texto suave. Ver o mockup, prancha "Reunião ·
+ * transcrição, ata e notas". */
+.reuniao-aberta { display: grid; gap: var(--espaco-4); --altura-das-abas: 2.5rem; }
+
+/* As abas grudam abaixo da barra do topo, como as de Ajustes: no minuto 50 de
+ * uma reunião de duas horas, anotar ou conferir a ata não pode custar rolar até
+ * o topo. A altura é fixa porque a barra da revisão gruda logo abaixo delas —
+ * são dois sticky irmãos, e sem a conta um cobre o outro (ver .controles). */
+.reuniao-aberta__abas {
+  display: flex;
+  gap: var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: calc(var(--z-suspenso) - 1);
+  box-sizing: border-box;
+  height: var(--altura-das-abas);
+  background: var(--cor-fundo);
+}
+.reuniao-aberta .controles { top: calc(var(--altura-da-barra) + var(--altura-das-abas)); }
+
+.reuniao-aberta__aba {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-1);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: 600 var(--texto-corpo) / 1.2 var(--fonte-ui);
+  cursor: pointer;
+}
+.reuniao-aberta__aba:hover { color: var(--cor-texto-forte); }
+.reuniao-aberta__aba[aria-selected="true"] { color: var(--cor-texto-forte); border-bottom-color: var(--cor-acao); }
+.reuniao-aberta__aba:focus-visible { outline: none; box-shadow: var(--anel-foco); border-radius: var(--raio-pequeno); }
+
+.reuniao-aberta__conta {
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+  color: var(--cor-texto-suave);
+  background: var(--cor-superficie-2);
+  border-radius: var(--raio-pilula);
+  padding: 2px var(--espaco-2);
+}
 
 /* Busca, estado e botões ficam colados no topo junto com os filtros: são as
  * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
@@ -1371,21 +1635,16 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 /* ─────────────────────────────────────────────────────────────── atas */
 
 .ata { display: grid; gap: var(--espaco-3); }
-/* Rolado até ele pelo painel de Reuniões, o cartão para logo abaixo da barra do
- * topo, que é sticky: sem a margem, título e botão focado ficavam debaixo dela. */
-.ata { scroll-margin-top: calc(var(--altura-da-barra) + var(--espaco-4)); }
 
-/* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
- * no botão que a usa, e não perdida no meio do cartão. */
-/* A coluna do botão tem largura fixa, e não `auto`.
- *
- * Com `auto` cada cartão media o próprio botão, e "Refazer ata" é mais largo
- * que "Gerar ata": o seletor e o botão dançavam de linha para linha, cada
- * cartão com um alinhamento diferente do vizinho. Numa lista, o que denuncia
- * isso não é um cartão — são dois, um debaixo do outro. */
+/* O tipo encostado no botão que o usa. A coluna do botão tem largura fixa, e
+ * não `auto`: "Refazer ata" e "Escrevendo…" são mais largos que "Gerar ata", e
+ * com `auto` o botão mudava de tamanho a cada troca de rótulo. Era pior quando
+ * a ata era um cartão numa lista — dois cartões um debaixo do outro, cada um
+ * alinhado de um jeito. */
 .ata__topo {
   display: grid;
-  grid-template-columns: 1fr auto 9.5rem;
+  grid-template-columns: auto 9.5rem;
+  justify-content: start;
   align-items: end;
   gap: var(--espaco-3);
 }
@@ -1393,6 +1652,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__topo > .aa-btn { width: 100%; }
 
 .ata__tipo { min-width: 14rem; margin: 0; }
+
+/* Na coluna do texto, para Copiar e Exportar não irem parar na outra ponta da tela. */
+.ata__corpo { max-width: 68ch; }
+.ata__cabeca { display: flex; align-items: center; gap: var(--espaco-2); flex-wrap: wrap; }
+.ata__estado { margin: 0 auto 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 
 /* A ata lida: coluna estreita de propósito. Linha de 100 caracteres cansa, e
  * este é o texto que se lê inteiro, ao contrário da transcrição, que se
@@ -1421,8 +1685,6 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
 .ata__pendencia input { margin-right: var(--espaco-2); }
 
-.ata__acoes { display: flex; justify-content: flex-end; flex-wrap: wrap; }
-
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
 }
@@ -1432,22 +1694,3 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
 .trilho__ponto--gravando { background: var(--cor-erro); }
 
-/* A ata dobrada. Fechada por padrão: com onze reuniões na tela, abrir todas
- * transformava a página numa rolagem sem fim. */
-.ata__dobra { display: grid; gap: var(--espaco-2); }
-
-.ata__resumo {
-  cursor: pointer;
-  color: var(--cor-acao);
-  font-size: var(--texto-pequeno);
-  font-weight: 600;
-  list-style: none;
-  padding: var(--espaco-2) 0;
-}
-
-/* O triângulo padrão do <details> é do navegador e destoa do resto; a seta
- * própria gira ao abrir. */
-.ata__resumo::-webkit-details-marker { display: none; }
-.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform var(--transicao-rapida); }
-.ata__dobra[open] > .ata__resumo::before { transform: rotate(90deg); }
-.ata__resumo:focus-visible { outline: var(--anel-foco); }

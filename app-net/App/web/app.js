@@ -1,5 +1,5 @@
 import { pedir } from "/ponte.js";
-import { telaDeRevisao, abrirPainel } from "/revisao.js";
+import { telaDaReuniao, abrirPainel } from "/reuniao.js";
 import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
 import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
@@ -8,7 +8,6 @@ import { abrirGaveta, fecharGavetas, pararAudio, alerta, campo, secao,
 import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, sincronizar, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
-import { telaDeAtas } from "/atas.js";
 import { telaDeReunioes } from "/reunioes.js";
 import { ligarBolinhas } from "/trilho.js";
 
@@ -16,6 +15,19 @@ const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
 const subtitulo = document.getElementById("subtitulo");
 const voltar = document.getElementById("voltar");
+const acoes = document.getElementById("acoes-da-barra");
+
+// A altura da barra do topo, medida — e não chutada no CSS. Quatro blocos
+// grudam abaixo dela (as abas da reunião e as de Ajustes, os controles da
+// revisão, o painel de Reuniões), e a barra muda de altura com o que mostra:
+// com título, subtítulo e o ← da reunião aberta ela tinha 90 px, e o chute de
+// 4.75rem (76 px) deixava 14 px de cada bloco atrás dela. Ver o :root do app.css.
+new ResizeObserver(([e]) => {
+  document.documentElement.style.setProperty(
+    // Sem arredondar: a barra tem altura fracionária, e o ceil deixava uma fresta
+    // de 1 px por onde o texto rolado aparecia.
+    "--altura-da-barra", `${e.borderBoxSize[0].blockSize}px`);
+}).observe(document.querySelector(".barra"));
 
 /** "1h 02min" ou "3min 20s" — a duração é para dar noção, não para cronometrar. */
 export function duracao(segundos) {
@@ -38,6 +50,15 @@ export function quando(nome) {
 export const tituloDe = (g) => g.titulo || quando(g.nome);
 
 /**
+ * Põe na barra do topo, à direita, o que é da tela — e tira o que havia. A
+ * troca de tela esvazia sozinha (cabecalho); a tela que volta com o mesmo
+ * título chama isto de novo.
+ */
+export function acoesDaBarra(...nos) {
+  acoes.replaceChildren(...nos);
+}
+
+/**
  * Troca o título da moldura — e, com ele, a tela.
  *
  * Toda tela chama isto ao se montar, e <b>só</b> ao se montar: é o único ponto
@@ -53,6 +74,9 @@ export const tituloDe = (g) => g.titulo || quando(g.nome);
 function cabecalho(t, sub, comVoltar) {
   pararAudio();
   const mudou = titulo.textContent !== t;
+  // O que a tela anterior pôs na barra não é desta. Só na troca de título: o
+  // cabeçalho é reescrito também para trocar o subtítulo, e aí a tela é a mesma.
+  if (mudou) acoes.replaceChildren();
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;
@@ -625,7 +649,7 @@ async function abrirResultado(g) {
     const r = await pedir("transcricao", { gravacao: g.caminho });
     if (!r.transcricao) throw new Error("a transcrição não foi encontrada");
     g.transcrita = true;
-    telaDeRevisao(g, JSON.parse(r.transcricao), { cabecalho, tela });
+    telaDaReuniao(g, JSON.parse(r.transcricao), { cabecalho, tela });
   } catch (e) {
     tela.replaceChildren(alerta(e.message, "erro"));
   }
@@ -694,7 +718,14 @@ async function transcrever(g, botao, painel, modeloDeDiarizacao = null) {
   }
 }
 
-export async function abrirGravacao(g) {
+/**
+ * Abre uma gravação: a reunião com abas, se ela já foi transcrita, ou a tela de
+ * transcrever, se não foi.
+ *
+ * @param aba qual aba da reunião abrir — "transcricao" (o padrão), "ata" ou
+ *   "notas". O painel de Reuniões pede "ata" para o próximo passo da ata.
+ */
+export async function abrirGravacao(g, { aba = "transcricao" } = {}) {
   fecharGavetas();
   if (!g.transcrita) return telaDePreparo(g);
 
@@ -706,8 +737,8 @@ export async function abrirGravacao(g) {
     if (r.transcricao) {
       cabecalho(tituloDe(g), "carregando…", true);
       tela.replaceChildren();
-      telaDeRevisao(g, JSON.parse(r.transcricao), {
-        cabecalho, tela,
+      telaDaReuniao(g, JSON.parse(r.transcricao), {
+        cabecalho, tela, aba,
         aoRefazer: () => { g.transcrita = false; telaDePreparo(g); },
         aoApagar: botaoApagarGravacao(g),
       });
@@ -722,8 +753,8 @@ export async function abrirGravacao(g) {
     tela.replaceChildren(alerta("A transcrição não foi encontrada.", "erro"));
     return;
   }
-  telaDeRevisao(g, JSON.parse(r.transcricao), {
-    cabecalho, tela, aoApagar: botaoApagarGravacao(g),
+  telaDaReuniao(g, JSON.parse(r.transcricao), {
+    cabecalho, tela, aba, aoApagar: botaoApagarGravacao(g),
   });
 }
 
@@ -754,19 +785,10 @@ export function abrirGravador() {
   return telaDoGravador({ cabecalho, tela });
 }
 
-/** O destino Atas mora em atas.js, pelo mesmo motivo dos outros dois. */
-export function abrirAtas(opcoes = {}) {
-  fecharGavetas();
-  destino("ir-atas");
-  return telaDeAtas({ cabecalho, tela }, opcoes);
-}
-
 // ─────────────────────────────────────────────────────────── ligação
 
 document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
 document.getElementById("ir-gravador").addEventListener("click", abrirGravador);
-// Embrulhado: o clique mandaria o evento no lugar das opções.
-document.getElementById("ir-atas").addEventListener("click", () => abrirAtas());
 
 document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
@@ -828,7 +850,9 @@ async function inicio() {
   // a tela por nada. "#config=vozes" cai direto na aba.
   if (tela === "config") return abrirAjustes(arg || "geral");
   if (tela === "gravador") return abrirGravador();
-  if (tela === "atas") return abrirAtas();
+  // Atas deixou de ser destino (a ata é uma aba da reunião): o endereço antigo
+  // cai na lista, e não numa tela em branco.
+  if (tela === "atas") return telaDeLista();
 
   const { gravacoes } = await pedir("gravacoes");
   const g = gravacoes[Number(arg) || 0];

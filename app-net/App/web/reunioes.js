@@ -11,9 +11,12 @@
 import { pedir } from "/ponte.js";
 import { alerta, anunciar } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado } from "/transcricoes.js";
-import { duracao, quando, tituloDe, abrirGravacao, abrirGravador, abrirAtas } from "/app.js";
-import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proximoPasso,
-         ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
+import { duracao, quando, tituloDe, abrirGravacao, abrirGravador, acoesDaBarra } from "/app.js";
+import { agruparPorDia, clientesDe, colunasDaSemana, diaDe, diasComGravacao, estadoDe, filtrar, horaDe,
+         hojeLocal, intervaloDoPeriodo, proximoPasso, rotuloDaSemana, rotuloDoFiltroDeData,
+         rotuloLongoDoDia, segundaDe, somarDias, ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
+import { popover } from "/popover.js";
+import { calendario } from "/calendario.js";
 
 
 /**
@@ -23,10 +26,24 @@ import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proxim
  * filtrou por Algar, abriu uma reunião e clicou em ← Reuniões espera a lista
  * como a deixou.
  */
-const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "" };
+const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "", modo: "dia" };
 
 /** A gravação no painel, pelo caminho. Sobrevive a voltar, como os critérios. */
 let escolhida = null;
+
+/**
+ * Lista ou semana, e a semana na tela (a segunda-feira dela). Sobrevive a
+ * voltar, como os critérios: quem abriu uma reunião da semana passada volta à
+ * semana passada.
+ *
+ * **`segunda: null` é "a semana de hoje"**, resolvida a cada desenho pelo
+ * relógio (semanaNaTela), e não uma data guardada. A bandeja fica aberta dias
+ * a fio — fechar a janela só esconde —, e uma segunda-feira guardada no
+ * domingo deixava o Hoje da segunda de manhã na semana passada.
+ */
+const vista = { modo: "lista", segunda: null };
+
+const semanaNaTela = () => vista.segunda ?? segundaDe(hojeLocal());
 
 /**
  * Abaixo disto o painel não cabe, o CSS o esconde, e o clique na linha volta
@@ -100,6 +117,9 @@ function avisarDeVersaoNova(tela) {
 
 export async function telaDeReunioes({ cabecalho, tela }) {
   cabecalho("Reuniões", "", false);
+  // Voltando de Reuniões para Reuniões o título não muda, e a barra não se
+  // esvazia sozinha: o que estava lá é da montagem anterior.
+  acoesDaBarra();
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
@@ -155,23 +175,90 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     ...clientesDe(gravacoes).map((c) => [c.nome, `${c.nome} (${c.n})`]),
     [SEM_CLIENTE, "Sem cliente"],
   ], criterios.cliente);
-  const filtroPeriodo = seletor("Data", "filtro-periodo", PERIODOS, criterios.periodo);
+  // O filtro de data: um botão que diz o critério e abre os atalhos em cima do
+  // calendário. Foi um seletor com "Um dia…" mais o campo de data do navegador
+  // (plano 1), e o nativo não marca os dias que têm gravação.
+  const botaoData = document.createElement("button");
+  botaoData.type = "button";
+  botaoData.id = "filtro-data";
+  botaoData.className = "aa-entrada reunioes__filtro reunioes__data";
+  const limparData = document.createElement("button");
+  limparData.type = "button";
+  limparData.id = "filtro-data-limpar";
+  limparData.className = "aa-btn aa-btn-texto reunioes__limpar-data";
+  limparData.setAttribute("aria-label", "Tirar o filtro de data");
+  limparData.textContent = "✕";
+  limparData.addEventListener("click", () => { escolherData("tudo"); botaoData.focus(); });
+  const comGravacao = diasComGravacao(gravacoes);
+  const { ancora: filtroData } = popover(botaoData, "Filtrar por data", painelDeData);
 
-  // O dia de "Um dia…" e "Uma semana…", no calendário do próprio navegador.
-  // Some quando o período não pede dia — um campo de data à toa na barra pede
-  // um valor que não vai ser usado.
-  const filtroData = document.createElement("input");
-  filtroData.type = "date";
-  filtroData.id = "filtro-data";
-  filtroData.className = "aa-entrada reunioes__filtro";
-  filtroData.value = criterios.data;
-  function ajustarData() {
-    const pede = criterios.periodo === "dia" || criterios.periodo === "semana";
-    filtroData.hidden = !pede;
-    filtroData.setAttribute("aria-label", criterios.periodo === "semana"
-      ? "Um dia da semana que você procura" : "O dia que você procura");
+  function pintarData() {
+    botaoData.textContent = rotuloDoFiltroDeData(criterios.periodo, criterios.data, hoje);
+    const filtra = intervaloDoPeriodo(criterios.periodo, criterios.data, hoje) !== null;
+    botaoData.classList.toggle("reunioes__data--ligada", filtra);
+    limparData.hidden = !filtra;
   }
-  ajustarData();
+  pintarData();
+
+  function escolherData(periodo, data = "") {
+    criterios.periodo = periodo;
+    criterios.data = data;
+    pintarData();
+    aoMudar();
+  }
+
+  function painelDeData(fechar) {
+    const raiz = document.createElement("div");
+    raiz.className = "filtro-data";
+
+    const atalhos = document.createElement("div");
+    atalhos.className = "filtro-data__atalhos";
+    atalhos.setAttribute("role", "group");
+    atalhos.setAttribute("aria-label", "Atalhos");
+    for (const [valor, rotulo] of PERIODOS.filter(([v]) => v !== "dia" && v !== "semana")) {
+      atalhos.appendChild(atalho(rotulo, criterios.periodo === valor, () => {
+        escolherData(valor);
+        fechar();
+      }));
+    }
+
+    // Um dia ou a semana dele: a mesma grade escolhe os dois, e o modo fica
+    // lembrado junto com os outros critérios.
+    const modo = document.createElement("div");
+    modo.className = "filtro-data__modo";
+    const legenda = document.createElement("span");
+    legenda.id = "filtro-data-modo";
+    legenda.textContent = "No calendário, escolher";
+    const opcoes = document.createElement("div");
+    opcoes.className = "filtro-data__opcoes";
+    opcoes.setAttribute("role", "group");
+    opcoes.setAttribute("aria-labelledby", legenda.id);
+    const botoesDoModo = [["dia", "um dia"], ["semana", "uma semana"]].map(([valor, rotulo]) => {
+      const b = atalho(rotulo, criterios.modo === valor, () => {
+        criterios.modo = valor;
+        for (const x of botoesDoModo) x.setAttribute("aria-pressed", String(x.dataset.modo === valor));
+      });
+      b.dataset.modo = valor;
+      return b;
+    });
+    opcoes.append(...botoesDoModo);
+    modo.append(legenda, opcoes);
+
+    const cal = calendario({
+      hoje,
+      foco: criterios.data || hoje,
+      marcados: comGravacao,
+      faixa: intervaloDoPeriodo(criterios.periodo, criterios.data, hoje),
+      aoEscolher: (dia) => { escolherData(criterios.modo, dia); fechar(); },
+    });
+
+    const dica = document.createElement("p");
+    dica.className = "campo__dica";
+    dica.textContent = "A semana vai de segunda a domingo. O ponto marca os dias com gravação.";
+
+    raiz.append(atalhos, modo, cal.raiz, dica);
+    return { raiz, focar: cal.focar };
+  }
 
   const filtroEstado = seletor("Estado", "filtro-estado", ESTADOS, criterios.estado);
 
@@ -179,7 +266,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   // silêncio: o seletor caiu em "Todos", e o critério cai junto.
   criterios.cliente = filtroCliente.value;
 
-  ferramentas.append(busca, filtroCliente, filtroPeriodo, filtroData, filtroEstado);
+  ferramentas.append(busca, filtroCliente, filtroData, limparData, filtroEstado);
 
   const lista = document.createElement("section");
   lista.className = "reunioes__lista";
@@ -193,14 +280,126 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   corpo.className = "reunioes__corpo";
   corpo.append(lista, painel);
 
-  raiz.append(ferramentas, corpo);
+  // A semana: colunas de cartões, e não grade de horas — com cinco reuniões num
+  // dia a grade cortava os títulos (spec §2, "Calendário").
+  const grade = document.createElement("div");
+  grade.className = "semana";
+  grade.setAttribute("aria-label", "A semana");
+
+  // Na semana, o painel da reunião abre por cima das colunas, e não ao lado:
+  // elas precisam da largura toda. É o mesmo painel da lista, que muda de lugar
+  // (pintarVista) — um clique no cartão mostra o próximo passo, o que a ata diz
+  // e as pendências, como na lista; o duplo clique e o Enter abrem a reunião.
+  const detalhe = document.createElement("div");
+  detalhe.className = "semana__detalhe";
+  detalhe.hidden = true;
+  const fecharDetalhe = botao("✕", "aa-btn aa-btn-texto semana__fechar", () => esconderDetalhe());
+  fecharDetalhe.setAttribute("aria-label", "Fechar o painel");
+  detalhe.appendChild(fecharDetalhe);
+
+  raiz.append(ferramentas, corpo, grade, detalhe);
   tela.appendChild(raiz);
+
+  raiz.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !detalhe.hidden) esconderDetalhe();
+  });
+
+  // O teto do painel da lista: da posição dele com a lista no topo até o pé da
+  // janela. Medido, e não calculado no CSS a partir da barra do topo: a barra
+  // de ferramentas quebra em duas linhas em janela média, e com o teto contado
+  // da barra do topo o fim do painel ficava fora da tela até a lista rolar.
+  const medirPainel = new ResizeObserver(() => {
+    if (!raiz.isConnected) { medirPainel.disconnect(); return; }
+    const rolagem = raiz.closest(".conteudo");
+    if (!rolagem || corpo.hidden) return;
+    const topo = corpo.getBoundingClientRect().top - rolagem.getBoundingClientRect().top + rolagem.scrollTop;
+    raiz.style.setProperty("--topo-do-painel", `${topo}px`);
+  });
+  medirPainel.observe(ferramentas);
+
+  // ---- Lista ou semana, e a navegação da semana, na barra do topo (mockup,
+  // prancha "Reuniões · semana"). Montadas uma vez: trocar de semana só repinta
+  // o rótulo, e o foco fica no botão que se clicou — quem volta três semanas
+  // clica três vezes no mesmo ‹.
+  const vistas = document.createElement("div");
+  vistas.className = "vistas";
+  vistas.setAttribute("role", "group");
+  vistas.setAttribute("aria-label", "Visualização");
+  const botoesDaVista = [["lista", "Lista"], ["semana", "Semana"]].map(([valor, rotulo]) => {
+    const b = atalho(rotulo, vista.modo === valor, () => trocarDeVista(valor));
+    b.dataset.vista = valor;
+    return b;
+  });
+  vistas.append(...botoesDaVista);
+
+  const nav = document.createElement("div");
+  nav.className = "semana-nav";
+  const antes = botao("‹", "aa-btn aa-btn-secundario semana-nav__seta",
+                      () => irParaSemana(somarDias(semanaNaTela(), -7)));
+  antes.setAttribute("aria-label", "Semana anterior");
+  const escolherSemana = document.createElement("button");
+  escolherSemana.type = "button";
+  escolherSemana.className = "aa-btn aa-btn-secundario semana-nav__escolher";
+  const { ancora: calendarioDaSemana } = popover(escolherSemana, "Escolher a semana", (fechar) => {
+    const caixa = document.createElement("div");
+    caixa.className = "filtro-data";
+    const agora = hojeLocal();
+    const cal = calendario({
+      hoje: agora,
+      foco: vista.segunda ?? agora,
+      marcados: comGravacao,
+      faixa: [semanaNaTela(), somarDias(semanaNaTela(), 6)],
+      aoEscolher: (dia) => { irParaSemana(segundaDe(dia)); fechar(); },
+    });
+    const dica = document.createElement("p");
+    dica.className = "campo__dica";
+    dica.textContent = "Escolha qualquer dia: a semana dele aparece, de segunda a domingo.";
+    caixa.append(cal.raiz, dica);
+    return { raiz: caixa, focar: cal.focar };
+  });
+  const depois = botao("›", "aa-btn aa-btn-secundario semana-nav__seta",
+                       () => irParaSemana(somarDias(semanaNaTela(), 7)));
+  depois.setAttribute("aria-label", "Próxima semana");
+  const irHoje = botao("Hoje", "aa-btn aa-btn-secundario semana-nav__hoje", () => irParaSemana(null));
+  nav.append(antes, calendarioDaSemana, depois, irHoje);
+  acoesDaBarra(nav, vistas);
+
+  function pintarVista() {
+    const semana = vista.modo === "semana";
+    for (const b of botoesDaVista) b.setAttribute("aria-pressed", String(b.dataset.vista === vista.modo));
+    nav.hidden = !semana;
+    corpo.hidden = semana;
+    grade.hidden = !semana;
+    if (semana) detalhe.appendChild(painel);
+    else corpo.appendChild(painel);
+    detalhe.hidden = true;
+    // Na semana, quem escolhe a data é a navegação dela.
+    filtroData.hidden = semana;
+    if (semana) limparData.hidden = true;
+    else pintarData();
+    escolherSemana.textContent = rotuloDaSemana(semanaNaTela(), hojeLocal());
+    irHoje.classList.toggle("semana-nav__hoje--agora", vista.segunda === null);
+  }
+
+  function trocarDeVista(modo) {
+    vista.modo = modo;
+    pintarVista();
+    aoMudar();
+  }
+
+  /** `null` é a semana de hoje; chegar nela por ‹ › ou pelo calendário também. */
+  function irParaSemana(segunda) {
+    vista.segunda = segunda === segundaDe(hojeLocal()) ? null : segunda;
+    pintarVista();
+    aoMudar();
+  }
 
   /** caminho → linha, para trocar a etiqueta sem redesenhar a lista. */
   const linhas = new Map();
   let visiveis = [];
 
   function desenhar() {
+    if (vista.modo === "semana") return desenharSemana();
     visiveis = filtrar(gravacoes, criterios, { hoje, rodandoDe: emCurso });
     cabecalho("Reuniões", visiveis.length === gravacoes.length
       ? contagem(gravacoes.length)
@@ -235,6 +434,119 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     marcarEscolhida();
   }
 
+
+  /** A semana na tela, com os filtros de agora — menos o de data, que é ela. */
+  function desenharSemana() {
+    // O relógio de agora, e não o da montagem: é o que decide a coluna de hoje.
+    const hoje = hojeLocal();
+    const segunda = semanaNaTela();
+    visiveis = filtrar(gravacoes, { ...criterios, periodo: "semana", data: segunda },
+                       { hoje, rodandoDe: emCurso });
+    // A semana sem os outros filtros, para dizer o que eles esconderam. Os
+    // critérios ficam na memória: um cliente deixado ontem na lista continua
+    // valendo aqui, e "Nenhuma gravação" num dia que teve três seria mentira.
+    const daSemana = filtrar(gravacoes, { periodo: "semana", data: segunda }, { hoje });
+    const escondidos = new Set(daSemana.map((g) => diaDe(g.nome)));
+    cabecalho("Reuniões", `semana de ${rotuloDaSemana(segunda, hoje)} · ${
+      visiveis.length === daSemana.length
+        ? contagem(daSemana.length) : `${visiveis.length} de ${contagem(daSemana.length)}`}`, false);
+    linhas.clear();
+    grade.replaceChildren();
+    if (visiveis.length === 0 && daSemana.length > 0) {
+      const nada = semResultado();
+      nada.classList.add("semana__sem-resultado");
+      grade.appendChild(nada);
+    }
+    const colunas = colunasDaSemana(visiveis, segunda, hoje, gravacoes);
+    // O painel aberto de uma reunião que o filtro ou a troca de semana tirou da
+    // tela fecha: ele falaria de um cartão que não está ali.
+    if (!visiveis.some((g) => g.caminho === escolhida)) detalhe.hidden = true;
+    grade.classList.toggle("semana--sete", colunas.length === 7);
+    for (const coluna of colunas) {
+      const dia = document.createElement("section");
+      dia.className = "semana__dia" + (coluna.hoje ? " semana__dia--hoje" : "");
+      dia.dataset.dia = coluna.dia;
+      const cabeca = document.createElement("h2");
+      cabeca.className = "semana__rotulo";
+      cabeca.id = `semana-${coluna.dia}`;
+      // "Seg 21" é para o olho; o leitor de tela ouve o dia inteiro.
+      cabeca.setAttribute("aria-label", rotuloLongoDoDia(coluna.dia) + (coluna.hoje ? ", hoje" : ""));
+      cabeca.textContent = coluna.rotulo;
+      if (coluna.hoje) {
+        const marca = document.createElement("span");
+        marca.className = "aa-etiqueta aa-etiqueta--info";
+        marca.textContent = "hoje";
+        cabeca.appendChild(marca);
+      }
+      dia.setAttribute("aria-labelledby", cabeca.id);
+      dia.appendChild(cabeca);
+      for (const g of coluna.itens) {
+        const c = cartao(g);
+        linhas.set(g.caminho, c);
+        dia.appendChild(c);
+      }
+      if (coluna.itens.length === 0) {
+        dia.appendChild(texto("semana__vazio", escondidos.has(coluna.dia)
+          ? "Nenhuma com esses filtros" : "Nenhuma gravação"));
+      }
+      grade.appendChild(dia);
+    }
+    marcarCartao();
+  }
+
+  function mostrarDetalhe(g) {
+    escolhida = g.caminho;
+    desenharPainel(g);
+    detalhe.hidden = false;
+    marcarCartao();
+  }
+
+  function esconderDetalhe() {
+    detalhe.hidden = true;
+    marcarCartao();
+    linhas.get(escolhida)?.focus();
+  }
+
+  function marcarCartao() {
+    for (const [caminho, c] of linhas)
+      c.setAttribute("aria-pressed", String(!detalhe.hidden && caminho === escolhida));
+  }
+
+  function cartao(g) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "semana__cartao";
+    b.dataset.gravacao = g.caminho;
+    preencherCartao(b, g);
+    b.setAttribute("aria-pressed", "false");
+    // Como a linha da lista: o clique mostra o painel, e o duplo clique e o
+    // Enter abrem a reunião.
+    b.addEventListener("click", () => mostrarDetalhe(g));
+    b.addEventListener("dblclick", () => abrirGravacao(g));
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      abrirGravacao(g);
+    });
+    return b;
+  }
+
+  /** Como preencherLinha: repinta sem trocar o botão, e a etiqueta vem por último. */
+  function preencherCartao(b, g) {
+    b.title = g.avisos.join("\n");
+    // <span>, e não o texto() de <p>: dentro de botão só cabe conteúdo de frase.
+    const pedaco = (classe, conteudo) => {
+      const e = document.createElement("span");
+      e.className = classe;
+      e.textContent = conteudo;
+      return e;
+    };
+    const partes = [pedaco("semana__hora", horaDe(g.nome)), pedaco("semana__titulo", tituloDe(g)),
+                    pedaco("semana__vinculo", g.cliente || g.projeto
+                      ? [g.cliente, g.projeto].filter(Boolean).join(" › ") : "sem cliente")];
+    if (g.avisos.length > 0) partes.push(pedaco("semana__aviso", g.avisos[0]));
+    b.replaceChildren(...partes, etiqueta(g));
+  }
 
   function linha(g) {
     const b = document.createElement("button");
@@ -412,9 +724,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       Object.assign(criterios, { texto: "", cliente: "", periodo: "tudo", data: "", estado: "" });
       busca.value = "";
       filtroCliente.value = "";
-      filtroPeriodo.value = "tudo";
-      filtroData.value = "";
-      ajustarData();
+      pintarData();
       filtroEstado.value = "";
       aoMudar();
       busca.focus();
@@ -435,17 +745,9 @@ export async function telaDeReunioes({ cabecalho, tela }) {
 
   busca.addEventListener("input", () => { criterios.texto = busca.value; aoMudar(); });
   filtroCliente.addEventListener("change", () => { criterios.cliente = filtroCliente.value; aoMudar(); });
-  filtroPeriodo.addEventListener("change", () => {
-    criterios.periodo = filtroPeriodo.value;
-    // O campo de data aparece ao lado, e o foco fica no seletor: no WebView2 as
-    // setas num seletor fechado disparam change a cada tecla, e levar o foco ao
-    // campo prendia quem só estava passando por "Um dia…" a caminho de outro.
-    ajustarData();
-    aoMudar();
-  });
-  filtroData.addEventListener("change", () => { criterios.data = filtroData.value; aoMudar(); });
   filtroEstado.addEventListener("change", () => { criterios.estado = filtroEstado.value; aoMudar(); });
 
+  pintarVista();
   desenhar();
 
   // A etiqueta acompanha o trabalho da placa: quem fica parado na lista vê
@@ -478,7 +780,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       Object.assign(g, nova);
       // Só a linha dela, e sem trocar o botão: quem estava nela continua.
       const l = linhas.get(caminho);
-      if (l) preencherLinha(l, g);
+      if (l) (l.classList.contains("semana__cartao") ? preencherCartao : preencherLinha)(l, g);
       desenharPainel(gravacoes.find((x) => x.caminho === escolhida) ?? null, { seMudou: true });
     } catch {
       // Sem resposta, a linha fica como estava; a próxima visita à tela relê tudo.
@@ -540,6 +842,17 @@ function seletor(rotulo, id, opcoes, valor) {
   return s;
 }
 
+/** Um botão de ligar e desligar, dos atalhos e do modo do filtro de data. */
+function atalho(rotulo, ligado, aoClicar) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "atalho";
+  b.textContent = rotulo;
+  b.setAttribute("aria-pressed", String(ligado));
+  b.addEventListener("click", aoClicar);
+  return b;
+}
+
 function texto(classe, conteudo) {
   const p = document.createElement("p");
   if (classe) p.className = classe;
@@ -576,13 +889,11 @@ function textoDaAta(g, rodando) {
 }
 
 /**
- * O botão do próximo passo leva aonde o passo se dá.
- *
- * A ata ainda mora em Atas; o plano 2 a traz para dentro da reunião, e aí
- * esta função é o único lugar a mudar.
+ * O botão do próximo passo leva aonde o passo se dá: transcrever na tela de
+ * transcrever, e tudo o que é da ata na aba Ata da reunião.
  */
 function seguir(g, acao) {
   if (acao === "transcrever" || acao === "acompanhar-transcricao") return abrirGravacao(g);
-  return abrirAtas({ foco: g.caminho });
+  return abrirGravacao(g, { aba: "ata" });
 }
 
