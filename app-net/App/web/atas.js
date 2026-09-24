@@ -136,20 +136,23 @@ function cartaoDeAta(g, tipos, ctx, emFoco = false) {
 
   // Uma ata que já existe abre junto com a tela: quem vem aqui quer lê-la, e
   // exigir um clique para mostrar o que já está pronto é pedágio.
-  mostrarAtaExistente(g, corpo, botao, emFoco);
+  // Pedida pelo painel, a ata aberta recebe o foco quando chega — e não o
+  // "Refazer ata", que um Enter logo depois refaria sem perguntar.
+  mostrarAtaExistente(g, corpo, botao, emFoco, emFoco);
 
   if (emCurso(g.caminho)) acompanhar(g, botao, painel, corpo);
 
   return raiz;
 }
 
-async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
+async function mostrarAtaExistente(g, corpo, botao, abrir = false, focar = false) {
   try {
     const r = await pedir("ata", { gravacao: g.caminho });
     if (!r.ata) return;
     botao.textContent = "Refazer ata";
     botao.className = "aa-btn aa-btn-secundario";
     desenharAta(corpo, r.ata, r.ata_velha, abrir, g);
+    if (focar) corpo.querySelector("summary")?.focus({ preventScroll: true });
   } catch {
     // Sem ata é o estado normal de quem nunca gerou.
   }

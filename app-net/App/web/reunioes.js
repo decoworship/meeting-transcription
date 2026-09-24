@@ -31,8 +31,12 @@ let escolhida = null;
 /**
  * Abaixo disto o painel não cabe, o CSS o esconde, e o clique na linha volta
  * a abrir a reunião direto. O número é o mesmo do @media do app.css.
+ *
+ * **900, e não 1100.** A janela abre com 1200 px físicos (JanelaDoApp.cs), e a
+ * 125% de escala — a de notebook — isso dá ~945 px de CSS: com o corte em 1100
+ * a tela nascia sem o painel justamente onde ela mais é usada.
  */
-const ESTREITA = window.matchMedia("(max-width: 1099px)");
+const ESTREITA = window.matchMedia("(max-width: 899px)");
 
 
 const TOM = {
@@ -237,8 +241,26 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     b.type = "button";
     b.className = "reuniao-linha";
     b.dataset.gravacao = g.caminho;
-    // O texto inteiro dos avisos, que na linha viram só "1 aviso".
-    if (g.avisos.length > 0) b.title = g.avisos.join("\n");
+    // Uma parada de Tab só para a lista inteira: a escolhida fica com 0 e as
+    // setas andam entre as linhas (marcarEscolhida, aoTeclar). Com uma parada
+    // por linha, chegar ao painel custava um Tab por gravação — setenta.
+    b.tabIndex = -1;
+    preencherLinha(b, g);
+    b.setAttribute("aria-pressed", "false");
+    // Escolher custa um clique a mais para abrir, e o duplo clique o devolve.
+    // Sem largura para o painel, escolher não mostraria nada — o clique abre.
+    b.addEventListener("click", () => (ESTREITA.matches ? abrirGravacao(g) : escolher(g)));
+    b.addEventListener("dblclick", () => abrirGravacao(g));
+    b.addEventListener("keydown", (e) => aoTeclar(e, g));
+    return b;
+  }
+
+  /**
+   * O conteúdo da linha, à parte do botão: o fim de uma tarefa repinta a linha
+   * sem trocar o botão — e quem estava com o foco nele continua.
+   */
+  function preencherLinha(b, g) {
+    b.title = g.avisos.join("\n");
 
     const hora = document.createElement("span");
     hora.className = "reuniao-linha__hora";
@@ -254,13 +276,41 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     meta.textContent = metaDe(g);
     textos.append(titulo, meta);
 
-    b.append(hora, textos, etiqueta(g));
-    b.setAttribute("aria-pressed", "false");
-    // Escolher custa um clique a mais para abrir, e o duplo clique o devolve.
-    // Sem largura para o painel, escolher não mostraria nada — o clique abre.
-    b.addEventListener("click", () => (ESTREITA.matches ? abrirGravacao(g) : escolher(g)));
-    b.addEventListener("dblclick", () => abrirGravacao(g));
-    return b;
+    // O aviso escrito na linha, e não só no title: sem o painel (janela
+    // estreita) a linha é o único lugar que o diz, e o teclado não vê title.
+    if (g.avisos.length > 0) {
+      const aviso = document.createElement("span");
+      aviso.className = "reuniao-linha__aviso";
+      aviso.textContent = g.avisos.length === 1
+        ? g.avisos[0] : `${g.avisos[0]} (+${g.avisos.length - 1})`;
+      textos.appendChild(aviso);
+    }
+
+    b.replaceChildren(hora, textos, etiqueta(g));
+  }
+
+  /**
+   * O teclado na lista: as setas e Home/End andam e escolhem, Enter abre.
+   *
+   * Enter abre porque o teclado não tem duplo clique: sem isto, abrir uma
+   * reunião pelo teclado era escolher e depois ir até o painel. Espaço segue
+   * sendo o clique do botão — escolhe.
+   */
+  function aoTeclar(e, g) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      abrirGravacao(g);
+      return;
+    }
+    const todas = [...linhas.values()];
+    const i = todas.indexOf(e.currentTarget);
+    const destino = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: todas.length - 1 }[e.key];
+    if (destino === undefined) return;
+    e.preventDefault();
+    const alvo = todas[Math.max(0, Math.min(todas.length - 1, destino))];
+    escolhida = alvo.dataset.gravacao;
+    marcarEscolhida();
+    alvo.focus();
   }
 
   function escolher(g) {
@@ -269,7 +319,11 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   }
 
   function marcarEscolhida() {
-    for (const [caminho, l] of linhas) l.setAttribute("aria-pressed", String(caminho === escolhida));
+    for (const [caminho, l] of linhas) {
+      const esta = caminho === escolhida;
+      l.setAttribute("aria-pressed", String(esta));
+      l.tabIndex = esta ? 0 : -1;
+    }
     desenharPainel(gravacoes.find((g) => g.caminho === escolhida) ?? null);
   }
 
@@ -285,10 +339,19 @@ export async function telaDeReunioes({ cabecalho, tela }) {
    */
   function desenharPainel(g, { seMudou = false } = {}) {
     const rodando = g ? emCurso(g.caminho) : null;
-    const chave = g
-      ? `${g.caminho}|${estadoDe(g, rodando).rotulo}|${proximoPasso(g, rodando).acao}` : "";
+    const passo = g ? proximoPasso(g, rodando) : null;
+    // **A chave é o que o painel desenha, e só isso.** O rótulo da etapa
+    // ("Transcrevendo…", "Separando falantes…") muda quatro vezes numa
+    // transcrição e não aparece aqui: com ele na chave o painel era recriado a
+    // cada etapa, e o foco de quem estava no botão caía no body.
+    const chave = g ? JSON.stringify([g.caminho, passo.acao, textoDaAta(g, rodando), g.resumo,
+      g.pendencias, g.pendencias_inicio, g.notas_inicio, g.avisos, g.cliente, g.projeto,
+      g.titulo, g.convidados]) : "";
     if (seMudou && chave === pintado) return;
     pintado = chave;
+    // Quem estava dentro do painel continua nele quando o redesenho é de verdade:
+    // o botão principal novo recebe o foco.
+    const tinhaFoco = painel.contains(document.activeElement);
     painel.replaceChildren();
     if (!g) return;
 
@@ -308,7 +371,6 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     );
     for (const aviso of g.avisos) painel.appendChild(alerta(aviso));
 
-    const passo = proximoPasso(g, rodando);
     const principal = botao(passo.rotulo, "aa-btn aa-btn-primario", () => seguir(g, passo.acao));
     principal.dataset.acao = passo.acao;
     const acoes = document.createElement("div");
@@ -333,6 +395,7 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       painel.appendChild(s);
     }
     if (g.notas_inicio) painel.appendChild(secaoDoPainel("Notas", g.notas_inicio));
+    if (tinhaFoco) principal.focus({ preventScroll: true });
   }
 
 
@@ -374,9 +437,10 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   filtroCliente.addEventListener("change", () => { criterios.cliente = filtroCliente.value; aoMudar(); });
   filtroPeriodo.addEventListener("change", () => {
     criterios.periodo = filtroPeriodo.value;
+    // O campo de data aparece ao lado, e o foco fica no seletor: no WebView2 as
+    // setas num seletor fechado disparam change a cada tecla, e levar o foco ao
+    // campo prendia quem só estava passando por "Um dia…" a caminho de outro.
     ajustarData();
-    // Escolheu "Um dia…" e ainda não disse qual: o cursor vai para onde se diz.
-    if (!filtroData.hidden && !filtroData.value) filtroData.focus();
     aoMudar();
   });
   filtroData.addEventListener("change", () => { criterios.data = filtroData.value; aoMudar(); });
@@ -391,13 +455,46 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   // de andamento recriaria as linhas, e quem estivesse com o Tab numa delas
   // perderia o lugar. Uma reunião que deixou de casar com o filtro de estado
   // sai no próximo filtro, não no meio da leitura.
+  //
+  // **O fim de uma tarefa relê a gravação no núcleo**, em vez de adivinhar o que
+  // ficou no disco: retranscrever uma reunião que tinha ata deixa a ata velha, e
+  // uma ata nova traz resumo e pendências — o palpite local errava os dois.
+  function marcaDoFim(caminho) {
+    const fim = ultimoResultado(caminho);
+    return fim && !fim.erro && !fim.cancelada && !emCurso(caminho)
+      ? `${caminho}|${fim.tarefa}|${fim.comecou_em}` : null;
+  }
+
+  // Semeado com os fins que já existiam: a lista acabou de ler o núcleo.
+  const tratados = new Set(gravacoes.map((g) => marcaDoFim(g.caminho)).filter(Boolean));
+
+  async function reler(caminho) {
+    try {
+      const { gravacoes: novas } = await pedir("gravacoes");
+      if (!raiz.isConnected) return;
+      const nova = novas.find((x) => x.caminho === caminho);
+      const g = gravacoes.find((x) => x.caminho === caminho);
+      if (!nova || !g) return;
+      Object.assign(g, nova);
+      // Só a linha dela, e sem trocar o botão: quem estava nela continua.
+      const l = linhas.get(caminho);
+      if (l) preencherLinha(l, g);
+      desenharPainel(gravacoes.find((x) => x.caminho === escolhida) ?? null, { seMudou: true });
+    } catch {
+      // Sem resposta, a linha fica como estava; a próxima visita à tela relê tudo.
+    }
+  }
+
   const cancelar = assinarTranscricoes(() => {
     if (!raiz.isConnected) { cancelar(); return; }
     for (const g of gravacoes) {
-      const fim = ultimoResultado(g.caminho);
-      if (!emCurso(g.caminho) && fim && !fim.erro && !fim.cancelada) {
-        if (fim.tarefa === "ata") { g.tem_ata = true; g.ata_velha = false; }
-        else g.transcrita = true;
+      const marca = marcaDoFim(g.caminho);
+      if (marca && !tratados.has(marca)) {
+        tratados.add(marca);
+        // Adiantado enquanto o núcleo responde: que a transcrição terminou é
+        // fato. O resto — ata velha, pendências — vem da releitura.
+        if (ultimoResultado(g.caminho).tarefa !== "ata") g.transcrita = true;
+        reler(g.caminho);
       }
       const l = linhas.get(g.caminho);
       if (l && l.lastElementChild.textContent !== estadoDe(g, emCurso(g.caminho)).rotulo)
@@ -417,15 +514,13 @@ function etiqueta(g) {
   return s;
 }
 
-/** "Algar › Agentes · 31min 00s · 3 pendências · 1 aviso". */
+/** "Algar › Agentes · 31min 00s · 3 pendências". Os avisos têm linha própria. */
 function metaDe(g) {
   const partes = [g.cliente || g.projeto
     ? [g.cliente, g.projeto].filter(Boolean).join(" › ") : "sem cliente"];
   partes.push(duracao(g.duracao_s));
   if (g.tem_ata && g.pendencias > 0)
     partes.push(g.pendencias === 1 ? "1 pendência" : `${g.pendencias} pendências`);
-  if (g.avisos.length > 0)
-    partes.push(g.avisos.length === 1 ? "1 aviso" : `${g.avisos.length} avisos`);
   return partes.join(" · ");
 }
 

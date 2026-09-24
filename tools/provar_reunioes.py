@@ -306,6 +306,9 @@ def prova_transcricao_em_curso(pagina) -> None:
     pagina.wait_for_timeout(30)
     conferir(pagina.evaluate("() => window.__botao.isConnected && document.activeElement === window.__botao"),
              "andamento sem mudança de estado não recria o botão, e o foco fica nele")
+    # O núcleo escreveu o transcricao.json: a ponte falsa passa a dizer isso,
+    # como o Listar diria.
+    pagina.evaluate("(c) => { window.__gravacoes.find((g) => g.caminho === c).transcrita = true; }", caminho)
     pagina.evaluate("(c) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo: "
                     "{ gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: 'montagem', fracao: 1, "
                     "texto: '', comecou_em: '', terminou: true, erro: null, cancelada: false } } })", caminho)
@@ -317,7 +320,7 @@ def prova_transcricao_em_curso(pagina) -> None:
 
 
 def prova_janela_estreita(pagina) -> None:
-    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 1000 px a lista cabe, sem rolagem lateral")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 860 px a lista cabe, sem rolagem lateral")
     conferir(not pagina.is_visible(".reunioes__painel"), "em janela estreita o painel some")
     linha_por_titulo(pagina, "Reunião de lideranças")
     pagina.evaluate("() => window.__linha.click()")
@@ -325,7 +328,7 @@ def prova_janela_estreita(pagina) -> None:
     conferir(True, "e o clique abre a reunião direto")
 
 
-prova_janela_estreita.janela = (1000, 700)
+prova_janela_estreita.janela = (860, 700)
 
 
 
@@ -342,13 +345,136 @@ def prova_ata_na_reuniao_pedida(pagina) -> None:
         return Boolean(d && d.open);
     }""")
     conferir(aberta, "'Abrir a ata' leva a Atas com a ata daquela reunião aberta")
+    foco = pagina.evaluate("() => document.activeElement && document.activeElement.tagName")
+    conferir(foco == "SUMMARY",
+             f"e o foco vai para a ata aberta, não para 'Refazer ata', que um Enter dispararia ({foco!r})")
+    conferir(pagina.evaluate(FOCO_A_VISTA), "e o que tem o foco está à vista, e não debaixo da barra do topo")
+
+
+def prova_gerar_ata_na_reuniao_pedida(pagina) -> None:
+    linha_por_titulo(pagina, "Sherlock")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.click(".reunioes__painel [data-acao='gerar-ata']")
+    pagina.wait_for_selector(".ata", timeout=5000)
+    pagina.wait_for_timeout(100)
     foco = pagina.evaluate("() => document.activeElement && document.activeElement.dataset.acao")
-    conferir(foco == "ata", f"e o foco vai para o botão dela ({foco!r})")
+    conferir(foco == "ata", f"'Gerar a ata' leva ao botão de gerar daquela reunião ({foco!r})")
+    conferir(pagina.evaluate(FOCO_A_VISTA), "e o botão está à vista, e não debaixo da barra do topo")
 
 
+def prova_troca_de_etapa(pagina) -> None:
+    linha_por_titulo(pagina, "Semanal")
+    pagina.evaluate("() => window.__linha.click()")
+    caminho = pagina.evaluate("() => window.__linha.dataset.gravacao")
+    etapa = ("([c, e]) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: "
+             "{ gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: e, fracao: 0.5, texto: '', "
+             "comecou_em: '', terminou: false, erro: null, cancelada: false }, ultimo: null } })")
+    pagina.evaluate(etapa, [caminho, "asr"])
+    pagina.wait_for_timeout(30)
+    pagina.evaluate("() => { window.__botao = document.querySelector('.reunioes__painel [data-acao]'); "
+                    "window.__botao.focus(); }")
+    pagina.evaluate(etapa, [caminho, "diarizacao"])
+    pagina.wait_for_timeout(30)
+    conferir(pagina.evaluate("() => window.__linha.lastElementChild.textContent") == "Separando falantes…",
+             "a etiqueta acompanha a etapa")
+    conferir(pagina.evaluate("() => window.__botao.isConnected && document.activeElement === window.__botao"),
+             "trocar de etapa não recria o botão do painel, e o foco fica nele")
+
+
+def prova_fim_rele_o_nucleo(pagina) -> None:
+    # Retranscrever uma reunião que tem ata deixa a ata velha no disco: o
+    # núcleo diz ata_velha, e a lista tem de acreditar nele e não num palpite.
+    linha_por_titulo(pagina, "Comunicação")
+    pagina.evaluate("() => window.__linha.click()")
+    caminho = pagina.evaluate("() => window.__linha.dataset.gravacao")
+    fim = ("([c, t]) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo: "
+           "{ gravacao: c, nome: 'x', tarefa: t, etapa: 'montagem', fracao: 1, texto: '', "
+           "comecou_em: '', terminou: true, erro: null, cancelada: false } } })")
+    pagina.evaluate("(c) => { window.__gravacoes.find((g) => g.caminho === c).ata_velha = true; }", caminho)
+    pagina.evaluate(fim, [caminho, "transcricao"])
+    pagina.wait_for_timeout(50)
+    conferir(pagina.evaluate("() => window.__linha.lastElementChild.textContent") == "Ata desatualizada",
+             "retranscrita com ata, a linha diz 'Ata desatualizada'")
+    conferir(pagina.get_attribute(".reunioes__painel [data-acao]", "data-acao") == "refazer-ata",
+             "e o painel oferece refazer a ata")
+    # A ata terminou com a pessoa parada na lista: resumo e pendências chegam.
+    linha_por_titulo(pagina, "Sherlock")
+    pagina.evaluate("() => window.__linha.click()")
+    caminho = pagina.evaluate("() => window.__linha.dataset.gravacao")
+    pagina.evaluate("""(c) => Object.assign(window.__gravacoes.find((g) => g.caminho === c), {
+        tem_ata: true, pendencias: 2, resumo: 'O NOC assume o plantão de sábado.',
+        pendencias_inicio: ['Escala do sábado — Marcos — sexta', 'Contato do NOC — André — [prazo a definir]'] })""",
+                    caminho)
+    pagina.evaluate(fim, [caminho, "ata"])
+    pagina.wait_for_timeout(50)
+    conferir(pagina.evaluate("() => window.__linha.lastElementChild.textContent") == "Ata pronta",
+             "a ata terminou, e a linha diz 'Ata pronta'")
+    meta = pagina.evaluate("() => window.__linha.querySelector('.reuniao-linha__meta').textContent")
+    conferir("2 pendências" in meta, f"e a linha conta as pendências da ata nova ({meta!r})")
+    conferir("plantão de sábado" in (pagina.text_content(".reunioes__painel") or ""),
+             "e o painel mostra o resumo da ata nova")
+
+
+def prova_teclado(pagina) -> None:
+    paradas = pagina.eval_on_selector_all(".reuniao-linha", "els => els.filter((e) => e.tabIndex === 0).length")
+    conferir(paradas == 1, f"a lista é uma parada de Tab só ({paradas} linhas com tabIndex 0)")
+    pagina.focus(".reuniao-linha[tabindex='0']")
+    pagina.keyboard.press("ArrowDown")
+    segunda = pagina.evaluate("() => document.activeElement.querySelector('.reuniao-linha__titulo').textContent")
+    conferir(segunda == "Semanal — Beegol · Uberlândia", f"a seta para baixo vai à próxima linha ({segunda!r})")
+    conferir(pagina.evaluate("() => document.activeElement.getAttribute('aria-pressed')") == "true",
+             "e a escolhe")
+    pagina.keyboard.press("Tab")
+    conferir(pagina.evaluate("() => Boolean(document.activeElement.closest('.reunioes__painel'))"),
+             "um Tab depois da lista cai no painel")
+    pagina.keyboard.press("Shift+Tab")
+    pagina.keyboard.press("ArrowUp")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector(".revisao", timeout=5000)
+    conferir(True, "Enter numa linha abre a reunião, como o duplo clique")
+
+
+def prova_janela_intermediaria(pagina) -> None:
+    conferir(pagina.is_visible(".reunioes__painel"), "a 1000 px o painel aparece")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "e a lista cabe, sem rolagem lateral")
+    aviso = pagina.evaluate("""() => {
+        const e = document.querySelector('.reuniao-linha__aviso');
+        return e && e.offsetParent !== null ? e.textContent : null;
+    }""")
+    conferir(aviso == "O microfone não teve áudio nenhum.",
+             f"o aviso da gravação aparece escrito na linha, e não só ao passar o mouse ({aviso!r})")
+
+
+prova_janela_intermediaria.janela = (1000, 700)
+
+
+def prova_data_nao_rouba_o_foco(pagina) -> None:
+    pagina.focus("#filtro-periodo")
+    pagina.select_option("#filtro-periodo", "dia")
+    pagina.wait_for_timeout(30)
+    ativo = pagina.evaluate("() => document.activeElement.id")
+    conferir(ativo == "filtro-periodo",
+             f"escolher 'Um dia…' não tira o foco do seletor — as setas passam por ele ({ativo!r})")
+
+
+
+# A tela de Atas com a janela baixa: o cartão pedido precisa de rolagem, e é
+# aí que a barra fixa do topo o cobriria.
+prova_ata_na_reuniao_pedida.janela = (1280, 520)
+prova_gerar_ata_na_reuniao_pedida.janela = (1280, 520)
+
+FOCO_A_VISTA = """() => {
+  const e = document.activeElement;
+  if (!e || e === document.body) return false;
+  const r = e.getBoundingClientRect();
+  const alvo = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 10));
+  return alvo === e || e.contains(alvo);
+}"""
 
 PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem,
-          prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida]
+          prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida,
+          prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
+          prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco]
 
 
 
@@ -375,7 +501,13 @@ def main() -> int:
                 print(f"── {prova.__name__}")
                 largura, altura = getattr(prova, "janela", (1280, 800))
                 pagina, erros = abrir(navegador, porta, largura, altura)
-                prova(pagina)
+                # Uma prova que estoura (um seletor que nunca aparece) conta como
+                # falha, e as outras continuam: parar na primeira esconderia o
+                # resto do que quebrou.
+                try:
+                    prova(pagina)
+                except Exception as e:  # noqa: BLE001 — qualquer estouro é falha da prova
+                    conferir(False, f"{prova.__name__} estourou: {str(e).splitlines()[0]}")
                 conferir(not erros, f"sem erro de JavaScript {erros[:2] if erros else ''}")
                 pagina.close()
 

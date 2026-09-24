@@ -335,6 +335,13 @@ html {
 .reuniao-linha__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reuniao-linha__titulo { font-weight: 600; color: var(--cor-texto-forte); }
 .reuniao-linha__meta { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.reuniao-linha__aviso {
+  font-size: var(--texto-rotulo);
+  color: var(--cor-atencao);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .reunioes__vazio {
   display: grid;
@@ -347,7 +354,9 @@ html {
 
 .reunioes__corpo {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 22rem;
+  /* O painel encolhe até 17rem na faixa de notebook, para a lista não ficar
+   * espremida entre 900 e 1100 px. */
+  grid-template-columns: minmax(0, 1fr) clamp(17rem, 32vw, 22rem);
   gap: var(--espaco-4);
   align-items: start;
 }
@@ -408,7 +417,7 @@ html {
 
 /* Sem largura para o painel, ele some, e o clique na linha abre a reunião
  * (ESTREITA, em reunioes.js). Os dois números andam juntos. */
-@media (max-width: 1099px) {
+@media (max-width: 899px) {
   .reunioes__corpo { grid-template-columns: 1fr; }
   .reunioes__painel { display: none; }
 }
@@ -1362,6 +1371,9 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 /* ─────────────────────────────────────────────────────────────── atas */
 
 .ata { display: grid; gap: var(--espaco-3); }
+/* Rolado até ele pelo painel de Reuniões, o cartão para logo abaixo da barra do
+ * topo, que é sticky: sem a margem, título e botão focado ficavam debaixo dela. */
+.ata { scroll-margin-top: calc(var(--altura-da-barra) + var(--espaco-4)); }
 
 /* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
  * no botão que a usa, e não perdida no meio do cartão. */
