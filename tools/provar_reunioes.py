@@ -481,6 +481,27 @@ def prova_reuniao_gerar_ata(pagina) -> None:
     conferir(selo().count() == 0, "e refeita sem pendência, o selo some")
 
 
+def prova_trilho_sem_atas(pagina) -> None:
+    conferir(pagina.locator("#ir-atas").count() == 0, "Atas saiu do trilho: a ata mora na reunião")
+    ordem = pagina.eval_on_selector_all(".trilho__item", "els => els.map((e) => e.id)")
+    conferir(ordem == ["ir-gravador", "ir-reunioes", "ir-config"],
+             f"o trilho é Gravador, Reuniões, Ajustes ({ordem})")
+    caminho = pagina.evaluate("() => window.__gravacoes[4].caminho")
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "ata", "lendo"])
+    pagina.wait_for_timeout(30)
+    conferir(pagina.get_attribute("#ir-reunioes", "data-ocupado") == "true",
+             "escrever a ata acende a bolinha de Reuniões")
+    rotulo = pagina.get_attribute("#ir-reunioes", "aria-label") or ""
+    conferir("escrevendo a ata" in rotulo, f"e a bolinha diz que é a ata, e não a transcrição ({rotulo!r})")
+
+
+def prova_endereco_de_atas(pagina) -> None:
+    # O --tela atas das fotos antigas não pode cair numa tela em branco.
+    pagina.evaluate("() => { location.hash = 'atas'; location.reload(); }")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    conferir(True, "o endereço antigo de Atas cai na lista de Reuniões")
+
+
 def prova_reuniao_pelo_endereco(pagina) -> None:
     # O --tela do app (e as fotos de documentação) abrem uma reunião numa aba.
     pagina.evaluate("() => { location.hash = 'revisao=4&notas'; location.reload(); }")
@@ -602,7 +623,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_c
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
-          prova_reuniao_pelo_endereco]
+          prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas]
 
 
 

@@ -60,17 +60,12 @@
        bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
     <!-- Uma bolinha por destino, acesa pelo trabalho daquele destino:
-         transcrever em Reuniões, gravar no Gravador, escrever ata em Atas.
-         Quem as acende é o web/trilho.js, do estado do núcleo — nunca por
-         tempo. -->
-    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
-            data-ocupado="false">
-      <span class="trilho__icone">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
-        <span class="trilho__ponto" aria-hidden="true"></span>
-      </span>
-      <span>Reuniões</span>
-    </button>
+         gravar no Gravador; transcrever, separar falantes e escrever a ata em
+         Reuniões. Quem as acende é o web/trilho.js, do estado do núcleo —
+         nunca por tempo.
+         O Gravador vem primeiro porque é o primeiro gesto do dia; Atas saiu
+         em 24/09/2026 e virou a aba Ata da reunião (docs/superpowers/specs/
+         2026-09-23-ui-ux.md, D-A). -->
     <button class="trilho__item" id="ir-gravador" type="button" data-ocupado="false">
       <span class="trilho__icone">
         <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
@@ -78,14 +73,13 @@
       </span>
       <span>Gravador</span>
     </button>
-    <!-- Atas fica abaixo do Gravador: é o terceiro destino de todo dia, e o
-         que se visita depois da reunião, não durante. -->
-    <button class="trilho__item" id="ir-atas" type="button" data-ocupado="false">
+    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
+            data-ocupado="false">
       <span class="trilho__icone">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
         <span class="trilho__ponto" aria-hidden="true"></span>
       </span>
-      <span>Atas</span>
+      <span>Reuniões</span>
     </button>
     <button class="trilho__item trilho__item--fim" id="ir-config" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-config"/></svg>

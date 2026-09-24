@@ -1554,7 +1554,7 @@ timeout 500 uv run --with playwright python tools/provar_reunioes.py 2>&1 | grep
 timeout 300 uv run --with playwright python tools/checar_transcricao.py 2>&1 | grep -E "FALHA|tudo certo"
 ```
 
-Expected: `node --check` e `grep` calados; `tudo certo.` nas duas (117 `ok` no `provar_reunioes`, 43 no `checar_transcricao`).
+Expected: `node --check` e `grep` calados; `tudo certo.` nas duas (120 `ok` no `provar_reunioes`, 43 no `checar_transcricao`).
 
 - [ ] **Step 8: Commit**
 

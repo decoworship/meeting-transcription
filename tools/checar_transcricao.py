@@ -492,68 +492,58 @@ def main() -> int:
                      pagina.input_value("#vocabulario").strip() != "",
                      pagina.input_value("#vocabulario"))
 
-            # ---- a tela Atas (item 3 da Fase 3)
+            # ---- a ata na aba da reunião (item 3 da Fase 3; aba desde o plano 2 da UI)
             pagina.evaluate("window.chrome.webview._transcritas.add('C:/g/a')")
-            pagina.click("#ir-atas")
-            pagina.wait_for_selector(".ata")
-            conferir("Atas lista só as reuniões transcritas",
-                     pagina.locator(".ata").count() >= 1)
-            conferir("o cartão oferece o tipo de reunião",
-                     pagina.locator(".ata__tipo select").count() >= 1)
+            pagina.click("#ir-reunioes")
+            pagina.wait_for_selector(".reuniao-linha")
+            conferir("Atas não é mais destino do trilho", pagina.locator("#ir-atas").count() == 0)
+            abrir_da_lista(pagina, "C:/g/a")
+            pagina.wait_for_selector(".reuniao-aberta [data-aba='ata']", timeout=5000)
+            pagina.click(".reuniao-aberta [data-aba='ata']")
+            pagina.wait_for_selector("#painel-ata .ata__tipo select")
+            conferir("a aba Ata oferece o tipo de reunião",
+                     pagina.locator("#painel-ata .ata__tipo select").count() == 1)
 
-            pagina.click("text=Gerar ata")
-            pagina.wait_for_selector(".ata .aa-progresso")
-            # A bolinha da ata é a de Atas, não a de Reuniões: as duas tarefas
-            # dividem o registro, e até 14/08 a tela acendia a errada.
-            conferir("gerar mostra o progresso e a bolinha de Atas acende",
-                     pagina.get_attribute("#ir-atas", "data-ocupado") == "true"
-                     and estado() == "false")
+            pagina.click("#painel-ata >> text=Gerar ata")
+            pagina.wait_for_selector("#painel-ata .aa-progresso")
+            # A bolinha da ata é a de Reuniões desde que Atas saiu do trilho —
+            # e ela diz que é a ata: até 14/08 a lista dizia "Transcrevendo…"
+            # enquanto a ata era escrita, e era esse o defeito relatado.
+            conferir("gerar mostra o progresso e acende a bolinha de Reuniões",
+                     estado() == "true")
+            conferir("a bolinha diz que está escrevendo a ata",
+                     "escrevendo a ata" in (pagina.get_attribute("#ir-reunioes", "aria-label") or ""))
 
             pagina.evaluate("""window.__ataPronta('C:/g/a',
               '# Ata — Teste\\n\\n## Decisões\\n\\n- **decidido** aqui\\n\\n'
               + '## Pendências\\n\\n- [ ] Mandar a base — **Dimi** — amanhã\\n')""")
-            pagina.wait_for_selector(".ata__texto", timeout=5000)
-            # A ata recém-gerada abre sozinha: quem acabou de mandar escrever
-            # quer ver. As outras ficam dobradas — com onze reuniões na tela,
-            # abrir todas era uma rolagem sem fim.
-            conferir("a ata recém-gerada abre sozinha",
-                     pagina.locator(".ata__dobra[open]").count() == 1)
-            conferir("a ata pronta aparece no cartão",
-                     "decidido" in pagina.inner_text(".ata__texto"))
-            conferir("o resumo da dobra conta as pendências",
-                     "pendência" in pagina.inner_text(".ata__resumo"),
-                     pagina.inner_text(".ata__resumo"))
-
-            pagina.click("#ir-reunioes")
-            pagina.wait_for_selector(".reuniao-linha")
-            pagina.click("#ir-atas")
-            pagina.wait_for_selector(".ata__dobra")
-            conferir("ao voltar, a ata vem fechada",
-                     pagina.locator(".ata__dobra[open]").count() == 0)
+            pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+            conferir("a ata pronta aparece na aba",
+                     "decidido" in pagina.inner_text("#painel-ata .ata__texto"))
+            conferir("o estado da ata conta as pendências",
+                     "pendência" in pagina.inner_text("#painel-ata .ata__estado"),
+                     pagina.inner_text("#painel-ata .ata__estado"))
+            conferir("a bolinha de Reuniões apaga quando a ata fica pronta", estado() == "false")
 
             # Exportar leva a ata para a pasta das atas — separada da de
             # transcrições, porque os destinos são diferentes.
-            pagina.click(".ata__resumo")
-            pagina.wait_for_selector(".ata__texto")
-            pagina.click("text=Exportar")
+            pagina.click("#painel-ata >> text=Exportar")
             pagina.wait_for_timeout(150)
             conferir("exportar diz onde a ata foi parar",
-                     "atas" in pagina.inner_text(".ata"),
-                     [l for l in pagina.inner_text(".ata").splitlines() if "atas" in l][:1])
+                     "atas" in pagina.inner_text("#painel-ata"),
+                     [l for l in pagina.inner_text("#painel-ata").splitlines() if "atas" in l][:1])
             # O "#" da ata vira h2 e o "##" vira h3 — um nível abaixo do que o
             # Markdown diz, porque a página já tem o h1 na barra do topo. Título
             # de documento dentro de documento quebraria a hierarquia para quem
             # navega por cabeçalho.
             conferir("o markdown vira HTML de verdade",
-                     pagina.locator(".ata__texto h2").count() == 1
-                     and pagina.locator(".ata__texto h3").count() == 2
-                     and pagina.locator(".ata__texto strong").count() >= 2)
+                     pagina.locator("#painel-ata .ata__texto h2").count() == 1
+                     and pagina.locator("#painel-ata .ata__texto h3").count() == 2
+                     and pagina.locator("#painel-ata .ata__texto strong").count() >= 2)
             conferir("a pendência vira caixa marcável",
-                     pagina.locator(".ata__pendencia input").count() == 1)
-            conferir("a bolinha de Atas apaga quando a ata fica pronta",
-                     pagina.get_attribute("#ir-atas", "data-ocupado") == "false")
+                     pagina.locator("#painel-ata .ata__pendencia input").count() == 1)
 
-            # ---- as três bolinhas, cada uma no seu destino
+            # ---- as bolinhas, cada uma no seu destino
             ocupado = lambda id_: pagina.get_attribute(f"#{id_}", "data-ocupado")  # noqa: E731
 
             pagina.evaluate("window.__gravar(true)")
@@ -562,14 +552,10 @@ def main() -> int:
                      ocupado("ir-gravador") == "true")
             conferir("e não acende a de Reuniões", ocupado("ir-reunioes") == "false")
 
-            pagina.click("#ir-atas")
-            pagina.wait_for_selector(".ata")
-            pagina.click("text=Refazer ata")
-            pagina.wait_for_selector(".ata .aa-progresso")
-            conferir("escrever ata acende a bolinha de Atas",
-                     ocupado("ir-atas") == "true")
-            conferir("e a de Reuniões continua apagada — era o defeito relatado",
-                     ocupado("ir-reunioes") == "false")
+            pagina.click("#painel-ata >> text=Refazer ata")
+            pagina.wait_for_selector("#painel-ata .aa-progresso")
+            conferir("escrever ata acende a bolinha de Reuniões",
+                     ocupado("ir-reunioes") == "true")
             conferir("gravação e ata convivem", ocupado("ir-gravador") == "true")
 
             pagina.click("#ir-reunioes")
