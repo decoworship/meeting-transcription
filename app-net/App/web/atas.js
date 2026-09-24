@@ -16,7 +16,13 @@ const ETAPAS = {
   montagem: "Montando a ata",
 };
 
-export async function telaDeAtas(ctx) {
+/**
+ * @param foco o caminho de uma gravação. Vem do painel de Reuniões: quem
+ *   pediu "Abrir a ata" de uma reunião cai no cartão dela, com a ata aberta,
+ *   e não no topo de uma lista que teria de percorrer.
+ */
+export async function telaDeAtas(ctx, { foco = null } = {}) {
+
   const { cabecalho, tela } = ctx;
   cabecalho("Atas", "", false);
   tela.setAttribute("aria-busy", "true");
@@ -49,7 +55,14 @@ export async function telaDeAtas(ctx) {
     return;
   }
 
-  for (const g of prontas) tela.appendChild(cartaoDeAta(g, tipos, ctx));
+  for (const g of prontas) tela.appendChild(cartaoDeAta(g, tipos, ctx, g.caminho === foco));
+
+  if (foco) {
+    const alvo = tela.querySelector(`[data-gravacao="${CSS.escape(foco)}"]`);
+    alvo?.scrollIntoView({ block: "start" });
+    alvo?.querySelector('[data-acao="ata"]')?.focus({ preventScroll: true });
+  }
+
 }
 
 /**
@@ -59,7 +72,7 @@ export async function telaDeAtas(ctx) {
  * página, e mandar o usuário a outro destino para ler meia página o faria voltar
  * a cada reunião que quisesse conferir.
  */
-function cartaoDeAta(g, tipos, ctx) {
+function cartaoDeAta(g, tipos, ctx, emFoco = false) {
   const raiz = document.createElement("div");
   raiz.className = "aa-cartao ata";
   raiz.dataset.gravacao = g.caminho;
@@ -93,6 +106,7 @@ function cartaoDeAta(g, tipos, ctx) {
   botao.className = "aa-btn aa-btn-primario";
   botao.type = "button";
   botao.textContent = "Gerar ata";
+  botao.dataset.acao = "ata";
 
   topo.append(esquerda, escolha, botao);
 
@@ -122,19 +136,23 @@ function cartaoDeAta(g, tipos, ctx) {
 
   // Uma ata que já existe abre junto com a tela: quem vem aqui quer lê-la, e
   // exigir um clique para mostrar o que já está pronto é pedágio.
-  mostrarAtaExistente(g, corpo, botao);
+  // Pedida pelo painel, a ata aberta recebe o foco quando chega — e não o
+  // "Refazer ata", que um Enter logo depois refaria sem perguntar.
+  mostrarAtaExistente(g, corpo, botao, emFoco, emFoco);
+
   if (emCurso(g.caminho)) acompanhar(g, botao, painel, corpo);
 
   return raiz;
 }
 
-async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
+async function mostrarAtaExistente(g, corpo, botao, abrir = false, focar = false) {
   try {
     const r = await pedir("ata", { gravacao: g.caminho });
     if (!r.ata) return;
     botao.textContent = "Refazer ata";
     botao.className = "aa-btn aa-btn-secundario";
     desenharAta(corpo, r.ata, r.ata_velha, abrir, g);
+    if (focar) corpo.querySelector("summary")?.focus({ preventScroll: true });
   } catch {
     // Sem ata é o estado normal de quem nunca gerou.
   }

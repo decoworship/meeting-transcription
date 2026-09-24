@@ -502,6 +502,22 @@ internal sealed class GravacaoResumo
     [JsonPropertyName("com_notas")] public bool ComNotas { get; init; }
 
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
+
+    /// <summary>Os convidados da agenda por nome — é por eles que a busca acha a reunião.</summary>
+    [JsonPropertyName("nomes")] public List<string> Nomes { get; init; } = [];
+
+    /// <summary>
+    /// O estado da ata, para a lista dizer o que a reunião precisa sem abri-la.
+    /// Ver <c>Nucleo/EstadoDaAta.cs</c>.
+    /// </summary>
+    [JsonPropertyName("tem_ata")] public bool TemAta { get; init; }
+    [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
+    [JsonPropertyName("pendencias")] public int Pendencias { get; init; }
+    [JsonPropertyName("pendencias_inicio")] public List<string> PendenciasInicio { get; init; } = [];
+    [JsonPropertyName("resumo")] public string? Resumo { get; init; }
+
+    /// <summary>O começo das notas, para o painel. Ver <c>Notas.Inicio</c>.</summary>
+    [JsonPropertyName("notas_inicio")] public string? NotasInicio { get; init; }
 }
 
 /// <summary>Uma fala da legenda gravada, como a tela a recebe.</summary>
@@ -744,10 +760,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         // Ata mais velha que a transcrição significa que alguém
                         // corrigiu o texto depois — e a ata ficou desatualizada
                         // sem ninguém avisar.
-                        AtaVelha = File.Exists(caminho)
-                                   && File.Exists(Path.Combine(onde, "transcricao.json"))
-                                   && File.GetLastWriteTimeUtc(caminho)
-                                      < File.GetLastWriteTimeUtc(Path.Combine(onde, "transcricao.json")),
+                        AtaVelha = EstadoDaAta.EstaVelha(onde),
                     });
                     break;
                 }
@@ -2679,12 +2692,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
         string? titulo = null;
         int convidados = 0;
+        var nomes = new List<string>();
         if (raiz.TryGetProperty("meeting", out var reuniao))
         {
             if (reuniao.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String)
                 titulo = t.GetString();
             if (reuniao.TryGetProperty("attendees", out var a) && a.ValueKind == JsonValueKind.Array)
+            {
                 convidados = a.GetArrayLength();
+                foreach (var n in a.EnumerateArray())
+                    if (n.ValueKind == JsonValueKind.String && n.GetString() is { Length: > 0 } nome)
+                        nomes.Add(nome);
+            }
         }
 
         // O vínculo com cliente/projeto vem junto na lista, e não por pedido
@@ -2699,6 +2718,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             avisos.Add("A transcrição foi interrompida antes de separar os falantes. "
                        + "Transcreva de novo para completá-la — o texto já pronto é aproveitado.");
 
+        // Na lista, e não num pedido por linha: são poucos campos por gravação,
+        // e um pedido por linha faria a lista piscar preenchendo-se aos poucos —
+        // o mesmo argumento do vínculo, logo acima.
+        var ata = EstadoDaAta.Ler(pasta);
+
         return new GravacaoResumo
         {
             Nome = Path.GetFileName(pasta),
@@ -2711,6 +2735,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Projeto = dados.Projeto,
             ComNotas = Notas.Existem(pasta),
             Avisos = avisos,
+            Nomes = nomes,
+            TemAta = ata.Existe,
+            AtaVelha = ata.Velha,
+            Pendencias = ata.Pendencias,
+            PendenciasInicio = [.. ata.PrimeirasPendencias],
+            Resumo = ata.Resumo,
+            NotasInicio = Notas.Inicio(pasta),
         };
     }
 }
