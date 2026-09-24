@@ -329,8 +329,26 @@ prova_janela_estreita.janela = (1000, 700)
 
 
 
+def prova_ata_na_reuniao_pedida(pagina) -> None:
+    linha_por_titulo(pagina, "Comunicação")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.click(".reunioes__painel [data-acao='abrir-ata']")
+    pagina.wait_for_selector(".ata", timeout=5000)
+    pagina.wait_for_timeout(100)
+    aberta = pagina.evaluate("""() => {
+        const c = [...document.querySelectorAll('.ata')]
+          .find((x) => x.dataset.gravacao.includes('13-59'));
+        const d = c && c.querySelector('details.ata__dobra');
+        return Boolean(d && d.open);
+    }""")
+    conferir(aberta, "'Abrir a ata' leva a Atas com a ata daquela reunião aberta")
+    foco = pagina.evaluate("() => document.activeElement && document.activeElement.dataset.acao")
+    conferir(foco == "ata", f"e o foco vai para o botão dela ({foco!r})")
+
+
+
 PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem,
-          prova_painel, prova_transcricao_em_curso, prova_janela_estreita]
+          prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida]
 
 
 

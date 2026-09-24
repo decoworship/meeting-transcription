@@ -755,17 +755,19 @@ export function abrirGravador() {
 }
 
 /** O destino Atas mora em atas.js, pelo mesmo motivo dos outros dois. */
-export function abrirAtas() {
+export function abrirAtas(opcoes = {}) {
   fecharGavetas();
   destino("ir-atas");
-  return telaDeAtas({ cabecalho, tela });
+  return telaDeAtas({ cabecalho, tela }, opcoes);
 }
 
 // ─────────────────────────────────────────────────────────── ligação
 
 document.getElementById("ir-config").addEventListener("click", () => abrirAjustes());
 document.getElementById("ir-gravador").addEventListener("click", abrirGravador);
-document.getElementById("ir-atas").addEventListener("click", abrirAtas);
+// Embrulhado: o clique mandaria o evento no lugar das opções.
+document.getElementById("ir-atas").addEventListener("click", () => abrirAtas());
+
 document.getElementById("ir-reunioes").addEventListener("click", telaDeLista);
 voltar.addEventListener("click", telaDeLista);
 
