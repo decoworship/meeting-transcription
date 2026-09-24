@@ -25,7 +25,9 @@ Não é preciso instalar Python, CUDA, .NET nem nada. Está tudo dentro.
    já tem o app instalado recebe a versão nova como atualização, e os atalhos
    passam a abrir o `PulseMeet.exe`. **Um ícone que você mesmo fixou na barra de
    tarefas** também é repontado; se ele não abrir, fixe-o de novo pelo menu
-   Iniciar.
+   Iniciar. **O ícone da bandeja**, perto do relógio, pode ir para a área
+   escondida (a setinha ^): para trazê-lo de volta, Configurações ›
+   Personalização › Barra de tarefas › Outros ícones da bandeja › PulseMeet.
 
 2. **O Windows vai mostrar um aviso azul** dizendo que o editor é desconhecido.
    Isso acontece porque o instalador não é assinado — assinatura de código custa

@@ -31,9 +31,11 @@ param(
     [switch]$Aplicar,
     [string]$Antigo = "MeetingApp.exe",
     [string]$Novo = "PulseMeet.exe",
-    [string]$Programas = [Environment]::GetFolderPath("Programs"),
-    [string]$AreaDeTrabalho = [Environment]::GetFolderPath("Desktop"),
-    [string[]]$Fixados = @(
+    # Vazios valem: é o que o Windows devolve para uma pasta conhecida que não
+    # existe, e uma delas faltando não pode abortar as outras.
+    [AllowEmptyString()][string]$Programas = [Environment]::GetFolderPath("Programs"),
+    [AllowEmptyString()][string]$AreaDeTrabalho = [Environment]::GetFolderPath("Desktop"),
+    [AllowEmptyCollection()][AllowEmptyString()][string[]]$Fixados = @(
         (Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"),
         (Join-Path $env:APPDATA "Microsoft\Internet Explorer\Quick Launch\User Pinned\StartMenu")),
     [string]$ChaveRun = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -55,10 +57,14 @@ $shell = New-Object -ComObject WScript.Shell
 $programas = $Programas
 $areaDeTrabalho = $AreaDeTrabalho
 $repontados = @()
-$lugares = @($Programas, $AreaDeTrabalho) + $Fixados
+$lugares = @($Programas, $AreaDeTrabalho) + $Fixados | Where-Object { $_ }
 foreach ($lugar in $lugares) {
     if (-not (Test-Path -LiteralPath $lugar)) { continue }
-    foreach ($lnk in Get-ChildItem -LiteralPath $lugar -Filter *.lnk -Recurse -ErrorAction SilentlyContinue) {
+    # Só o menu Iniciar em profundidade: a área de trabalho pode ser o OneDrive
+    # inteiro, e percorrê-la deixaria o passo escondido do instalador parado em
+    # "Atualizando os atalhos…" sem ninguém saber por quê.
+    $fundo = ($lugar -eq $Programas)
+    foreach ($lnk in Get-ChildItem -LiteralPath $lugar -Filter *.lnk -Recurse:$fundo -ErrorAction SilentlyContinue) {
         $atalho = $shell.CreateShortcut($lnk.FullName)
         if ($atalho.TargetPath -ne $velho) { continue }
         Write-Output "atalho: $($lnk.FullName)"
@@ -76,9 +82,9 @@ foreach ($lugar in $lugares) {
 # ---- os nomes, no menu Iniciar e na área de trabalho
 foreach ($lnk in $repontados) {
     $dir = Split-Path -Parent $lnk
-    if (-not ($dir.StartsWith($programas) -or $dir -eq $areaDeTrabalho)) { continue }
+    if (-not (($programas -and $dir.StartsWith($programas)) -or ($areaDeTrabalho -and $dir -eq $areaDeTrabalho))) { continue }
     $base = [IO.Path]::GetFileNameWithoutExtension($lnk)
-    $dirNovo = if ((Split-Path -Leaf $dir) -eq $nomeVelho -and $dir.StartsWith($programas)) {
+    $dirNovo = if ((Split-Path -Leaf $dir) -eq $nomeVelho -and $programas -and $dir.StartsWith($programas)) {
         Join-Path (Split-Path -Parent $dir) $nomeNovo } else { $dir }
     $alvo = Join-Path $dirNovo ("{0}.lnk" -f $(if ($base -eq $nomeVelho) { $nomeNovo } else { $base }))
     if ($alvo -eq $lnk) { continue }
@@ -89,8 +95,8 @@ foreach ($lnk in $repontados) {
     # velha): o segundo sai, e fica um só.
     if (Test-Path -LiteralPath $alvo) { Remove-Item -LiteralPath $lnk } else { Move-Item -LiteralPath $lnk -Destination $alvo }
 }
-$pastaVelha = Join-Path $programas $nomeVelho
-if ($Aplicar -and (Test-Path -LiteralPath $pastaVelha) -and -not (Get-ChildItem -LiteralPath $pastaVelha -Force)) {
+$pastaVelha = if ($programas) { Join-Path $programas $nomeVelho } else { "" }
+if ($Aplicar -and $pastaVelha -and (Test-Path -LiteralPath $pastaVelha) -and -not (Get-ChildItem -LiteralPath $pastaVelha -Force)) {
     Remove-Item -LiteralPath $pastaVelha
 }
 

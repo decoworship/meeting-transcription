@@ -113,7 +113,10 @@ redesenho). **A marca é uma constante só**: `Marca.Nome` em `Nucleo/Marca.cs` 
 o `#define Marca` do `.iss`, com um teste que falha se os dois discordarem — e
 que confere também o `AssemblyName` do app e os scripts que copiam o `.exe`.
 Quem tinha o `MeetingApp.exe` tem os atalhos repontados pelo
-`tools/repontar_atalhos.ps1`, que o instalador e o `publicar.sh` rodam. O que
+`tools/repontar_atalhos.ps1`, que o instalador e o `publicar.sh` rodam.
+**Publicar só de uma árvore que tem a troca**: o `publicar.sh` de um ramo antigo
+copia um `MeetingApp.exe` que nenhum atalho abre mais — ramo antigo recebe a main
+antes de publicar. O que
 carrega o nome antigo por baixo — `AppId`, a pasta de instalação, o mutex, os
 namespaces, o `RootNamespace` e os `LogicalName` dos recursos, e a pasta de
 dados do WebView2 — **não muda nunca**, e cada um quebra algo diferente se

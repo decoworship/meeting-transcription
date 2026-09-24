@@ -209,7 +209,7 @@ Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"
 ; MeetingApp.exe que o [InstallDelete] apagou. Idempotente: sem nada velho, não
 ; acha nada.
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
-  Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\repontar_atalhos.ps1"" -Pasta ""{app}"" -Aplicar"; \
+  Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\repontar_atalhos.ps1"" -Pasta ""{app}"" -Aplicar"; \
   StatusMsg: "Atualizando os atalhos…"; Flags: runhidden waituntilterminated
 Filename: "{app}\{#Marca}.exe"; Description: "Abrir o {#Marca}"; \
   Flags: nowait postinstall skipifsilent

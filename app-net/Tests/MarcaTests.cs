@@ -72,6 +72,9 @@ public sealed class MarcaTests
         Assert.Contains("UsePreviousGroup=no", texto);
         // E os atalhos que a pessoa fez são repontados pelo mesmo script do publicar.sh.
         Assert.Contains(@"-File """"{app}\repontar_atalhos.ps1"""" -Pasta """"{app}"""" -Aplicar", texto);
+        // Escondido e esperado: um PowerShell que parasse para perguntar
+        // travaria o instalador sem ninguém ver.
+        Assert.Contains("-NoProfile -NonInteractive -ExecutionPolicy Bypass", texto);
 
         // O .exe velho só aparece para ser apagado.
         var velhas = texto.Split('\n')
@@ -91,6 +94,9 @@ public sealed class MarcaTests
             if (caminho is null) continue;
             Assert.Contains($"{Marca.Nome}.exe", File.ReadAllText(caminho));
         }
+        string? publicar = Achar(Path.Combine("tools", "publicar.sh"));
+        if (publicar is not null)
+            Assert.Contains("-NonInteractive", File.ReadAllText(publicar));
     }
 
     private static string? Propriedade(string csproj, string nome)

@@ -21,7 +21,8 @@ try {
     $programas = Join-Path $raiz "Programs"
     $area = Join-Path $raiz "Desktop"
     $fixados = Join-Path $raiz "TaskBar"
-    foreach ($d in @($pasta, $outra, (Join-Path $programas "MeetingApp"), (Join-Path $programas "Outro"), $area, $fixados)) {
+    foreach ($d in @($pasta, $outra, (Join-Path $programas "MeetingApp"), (Join-Path $programas "Outro"), $area,
+                     (Join-Path $area "Projetos"), $fixados)) {
         New-Item -ItemType Directory -Force -Path $d | Out-Null
     }
     foreach ($f in @("$pasta\MeetingApp.exe", "$pasta\PulseMeet.exe", "$outra\MeetingApp.exe")) { New-Item -ItemType File -Path $f | Out-Null }
@@ -33,6 +34,10 @@ try {
     Atalho "$programas\MeetingApp\PulseMeet.lnk" "$pasta\MeetingApp.exe"
     Atalho "$programas\Outro\Outro.lnk" "$outra\MeetingApp.exe"
     Atalho "$area\MeetingApp.lnk" "$pasta\MeetingApp.exe"
+    # Numa subpasta da área de trabalho: só o menu Iniciar é percorrido em
+    # profundidade. A área de trabalho pode ser o OneDrive inteiro, e o passo
+    # escondido do instalador pareceria travado.
+    Atalho "$area\Projetos\MeetingApp.lnk" "$pasta\MeetingApp.exe"
     Atalho "$fixados\MeetingApp.lnk" "$pasta\MeetingApp.exe"
 
     New-Item -Path "$chave\Run" -Force | Out-Null
@@ -46,16 +51,17 @@ try {
     $desligado = [byte[]](3, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8)
     Set-ItemProperty -Path "$chave\Aprovado" -Name "MeetingApp" -Value $desligado -Type Binary
 
-    $args = @{ Pasta = $pasta; Programas = $programas; AreaDeTrabalho = $area; Fixados = @($fixados);
+    # Não "$args": é variável automática do PowerShell.
+    $lugaresDaProva = @{ Pasta = $pasta; Programas = $programas; AreaDeTrabalho = $area; Fixados = @($fixados);
                ChaveRun = "$chave\Run"; ChaveAprovado = "$chave\Aprovado"; ChaveDesinstalar = "$chave\Desinstalar" }
 
-    $lista = & $script @args
+    $lista = & $script @lugaresDaProva
     Conferir ((Alvo "$area\MeetingApp.lnk") -eq "$pasta\MeetingApp.exe") "sem -Aplicar, nada muda"
     # Quatro atalhos (dois no menu Iniciar, um na área de trabalho, um fixado),
     # o início automático e o ícone de "Aplicativos instalados".
     Conferir (($lista -join "`n") -match "a repontar: 6") "e ele diz o que mudaria ($(@($lista)[-1]))"
 
-    $saida = & $script @args -Aplicar
+    $saida = & $script @lugaresDaProva -Aplicar
     Conferir (Test-Path "$programas\PulseMeet\PulseMeet.lnk") "o menu Iniciar ganha a pasta PulseMeet com o atalho PulseMeet"
     Conferir ((Alvo "$programas\PulseMeet\PulseMeet.lnk") -eq "$pasta\PulseMeet.exe") "apontando para o PulseMeet.exe"
     Conferir (-not (Test-Path "$programas\MeetingApp")) "e a pasta MeetingApp do menu Iniciar some"
@@ -74,8 +80,20 @@ try {
     $outro = (Get-ItemProperty -Path "$chave\Desinstalar\Outro").DisplayIcon
     Conferir ($outro -eq "$outra\MeetingApp.exe") "e o dos outros programas fica"
 
-    $denovo = & $script @args -Aplicar
+    Conferir ((Alvo "$area\Projetos\MeetingApp.lnk") -eq "$pasta\MeetingApp.exe") "a subpasta da área de trabalho não é percorrida"
+
+    $denovo = & $script @lugaresDaProva -Aplicar
     Conferir (@($denovo)[-1] -eq "repontados: 0") "rodar de novo não acha mais nada ($(@($denovo)[-1]))"
+
+    # Uma pasta conhecida que não existe (o Windows devolve "" para ela) não
+    # pode abortar o resto: o iniciar com o Windows é o que a pessoa nota.
+    Set-ItemProperty -Path "$chave\Run" -Name "MeetingApp" -Value "`"$pasta\MeetingApp.exe`""
+    Remove-ItemProperty -Path "$chave\Run" -Name "PulseMeet"
+    $semArea = @{} + $lugaresDaProva
+    $semArea.AreaDeTrabalho = ""
+    $saida = & $script @semArea -Aplicar
+    $run = Get-ItemProperty -Path "$chave\Run"
+    Conferir (($null -eq $run.MeetingApp) -and ($run.PulseMeet -eq "`"$pasta\PulseMeet.exe`"")) "sem área de trabalho, o iniciar com o Windows é repontado mesmo assim"
 }
 finally {
     Remove-Item -LiteralPath $raiz -Recurse -Force -ErrorAction SilentlyContinue

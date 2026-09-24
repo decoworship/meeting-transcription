@@ -113,9 +113,11 @@ tools/montar_instalador.sh
 
 **A primeira versão depois de 24/09/2026 troca o nome do executável**
 (`MeetingApp.exe` → `PulseMeet.exe`, docs/MARCA.md). O CHANGELOG dela diz, para
-quem usa, que o programa passou a se chamar PulseMeet, e que um ícone fixado à
+quem usa, que o programa passou a se chamar PulseMeet; que um ícone fixado à
 mão na barra de tarefas é repontado pelo instalador — e, se não abrir, se fixa
-de novo pelo menu Iniciar.
+de novo pelo menu Iniciar —; e que **o ícone da bandeja pode ir para a área
+escondida (^)**, e como trazê-lo de volta (docs/MARCA.md, "O que não se
+reponta").
 
 Até aqui é o que sempre foi. O resto existe desde 19/08/2026, e é o que põe o
 instalador ao alcance de quem não recebe arquivo na mão:

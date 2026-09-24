@@ -41,7 +41,7 @@ que são o que o Gerenciador de Tarefas e as propriedades do arquivo mostram), e
 
 O que apontava para o `MeetingApp.exe` é repontado por
 [`tools/repontar_atalhos.ps1`](../tools/repontar_atalhos.ps1): o menu Iniciar, a
-área de trabalho, os fixados da barra de tarefas e do Iniciar, o "iniciar com
+área de trabalho, os fixados da barra de tarefas, o "iniciar com
 o Windows" — levando junto a escolha do Gerenciador de Tarefas, para quem tinha
 desligado o início automático — e o ícone de "Aplicativos instalados". O instalador o roda no fim (e apaga o
 `MeetingApp.exe` e a pasta "MeetingApp" do menu Iniciar, de antes da 0.4.0); o
@@ -49,9 +49,28 @@ desligado o início automático — e o ícone de "Aplicativos instalados". O in
 `.exe` velho. A prova dele roda numa pasta e numa chave de registro de mentira:
 [`tools/provar_repontar_atalhos.ps1`](../tools/provar_repontar_atalhos.ps1).
 
-**O que não se reponta**: um fixado da barra de tarefas pode guardar uma cópia
-do atalho que o Windows não relê. Se o ícone fixado não abrir depois da
-atualização, a pessoa o fixa de novo pelo menu Iniciar.
+**O que não se reponta**, e o que dizer a quem usa:
+
+- **o ícone da bandeja vai para a área escondida (^).** O Windows 11 guarda
+  "mostrar na bandeja" pelo caminho do `.exe` (`HKCU\Control Panel\NotifyIconSettings`),
+  e um `.exe` novo nasce escondido. É o ícone que mostra o estado da gravação e o
+  único jeito de sair do app: religá-lo é Configurações › Personalização ›
+  Barra de tarefas › Outros ícones da bandeja › PulseMeet;
+- **um fixado da barra de tarefas** pode guardar uma cópia do atalho que o
+  Windows não relê: se não abrir, fixa-se de novo pelo menu Iniciar;
+- **um fixado do Iniciar**, no Windows 10 e 11, não é um atalho em disco, e some
+  quando a pasta do menu Iniciar troca de nome: fixa-se de novo.
+
+**Publicar só de uma árvore que tem a troca.** Depois dela, um `publicar.sh`
+antigo — de um ramo que não recebeu a main — copia um `MeetingApp.exe` que
+nenhum atalho abre mais, e o menu Iniciar continua abrindo o `PulseMeet.exe`
+de antes, calado. Ramo antigo recebe a main antes de publicar. **Desfazer a
+troca** é o mesmo script ao contrário, e apagar o novo:
+`repontar_atalhos.ps1 -Pasta <instalação> -Antigo PulseMeet.exe -Novo MeetingApp.exe -Aplicar`.
+E, na máquina que se atualiza pelo `publicar.sh`, **desinstalar antes do próximo
+instalador** deixa para trás o que o desinstalador antigo não conhece: o
+`PulseMeet.exe`, o atalho `PulseMeet\PulseMeet.lnk` e o valor `PulseMeet` do
+iniciar com o Windows, apontando para uma pasta sem o `WebView2Loader.dll`.
 
 ## O que não muda com a marca
 

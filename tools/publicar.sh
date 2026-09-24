@@ -214,7 +214,7 @@ ls -la "$DESTINO/PulseMeet.exe"
 # o vazio. Uma vez só: depois da troca não há MeetingApp.exe para achar.
 if [[ -f "$DESTINO/MeetingApp.exe" ]]; then
   echo "==> o executável agora é PulseMeet.exe: repontando os atalhos"
-  (cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile \
+  (cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
      -ExecutionPolicy Bypass -File "$(wslpath -w "$RAIZ/tools/repontar_atalhos.ps1")" \
      -Pasta "$(wslpath -w "$DESTINO")" -Aplicar | tr -d '\r' | sed 's/^/    /')
   rm -f "$DESTINO/MeetingApp.exe"
