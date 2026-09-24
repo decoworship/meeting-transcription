@@ -853,9 +853,9 @@ def prova_semana_abre_e_volta(pagina) -> None:
     pagina.wait_for_timeout(50)
     antes = pagina.text_content(".semana-nav__escolher").strip()
     # Sete dias atrás é sempre a semana anterior; seis, no domingo, ainda é esta.
-    pagina.click(".semana__cartao >> text=Agente de Crédito — kickoff")
+    pagina.dblclick(".semana__cartao >> text=Agente de Crédito — kickoff")
     pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
-    conferir(True, "um clique no cartão abre a reunião")
+    conferir(True, "o duplo clique no cartão abre a reunião, como na lista")
     pagina.click("#voltar")
     pagina.wait_for_selector(".semana .semana__dia", timeout=5000)
     conferir(pagina.text_content(".semana-nav__escolher").strip() == antes,
@@ -956,6 +956,70 @@ def prova_popover_fecha_com_shift_tab(pagina) -> None:
         conferir(pagina.get_attribute(gatilho, "aria-expanded") == "false", "e o botão diz que fechou")
 
 
+def prova_semana_clique_mostra_o_resumo(pagina) -> None:
+    # Achado no percurso do dono em 24/09/2026: na semana, o clique ia direto à
+    # reunião, e o que o painel da lista mostra — o próximo passo, o que a ata
+    # diz, as pendências — não se via.
+    ir_para_semana(pagina)
+    cartao = ".semana__cartao >> text=Reunião de lideranças"
+    pagina.click(cartao)
+    pagina.wait_for_timeout(50)
+    conferir(pagina.locator(".reuniao-aberta").count() == 0, "um clique no cartão não sai da semana")
+    conferir(pagina.is_visible(".semana__detalhe .reunioes__painel"), "e abre o painel da reunião por cima")
+    conferir("Reunião de lideranças" in (pagina.text_content(".semana__detalhe") or ""), "com a reunião clicada")
+    marcado = pagina.eval_on_selector_all(".semana__cartao[aria-pressed='true'] .semana__titulo",
+                                          "els => els.map((e) => e.textContent)")
+    conferir(marcado == ["Reunião de lideranças"], f"e o cartão fica marcado ({marcado})")
+    conferir(pagina.evaluate(A_VISTA, ".semana__detalhe [data-acao]"), "com o próximo passo à vista")
+    pagina.keyboard.press("Escape")
+    conferir(not pagina.is_visible(".semana__detalhe"), "Esc fecha o painel")
+    ativo = pagina.evaluate("() => document.activeElement.closest('.semana__cartao') !== null")
+    conferir(ativo, "e devolve o foco ao cartão")
+    pagina.click(cartao)
+    pagina.click(".semana__detalhe [aria-label='Fechar o painel']")
+    conferir(not pagina.is_visible(".semana__detalhe"), "o ✕ também fecha")
+    pagina.focus(".semana__cartao >> nth=0")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+    conferir(True, "Enter no cartão abre a reunião, como na lista")
+
+
+def prova_semana_resumo_na_janela_estreita(pagina) -> None:
+    # Na lista estreita o painel some; na semana ele é por cima, e cabe.
+    ir_para_semana(pagina)
+    pagina.click(".semana__cartao >> text=Reunião de lideranças")
+    pagina.wait_for_timeout(50)
+    caixa = pagina.evaluate("""() => { const r = document.querySelector('.semana__detalhe').getBoundingClientRect();
+                                        return [Math.round(r.left), Math.round(r.right), innerWidth]; }""")
+    conferir(pagina.is_visible(".semana__detalhe .reunioes__painel") and caixa[0] >= 0 and caixa[1] <= caixa[2],
+             f"na janela estreita, o painel da semana aparece e cabe ({caixa})")
+
+
+prova_semana_resumo_na_janela_estreita.janela = (860, 700)
+
+
+def prova_painel_rola_sozinho(pagina) -> None:
+    # Achado no percurso do dono em 24/09/2026: o painel mais alto que a janela
+    # só mostrava o fim quando a lista inteira rolava até o fim.
+    linha_por_titulo(pagina, "Comunicação")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.wait_for_timeout(50)
+    m = pagina.evaluate("""() => { const p = document.querySelector('.reunioes__painel'), r = p.getBoundingClientRect();
+                                    return { baixo: Math.round(r.bottom), janela: innerHeight,
+                                             rola: p.scrollHeight > p.clientHeight }; }""")
+    conferir(m["baixo"] <= m["janela"], f"o painel cabe na janela ({m})")
+    conferir(m["rola"], "e rola sozinho quando o que ele mostra é mais alto")
+    pagina.evaluate("() => { const p = document.querySelector('.reunioes__painel'); p.scrollTop = p.scrollHeight; }")
+    pagina.wait_for_timeout(50)
+    fim = pagina.evaluate("""() => { const p = document.querySelector('.reunioes__painel');
+                                      return Math.round(p.lastElementChild.getBoundingClientRect().bottom) <= innerHeight
+                                             && document.querySelector('.conteudo').scrollTop === 0; }""")
+    conferir(fim, "o fim do painel se alcança rolando o painel, sem rolar a lista")
+
+
+prova_painel_rola_sozinho.janela = (1280, 520)
+
+
 def prova_semana_etiqueta(pagina) -> None:
     ir_para_semana(pagina)
     caminho = pagina.evaluate("() => window.__gravacoes[3].caminho")   # Sherlock, hoje
@@ -1028,7 +1092,7 @@ def prova_semana_barra_troca_de_tela(pagina) -> None:
     # reunião aberta tem outro título, e é pela troca de título que a barra
     # se esvazia (cabecalho, em app.js).
     ir_para_semana(pagina)
-    pagina.click(".semana__cartao >> text=Sherlock Diário")
+    pagina.dblclick(".semana__cartao >> text=Sherlock Diário")
     pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
     conferir(pagina.locator(".barra .semana-nav, .barra [data-vista]").count() == 0,
              "na reunião aberta, a barra não mostra a navegação da semana")
@@ -1075,7 +1139,8 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_semana_a_125, prova_semana_barra_troca_de_tela,
           prova_semana_abre_e_volta_no_domingo, prova_semana_hoje_vira_a_semana,
           prova_semana_fim_de_semana_numa_linha, prova_semana_filtro_esconde,
-          prova_popover_fecha_com_shift_tab]
+          prova_popover_fecha_com_shift_tab, prova_semana_clique_mostra_o_resumo,
+          prova_semana_resumo_na_janela_estreita, prova_painel_rola_sozinho]
 
 
 

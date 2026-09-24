@@ -286,8 +286,36 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   grade.className = "semana";
   grade.setAttribute("aria-label", "A semana");
 
-  raiz.append(ferramentas, corpo, grade);
+  // Na semana, o painel da reunião abre por cima das colunas, e não ao lado:
+  // elas precisam da largura toda. É o mesmo painel da lista, que muda de lugar
+  // (pintarVista) — um clique no cartão mostra o próximo passo, o que a ata diz
+  // e as pendências, como na lista; o duplo clique e o Enter abrem a reunião.
+  const detalhe = document.createElement("div");
+  detalhe.className = "semana__detalhe";
+  detalhe.hidden = true;
+  const fecharDetalhe = botao("✕", "aa-btn aa-btn-texto semana__fechar", () => esconderDetalhe());
+  fecharDetalhe.setAttribute("aria-label", "Fechar o painel");
+  detalhe.appendChild(fecharDetalhe);
+
+  raiz.append(ferramentas, corpo, grade, detalhe);
   tela.appendChild(raiz);
+
+  raiz.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !detalhe.hidden) esconderDetalhe();
+  });
+
+  // O teto do painel da lista: da posição dele com a lista no topo até o pé da
+  // janela. Medido, e não calculado no CSS a partir da barra do topo: a barra
+  // de ferramentas quebra em duas linhas em janela média, e com o teto contado
+  // da barra do topo o fim do painel ficava fora da tela até a lista rolar.
+  const medirPainel = new ResizeObserver(() => {
+    if (!raiz.isConnected) { medirPainel.disconnect(); return; }
+    const rolagem = raiz.closest(".conteudo");
+    if (!rolagem || corpo.hidden) return;
+    const topo = corpo.getBoundingClientRect().top - rolagem.getBoundingClientRect().top + rolagem.scrollTop;
+    raiz.style.setProperty("--topo-do-painel", `${topo}px`);
+  });
+  medirPainel.observe(ferramentas);
 
   // ---- Lista ou semana, e a navegação da semana, na barra do topo (mockup,
   // prancha "Reuniões · semana"). Montadas uma vez: trocar de semana só repinta
@@ -342,6 +370,9 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     nav.hidden = !semana;
     corpo.hidden = semana;
     grade.hidden = !semana;
+    if (semana) detalhe.appendChild(painel);
+    else corpo.appendChild(painel);
+    detalhe.hidden = true;
     // Na semana, quem escolhe a data é a navegação dela.
     filtroData.hidden = semana;
     if (semana) limparData.hidden = true;
@@ -427,6 +458,9 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       grade.appendChild(nada);
     }
     const colunas = colunasDaSemana(visiveis, segunda, hoje, gravacoes);
+    // O painel aberto de uma reunião que o filtro ou a troca de semana tirou da
+    // tela fecha: ele falaria de um cartão que não está ali.
+    if (!visiveis.some((g) => g.caminho === escolhida)) detalhe.hidden = true;
     grade.classList.toggle("semana--sete", colunas.length === 7);
     for (const coluna of colunas) {
       const dia = document.createElement("section");
@@ -457,6 +491,25 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       }
       grade.appendChild(dia);
     }
+    marcarCartao();
+  }
+
+  function mostrarDetalhe(g) {
+    escolhida = g.caminho;
+    desenharPainel(g);
+    detalhe.hidden = false;
+    marcarCartao();
+  }
+
+  function esconderDetalhe() {
+    detalhe.hidden = true;
+    marcarCartao();
+    linhas.get(escolhida)?.focus();
+  }
+
+  function marcarCartao() {
+    for (const [caminho, c] of linhas)
+      c.setAttribute("aria-pressed", String(!detalhe.hidden && caminho === escolhida));
   }
 
   function cartao(g) {
@@ -465,8 +518,16 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     b.className = "semana__cartao";
     b.dataset.gravacao = g.caminho;
     preencherCartao(b, g);
-    // Um clique abre: a semana não tem painel ao lado para escolher antes.
-    b.addEventListener("click", () => abrirGravacao(g));
+    b.setAttribute("aria-pressed", "false");
+    // Como a linha da lista: o clique mostra o painel, e o duplo clique e o
+    // Enter abrem a reunião.
+    b.addEventListener("click", () => mostrarDetalhe(g));
+    b.addEventListener("dblclick", () => abrirGravacao(g));
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      abrirGravacao(g);
+    });
     return b;
   }
 
