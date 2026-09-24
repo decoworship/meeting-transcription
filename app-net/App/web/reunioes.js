@@ -11,9 +11,10 @@
 import { pedir } from "/ponte.js";
 import { alerta, anunciar } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado } from "/transcricoes.js";
-import { duracao, tituloDe, abrirGravacao, abrirGravador } from "/app.js";
-import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal,
+import { duracao, quando, tituloDe, abrirGravacao, abrirGravador, abrirAtas } from "/app.js";
+import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal, proximoPasso,
          ESTADOS, PERIODOS, SEM_CLIENTE } from "/reunioes-regras.js";
+
 
 /**
  * Os critérios sobrevivem a abrir uma reunião e voltar.
@@ -23,6 +24,16 @@ import { agruparPorDia, clientesDe, estadoDe, filtrar, horaDe, hojeLocal,
  * como a deixou.
  */
 const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "" };
+
+/** A gravação no painel, pelo caminho. Sobrevive a voltar, como os critérios. */
+let escolhida = null;
+
+/**
+ * Abaixo disto o painel não cabe, o CSS o esconde, e o clique na linha volta
+ * a abrir a reunião direto. O número é o mesmo do @media do app.css.
+ */
+const ESTREITA = window.matchMedia("(max-width: 1099px)");
+
 
 const TOM = {
   info: "aa-etiqueta aa-etiqueta--info",
@@ -170,7 +181,15 @@ export async function telaDeReunioes({ cabecalho, tela }) {
   lista.className = "reunioes__lista";
   lista.setAttribute("aria-label", "Gravações");
 
-  raiz.append(ferramentas, lista);
+  const painel = document.createElement("aside");
+  painel.className = "reunioes__painel";
+  painel.setAttribute("aria-label", "Reunião escolhida");
+
+  const corpo = document.createElement("div");
+  corpo.className = "reunioes__corpo";
+  corpo.append(lista, painel);
+
+  raiz.append(ferramentas, corpo);
   tela.appendChild(raiz);
 
   /** caminho → linha, para trocar a etiqueta sem redesenhar a lista. */
@@ -187,10 +206,12 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     lista.replaceChildren();
     if (visiveis.length === 0) {
       lista.appendChild(semResultado());
+      desenharPainel(null);
       return;
     }
 
-    for (const grupo of agruparPorDia(visiveis, hoje)) {
+    const grupos = agruparPorDia(visiveis, hoje);
+    for (const grupo of grupos) {
       const dia = document.createElement("h2");
       dia.className = "reunioes__dia";
       dia.textContent = grupo.rotulo;
@@ -201,7 +222,15 @@ export async function telaDeReunioes({ cabecalho, tela }) {
         lista.appendChild(l);
       }
     }
+
+    // A escolhida que o filtro escondeu cede o lugar à primeira que sobrou:
+    // um painel falando de uma reunião que não está na lista confunde.
+    // **A primeira da tela, e não a primeira que o núcleo mandou**: o "Sem
+    // data" chega na frente e é desenhado no fim.
+    if (!visiveis.some((g) => g.caminho === escolhida)) escolhida = grupos[0].itens[0].caminho;
+    marcarEscolhida();
   }
+
 
   function linha(g) {
     const b = document.createElement("button");
@@ -226,9 +255,86 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     textos.append(titulo, meta);
 
     b.append(hora, textos, etiqueta(g));
-    b.addEventListener("click", () => abrirGravacao(g));
+    b.setAttribute("aria-pressed", "false");
+    // Escolher custa um clique a mais para abrir, e o duplo clique o devolve.
+    // Sem largura para o painel, escolher não mostraria nada — o clique abre.
+    b.addEventListener("click", () => (ESTREITA.matches ? abrirGravacao(g) : escolher(g)));
+    b.addEventListener("dblclick", () => abrirGravacao(g));
     return b;
   }
+
+  function escolher(g) {
+    escolhida = g.caminho;
+    marcarEscolhida();
+  }
+
+  function marcarEscolhida() {
+    for (const [caminho, l] of linhas) l.setAttribute("aria-pressed", String(caminho === escolhida));
+    desenharPainel(gravacoes.find((g) => g.caminho === escolhida) ?? null);
+  }
+
+  /** O que o painel desenhou por último, para não redesenhá-lo à toa. */
+  let pintado = "";
+
+  /**
+   * O painel da escolhida: o que ela é, o que ela precisa, e o que a ata diz.
+   *
+   * @param seMudou redesenhar só se o estado mudou. É o caso dos eventos de
+   *   andamento, que chegam várias vezes por etapa: redesenhar a cada um
+   *   tiraria o foco de quem está com o Tab no botão do painel.
+   */
+  function desenharPainel(g, { seMudou = false } = {}) {
+    const rodando = g ? emCurso(g.caminho) : null;
+    const chave = g
+      ? `${g.caminho}|${estadoDe(g, rodando).rotulo}|${proximoPasso(g, rodando).acao}` : "";
+    if (seMudou && chave === pintado) return;
+    pintado = chave;
+    painel.replaceChildren();
+    if (!g) return;
+
+    const titulo = document.createElement("h2");
+    titulo.className = "reunioes__painel-titulo";
+    titulo.textContent = tituloDe(g);
+
+    painel.append(
+      titulo,
+      // Sem data no nome da pasta, o quando() devolveria o próprio nome.
+      texto("reunioes__painel-meta", [horaDe(g.nome) ? quando(g.nome) : null,
+        duracao(g.duracao_s),
+        g.convidados > 0 ? `${g.convidados} convidados` : null].filter(Boolean).join(" · ")),
+      texto("reunioes__painel-vinculo", g.cliente || g.projeto
+        ? [g.cliente, g.projeto].filter(Boolean).join(" › ")
+        : "Sem cliente — escolha ao transcrever"),
+    );
+    for (const aviso of g.avisos) painel.appendChild(alerta(aviso));
+
+    const passo = proximoPasso(g, rodando);
+    const principal = botao(passo.rotulo, "aa-btn aa-btn-primario", () => seguir(g, passo.acao));
+    principal.dataset.acao = passo.acao;
+    const acoes = document.createElement("div");
+    acoes.className = "reunioes__painel-acoes";
+    acoes.append(principal, botao("Abrir", "aa-btn aa-btn-secundario", () => abrirGravacao(g)));
+    painel.appendChild(acoes);
+
+    painel.appendChild(secaoDoPainel("Ata", textoDaAta(g, rodando)));
+    if (g.resumo) painel.appendChild(texto("reunioes__painel-resumo", g.resumo));
+
+    const pendencias = g.pendencias_inicio ?? [];
+    if (pendencias.length > 0) {
+      const s = secaoDoPainel(g.pendencias === 1 ? "1 pendência" : `${g.pendencias} pendências`);
+      const ul = document.createElement("ul");
+      ul.className = "reunioes__pendencias";
+      for (const p of pendencias) {
+        const li = document.createElement("li");
+        li.textContent = p;
+        ul.appendChild(li);
+      }
+      s.appendChild(ul);
+      painel.appendChild(s);
+    }
+    if (g.notas_inicio) painel.appendChild(secaoDoPainel("Notas", g.notas_inicio));
+  }
+
 
   function semResultado() {
     const caixa = document.createElement("div");
@@ -297,6 +403,8 @@ export async function telaDeReunioes({ cabecalho, tela }) {
       if (l && l.lastElementChild.textContent !== estadoDe(g, emCurso(g.caminho)).rotulo)
         l.lastElementChild.replaceWith(etiqueta(g));
     }
+    desenharPainel(gravacoes.find((x) => x.caminho === escolhida) ?? null, { seMudou: true });
+
   });
 }
 
@@ -336,3 +444,50 @@ function seletor(rotulo, id, opcoes, valor) {
   s.value = opcoes.some(([v]) => v === valor) ? valor : opcoes[0][0];
   return s;
 }
+
+function texto(classe, conteudo) {
+  const p = document.createElement("p");
+  if (classe) p.className = classe;
+  p.textContent = conteudo;
+  return p;
+}
+
+function botao(rotulo, classe, aoClicar) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = classe;
+  b.textContent = rotulo;
+  b.addEventListener("click", aoClicar);
+  return b;
+}
+
+function secaoDoPainel(rotulo, conteudo = null) {
+  const s = document.createElement("section");
+  s.className = "reunioes__painel-secao";
+  const h = document.createElement("h3");
+  h.className = "reunioes__rotulo";
+  h.textContent = rotulo;
+  s.appendChild(h);
+  if (conteudo) s.appendChild(texto("", conteudo));
+  return s;
+}
+
+function textoDaAta(g, rodando) {
+  if (rodando?.tarefa === "ata") return "Sendo escrita agora.";
+  if (!g.transcrita) return "A ata é escrita a partir da transcrição.";
+  if (!g.tem_ata) return "Ainda não foi escrita.";
+  if (g.ata_velha) return "A transcrição foi corrigida depois que esta ata foi escrita.";
+  return "Pronta.";
+}
+
+/**
+ * O botão do próximo passo leva aonde o passo se dá.
+ *
+ * A ata ainda mora em Atas; o plano 2 a traz para dentro da reunião, e aí
+ * esta função é o único lugar a mudar.
+ */
+function seguir(g, acao) {
+  if (acao === "transcrever" || acao === "acompanhar-transcricao") return abrirGravacao(g);
+  return abrirAtas({ foco: g.caminho });
+}
+

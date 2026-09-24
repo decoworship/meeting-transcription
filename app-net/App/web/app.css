@@ -345,6 +345,75 @@ html {
 }
 .reunioes__vazio p { margin: 0; }
 
+.reunioes__corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: var(--espaco-4);
+  align-items: start;
+}
+
+.reuniao-linha[aria-pressed="true"],
+.reuniao-linha[aria-pressed="true"]:hover { background: var(--cor-acao-suave); }
+
+/* Gruda logo abaixo da barra do topo, que também é sticky — pela mesma
+ * variável que as abas dos ajustes e os controles da revisão já usam. */
+.reunioes__painel {
+  position: sticky;
+  top: calc(var(--altura-da-barra) + var(--espaco-4));
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+}
+.reunioes__painel:empty { display: none; }
+
+.reunioes__painel-titulo {
+  margin: 0;
+  font-family: var(--fonte-display);
+  font-size: 1.3rem;
+  line-height: 1.2;
+  color: var(--cor-texto-forte);
+}
+.reunioes__painel-meta,
+.reunioes__painel-vinculo { margin: 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.reunioes__painel-resumo { margin: 0; color: var(--cor-texto-forte); }
+
+.reunioes__painel-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  padding-bottom: var(--espaco-3);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.reunioes__painel-secao { display: grid; gap: var(--espaco-1); }
+.reunioes__painel-secao p { margin: 0; }
+.reunioes__rotulo {
+  margin: 0;
+  font: 700 var(--texto-rotulo) / 1.2 var(--fonte-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+.reunioes__pendencias {
+  margin: 0;
+  padding-left: var(--espaco-4);
+  display: grid;
+  gap: var(--espaco-1);
+  font-size: var(--texto-pequeno);
+}
+
+/* Sem largura para o painel, ele some, e o clique na linha abre a reunião
+ * (ESTREITA, em reunioes.js). Os dois números andam juntos. */
+@media (max-width: 1099px) {
+  .reunioes__corpo { grid-template-columns: 1fr; }
+  .reunioes__painel { display: none; }
+}
+
+
 /* ──────────────────────────────────────────── preparar a transcrição */
 
 .secao { display: grid; gap: var(--espaco-4); }

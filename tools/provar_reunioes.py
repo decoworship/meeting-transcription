@@ -243,14 +243,95 @@ def prova_sem_resultado(pagina) -> None:
 def prova_criterios_sobrevivem(pagina) -> None:
     pagina.select_option("#filtro-cliente", "Vivo")
     pagina.click(".reuniao-linha")
+    pagina.click('.reunioes__painel >> text="Abrir"')
     pagina.wait_for_selector(".revisao", timeout=5000)
     pagina.click("#voltar")
     pagina.wait_for_selector(".reuniao-linha", timeout=5000)
     conferir(pagina.input_value("#filtro-cliente") == "Vivo", "o filtro voltou como estava")
     conferir(titulos(pagina) == ["Sherlock Diário — Status e Ações"], "e a lista voltou filtrada")
+    conferir(pagina.get_attribute(".reuniao-linha", "aria-pressed") == "true",
+             "e a mesma reunião continua escolhida")
 
 
-PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem]
+
+def prova_painel(pagina) -> None:
+    # A primeira da TELA: o núcleo manda a "Reunião importada" na frente, e ela
+    # é desenhada no fim, em "Sem data".
+    conferir(pagina.get_attribute(".reuniao-linha", "aria-pressed") == "true",
+             "sem escolha anterior, a escolhida é a primeira linha da tela")
+    conferir(pagina.text_content(".reunioes__painel-titulo") == "Reunião de lideranças",
+             "e o painel fala dela")
+    linha_por_titulo(pagina, "Sherlock")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.wait_for_timeout(50)
+    conferir(pagina.evaluate("() => window.__linha.getAttribute('aria-pressed')") == "true",
+             "o clique escolhe a linha, e não abre a reunião")
+    conferir(pagina.text_content(".reunioes__painel-titulo") == "Sherlock Diário — Status e Ações",
+             "o painel mostra a escolhida")
+    for inicio, acao in [("Sherlock", "gerar-ata"), ("Semanal", "transcrever"),
+                         ("Pedido Sugerido", "refazer-ata"), ("Comunicação", "abrir-ata")]:
+        linha_por_titulo(pagina, inicio)
+        pagina.evaluate("() => window.__linha.click()")
+        pagina.wait_for_timeout(30)
+        achada = pagina.get_attribute(".reunioes__painel [data-acao]", "data-acao")
+        conferir(achada == acao, f"'{inicio}' oferece {acao} ({achada})")
+    pendencias = pagina.eval_on_selector_all(".reunioes__pendencias li", "els => els.length")
+    conferir(pendencias == 3, f"o painel mostra as três primeiras pendências ({pendencias})")
+    linha_por_titulo(pagina, "Reunião de lideranças")
+    pagina.evaluate("() => window.__linha.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))")
+    pagina.wait_for_selector(".revisao", timeout=5000)
+    conferir(True, "o duplo clique abre a reunião")
+
+
+def prova_transcricao_em_curso(pagina) -> None:
+    linha_por_titulo(pagina, "Semanal")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.wait_for_timeout(30)
+    pagina.evaluate("() => { window.__botao = document.querySelector('.reunioes__painel [data-acao]'); "
+                    "window.__botao.focus(); }")
+    caminho = pagina.evaluate("() => window.__linha.dataset.gravacao")
+    em_curso = ("(c, f) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: "
+                "{ gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: 'asr', fracao: f, texto: '', "
+                "comecou_em: '', terminou: false, erro: null, cancelada: false }, ultimo: null } })")
+    pagina.evaluate(f"([c, f]) => ({em_curso})(c, f)", [caminho, 0.2])
+    pagina.wait_for_timeout(30)
+    conferir(pagina.evaluate("() => window.__linha.isConnected"), "a lista não foi redesenhada")
+    conferir(pagina.evaluate("() => window.__linha.lastElementChild.textContent") == "Transcrevendo…",
+             "a etiqueta passou a 'Transcrevendo…'")
+    conferir(pagina.get_attribute(".reunioes__painel [data-acao]", "data-acao") == "acompanhar-transcricao",
+             "o painel passou a oferecer acompanhar")
+    pagina.evaluate("() => { window.__botao = document.querySelector('.reunioes__painel [data-acao]'); "
+                    "window.__botao.focus(); }")
+    pagina.evaluate(f"([c, f]) => ({em_curso})(c, f)", [caminho, 0.6])
+    pagina.wait_for_timeout(30)
+    conferir(pagina.evaluate("() => window.__botao.isConnected && document.activeElement === window.__botao"),
+             "andamento sem mudança de estado não recria o botão, e o foco fica nele")
+    pagina.evaluate("(c) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo: "
+                    "{ gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: 'montagem', fracao: 1, "
+                    "texto: '', comecou_em: '', terminou: true, erro: null, cancelada: false } } })", caminho)
+    pagina.wait_for_timeout(30)
+    conferir(pagina.evaluate("() => window.__linha.lastElementChild.textContent") == "Sem ata",
+             "terminada, a etiqueta diz 'Sem ata' sozinha")
+    conferir(pagina.get_attribute(".reunioes__painel [data-acao]", "data-acao") == "gerar-ata",
+             "e o painel passa a oferecer gerar a ata")
+
+
+def prova_janela_estreita(pagina) -> None:
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 1000 px a lista cabe, sem rolagem lateral")
+    conferir(not pagina.is_visible(".reunioes__painel"), "em janela estreita o painel some")
+    linha_por_titulo(pagina, "Reunião de lideranças")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.wait_for_selector(".revisao", timeout=5000)
+    conferir(True, "e o clique abre a reunião direto")
+
+
+prova_janela_estreita.janela = (1000, 700)
+
+
+
+PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_sem_resultado, prova_criterios_sobrevivem,
+          prova_painel, prova_transcricao_em_curso, prova_janela_estreita]
+
 
 
 def main() -> int:
