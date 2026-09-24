@@ -44,6 +44,51 @@ public static class CorrecaoDaLegenda
 {
     public sealed record Resultado(List<TrechoDaLegenda> Trechos, int Trocas, int Fundidos);
 
+    /// <summary>A correção de uma reunião, com o que se sabia do vínculo dela.</summary>
+    /// <param name="SemVocabulario">
+    /// O projeto da reunião não deu vocabulário — ou porque não há projeto, ou
+    /// porque ele não tem. A regra por entidade ainda roda (agenda, cliente e
+    /// projeto), mas a fonética não tem alvo.
+    /// </param>
+    public sealed record DaReuniao(Resultado Correcao, bool SemVocabulario, bool SemProjeto)
+    {
+        /// <summary>A linha do <c>registro.log</c>. Nunca um zero mudo.</summary>
+        public string Resumo()
+        {
+            string contagem = $"{Correcao.Trocas} troca(s), {Correcao.Fundidos} trecho(s) fundido(s)";
+            if (!SemVocabulario) return $"termos corrigidos: {contagem}";
+            string porque = SemProjeto ? "reunião sem projeto" : "projeto sem vocabulário";
+            return $"termos: sem vocabulário ({porque}) — {contagem}";
+        }
+    }
+
+    /// <summary>
+    /// A cadeia inteira: o vínculo da pasta, o vocabulário do projeto, as
+    /// entidades, e a correção.
+    /// </summary>
+    /// <remarks>
+    /// <b>O vínculo é lido na hora, do disco.</b> Ele muitas vezes chega
+    /// <i>depois</i> da separação de falantes — em 5 de 9 reuniões medidas em
+    /// 23/09/2026 —, e por isso quem salva o vínculo chama isto de novo. Rodar
+    /// duas vezes é seguro: a segunda não acha o que trocar.
+    /// </remarks>
+    public static DaReuniao CorrigirDaReuniao(
+        string pasta, IReadOnlyList<TrechoDaLegenda> trechos, Projetos projetos)
+    {
+        var vinculo = DadosDaReuniao.Ler(pasta);
+        bool semProjeto = vinculo.Cliente is not { Length: > 0 }
+                       || vinculo.Projeto is not { Length: > 0 };
+        string? vocabulario = semProjeto ? null
+            : projetos.Preferencias(vinculo.Cliente!, vinculo.Projeto!)?.InitialPrompt;
+        var entidades = CorrecaoDeTermos.Entidades(
+            pasta, vocabulario, vinculo.Cliente, vinculo.Projeto);
+
+        return new DaReuniao(
+            Corrigir(trechos, vocabulario, entidades),
+            SemVocabulario: vocabulario is not { Length: > 0 },
+            SemProjeto: semProjeto);
+    }
+
     public static Resultado Corrigir(
         IReadOnlyList<TrechoDaLegenda> trechos, string? vocabulario,
         IReadOnlyList<string> entidades)
@@ -111,6 +156,15 @@ public static class CorrecaoDaLegenda
         foreach (var t in trocasDaFala.OrderBy(t => t.Posicao))
         {
             int local = t.Posicao - inicioDoTrecho + deslocamento;
+
+            // **Recorte que não bate é troca pulada, não exceção.** Não deveria
+            // acontecer — a posição e o trecho saem da mesma regra de junção —,
+            // mas se acontecer, lançar faria o catch da ponte descartar todas as
+            // correções da reunião por causa de uma.
+            if (local < 0 || local + t.De.Length > saida.Length
+                || string.CompareOrdinal(saida, local, t.De, 0, t.De.Length) != 0)
+                continue;
+
             saida = saida[..local] + t.Para + saida[(local + t.De.Length)..];
             deslocamento += t.Para.Length - t.De.Length;
             trocas.Add(t);
