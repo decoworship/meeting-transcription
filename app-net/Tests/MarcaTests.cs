@@ -37,6 +37,31 @@ public sealed class MarcaTests
     }
 
     [Fact]
+    public void OExecutavelTemONomeDaMarca()
+    {
+        // O nome do .exe é o AssemblyName: desde 24/09/2026 ele é PulseMeet.exe
+        // (docs/MARCA.md). O título e o produto são o que o Gerenciador de
+        // Tarefas e as propriedades do arquivo mostram.
+        string? csproj = Achar(Path.Combine("app-net", "App", "MeetingApp.App.csproj"));
+        if (csproj is null) return;
+        string texto = File.ReadAllText(csproj);
+
+        Assert.Equal(Marca.Nome, Propriedade(texto, "AssemblyName"));
+        Assert.Equal(Marca.Nome, Propriedade(texto, "AssemblyTitle"));
+        Assert.Equal(Marca.Nome, Propriedade(texto, "Product"));
+        // O RootNamespace fica no nome antigo, e escrito: sem ele, o padrão é o
+        // AssemblyName, e o namespace padrão e os recursos sem LogicalName
+        // mudariam de nome junto com o .exe.
+        Assert.Equal("MeetingApp", Propriedade(texto, "RootNamespace"));
+    }
+
+    private static string? Propriedade(string csproj, string nome)
+    {
+        var m = Regex.Match(csproj, $@"<{nome}>([^<]*)</{nome}>");
+        return m.Success ? m.Groups[1].Value : null;
+    }
+
+    [Fact]
     public void OSimboloEOQueGeraOsIcones()
     {
         string? svg = Achar(Path.Combine("assets", "logo.svg"));
