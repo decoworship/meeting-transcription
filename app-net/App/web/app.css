@@ -202,8 +202,8 @@ html {
   top: 0;
   z-index: var(--z-suspenso);
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "voltar titulo" "voltar sub";
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "voltar titulo acoes" "voltar sub acoes";
   align-items: center;
   gap: 0 var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-6);
@@ -225,6 +225,24 @@ html {
   margin: 0;
   color: var(--cor-texto-suave);
   font-size: var(--texto-pequeno);
+}
+
+.barra__acoes {
+  grid-area: acoes;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espaco-3);
+}
+.barra__acoes:empty { display: none; }
+
+/* Sem largura, as ações descem para uma linha própria, em vez de espremer o
+ * título. A barra muda de altura, e os blocos que grudam abaixo dela seguem —
+ * a altura é medida (app.js). */
+@media (max-width: 899px) {
+  .barra { grid-template-columns: auto 1fr; grid-template-areas: "voltar titulo" "voltar sub" "acoes acoes"; }
+  .barra__acoes { justify-content: flex-start; margin-top: var(--espaco-2); }
 }
 
 /* ─────────────────────────────────────────────────────── lista */
@@ -287,6 +305,67 @@ html {
 }
 .reunioes__data--ligada { border-color: var(--cor-acao); color: var(--cor-acao); }
 .reunioes__limpar-data { padding-inline: var(--espaco-2); }
+
+/* ─────────────────────────────────────────── a semana
+ *
+ * Colunas de cartões (reunioes.js, desenharSemana). As colunas se ajeitam na
+ * largura: cinco ou sete lado a lado na janela cheia, e quebram em duas linhas
+ * na estreita, em vez de rolar para o lado. */
+.semana {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--espaco-3);
+  align-items: start;
+}
+.semana__dia {
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-3);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+}
+.semana__dia--hoje { border-color: var(--cor-acao); }
+.semana__rotulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-1);
+  font-size: var(--texto-corpo);
+  font-weight: 700;
+  color: var(--cor-texto-forte);
+}
+.semana__cartao {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-width: 0;
+  width: 100%;
+  padding: var(--espaco-2) var(--espaco-3);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--cor-fundo);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+  cursor: pointer;
+}
+.semana__cartao:hover { border-color: var(--cor-borda-forte); }
+.semana__cartao:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.semana__hora { font-family: var(--fonte-mono); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.semana__titulo { font-weight: 600; color: var(--cor-texto-forte); overflow-wrap: anywhere; }
+.semana__vinculo { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); overflow-wrap: anywhere; }
+.semana__aviso { font-size: var(--texto-rotulo); color: var(--cor-atencao); }
+.semana__cartao > .aa-etiqueta { margin-top: var(--espaco-1); }
+.semana__vazio { margin: 0; padding: var(--espaco-1); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+
+/* Lista e Semana, e a navegação da semana, na barra do topo. */
+.vistas { display: inline-flex; gap: var(--espaco-1); }
+.semana-nav { display: inline-flex; align-items: center; gap: var(--espaco-1); }
+.semana-nav__seta { padding-inline: var(--espaco-3); }
+.semana-nav__hoje--agora { border-color: var(--cor-acao); color: var(--cor-acao); }
 
 /* ─────────────────────────────────────────── o painel que abre num botão
  *

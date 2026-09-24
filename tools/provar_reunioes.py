@@ -770,6 +770,113 @@ def prova_calendario_cabe_na_janela(pagina) -> None:
 prova_calendario_cabe_na_janela.janela = (860, 700)
 
 
+def ir_para_semana(pagina) -> None:
+    pagina.click(".barra [data-vista='semana']")
+    pagina.wait_for_selector(".semana .semana__dia", timeout=3000)
+
+
+def segunda_de(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def no_acervo(de: date, ate: date) -> int:
+    return sum(1 for d in DIAS_DO_ACERVO if de <= date.today() - timedelta(days=d) <= ate)
+
+
+def cartoes(pagina) -> list[str]:
+    return pagina.eval_on_selector_all(".semana__cartao .semana__titulo", "els => els.map((e) => e.textContent)")
+
+
+def prova_semana(pagina) -> None:
+    vista = lambda: pagina.eval_on_selector_all(  # noqa: E731
+        ".barra [data-vista]", "els => els.filter((e) => e.getAttribute('aria-pressed') === 'true').map((e) => e.dataset.vista)")
+    conferir(vista() == ["lista"], f"Reuniões abre na lista, com Lista e Semana na barra ({vista()})")
+    ir_para_semana(pagina)
+    conferir(vista() == ["semana"] and not pagina.is_visible(".reunioes__lista"), "Semana troca a lista pela semana")
+    conferir(not pagina.is_visible("#filtro-data"), "e o filtro de data sai, porque quem escolhe a data é a semana")
+
+    hoje = date.today()
+    seg = segunda_de(hoje)
+    fim_de_semana = no_acervo(seg + timedelta(days=5), seg + timedelta(days=6)) > 0
+    colunas = pagina.eval_on_selector_all(".semana__dia", "els => els.map((e) => e.dataset.dia)")
+    conferir(len(colunas) == (7 if fim_de_semana else 5) and colunas[0] == seg.isoformat(),
+             f"de segunda a sexta, e o fim de semana só com gravação ({len(colunas)} colunas)")
+    de_hoje = pagina.eval_on_selector_all(".semana__dia--hoje .semana__titulo", "els => els.map((e) => e.textContent)")
+    conferir(de_hoje == ["Sherlock Diário — Status e Ações", "Semanal — Beegol · Uberlândia", "Reunião de lideranças"],
+             f"hoje vem marcado, com as reuniões dele em ordem de hora ({de_hoje})")
+    conferir(len(cartoes(pagina)) == no_acervo(seg, seg + timedelta(days=6)),
+             f"a semana tem as reuniões dela ({len(cartoes(pagina))})")
+    sub = pagina.text_content("#subtitulo")
+    conferir("semana de" in sub, f"o subtítulo diz a semana ({sub!r})")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a semana cabe na largura da janela")
+
+    buscar(pagina, "sherlock")
+    conferir(cartoes(pagina) == ["Sherlock Diário — Status e Ações"], "a busca continua filtrando na semana")
+    ativo = pagina.evaluate("() => document.activeElement && document.activeElement.id")
+    conferir(ativo == "busca-reunioes", f"sem tirar o cursor do campo ({ativo!r})")
+    buscar(pagina, "")
+
+    rotulo = lambda: pagina.text_content(".semana-nav__escolher").strip()  # noqa: E731
+    agora = rotulo()
+    pagina.click(".semana-nav [aria-label='Semana anterior']")
+    pagina.wait_for_timeout(50)
+    conferir(rotulo() != agora and len(cartoes(pagina)) == no_acervo(seg - timedelta(days=7), seg - timedelta(days=1)),
+             f"‹ vai à semana anterior ({rotulo()!r}, {len(cartoes(pagina))} reuniões)")
+    rotulo_do_foco = pagina.evaluate("() => document.activeElement.getAttribute('aria-label')")
+    conferir(rotulo_do_foco == "Semana anterior", f"e o foco fica no ‹, para clicar de novo ({rotulo_do_foco!r})")
+    pagina.click(".semana-nav >> text=Hoje")
+    pagina.wait_for_timeout(50)
+    conferir(rotulo() == agora, "Hoje volta à semana de hoje")
+
+    pagina.click(".semana-nav__escolher")
+    pagina.wait_for_selector(".popover .calendario", timeout=2000)
+    dia_no_calendario(pagina, hoje - timedelta(days=45))
+    conferir(cartoes(pagina) == ["Planejamento trimestral"],
+             f"escolher um dia no calendário mostra a semana dele ({cartoes(pagina)})")
+    conferir(not pagina.is_visible(".popover"), "e fecha o calendário")
+
+
+def prova_semana_abre_e_volta(pagina) -> None:
+    ir_para_semana(pagina)
+    pagina.click(".semana-nav [aria-label='Semana anterior']")
+    pagina.wait_for_timeout(50)
+    antes = pagina.text_content(".semana-nav__escolher").strip()
+    pagina.click(".semana__cartao >> text=Comunicação Beegol + App")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+    conferir(True, "um clique no cartão abre a reunião")
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".semana .semana__dia", timeout=5000)
+    conferir(pagina.text_content(".semana-nav__escolher").strip() == antes,
+             "← Reuniões volta à semana, na mesma semana")
+    pagina.click(".barra [data-vista='lista']")
+    pagina.wait_for_selector(".reuniao-linha", timeout=3000)
+    conferir(pagina.is_visible("#filtro-data") and not pagina.is_visible(".semana-nav"),
+             "Lista devolve a lista, com o filtro de data, e tira a navegação da semana")
+
+
+def prova_semana_etiqueta(pagina) -> None:
+    ir_para_semana(pagina)
+    caminho = pagina.evaluate("() => window.__gravacoes[3].caminho")   # Sherlock, hoje
+    pagina.evaluate("(c) => { window.__cartao = document.querySelector(`.semana__cartao[data-gravacao='${CSS.escape(c)}']`); }",
+                    caminho)
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "ata", "lendo"])
+    pagina.wait_for_timeout(50)
+    etiqueta = pagina.evaluate("() => window.__cartao.lastElementChild.textContent")
+    conferir(etiqueta == "Escrevendo a ata…", f"a etiqueta do cartão acompanha a tarefa ({etiqueta!r})")
+    conferir(pagina.evaluate("(c) => window.__cartao === document.querySelector(`.semana__cartao[data-gravacao='${CSS.escape(c)}']`)",
+                             caminho), "sem recriar o cartão")
+
+
+def prova_semana_estreita(pagina) -> None:
+    ir_para_semana(pagina)
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a semana cabe numa janela estreita, sem rolagem lateral")
+    conferir(pagina.evaluate(A_VISTA, ".semana-nav [aria-label='Próxima semana']"),
+             "e a navegação da semana continua à vista na barra")
+
+
+prova_semana_estreita.janela = (860, 700)
+
+
 def prova_calendario_atravessa_o_mes(pagina) -> None:
     # As setas passam da borda do mês, e a grade tem de ir junto: o dia focado
     # sumir da tela deixaria o foco em lugar nenhum.
@@ -799,6 +906,34 @@ def prova_calendario_sobrevive_a_tarefa(pagina) -> None:
     conferir(pagina.is_visible(".popover"), "uma tarefa andando não fecha o calendário aberto")
     depois = pagina.evaluate("() => document.activeElement.dataset.dia")
     conferir(depois == antes, f"nem tira o foco do dia ({antes!r} → {depois!r})")
+
+
+def prova_semana_a_125(pagina) -> None:
+    # A janela abre com 1200 px físicos, e a 125% de escala — a de notebook —
+    # isso dá ~945 px: a barra está no limite de caber título e navegação.
+    ir_para_semana(pagina)
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 125%, a semana cabe sem rolagem lateral")
+    for rotulo in ["Semana anterior", "Próxima semana"]:
+        conferir(pagina.evaluate(A_VISTA, f".semana-nav [aria-label='{rotulo}']"), f"e o botão '{rotulo}' está à vista")
+    conferir(pagina.evaluate(A_VISTA, ".barra [data-vista='lista']"), "e o Lista também")
+
+
+prova_semana_a_125.janela = (945, 700)
+
+
+def prova_semana_barra_troca_de_tela(pagina) -> None:
+    # A navegação da semana mora na barra do topo, que é de todas as telas. A
+    # reunião aberta tem outro título, e é pela troca de título que a barra
+    # se esvazia (cabecalho, em app.js).
+    ir_para_semana(pagina)
+    pagina.click(".semana__cartao >> text=Sherlock Diário")
+    pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
+    conferir(pagina.locator(".barra .semana-nav, .barra [data-vista]").count() == 0,
+             "na reunião aberta, a barra não mostra a navegação da semana")
+    pagina.click("#ir-reunioes")
+    pagina.wait_for_selector(".semana .semana__dia", timeout=5000)
+    conferir(pagina.locator(".barra .semana-nav").count() == 1 and pagina.is_visible(".semana-nav"),
+             "de volta a Reuniões, a semana e a navegação voltam, uma vez só")
 
 
 def prova_data_nao_rouba_o_foco(pagina) -> None:
@@ -833,7 +968,9 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
-          prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata]
+          prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata,
+          prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,
+          prova_semana_a_125, prova_semana_barra_troca_de_tela]
 
 
 

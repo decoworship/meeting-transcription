@@ -15,6 +15,7 @@ const tela = document.getElementById("tela");
 const titulo = document.getElementById("titulo");
 const subtitulo = document.getElementById("subtitulo");
 const voltar = document.getElementById("voltar");
+const acoes = document.getElementById("acoes-da-barra");
 
 // A altura da barra do topo, medida — e não chutada no CSS. Quatro blocos
 // grudam abaixo dela (as abas da reunião e as de Ajustes, os controles da
@@ -49,6 +50,15 @@ export function quando(nome) {
 export const tituloDe = (g) => g.titulo || quando(g.nome);
 
 /**
+ * Põe na barra do topo, à direita, o que é da tela — e tira o que havia. A
+ * troca de tela esvazia sozinha (cabecalho); a tela que volta com o mesmo
+ * título chama isto de novo.
+ */
+export function acoesDaBarra(...nos) {
+  acoes.replaceChildren(...nos);
+}
+
+/**
  * Troca o título da moldura — e, com ele, a tela.
  *
  * Toda tela chama isto ao se montar, e <b>só</b> ao se montar: é o único ponto
@@ -64,6 +74,9 @@ export const tituloDe = (g) => g.titulo || quando(g.nome);
 function cabecalho(t, sub, comVoltar) {
   pararAudio();
   const mudou = titulo.textContent !== t;
+  // O que a tela anterior pôs na barra não é desta. Só na troca de título: o
+  // cabeçalho é reescrito também para trocar o subtítulo, e aí a tela é a mesma.
+  if (mudou) acoes.replaceChildren();
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;
