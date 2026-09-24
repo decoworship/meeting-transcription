@@ -68,7 +68,7 @@ explicar — quarentena, modelo antigo e geração antiga — e **só o primeiro
 ação**. A tela mostra 48 amostras apagadas com um motivo em texto, e não há por
 onde reagir a nenhuma delas.
 
-### UI-3 · Busca e filtro nas listas — `feature` · `aberto`
+### UI-3 · Busca e filtro nas listas — `feature` · feito em 24/09/2026
 
 Reuniões e Atas desenham **um cartão por gravação, sem corte, sem busca e sem
 filtro** ([app.js:73](../app-net/App/web/app.js#L73),
@@ -80,6 +80,16 @@ de revisão, dentro de uma transcrição
 Achar a reunião de duas semanas atrás é rolar. Filtrar por cliente é o corte
 óbvio — cliente e projeto já estão no cartão, justamente porque é por eles que
 se procura.
+
+**Feito**, pelo plano
+[2026-09-23-ui-01-reunioes-lista.md](superpowers/plans/2026-09-23-ui-01-reunioes-lista.md),
+e conferido pelo dono no acervo real em 24/09/2026: busca sem acento em título,
+cliente, projeto, convidados, data e estado; filtros de cliente, data (atalhos,
+um dia ou uma semana, de segunda a domingo) e estado; grupos por dia; o estado
+da ata na linha e o próximo passo num painel. **Ficou de fora, de propósito:** a
+busca no **conteúdo** das transcrições (pede op nova no núcleo), a vista de
+semana com calendário, e a lista de Atas, que continua como está até o plano 2
+trazer a ata para dentro da reunião.
 
 ### UI-4 · O tempo marcado na nota não leva ao áudio — `feature` · `espera`
 
