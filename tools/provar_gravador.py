@@ -1,0 +1,267 @@
+#!/usr/bin/env python3
+"""Prova a tela do Gravador num Chromium de verdade — o plano 3 do redesenho.
+
+A tela da única hora em que o app não pode falhar se prova no navegador, não no
+raciocínio (spec §4). Mesmo molde do ``tools/provar_reunioes.py``: o app inteiro
+(``index.html`` com a moldura, o trilho e o chip de gravando), uma ponte falsa
+que responde o que o núcleo responderia, e afirmações que falham com mensagem.
+
+O estado do gravador é o do núcleo (``EstadoDoGravador`` em ``App/Ponte.cs``) e
+chega pelo ``id: 0`` como lá; a prova o empurra com ``window.__empurrar()``. A
+legenda chega pelo evento ``aovivo`` com ``{novo, tentativo, dono}`` — sem tempo,
+como o núcleo manda —, e o relógio que a tela usa para carimbá-la é o
+``duracao_s`` do último estado empurrado.
+
+Uso::
+
+    uv run --with playwright python tools/provar_gravador.py [--so prova_a,prova_b] [--fotos PASTA]
+"""
+
+import argparse
+import http.server
+import socketserver
+import sys
+import threading
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parent.parent
+WEB = RAIZ / "app-net" / "App" / "web"
+DS = RAIZ / "assets" / "ds"
+
+# A ponte falsa. As horas da agenda nascem de "agora", porque o herói diz
+# "começa em N min" e a lista marca o que já terminou.
+PONTE_FALSA = r"""
+(() => {
+  const agora = Date.now();
+  const hora = (min) => new Date(agora + min * 60000).toISOString();
+  const p = (n) => String(n).padStart(2, "0");
+  const hoje = new Date();
+  const nome = (h, m) => `${hoje.getFullYear()}-${p(hoje.getMonth() + 1)}-${p(hoje.getDate())}_${p(h)}-${p(m)}-00`;
+
+  const faixa = (nome, dispositivo, extra) => Object.assign({
+    nome, dispositivo, nivel: 0.05, ja_ouviu: true, mudo: false, silencio_s: 0,
+    desconectado: false, falha: null }, extra);
+
+  window.__estado = {
+    gravando: false, mudo: false, mudo_ha_s: 0, cor: "cinza", status: "Parado",
+    duracao_s: 0, pasta: "C:\\Users\\andre\\Gravacoes", gravacao: null,
+    titulo: null, participantes: null, fixado: null, notificacoes: true,
+    usar_agenda: true, agenda_configurada: true, conta: "andre@beegol.com",
+    faixas: [faixa("mic", "Headset AN01 Hands-Free"), faixa("system", "Alto-falantes (Realtek Audio)")],
+  };
+
+  const EVENTOS = [
+    { id: "e1", titulo: "Sherlock Diário — Status e Ações", inicio: hora(-300), fim: hora(-270), participantes: 4, organizador: "vivo.com.br" },
+    { id: "e2", titulo: "Reunião de lideranças", inicio: hora(-170), fim: hora(-130), participantes: 9, organizador: "beegol.com" },
+    { id: "e3", titulo: "Comunicação Beegol + App", inicio: hora(5), fim: hora(35), participantes: 7, organizador: "algar.com.br",
+      nomes: ["Carol Souza", "Rafael Prado", "André Yuri"] },
+    { id: "e4", titulo: "Update Squad Beegol — Faturamento B2B", inicio: hora(125), fim: hora(155), participantes: 5, organizador: "beegol.com" },
+  ];
+  window.__proximas = { status: "ok", eventos: EVENTOS, pre_definido: "e3" };
+
+  const G = (n, extra) => Object.assign({
+    nome: n, caminho: "C:\\Rec\\" + n, duracao_s: 1800, titulo: null, convidados: 0,
+    transcrita: true, cliente: null, projeto: null, com_notas: false, avisos: [],
+    tem_ata: false, ata_velha: false, pendencias: 0, pendencias_inicio: [],
+    resumo: null, nomes: [], notas_inicio: null,
+  }, extra);
+  window.__gravacoes = [
+    G(nome(11, 2), { titulo: "Reunião de lideranças", cliente: "Beegol (interno)", projeto: "Gestão",
+                     duracao_s: 2220, transcrita: false, convidados: 9 }),
+    G(nome(9, 0), { titulo: "Sherlock Diário — Status e Ações", cliente: "Vivo", projeto: "Sherlock" }),
+    G("2026-09-18_14-00-00", { titulo: "Comunicação Beegol + App", cliente: "Algar", projeto: "Agentes" }),
+  ];
+  window.__transcricoes = { atual: null, ultimo: null };
+  window.__aovivo = { aovivo_modo: "legenda", aovivo_impedimento: null, aovivo_ate: [], perguntar_impedimento: null };
+  window.__notas = {};
+  window.__vinculos = {};
+  window.__pedidos = [];
+
+  const G_ = () => JSON.parse(JSON.stringify(window.__estado));
+  const responder = (q) => {
+    const e = window.__estado;
+    switch (q.op) {
+      case "gravador": return { gravador: G_() };
+      case "dispositivos": return { dispositivos: {
+        entradas: [{ id: "m1", nome: "Headset AN01 Hands-Free", padrao: true }, { id: "m2", nome: "Microfone (Realtek)" }],
+        saidas: [{ id: "s1", nome: "Alto-falantes (Realtek Audio)", padrao: true }],
+        mic_id: null, loopback_id: null } };
+      case "agenda-proximas": return { proximas: window.__proximas };
+      case "gravacoes": return { gravacoes: window.__gravacoes };
+      case "transcricoes": return { transcricoes: window.__transcricoes };
+      case "clientes": return { clientes: { "Algar": ["Agentes", "Agente de Crédito"], "Beegol (interno)": ["Gestão", "App"], "Vivo": ["Sherlock"] } };
+      case "aovivo": return window.__aovivo;
+      case "config": return { config: {} };
+      case "notas": return { notas: window.__notas[q.gravacao] ?? "" };
+      case "salvar-notas": window.__notas[q.gravacao] = q.conteudo; return {};
+      case "reuniao": return window.__vinculos[q.gravacao] ?? { cliente: "", projeto: "" };
+      case "salvar-reuniao": window.__vinculos[q.gravacao] = { cliente: q.cliente, projeto: q.projeto }; return {};
+      case "fixar-evento": {
+        e.fixado = q.evento || null;
+        const ev = EVENTOS.find((x) => x.id === e.fixado);
+        if (!e.gravando) { e.titulo = ev?.titulo ?? null; e.participantes = ev?.nomes ?? null; }
+        return { gravador: G_() };
+      }
+      case "gravar": {
+        const ev = EVENTOS.find((x) => x.id === (e.fixado || window.__proximas.pre_definido));
+        Object.assign(e, { gravando: true, cor: "vermelho", status: "Gravando", duracao_s: 0,
+          gravacao: "C:\\Rec\\" + nome(14, 0), titulo: ev?.titulo ?? null, participantes: ev?.nomes ?? null });
+        return { gravador: G_() };
+      }
+      case "parar-gravacao":
+        Object.assign(e, { gravando: false, cor: "cinza", status: "Parado", gravacao: null, fixado: null, mudo: false, mudo_ha_s: 0 });
+        return { gravador: G_() };
+      case "mutar":
+        e.mudo = !e.mudo; e.mudo_ha_s = 0; e.cor = e.mudo ? "laranja" : "vermelho";
+        e.faixas[0].mudo = e.mudo;
+        return { gravador: G_() };
+      case "escolher-dispositivo": return { gravador: G_() };
+      case "catalogo": return { catalogo: [] };
+      default: return {};
+    }
+  };
+
+  window.chrome = { webview: {
+    _ouvintes: [],
+    addEventListener(_, f) { this._ouvintes.push(f); },
+    postMessage(cru) {
+      const q = JSON.parse(cru);
+      window.__pedidos.push(q);
+      const r = Object.assign({ id: q.id }, responder(q));
+      setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, 0);
+    },
+  } };
+  window.__emitir = (ev) => {
+    for (const f of window.chrome.webview._ouvintes)
+      f({ data: JSON.stringify(Object.assign({ id: 0 }, ev)) });
+  };
+  // Empurra o estado como o núcleo faz a cada 200 ms, mudando o que se pedir.
+  window.__empurrar = (mudar) => {
+    Object.assign(window.__estado, mudar || {});
+    window.__emitir({ tipo: "gravador", gravador: G_() });
+  };
+  window.__legenda = (novo, tentativo, dono) =>
+    window.__emitir({ tipo: "aovivo", legenda: { novo, tentativo, dono } });
+})();
+"""
+
+
+class Servidor(http.server.SimpleHTTPRequestHandler):
+    """Mapeia /ds/ para o design system, como o app faz por recurso embutido."""
+
+    def log_message(self, *args):
+        pass
+
+    def translate_path(self, path):
+        path = path.split("?")[0]
+        if path.startswith("/ds/"):
+            return str(DS / path[4:])
+        return str(WEB / path.lstrip("/"))
+
+
+falhas: list[str] = []
+
+
+def conferir(condicao: bool, o_que: str) -> None:
+    print(("  ok     " if condicao else "  FALHA  ") + o_que)
+    if not condicao:
+        falhas.append(o_que)
+
+
+def abrir(navegador, porta: int, largura: int = 1280, altura: int = 800, tema: str | None = None,
+          antes: str | None = None, hash_: str = "gravador"):
+    pagina = navegador.new_page(viewport={"width": largura, "height": altura})
+    erros: list[str] = []
+    pagina.on("pageerror", lambda e: erros.append(str(e)))
+    pagina.add_init_script(PONTE_FALSA)
+    # O que a prova muda na ponte antes de a tela montar (sem agenda, sem legenda…).
+    if antes:
+        pagina.add_init_script(antes)
+    if tema:
+        pagina.add_init_script(
+            "document.addEventListener('DOMContentLoaded', () => "
+            f"document.documentElement.dataset.tema = '{tema}')")
+    pagina.goto(f"http://127.0.0.1:{porta}/index.html#{hash_}", wait_until="load")
+    pagina.wait_for_selector("#tela[aria-busy='false']", timeout=5000)
+    pagina.wait_for_timeout(100)
+    return pagina, erros
+
+
+def pedidos(pagina, op: str) -> list[dict]:
+    return pagina.evaluate("(op) => window.__pedidos.filter((q) => q.op === op)", op)
+
+
+SEM_ROLAGEM_LATERAL = """() => {
+  const c = document.querySelector('.conteudo');
+  return c.scrollWidth <= c.clientWidth && document.documentElement.scrollWidth <= innerWidth;
+}"""
+
+
+# ─────────────────────────────────────────────────────────────── as provas
+
+def prova_monta(pagina) -> None:
+    conferir(pagina.text_content("#titulo") == "Gravador", "o Gravador monta, com o título na barra")
+
+
+PROVAS = [prova_monta]
+
+
+def fotografar(navegador, porta: int, pasta: Path) -> None:
+    pasta.mkdir(parents=True, exist_ok=True)
+    for tema in ["escuro", "claro"]:
+        pagina, _ = abrir(navegador, porta, tema=tema)
+        pagina.screenshot(path=str(pasta / f"gravador-antes-{tema}.png"))
+        pagina.close()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--fotos", type=Path, help="pasta onde deixar as fotos das telas")
+    ap.add_argument("--so", help="só estas provas, separadas por vírgula")
+    args = ap.parse_args()
+    provas = PROVAS
+    if args.so:
+        pedidas = set(args.so.split(","))
+        provas = [p for p in PROVAS if p.__name__ in pedidas]
+        if len(provas) != len(pedidas):
+            print(f"prova desconhecida: {sorted(pedidas - {p.__name__ for p in PROVAS})}", file=sys.stderr)
+            return 2
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        print("falta o playwright: uv run --with playwright python tools/provar_gravador.py", file=sys.stderr)
+        return 2
+
+    socketserver.TCPServer.allow_reuse_address = True
+    with socketserver.TCPServer(("127.0.0.1", 0), Servidor) as srv:
+        porta = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        with sync_playwright() as pw:
+            navegador = pw.chromium.launch()
+            for prova in provas:
+                print(f"── {prova.__name__}")
+                largura, altura = getattr(prova, "janela", (1280, 800))
+                pagina, erros = abrir(navegador, porta, largura, altura,
+                                      antes=getattr(prova, "antes", None),
+                                      hash_=getattr(prova, "hash", "gravador"))
+                try:
+                    prova(pagina)
+                except Exception as e:  # noqa: BLE001 — qualquer estouro é falha da prova
+                    conferir(False, f"{prova.__name__} estourou: {str(e).splitlines()[0]}")
+                conferir(not erros, f"sem erro de JavaScript {erros[:2] if erros else ''}")
+                pagina.close()
+            if args.fotos:
+                fotografar(navegador, porta, args.fotos)
+            navegador.close()
+        srv.shutdown()
+
+    if falhas:
+        print(f"\n{len(falhas)} falha(s).", file=sys.stderr)
+        return 1
+    print("\ntudo certo.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
