@@ -11,6 +11,7 @@
 // sim.
 
 import { pedir } from "/ponte.js";
+import { abaClientes } from "/clientes.js";
 import { alerta, campo, confirmar, avisar, perguntarTexto } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
@@ -1087,312 +1088,8 @@ function abaTranscricao(config, gravar, diarizadores = []) {
 }
 
 // ──────────────────────────────────────────────────────── aba Clientes
-
-function abaClientes(clientes, catalogo, diarizadores) {
-  const painel = document.createElement("div");
-  painel.className = "painel";
-
-  const nomes = Object.keys(clientes).sort((a, b) => a.localeCompare(b, "pt-BR"));
-
-  const b = bloco("Clientes e projetos",
-    "Cada projeto guarda o vocabulário, o idioma e o modelo usados nas "
-    + "reuniões dele.");
-
-  if (nomes.length === 0) {
-    const vazio = document.createElement("p");
-    vazio.className = "campo__dica";
-    vazio.textContent = "Nenhum cliente ainda. Eles nascem ao preparar uma "
-      + "transcrição: digitar um nome novo ali já o cria.";
-    b.appendChild(vazio);
-  }
-
-  for (const nome of nomes) {
-    const pessoa = document.createElement("div");
-    pessoa.className = "pessoa";
-
-    const topo = document.createElement("div");
-    topo.className = "pessoa__topo";
-    const h = document.createElement("p");
-    h.className = "pessoa__nome";
-    h.textContent = nome;
-    const quantos = document.createElement("span");
-    quantos.className = "campo__dica";
-    const n = clientes[nome].length;
-    quantos.textContent = `${n} ${n === 1 ? "projeto" : "projetos"}`;
-
-    const acoes = document.createElement("span");
-    acoes.className = "amostra__acoes";
-    acoes.append(
-      botaoRenomear("cliente", nome, (novo) =>
-        pedir("renomear-cliente", { cliente: nome, nome: novo })),
-      botaoApagar(
-        `Apagar o cliente "${nome}" e os ${n} ${n === 1 ? "projeto" : "projetos"} dele?\n\n`
-        + "Isto esquece o vocabulário e as preferências. As transcrições já "
-        + "feitas continuam onde estão.",
-        () => pedir("apagar-cliente", { cliente: nome })),
-    );
-
-    topo.append(h, quantos, acoes);
-    pessoa.appendChild(topo);
-
-    for (const projeto of [...clientes[nome]].sort((a, b) => a.localeCompare(b, "pt-BR")))
-      pessoa.appendChild(linhaDeProjeto(nome, projeto, catalogo, diarizadores));
-
-    b.appendChild(pessoa);
-  }
-
-  painel.appendChild(b);
-  const comoNascem = document.createElement("p");
-  comoNascem.className = "campo__dica";
-  comoNascem.textContent = "Cliente e projeto novos nascem na tela de preparo: "
-    + "digite um nome que ainda não existe e ele passa a valer. Aqui se renomeia "
-    + "e se apaga o que já existe — renomear leva junto o vocabulário e as "
-    + "preferências do projeto.";
-  painel.appendChild(comoNascem);
-
-  return painel;
-}
-
-/** O par de botões que renomeia, com o nome atual já no campo. */
-function botaoRenomear(oQue, atual, aoConfirmar) {
-  const b = document.createElement("button");
-  b.className = "aa-btn aa-btn-texto";
-  b.type = "button";
-  b.textContent = "Renomear";
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    const novo = await perguntarTexto(`Novo nome do ${oQue}`, atual,
-                                     { titulo: `Renomear ${oQue}` });
-    if (!novo || novo === atual) return;
-    try {
-      await aoConfirmar(novo);
-    } catch (err) {
-      await avisar(err.message, { titulo: "Não deu para renomear" });
-      return;
-    }
-    recarregar();
-  });
-  return b;
-}
-
-/**
- * O botão que apaga, sempre com confirmação que diz o que se perde.
- *
- * O texto da confirmação nomeia o alvo e a consequência, em vez de perguntar
- * "tem certeza?" — quem lê "tem certeza" clica em sim por reflexo.
- */
-function botaoApagar(pergunta, aoConfirmar) {
-  const b = document.createElement("button");
-  b.className = "aa-btn aa-btn-texto";
-  b.type = "button";
-  b.textContent = "Apagar";
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    if (!await confirmar(pergunta, { titulo: "Apagar", ok: "Apagar" })) return;
-    try {
-      await aoConfirmar();
-    } catch (err) {
-      await avisar(err.message, { titulo: "Não deu para apagar" });
-      return;
-    }
-    recarregar();
-  });
-  return b;
-}
-
-/**
- * Um projeto que abre nos parâmetros dele.
- *
- * Sanfona, e não navegação para outra tela: comparar dois projetos do mesmo
- * cliente é o gesto que se faz aqui — "o outro está usando qual modelo?" — e
- * trocar de tela a cada um transformaria a comparação em ida e volta.
- */
-function linhaDeProjeto(cliente, projeto, catalogo, diarizadores) {
-  const caixa = document.createElement("div");
-  caixa.className = "projeto";
-
-  const topo = document.createElement("button");
-  topo.className = "projeto__topo";
-  topo.type = "button";
-  topo.setAttribute("aria-expanded", "false");
-
-  const seta = document.createElement("span");
-  seta.className = "projeto__seta";
-  seta.textContent = "▸";
-
-  const nome = document.createElement("span");
-  nome.textContent = projeto;
-
-  const resumo = document.createElement("span");
-  resumo.className = "campo__dica";
-
-  topo.append(seta, nome, resumo);
-
-  // As ações ficam fora do <button> do topo: botão dentro de botão é HTML
-  // inválido, e o clique de um acabaria disparando o outro.
-  const acoes = document.createElement("span");
-  acoes.className = "amostra__acoes projeto__acoes";
-  acoes.append(
-    botaoRenomear("projeto", projeto, (novo) =>
-      pedir("renomear-projeto", { cliente, projeto, nome: novo })),
-    botaoApagar(
-      `Apagar o projeto "${projeto}" de ${cliente}?\n\n`
-      + "Isto esquece o vocabulário e as preferências dele. As transcrições já "
-      + "feitas continuam onde estão.",
-      () => pedir("apagar-projeto", { cliente, projeto })),
-  );
-
-  const corpo = document.createElement("div");
-  corpo.className = "projeto__corpo";
-  corpo.hidden = true;
-
-  let prefs = null;
-
-  /** "large-v3 · pt · com falantes" — o que dá para saber sem abrir. */
-  function resumir() {
-    if (!prefs) return;
-    const partes = [
-      prefs.model_size || "modelo padrão",
-      prefs.language || "idioma automático",
-      prefs.diarization === false ? "sem falantes" : "com falantes",
-    ];
-    resumo.textContent = partes.join(" · ");
-  }
-
-  async function gravar(mudanca) {
-    Object.assign(prefs, mudanca);
-    estadoDoProjeto.textContent = "salvando…";
-    try {
-      await pedir("salvar-projeto", { cliente, projeto, prefs });
-      estadoDoProjeto.textContent = "salvo";
-      resumir();
-    } catch (e) {
-      estadoDoProjeto.textContent = `não salvou: ${e.message}`;
-    }
-  }
-
-  const estadoDoProjeto = document.createElement("p");
-  estadoDoProjeto.className = "campo__dica";
-
-  async function montar() {
-    if (!prefs) prefs = (await pedir("prefs", { cliente, projeto })).prefs ?? {};
-    corpo.replaceChildren();
-    resumir();
-
-    const asr = catalogo.filter((i) => i.pacote.familia === "asr");
-    // Do disco, e não do catálogo: a família "diarizacao" saiu dele na Fase 4,
-    // quando os pesos passaram a viajar dentro do instalador — e este seletor
-    // ficou com uma opção morta oferecendo uma escolha que não existia. Vem na
-    // mesma leitura do catálogo, na subida da tela. Ver
-    // Motores.ModelosDeDiarizacao e FASE6 §4.6.
-    const diar = diarizadores;
-
-    // O modelo do projeto pode ser um que não está mais no catálogo — projeto
-    // criado no app Python, ou pacote removido. Mostrar "(padrão)" e não a
-    // primeira opção da lista: escolher por conta própria mudaria em silêncio
-    // como as reuniões deste cliente são transcritas.
-    const campoModelo = campo("Modelo de transcrição", "select", {
-      opcoes: ["(usar o padrão do app)", ...asr.map((i) => i.pacote.nome)],
-    });
-    const selModelo = campoModelo.querySelector("select");
-    selModelo.options[0].value = "";
-    asr.forEach((i, n) => { selModelo.options[n + 1].value = i.pacote.id; });
-    selModelo.value = prefs.model_size ?? "";
-    if (selModelo.selectedIndex === -1) {
-      const solto = document.createElement("option");
-      solto.value = prefs.model_size;
-      solto.textContent = `${prefs.model_size} (não instalado)`;
-      selModelo.appendChild(solto);
-      selModelo.value = prefs.model_size;
-    }
-    selModelo.addEventListener("change", (e) =>
-      gravar({ model_size: e.target.value || null }));
-
-    const campoIdioma = campo("Idioma", "input", {
-      valor: prefs.language ?? "",
-      dica: "vazio = detectar sozinho",
-    });
-    campoIdioma.querySelector("input").addEventListener("change", (e) =>
-      gravar({ language: e.target.value.trim() || null }));
-
-    const campoDiar = campo("Modelo de diarização", "select", {
-      opcoes: ["(usar o padrão do app)", ...diar],
-    });
-    const selDiar = campoDiar.querySelector("select");
-    selDiar.options[0].value = "";
-    diar.forEach((nome, n) => { selDiar.options[n + 1].value = nome; });
-    selDiar.value = prefs.diar_model ?? "";
-    // Um modelo escolhido que não está mais em disco não pode sumir em silêncio:
-    // ele decide como este cliente é transcrito, e cair para o padrão sem avisar
-    // mudaria isso sem ninguém pedir. Mesma regra do modelo de transcrição.
-    if (selDiar.selectedIndex === -1) {
-      const solto = document.createElement("option");
-      solto.value = prefs.diar_model;
-      solto.textContent = `${prefs.diar_model} (não instalado)`;
-      selDiar.appendChild(solto);
-      selDiar.value = prefs.diar_model;
-    }
-    selDiar.addEventListener("change", (e) =>
-      gravar({ diar_model: e.target.value || null }));
-
-    const linha = document.createElement("div");
-    linha.className = "linha";
-    linha.append(campoModelo, campoIdioma, campoDiar);
-
-    const separar = document.createElement("label");
-    separar.className = "campo campo--linha";
-    const caixaSep = document.createElement("input");
-    caixaSep.type = "checkbox";
-    caixaSep.checked = prefs.diarization !== false;
-    caixaSep.addEventListener("change", (e) => gravar({ diarization: e.target.checked }));
-    const rotSep = document.createElement("span");
-    rotSep.textContent = "Separar os falantes";
-    separar.append(caixaSep, rotSep);
-
-    const vocab = campo("Vocabulário", "textarea", {
-      linhas: 3, valor: prefs.initial_prompt ?? "",
-    });
-    vocab.querySelector("textarea").addEventListener("change", (e) =>
-      gravar({ initial_prompt: e.target.value.trim() || null }));
-
-    const dicaVocab = document.createElement("p");
-    dicaVocab.className = "campo__dica";
-    // O mesmo texto do preparo, pelo mesmo motivo: o teto de 224 tokens do
-    // initial_prompt morreu quando a correção fonética entrou.
-    dicaVocab.textContent = "Nomes de pessoas, jargão, nomes de sistemas. Sem "
-      + "limite de tamanho — o que o modelo escrever parecido é corrigido depois. "
-      + "É este vocabulário que alimenta a correção fonética.";
-
-    corpo.append(linha, separar, vocab, dicaVocab, estadoDoProjeto);
-  }
-
-  let montado = false;
-  topo.addEventListener("click", async () => {
-    const abrindo = corpo.hidden;
-    corpo.hidden = !abrindo;
-    topo.setAttribute("aria-expanded", String(abrindo));
-    seta.textContent = abrindo ? "▾" : "▸";
-    if (abrindo && !montado) {
-      montado = true;
-      corpo.textContent = "carregando…";
-      await montar();
-    }
-  });
-
-  // O resumo aparece antes de abrir, e o que ele carrega fica guardado: é o que
-  // responde "qual modelo este projeto usa?" sem exigir um clique por projeto,
-  // e sem pedir as mesmas preferências duas vezes quando o projeto for aberto.
-  pedir("prefs", { cliente, projeto })
-    .then((r) => { prefs = r.prefs ?? {}; resumir(); })
-    .catch(() => {});
-
-  const linhaTopo = document.createElement("div");
-  linhaTopo.className = "projeto__linha";
-  linhaTopo.append(topo, acoes);
-
-  caixa.append(linhaTopo, corpo);
-  return caixa;
-}
+//
+// Mora em clientes.js desde o plano 4a do redesenho (mestre-detalhe).
 
 // ─────────────────────────────────────────────────────────── aba Vozes
 
@@ -1684,14 +1381,18 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, diarizadores, vozes, gravador;
+  let config, clientes, catalogo, diarizadores, vozes, gravador, gravacoes, tipos;
   try {
     // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
+    // As gravações e os tipos de ata só servem a Clientes (as contagens e o
+    // tipo padrão do projeto); sem eles, a seção perde isso e o resto vale.
     [{ config }, { clientes }, { catalogo, diarizadores }, { vozes },
-     { gravador }] = await Promise.all([
+     { gravador }, { gravacoes }, { tipos }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
       pedir("gravador"),
+      pedir("gravacoes").catch(() => ({ gravacoes: [] })),
+      pedir("modelos-de-ata").catch(() => ({ tipos: [] })),
     ]);
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
@@ -1757,7 +1458,10 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       gravador: () => abaGravador(gravador, mexerNoGravador),
       modelos: () => abaModelos(catalogo, config, gravar),
       transcricao: () => abaTranscricao(config, gravar, diarizadores ?? []),
-      clientes: () => abaClientes(clientes, catalogo, diarizadores ?? []),
+      clientes: () => abaClientes({
+        clientes, catalogo, diarizadores: diarizadores ?? [],
+        gravacoes: gravacoes ?? [], tipos: tipos ?? [],
+      }, () => recarregar(), estado),
       vozes: () => abaVozes(vozes, mexerNaVoz),
     }[atual]();
     conteudo.appendChild(estado);

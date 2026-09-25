@@ -28,6 +28,14 @@ import { calendario } from "/calendario.js";
  */
 const criterios = { texto: "", cliente: "", periodo: "tudo", data: "", estado: "", modo: "dia" };
 
+/**
+ * Abre a lista já filtrada — o "Ver as reuniões deste projeto" de Ajustes ›
+ * Clientes. Não há filtro de projeto: a busca já cobre o nome dele.
+ */
+export function filtrarReunioesPor({ cliente = "", texto = "" }) {
+  Object.assign(criterios, { texto, cliente, periodo: "tudo", data: "", estado: "" });
+}
+
 /** A gravação no painel, pelo caminho. Sobrevive a voltar, como os critérios. */
 let escolhida = null;
 

@@ -1837,3 +1837,116 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
 .trilho__ponto--gravando { background: var(--cor-erro); }
 
+
+/* ── Ajustes › Clientes e projetos: mestre-detalhe (plano 4a do redesenho).
+ * O bloco perde o respiro interno: a lista e o detalhe encostam na borda dele,
+ * como na prancha, e cada parte põe o seu. */
+.clientes { padding: 0; gap: 0; overflow: hidden; }
+.clientes__cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.clientes__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.clientes > .campo__dica { padding: var(--espaco-5); }
+
+.clientes__corpo { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; min-height: 30rem; }
+.clientes__mestre { border-right: 1px solid var(--cor-borda); min-width: 0; }
+.clientes__busca { display: block; width: calc(100% - 2 * var(--espaco-3)); margin: var(--espaco-3); }
+.clientes__nada { padding: var(--espaco-3) var(--espaco-4); }
+
+.clientes__cliente {
+  display: grid;
+  gap: var(--espaco-1);
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.clientes__cliente:hover { background: var(--cor-superficie-2); }
+.clientes__cliente[aria-current="true"] { background: var(--cor-acao-suave); }
+.clientes__cliente:focus-visible,
+.clientes__projeto-topo:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+
+.clientes__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.clientes__sub { color: var(--cor-texto-suave); font-size: var(--texto-rotulo); margin: 0; }
+
+.clientes__detalhe { min-width: 0; }
+.clientes__detalhe-cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4) var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.clientes__detalhe-nome { margin: 0 0 var(--espaco-1); font-size: var(--texto-corpo); }
+.clientes__detalhe-acoes { display: flex; gap: var(--espaco-2); }
+.clientes__detalhe-acoes .popover { left: auto; right: 0; }
+.clientes__menu { display: grid; gap: var(--espaco-1); }
+.clientes__menu .aa-btn { justify-content: flex-start; }
+.clientes__vazio { padding: var(--espaco-4) var(--espaco-5); }
+
+.clientes__projeto { border-bottom: 1px solid var(--cor-borda); }
+.clientes__projeto-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: var(--espaco-4) var(--espaco-5);
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.clientes__projeto-topo:hover { background: var(--cor-superficie-2); }
+.clientes__projeto--aberto > .clientes__projeto-topo { background: var(--cor-acao-suave); }
+.clientes__projeto-nome { display: grid; gap: var(--espaco-1); min-width: 0; }
+.clientes__tipo {
+  display: grid;
+  justify-items: end;
+  gap: var(--espaco-1);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+  text-align: right;
+}
+.clientes__resumo { opacity: .8; }
+
+.clientes__projeto-corpo {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-3) var(--espaco-5) var(--espaco-5);
+}
+.clientes__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--espaco-3);
+}
+.clientes__campos .aa-entrada { min-width: 0; width: 100%; }
+.clientes__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2); }
+.clientes__ver { margin-right: auto; padding-left: 0; text-decoration: underline; }
+.clientes__perigo { color: var(--cor-erro); }
+.clientes__mais {
+  display: grid;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-4);
+  border-top: 1px solid var(--cor-borda);
+}
+
+/* Estreito, a lista de clientes vai para cima do detalhe. */
+@media (max-width: 1100px) {
+  .clientes__corpo { grid-template-columns: 1fr; }
+  .clientes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
+  .clientes__lista { max-height: 14rem; overflow: auto; }
+}

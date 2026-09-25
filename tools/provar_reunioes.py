@@ -76,6 +76,10 @@ PONTE_FALSA = r"""
             + "## Pendências\n\n- [ ] Consolidar as referências — **Carol** — sexta\n";
 
   const responder = (q) => {
+    // Uma prova de outra tela (tools/provar_ajustes.py) responde antes, com o
+    // estado dela; o que ela não responder cai no de sempre.
+    const daProva = window.__responder && window.__responder(q);
+    if (daProva) return daProva;
     switch (q.op) {
       case "gravacoes": return { gravacoes };
       case "transcricoes": return { transcricoes: { atual: null, ultimo: null } };
