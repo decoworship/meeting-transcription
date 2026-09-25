@@ -127,8 +127,11 @@ PONTE_FALSA = r"""
     postMessage(cru) {
       const q = JSON.parse(cru);
       window.__pedidos.push(q);
-      const r = Object.assign({ id: q.id }, responder(q));
-      setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, 0);
+      const falha = window.__falhar && window.__falhar[q.op];
+      if (falha) delete window.__falhar[q.op];
+      const r = falha ? { id: q.id, erro: falha } : Object.assign({ id: q.id }, responder(q));
+      const atraso = (window.__atrasoPorOp && window.__atrasoPorOp[q.op]) || 0;
+      setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, atraso);
     },
   } };
   window.__emitir = (ev) => {
@@ -274,8 +277,7 @@ def prova_antes_heroi(pagina) -> None:
     conferir(texto(pagina, ".grav-heroi .grav-vinculo") == "Algar › Agentes"
              and "o mesmo da última reunião com este título" in texto(pagina, ".grav-heroi__vinculo"),
              "sugere o cliente › projeto da última reunião com este título")
-    conferir(pagina.is_visible("text=Gravar esta reunião") and pagina.is_visible("text=Gravar sem reunião da agenda"),
-             "os dois botões de gravar")
+    conferir(pagina.is_visible("text=Gravar esta reunião"), "o botão de gravar a reunião")
     vai = pagina.eval_on_selector_all(".grav-vai__valor", "els => els.map((e) => e.textContent)")
     conferir(vai == ["Headset AN01 Hands-Free", "Alto-falantes (Realtek Audio)", "andre@beegol.com"],
              f"\"Vai gravar\" diz microfone, áudio da reunião e a conta ({vai})")
@@ -536,7 +538,82 @@ prova_janela_estreita_antes.janela = (900, 700)
 prova_janela_estreita_gravando.janela = (900, 700)
 prova_janela_estreita_gravando.antes = GRAVANDO
 
-PROVAS = [prova_monta, prova_janela_estreita_antes, prova_janela_estreita_gravando, prova_chip_nas_outras_telas, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_gravar_sem_so_quando_e_verdade(pagina) -> None:
+    # O núcleo rotula com o pre_definido quando nada está fixado: "sem reunião"
+    # seria mentira, e o botão não aparece.
+    conferir(not pagina.is_visible("text=Gravar sem reunião da agenda"),
+             "com uma reunião que o núcleo rotularia sozinho, \"Gravar sem reunião\" não aparece")
+
+
+def prova_gravar_sem_quando_nada_rotula(pagina) -> None:
+    conferir(pagina.is_visible("text=Gravar sem reunião da agenda"),
+             "sem reunião que o núcleo rotularia, o botão aparece")
+    pagina.click("text=Gravar sem reunião da agenda")
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    conferir(not pedidos(pagina, "fixar-evento") and len(pedidos(pagina, "gravar")) == 1,
+             "e grava sem fixar nada")
+
+
+prova_gravar_sem_quando_nada_rotula.antes = "window.__proximas.pre_definido = null;"
+
+
+def prova_assinante_que_quebra(pagina) -> None:
+    pagina.evaluate("""() => import('/ponte.js').then((m) =>
+        m.assinar('gravador', () => { throw new Error('assinante quebrado'); }))""")
+    pagina.click("#ir-reunioes")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    pagina.click("#ir-gravador")
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    pagina.evaluate("() => window.__empurrar({ duracao_s: 2000 })")
+    conferir(texto(pagina, ".grav-faixa__tempo") == "00:33:20",
+             "um assinante que quebra não para a faixa do Gravador")
+
+
+prova_assinante_que_quebra.antes = GRAVANDO
+
+
+def prova_mutar_duas_vezes(pagina) -> None:
+    pagina.evaluate("() => { window.__atrasoPorOp = { mutar: 300 }; }")
+    pagina.click(".grav-faixa__acoes >> text=Mutar")
+    pagina.click(".grav-faixa__acoes button:nth-child(2)", force=True)
+    pagina.wait_for_timeout(500)
+    conferir(len(pedidos(pagina, "mutar")) == 1, f"dois cliques rápidos mandam um mutar só ({len(pedidos(pagina, 'mutar'))})")
+    conferir(not pagina.is_disabled(".grav-faixa__acoes button:nth-child(2)"), "e o botão volta")
+
+
+prova_mutar_duas_vezes.antes = GRAVANDO
+
+
+def prova_erro_do_vinculo_some(pagina) -> None:
+    pagina.wait_for_timeout(200)
+    pagina.evaluate("() => { window.__falhar = { 'salvar-reuniao': 'disco cheio' }; }")
+    for projeto in ["Agente de Crédito", "Agentes"]:
+        pagina.click(".grav-faixa .grav-vinculo")
+        pagina.wait_for_selector(".popover .grav-vinculo__form", timeout=2000)
+        pagina.fill("#grav-faixa-projeto", projeto)
+        pagina.click(".popover >> text=Usar")
+        pagina.wait_for_timeout(100)
+        if projeto == "Agente de Crédito":
+            conferir("disco cheio" in texto(pagina, ".grav-gravando"), "a falha de guardar o cliente aparece")
+    conferir("disco cheio" not in texto(pagina, ".grav-gravando"), "e some quando guardar dá certo")
+
+
+prova_erro_do_vinculo_some.antes = GRAVANDO
+
+
+def prova_bandeirinha(pagina) -> None:
+    legenda(pagina, 1838, " Precisamos alinhar", "", True)
+    pagina.click(".grav-faixa__acoes >> text=Marcar momento")
+    conferir(pagina.locator(".grav-faixa__acoes button:first-child svg use[href='#i-marca']").count() == 1,
+             "Marcar momento tem a bandeirinha")
+    conferir(pagina.locator(".fala__momento svg use[href='#i-marca']").count() == 1,
+             "e o \"momento marcado\" também")
+
+
+prova_bandeirinha.antes = GRAVANDO
+
+PROVAS = [prova_monta, prova_gravar_sem_so_quando_e_verdade, prova_gravar_sem_quando_nada_rotula,
+          prova_assinante_que_quebra, prova_mutar_duas_vezes, prova_erro_do_vinculo_some, prova_bandeirinha, prova_janela_estreita_antes, prova_janela_estreita_gravando, prova_chip_nas_outras_telas, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]

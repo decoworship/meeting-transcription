@@ -29,7 +29,7 @@
 // quem digita nas notas e faria o texto piscar.
 
 import { pedir, assinar } from "/ponte.js";
-import { alerta, campoComSugestoes } from "/pecas.js";
+import { alerta, campoComSugestoes, icone } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
 import { painelAoVivo } from "/aovivo.js";
 import { painelDePerguntas } from "/perguntar.js";
@@ -238,7 +238,8 @@ export async function telaDoGravador(ctx) {
   const medidores = el("div", "grav-faixa__medidores");
   medidores.append(faixas.mic.raiz, faixas.system.raiz);
   const acoes = el("div", "grav-faixa__acoes");
-  const marcar = botao("aa-btn-primario", "Marcar momento");
+  const marcar = botao("aa-btn-primario grav-marcar", "Marcar momento");
+  marcar.prepend(icone("i-marca"));
   const mutar = botao("aa-btn-secundario", "Mutar");
   const parar = botao("aa-btn-secundario grav-parar", "Parar");
   acoes.append(marcar, mutar, parar);
@@ -445,6 +446,8 @@ export async function telaDoGravador(ctx) {
     vinculoFaixa.texto.textContent = rotuloDoVinculo(v);
     try {
       await pedir("salvar-reuniao", { gravacao: g, cliente: v.cliente, projeto: v.projeto });
+      // A falha de antes deixou de valer: a mesma ação acabou de dar certo.
+      avisosDeFora.replaceChildren();
     } catch (e) {
       avisosDeFora.replaceChildren(alerta(`Não guardou o cliente: ${e.message}`, "erro"));
     }
@@ -471,14 +474,16 @@ export async function telaDoGravador(ctx) {
   function aplicar(g) {
     estado = g;
 
-    if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
-
+    // Primeiro o que diz se está gravando e se está mudo: uma exceção mais
+    // abaixo nesta volta não pode congelar o relógio nem o botão de mutar.
     ponto.dataset.cor = g.cor;
     ponto.title = g.status;
     tempo.textContent = relogio(g.duracao_s);
-    mutar.textContent = g.mudo ? "Desmutar" : "Mutar";
-    mutar.setAttribute("aria-pressed", String(Boolean(g.mudo)));
+    rotularMutar(g.mudo);
     faixa.dataset.mudo = String(Boolean(g.mudo));
+
+    if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
+
 
     desenharAvisos(g);
 
@@ -528,6 +533,11 @@ export async function telaDoGravador(ctx) {
     marcar.disabled = !(g.gravando && g.gravacao);
 
     if (g.gravando && g.gravacao && g.gravacao !== vinculoDe) carregarVinculo(g.gravacao);
+  }
+
+  function rotularMutar(mudo) {
+    mutar.textContent = mudo ? "Desmutar" : "Mutar";
+    mutar.setAttribute("aria-pressed", String(Boolean(mudo)));
   }
 
   /** Começou ou parou: o que muda uma vez por gravação, e não 5×/s. */
@@ -580,7 +590,7 @@ export async function telaDoGravador(ctx) {
       a.dataset.aviso = tipo;
       if (tipo === "mudo") {
         const des = botao("aa-btn-secundario aa-btn--pequeno grav-desmutar", "Desmutar");
-        des.addEventListener("click", () => chamar("mutar"));
+        des.addEventListener("click", () => alternarMudo());
         a.appendChild(des);
       }
       return a;
@@ -638,6 +648,7 @@ export async function telaDoGravador(ctx) {
           : SEM_LISTA[listagem.status] ?? SEM_LISTA.sem_evento;
       heroiVinculo.hidden = true;
       gravarEsta.hidden = true;
+      gravarSem.hidden = false;
       gravarSem.textContent = "Gravar";
       gravarSem.className = "aa-btn aa-btn-primario aa-btn--grande grav-gravar";
       sugestao = null;
@@ -655,6 +666,11 @@ export async function telaDoGravador(ctx) {
     gravarEsta.hidden = false;
     gravarSem.textContent = "Gravar sem reunião da agenda";
     gravarSem.className = "aa-btn aa-btn-secundario aa-btn--grande";
+    // **Só quando é verdade.** Sem nada fixado, o núcleo rotula a gravação com
+    // o `pre_definido` sozinho — e soltar a escolhida também cai nele. Com um
+    // pre_definido, "sem reunião da agenda" gravaria com reunião; o botão some.
+    // A versão exata precisa de um "nenhuma" no fixar-evento (C#, GRA-4).
+    gravarSem.hidden = Boolean(listagem?.pre_definido);
 
     // A sugestão: o par da última gravação com o mesmo título. Uma escolha
     // feita aqui mesmo ganha, até o herói mudar de reunião.
@@ -800,6 +816,9 @@ export async function telaDoGravador(ctx) {
   async function chamar(op, campos = {}) {
     try {
       const r = await pedir(op, campos);
+      // Deu certo: o erro que uma chamada anterior deixou aqui não vale mais.
+      avisosDeFora.replaceChildren();
+      erroHeroi.replaceChildren();
       if (r.gravador) aplicar(r.gravador);
       return true;
     } catch (e) {
@@ -848,7 +867,20 @@ export async function telaDoGravador(ctx) {
   marcar.addEventListener("click", () => {
     if (notas.marcarMomento({ focar: abaAtiva === "notas" })) previa.marcarMomento();
   });
-  mutar.addEventListener("click", () => chamar("mutar"));
+  // Um mutar por vez: dois cliques rápidos mandariam dois e desfariam o mudo.
+  let mutando = false;
+  async function alternarMudo() {
+    if (mutando) return;
+    mutando = true;
+    mutar.disabled = true;
+    avisos.querySelector(".grav-desmutar")?.setAttribute("disabled", "");
+    try { await chamar("mutar"); } finally {
+      mutando = false;
+      mutar.disabled = false;
+      avisos.querySelector(".grav-desmutar")?.removeAttribute("disabled");
+    }
+  }
+  mutar.addEventListener("click", alternarMudo);
   parar.addEventListener("click", async () => {
     parar.disabled = true;
     await chamar("parar-gravacao");

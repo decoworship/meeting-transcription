@@ -17,7 +17,7 @@
 // que ninguém está olhando.
 
 import { assinar, pedir } from "/ponte.js";
-import { alerta } from "/pecas.js";
+import { alerta, icone } from "/pecas.js";
 import { listaDeTrechos } from "/lista-de-trechos.js";
 import { novaLinha, mostraDono, contarPalavras } from "/legenda-regras.js";
 
@@ -181,7 +181,7 @@ export function painelAoVivo(opcoes = {}) {
     if (!alvo || alvo.querySelector(".fala__momento")) return;
     const m = document.createElement("span");
     m.className = "fala__momento";
-    m.textContent = "momento marcado";
+    m.append(icone("i-marca"), document.createTextNode("momento marcado"));
     alvo.querySelector(".fala__corpo").appendChild(m);
   }
 

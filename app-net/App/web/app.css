@@ -2122,3 +2122,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .chip-gravando:focus-visible { outline: none; box-shadow: var(--anel-foco); }
 .chip-gravando__ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--cor-erro); }
 .chip-gravando[data-mudo="true"] .chip-gravando__ponto { background: var(--cor-destaque); }
+
+/* A bandeirinha do momento: no botão da faixa e na etiqueta da legenda. */
+.grav-marcar .icone, .fala__momento .icone {
+  width: 16px; height: 16px; flex: none;
+}
+.grav-marcar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
+.fala__momento { align-items: center; gap: var(--espaco-2); }
+.fala__momento .icone { width: 13px; height: 13px; }
