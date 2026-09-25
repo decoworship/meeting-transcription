@@ -219,4 +219,23 @@ public sealed class ProjetosTests : IDisposable
         Assert.False(p.ApagarProjeto("Fantasma", "Nenhum"));
         Assert.False(p.RenomearProjeto("Fantasma", "Nenhum", "Outro"));
     }
+
+    [Fact]
+    public void OTipoDeAtaDoProjetoSobreviveAoPreparo()
+    {
+        // O tipo de ata padrão é escolhido em Ajustes › Clientes; o preparo
+        // salva as preferências sem conhecer a chave, e não pode apagá-la.
+        var p = new Projetos(Caminho);
+        p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto { TipoDeAta = "cliente" });
+        p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto { Language = "pt" });
+
+        var relido = new Projetos(Caminho).Preferencias("Algar", "Agentes");
+        Assert.Equal("cliente", relido!.TipoDeAta);
+        Assert.Equal("pt", relido.Language);
+        Assert.Contains("\"tipo_de_ata\": \"cliente\"", File.ReadAllText(Caminho));
+
+        // "Padrão do app" é texto vazio: nulo não se escreve, e não voltaria.
+        p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto { TipoDeAta = "" });
+        Assert.Equal("", new Projetos(Caminho).Preferencias("Algar", "Agentes")!.TipoDeAta);
+    }
 }
