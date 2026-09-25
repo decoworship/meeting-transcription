@@ -342,8 +342,12 @@ def main() -> int:
             # estado.
             largura_no_meio = pagina.evaluate(
                 "document.querySelector('.aa-progresso div').style.width")
-            conferir("a etapa aparece em português", "Transcrevendo: minuto 12 de 60" in texto_no_meio,
-                     texto_no_meio)
+            # A etapa agora vive na lista .preparo__etapas (Task 8), e o
+            # texto do núcleo vem sozinho no campo__dica.
+            etapa_atual = pagina.inner_text(".preparo__etapas li[aria-current='step']")
+            conferir("a etapa aparece em português", etapa_atual == "Transcrevendo" and
+                     texto_no_meio == "minuto 12 de 60",
+                     f"{etapa_atual!r} / {texto_no_meio!r}")
 
             # ---- critério A: sair e voltar
             pagina.click("#ir-gravador")

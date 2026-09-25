@@ -719,6 +719,24 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   transition: width var(--transicao-lenta);
 }
 
+/* O preparo transcrevendo: o andamento em cima, as quatro etapas numa linha. */
+.preparo__andamento { display: grid; gap: var(--espaco-2); margin-bottom: var(--espaco-4); }
+.preparo__etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--texto-pequeno);
+}
+.preparo__etapas li { color: var(--cor-texto-suave); }
+.preparo__etapas li[data-estado="feita"]::before { content: "✓ "; color: var(--cor-acao); }
+.preparo__etapas li[data-estado="atual"] { color: var(--cor-texto-forte); font-weight: 600; }
+.preparo__resumo { margin: 0 0 var(--espaco-4); color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.preparo__motor > summary { cursor: pointer; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.preparo__motor[open] > summary { margin-bottom: var(--espaco-3); }
+
 /* ────────────────────────────────────────────────── notas da reunião */
 
 .notas { display: grid; gap: var(--espaco-2); }

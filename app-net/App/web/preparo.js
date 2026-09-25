@@ -5,7 +5,7 @@ import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, botaoApagarGravacao } from "/app.js";
 import { campoDeEtiquetas } from "/etiquetas.js";
-import { separarTermos } from "/reuniao-regras.js";
+import { separarTermos, estadoDasEtapas, resumoDoMotor } from "/reuniao-regras.js";
 
 // ───────────────────────────────────────────── preparar / transcrever
 
@@ -50,6 +50,10 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // Vem antes de tudo porque é o que responde a pergunta desta tela: vale
   // transcrever? Quem leu e viu que está lá decide com informação; quem não
   // tinha legenda ligada não vê nada, e a tela é a de sempre.
+  // Guardado em variável, e não posto na tela direto: o andamento tem de ser
+  // o primeiro filho da tela quando a transcrição roda, e este bloco vem antes
+  // dele na leitura — mas depois dele no DOM.
+  let legendaGravada = null;
   const turnos = leg?.legenda_gravada;
   if (turnos?.length) {
     const b = document.createElement("details");
@@ -106,11 +110,11 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
       corpo.appendChild(fala);
     }
     b.appendChild(corpo);
-    tela.appendChild(b);
+    legendaGravada = b;
   }
 
   const forma = document.createElement("div");
-  forma.className = "secao";
+  forma.className = "secao preparo__formulario";
 
   // ---- reunião: cliente e projeto aceitam nome novo digitado
   const reuniao = secao("Reunião");
@@ -124,8 +128,12 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   );
   reuniao.appendChild(linha1);
 
-  // ---- motor
-  const motor = secao("Motor");
+  // ---- motor, dobrado: se mexe uma vez por projeto, e a linha fechada já diz
+  // o que ele escolhe. Os ids ficam os mesmos, e com eles tudo o que os lê.
+  const motor = document.createElement("details");
+  motor.className = "bloco preparo__motor";
+  const motorResumo = document.createElement("summary");
+  motorResumo.className = "preparo__motor-resumo";
   const linha2 = document.createElement("div");
   linha2.className = "linha";
   linha2.append(
@@ -140,7 +148,14 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
     // nem isso, era duas mentiras na mesma linha (FASE0-RESULTADOS).
     campo("Separar falantes", "select", { id: "diarizacao", opcoes: ["sim", "não"] }),
   );
-  motor.appendChild(linha2);
+  motor.append(motorResumo, linha2);
+
+  const escolhaDoMotor = () => ({
+    modelo: document.getElementById("modelo").value,
+    idioma: document.getElementById("idioma").value,
+    diarizar: document.getElementById("diarizacao").value === "sim",
+  });
+  const pintarMotor = () => { motorResumo.textContent = `Motor · ${resumoDoMotor(escolhaDoMotor())}`; };
 
   // ---- notas escritas durante a reunião
   //
@@ -148,6 +163,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // siglas que o vocabulário quer, e lê-las primeiro é a ordem em que a pessoa
   // vai querer copiar.
   const blocoNotas = secao("Notas");
+  blocoNotas.id = "painel-preparo-notas";
   const notas = blocoDeNotas(g.caminho, { linhas: 5, aoMudar: (t) => sugerirTermos(t) });
   blocoNotas.appendChild(notas.raiz);
 
@@ -214,13 +230,34 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   aviso.className = "campo__dica";
   acoes.append(botao, aviso, botaoApagarGravacao(g));
 
-  const painel = document.createElement("div");
-  forma.append(reuniao, motor, blocoNotas, vocab, acoes, painel);
-  tela.appendChild(forma);
+  const andamento = document.createElement("div");
+  andamento.className = "preparo__andamento";
+  andamento.hidden = true;
+  const resumo = document.createElement("p");
+  resumo.className = "preparo__resumo";
+  resumo.hidden = true;
+
+  forma.append(reuniao, vocab, motor, acoes);
+  // As notas ficam fora do formulário: não são mandadas ao motor, e anotar
+  // enquanto a transcrição roda é uso normal — elas não se trancam com ele.
+  tela.append(andamento, resumo, ...(legendaGravada ? [legendaGravada] : []), forma, blocoNotas);
+  pintarMotor();
 
   // ---- ligações entre os campos
   const campoCliente = document.getElementById("cliente");
   const campoProjeto = document.getElementById("projeto");
+
+  // O que foi mandado, numa linha: é o que o formulário diz enquanto não se
+  // pode mais editá-lo.
+  const linhaDeResumo = () => {
+    const n = separarTermos(termos.valor()).length;
+    return [
+      [campoCliente.value.trim(), campoProjeto.value.trim()].filter(Boolean).join(" › ") || null,
+      resumoDoMotor(escolhaDoMotor()),
+      n ? `${n} ${n === 1 ? "termo" : "termos"}` : null,
+    ].filter(Boolean).join(" · ");
+  };
+  const partes = { andamento, resumo, forma, linhaDeResumo };
 
   function atualizarProjetos() {
     const projetos = clientes[campoCliente.value] ?? [];
@@ -257,6 +294,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
     document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
     termos.definir(prefs.initial_prompt ?? "");
+    pintarMotor();
     // Qual pipeline separa os falantes não tem campo nesta tela — escolhe-se em
     // Ajustes › Clientes, por projeto, e aqui ele só viaja. Guardá-lo é o que
     // impede as duas gravações abaixo de o substituírem por uma constante.
@@ -347,7 +385,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // sair do campo, e não só ao transcrever. O vocabulário grava a cada termo
   // posto ou tirado, pelo `aoMudar` do campo de etiquetas.
   for (const id of ["modelo", "idioma", "diarizacao"])
-    document.getElementById(id).addEventListener("change", guardarVocabulario);
+    document.getElementById(id).addEventListener("change", () => { guardarVocabulario(); pintarMotor(); });
 
   // As preferências do projeto que já veio vinculado, lidas na montagem.
   //
@@ -373,7 +411,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // do mesmo defeito — com o agravante de mandar o vocabulário vazio ao motor.
   botao.addEventListener("click", async () => {
     await preferenciasProntas;
-    transcrever(g, botao, painel, modeloDeDiarizacao, termos.valor(), aoTerminar);
+    transcrever(g, botao, partes, modeloDeDiarizacao, termos.valor(), aoTerminar);
   });
 
   await preferenciasProntas;
@@ -382,9 +420,9 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // jeito que existe: quem saiu no meio e voltou cai aqui, e o que ele precisa
   // ver é a barra onde ela está — não um botão "Transcrever" que começaria tudo
   // de novo. O erro da última tentativa aparece pelo mesmo caminho.
-  if (emCurso(g.caminho)) acompanhar(g, botao, painel, aoTerminar);
+  if (emCurso(g.caminho)) acompanhar(g, botao, partes, aoTerminar);
   else if (ultimoResultado(g.caminho)?.erro)
-    painel.replaceChildren(alerta(ultimoResultado(g.caminho).erro, "erro"));
+    mostrarFim(partes, alerta(ultimoResultado(g.caminho).erro, "erro"));
 }
 
 function dataDe(nome) {
@@ -392,12 +430,21 @@ function dataDe(nome) {
   return m ? m[1] : "";
 }
 
-const ETAPAS = {
-  mix: "Somando as faixas",
-  asr: "Transcrevendo",
-  diarizacao: "Separando os falantes",
-  montagem: "Montando o resultado",
-};
+/** Transcrevendo: o andamento no topo, e o formulário vira uma linha. */
+function trancar({ andamento, resumo, forma, linhaDeResumo }) {
+  resumo.textContent = linhaDeResumo();
+  resumo.hidden = false;
+  forma.hidden = true;
+  andamento.hidden = false;
+}
+
+/** Parada ou com erro: o recado fica no topo, onde se olhava, e o formulário volta. */
+function mostrarFim({ andamento, resumo, forma }, ...nos) {
+  andamento.replaceChildren(...nos);
+  andamento.hidden = nos.length === 0;
+  resumo.hidden = true;
+  forma.hidden = false;
+}
 
 /**
  * Desenha a transcrição desta gravação enquanto ela roda, esteja ela recém
@@ -407,9 +454,13 @@ const ETAPAS = {
  * sair da tela e voltar sem perder a barra, e é o que faz o resultado chegar
  * mesmo que ninguém estivesse olhando quando ele ficou pronto.
  */
-function acompanhar(g, botao, painel, aoTerminar) {
+function acompanhar(g, botao, partes, aoTerminar) {
+  const { andamento } = partes;
   botao.disabled = true;
   botao.textContent = "Transcrevendo…";
+
+  const etapas = document.createElement("ol");
+  etapas.className = "preparo__etapas";
 
   const barra = document.createElement("div");
   barra.className = "aa-progresso";
@@ -420,7 +471,7 @@ function acompanhar(g, botao, painel, aoTerminar) {
   estado.className = "campo__dica";
   estado.textContent = "preparando…";
 
-  // Parar mora ao lado da barra, e não entre os botões da tela: é a ação de
+  // Parar mora no andamento, e não entre os botões do formulário: é a ação de
   // quem está olhando a transcrição correr e mudou de ideia. Some junto com ela.
   const parar = document.createElement("button");
   parar.className = "aa-btn aa-btn-texto";
@@ -434,19 +485,28 @@ function acompanhar(g, botao, painel, aoTerminar) {
     } catch (e) {
       parar.disabled = false;
       parar.textContent = "Parar transcrição";
-      painel.appendChild(alerta(e.message, "erro"));
+      andamento.appendChild(alerta(e.message, "erro"));
     }
   });
 
   const linha = document.createElement("div");
   linha.className = "progresso__linha";
   linha.append(estado, parar);
-  painel.replaceChildren(barra, linha);
+  andamento.replaceChildren(etapas, barra, linha);
+  trancar(partes);
 
   function pintar(t) {
-    estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
+    etapas.replaceChildren(...estadoDasEtapas(t.etapa).map((e) => {
+      const li = document.createElement("li");
+      li.dataset.estado = e.estado;
+      if (e.estado === "atual") li.setAttribute("aria-current", "step");
+      li.textContent = e.rotulo;
+      return li;
+    }));
+    estado.textContent = t.texto || "";
     preenchimento.style.width = `${t.fracao >= 0 ? Math.round(t.fracao * 100) : 0}%`;
   }
+  pintar({ etapa: null, texto: "preparando…", fracao: 0 });
 
   const atual = emCurso(g.caminho);
   if (atual) pintar(atual);
@@ -454,7 +514,7 @@ function acompanhar(g, botao, painel, aoTerminar) {
   const cancelarAssinatura = assinarTranscricoes(() => {
     // A tela saiu do documento (trocou-se de destino): largar a assinatura e
     // deixar o trabalho seguir. Quem voltar a esta gravação monta outra.
-    if (!painel.isConnected) { cancelarAssinatura(); return; }
+    if (!andamento.isConnected) { cancelarAssinatura(); return; }
 
     const rodando = emCurso(g.caminho);
     if (rodando) { pintar(rodando); return; }
@@ -471,13 +531,13 @@ function acompanhar(g, botao, painel, aoTerminar) {
       const nota = document.createElement("p");
       nota.className = "campo__dica";
       nota.textContent = "Transcrição interrompida. A placa foi liberada.";
-      painel.replaceChildren(nota);
+      mostrarFim(partes, nota);
       return;
     }
     if (fim.erro) {
       botao.disabled = false;
       botao.textContent = "Tentar de novo";
-      painel.replaceChildren(alerta(fim.erro, "erro"));
+      mostrarFim(partes, alerta(fim.erro, "erro"));
       return;
     }
     aoTerminar(g);
@@ -491,7 +551,7 @@ function acompanhar(g, botao, painel, aoTerminar) {
  *   Vem de fora pelo mesmo motivo: `transcrever` é irmã de `telaDePreparo`,
  *   não aninhada nela, e não enxerga o campo.
  */
-async function transcrever(g, botao, painel, modeloDeDiarizacao = null, vocabulario, aoTerminar) {
+async function transcrever(g, botao, partes, modeloDeDiarizacao = null, vocabulario, aoTerminar) {
   botao.disabled = true;
 
   try {
@@ -541,10 +601,10 @@ async function transcrever(g, botao, painel, modeloDeDiarizacao = null, vocabula
       cliente: document.getElementById("cliente").value.trim(),
       projeto: document.getElementById("projeto").value.trim(),
     });
-    acompanhar(g, botao, painel, aoTerminar);
+    acompanhar(g, botao, partes, aoTerminar);
   } catch (e) {
     botao.disabled = false;
     botao.textContent = "Tentar de novo";
-    painel.replaceChildren(alerta(e.message, "erro"));
+    mostrarFim(partes, alerta(e.message, "erro"));
   }
 }

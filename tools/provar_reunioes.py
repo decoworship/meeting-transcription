@@ -643,6 +643,72 @@ def prova_preparo_vocabulario(pagina) -> None:
              f"e o projeto guarda a lista no formato de sempre ({salvo and salvo['prefs']['initial_prompt']!r})")
 
 
+def prova_preparo_curto(pagina) -> None:
+    abrir_preparo(pagina)
+    conferir(not pagina.evaluate("() => document.querySelector('.preparo__motor').open"),
+             "as opções do motor vêm dobradas")
+    resumo = pagina.text_content(".preparo__motor summary")
+    conferir(resumo == "Motor · large-v3 · pt · separa os falantes", f"numa linha que diz o que escolhem ({resumo!r})")
+    pagina.click(".preparo__motor summary")
+    pagina.select_option("#diarizacao", "não")
+    conferir(pagina.text_content(".preparo__motor summary").endswith("sem separar falantes"),
+             "e a linha acompanha a escolha")
+    conferir(pagina.evaluate("""() => {
+        const y = (s) => document.querySelector(s).getBoundingClientRect().top;
+        return y('#vocabulario') < y('.preparo__motor') && y('#cliente') < y('#vocabulario');
+    }"""), "reunião, vocabulário, e o motor depois")
+
+
+ETAPAS_DA_TELA = """() => [...document.querySelectorAll('.preparo__etapas li')]
+  .map((l) => [l.dataset.estado, l.getAttribute('aria-current')])"""
+
+
+def prova_preparo_andamento(pagina) -> None:
+    pagina.evaluate("() => { window.__vinculo = { cliente: 'Vivo', projeto: 'Sherlock' }; "
+                    "window.__prefs = { language: 'pt', model_size: 'large-v3', initial_prompt: 'NOC, CCIL' }; }")
+    abrir_preparo(pagina)
+    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.titulo?.startsWith('Semanal')).caminho")
+    pagina.click("text=Transcrever")
+    pagina.wait_for_selector(".preparo__andamento", timeout=5000)
+    pagina.evaluate(TAREFA_EM_CURSO, [caminho, "transcricao", "asr"])
+    pagina.wait_for_timeout(30)
+    conferir(pagina.evaluate(ETAPAS_DA_TELA) == [["feita", None], ["atual", "step"], ["pendente", None], ["pendente", None]],
+             f"o andamento mostra as quatro etapas, e onde está ({pagina.evaluate(ETAPAS_DA_TELA)})")
+    conferir(pagina.evaluate("() => document.querySelector('#tela').firstElementChild.classList.contains('preparo__andamento')"),
+             "no topo da tela")
+    conferir(pagina.evaluate("() => document.querySelector('.preparo__andamento').getBoundingClientRect().bottom <= innerHeight"),
+             "e à vista sem rolar")
+    conferir(not pagina.is_visible(".preparo__formulario"), "o formulário sai")
+    resumo = pagina.text_content(".preparo__resumo")
+    conferir(resumo == "Vivo › Sherlock · large-v3 · pt · separa os falantes · 2 termos",
+             f"e vira uma linha de resumo ({resumo!r})")
+    conferir(pagina.is_visible("#painel-preparo-notas .notas__texto") and
+             not pagina.is_disabled("#painel-preparo-notas .notas__texto"),
+             "as notas continuam à mão, e editáveis")
+    # Cancelada: tudo volta a ser editável.
+    pagina.evaluate("""(c) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo:
+        { gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: 'asr', fracao: 0.5, texto: '',
+          comecou_em: '', terminou: true, erro: null, cancelada: true } } })""", caminho)
+    pagina.wait_for_timeout(30)
+    conferir(pagina.is_visible(".preparo__formulario") and not pagina.is_visible(".preparo__resumo"),
+             "parada, o formulário volta e o resumo some")
+    conferir("interrompida" in (pagina.text_content(".preparo__andamento") or ""), "dizendo que parou")
+
+
+def prova_preparo_erro_devolve_o_formulario(pagina) -> None:
+    abrir_preparo(pagina)
+    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.titulo?.startsWith('Semanal')).caminho")
+    pagina.click("text=Transcrever")
+    pagina.wait_for_selector(".preparo__andamento", timeout=5000)
+    pagina.evaluate("""(c) => window.__emitir({ tipo: 'transcricoes', transcricoes: { atual: null, ultimo:
+        { gravacao: c, nome: 'x', tarefa: 'transcricao', etapa: 'asr', fracao: 0.5, texto: '',
+          comecou_em: '', terminou: true, erro: 'a placa sumiu', cancelada: false } } })""", caminho)
+    pagina.wait_for_timeout(30)
+    conferir(pagina.is_visible(".preparo__formulario"), "com erro, o formulário volta")
+    conferir("a placa sumiu" in (pagina.text_content(".preparo__andamento") or ""), "e o erro fica no topo, onde se olhava")
+    conferir(pagina.text_content(".preparo__formulario .aa-btn-primario") == "Tentar de novo", "oferecendo tentar de novo")
+
+
 def prova_reuniao_ata(pagina) -> None:
     abrir_reuniao(pagina, "Comunicação")
     largura = "() => Math.round(document.querySelector('.reuniao-aberta').getBoundingClientRect().width)"
@@ -1348,6 +1414,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
           prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
           prova_reuniao_ata, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
+          prova_preparo_curto, prova_preparo_andamento, prova_preparo_erro_devolve_o_formulario,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,
           prova_notas_tocam,
