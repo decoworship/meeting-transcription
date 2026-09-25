@@ -56,11 +56,20 @@ percurso ([FASE5-HANDOFF.md](FASE5-HANDOFF.md) §2). O acervo passou de 44
 gravações, e o uso deixou de ser "uma reunião por vez" — que é o regime em que
 todas as telas foram desenhadas.
 
-### UI-2 · A tela de vozes — `feature` · `aberto`
+### UI-2 · A tela de vozes — `feature` · feito em 25/09/2026
 
 Fila de revisão, play por amostra, ações por amostra (remover, mover, tirar da
 quarentena) e indicador de saúde por perfil. O desenho está escrito em
 [VOZES.md](VOZES.md) §6, e o modelo de dados já é o certo — falta a tela.
+
+**Feito em 25/09/2026** no plano 6 do redesenho
+([plano](superpowers/plans/2026-09-25-ui-06-vozes.md)): Ajustes › Vozes em
+mestre-detalhe, com "Para revisar" (play, semelhança, "É X" / "É outra pessoa"
+/ "Descartar"), a saúde por perfil ("boa" com quatro amostras em uso, "pouca
+voz" abaixo), "Fora de uso" dobrado e a sugestão de juntar do `VOZ-1`. O "Não
+são" da sugestão **não é guardado** — vale até fechar o app; guardar pede um
+campo novo no `vozes.json`. A "confusão entre perfis" do VOZES.md §4b não
+entrou: o núcleo não a calcula.
 
 **Por que subiu de prioridade sozinha:** a decisão de 20/08/2026 pôs a geração 1
 dos vetores fora de circulação. Hoje a biblioteca tem **três estados** para
@@ -206,7 +215,7 @@ engano.
 
 A tela é o **UI-2**. O que sobra aqui é o que não é tela.
 
-### VOZ-1 · Sugerir fusão de perfis parecidos — `feature` · `espera`
+### VOZ-1 · Sugerir fusão de perfis parecidos — `feature` · feito em 25/09/2026 (com o UI-2)
 
 *Fundir "Élio" ↔ "Elio" (0,93)?* — a mesma pessoa inscrita duas vezes com
 grafias diferentes é o defeito que a biblioteca acumula sozinha, e a distância
