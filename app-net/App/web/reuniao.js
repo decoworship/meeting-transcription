@@ -17,6 +17,7 @@ import { telaDeRevisao, abrirPainel as abrirPainelDaRevisao } from "/revisao.js"
 import { montarAta } from "/atas.js";
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, acoesDaBarra } from "/app.js";
+import { tocadorDaReuniao } from "/tocador.js";
 
 const ABAS = ["transcricao", "ata", "notas"];
 
@@ -73,6 +74,10 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
 
     abas.set(id, { botao, painel, montada: false });
   }
+
+  // O tocador é da reunião, e não de uma aba: a nota também toca (UI-4), e
+  // tocar sem ter onde pausar era o defeito do ⏸ solto.
+  raiz.appendChild(tocadorDaReuniao(g));
 
   tela.replaceChildren(raiz);
   cabecalho(tituloDe(g), [

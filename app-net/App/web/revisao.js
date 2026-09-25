@@ -14,28 +14,9 @@ import { pedir } from "/ponte.js";
 import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
          campoComSugestoes, preencherSugestoes, confirmar } from "/pecas.js";
 import { listaDeTrechos } from "/lista-de-trechos.js";
+import { ouvir } from "/tocador.js";
 
 let estado = null;
-
-const audio = document.getElementById("audio");
-
-/**
- * Toca a gravação a partir de um instante.
- *
- * O arquivo é o mix — a mesma soma das faixas que o ASR ouviu —, então os
- * tempos da transcrição batem com o que se escuta. Sem isso, conferir se o
- * falante está certo exigiria abrir o WAV noutro programa e procurar o minuto
- * na mão.
- */
-function ouvirA(segundos) {
-  if (!audio.src) {
-    // Mapeado em JanelaDoApp: o WebView2 serve direto do disco, com Range, que
-    // é o que faz pular para o meio de um WAV de 200 MB ser instantâneo.
-    audio.src = `https://gravacoes.local/${encodeURIComponent(estado.gravacao.nome)}/mix.wav`;
-  }
-  audio.currentTime = segundos;
-  audio.play().catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
-}
 
 /**
  * Grava a transcrição, juntando edições próximas numa escrita só.
@@ -360,7 +341,7 @@ function linhaDoTrecho(seg, indice) {
     for (const o of corpo.querySelectorAll("[data-tocando]"))
       o.removeAttribute("data-tocando");
     linha.dataset.tocando = "true";
-    ouvirA(seg.start);
+    ouvir(estado.gravacao, seg.start);
   });
   linha.addEventListener("dblclick", () => editar(indice));
   return linha;

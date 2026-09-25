@@ -711,6 +711,59 @@ def prova_reuniao_rolagem(pagina) -> None:
     conferir(abs(pagina.evaluate(rolagem) - antes) <= 1, "e passar pela Ata também")
 
 
+TOCADOR = """() => ({
+  rotulo: document.querySelector('.tocador [data-acao="tocar"]').getAttribute('aria-label'),
+  tempo: document.querySelector('.tocador__tempo').textContent,
+  posicao: document.querySelector('.tocador__posicao').value,
+})"""
+
+
+def prova_tocador(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    conferir(pagina.is_visible(".reuniao-aberta .tocador"), "a reunião tem o tocador")
+    conferir(pagina.evaluate(TOCADOR) == {"rotulo": "Tocar", "tempo": "00:00 / 30:00", "posicao": "0"},
+             f"parado, no zero, com a duração da reunião ({pagina.evaluate(TOCADOR)})")
+    # A reunião "Comunicação" tem poucos trechos e não enche a janela: o
+    # `.tocador` não fica encostado no fundo (t.bottom == innerHeight), mas
+    # continua fixo no pé — nunca passa dele, e o CSS que o leva até lá é o
+    # sticky. Ver task-4-brief.md Step 7.
+    no_pe = pagina.evaluate("""() => {
+        const el = document.querySelector('.tocador');
+        const t = el.getBoundingClientRect();
+        return t.bottom <= innerHeight + 1 && getComputedStyle(el).position === 'sticky';
+    }""")
+    conferir(no_pe, "e ele fica no pé da janela")
+    pagina.click("#corpo-transcricao .trecho >> nth=1")
+    tocou = pagina.evaluate("() => window.__tocou")
+    conferir(tocou and tocou["t"] == 4 and tocou["src"].endswith("/mix.wav"),
+             f"clicar no trecho toca o mix de onde ele começa ({tocou})")
+    conferir(pagina.evaluate(TOCADOR)["rotulo"] == "Pausar", "e o tocador passa a oferecer pausar")
+    conferir(pagina.evaluate(TOCADOR)["tempo"] == "00:04 / 30:00", "mostrando onde está")
+    pagina.click(".tocador [data-acao='tocar']")
+    conferir(pagina.evaluate(TOCADOR)["rotulo"] == "Tocar", "pausar pelo tocador")
+    pagina.evaluate("""() => { const r = document.querySelector('.tocador__posicao');
+        r.value = '900'; r.dispatchEvent(new Event('input', { bubbles: true })); }""")
+    conferir(pagina.evaluate("() => document.getElementById('audio').currentTime") == 900,
+             "arrastar a posição leva o áudio para lá")
+    conferir(pagina.evaluate(TOCADOR)["tempo"] == "15:00 / 30:00", "e o tempo acompanha")
+    pagina.click(".reuniao-aberta [data-aba='notas']")
+    conferir(pagina.is_visible(".reuniao-aberta .tocador"), "o tocador continua na aba Notas")
+
+
+def prova_tocador_troca_de_reuniao(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.click("#corpo-transcricao .trecho >> nth=1")
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    conferir(pagina.evaluate("() => !document.getElementById('audio').hasAttribute('src')"),
+             "sair da reunião solta o áudio")
+    abrir_reuniao(pagina, "Sherlock")
+    conferir(pagina.evaluate(TOCADOR)["tempo"] == "00:00 / 30:00", "a reunião seguinte começa com o tocador zerado")
+    # Um evento do <audio> depois da troca não pode repintar o tocador que saiu.
+    pagina.evaluate("() => document.getElementById('audio').dispatchEvent(new Event('play'))")
+    conferir(pagina.locator(".tocador").count() == 1, "há um tocador só na página")
+
+
 def prova_ata_so_acompanha_a_ata(pagina) -> None:
     # A separação de falantes roda sobre a legenda de uma reunião que já abre em
     # abas. A aba Ata não pode tomá-la por uma ata sendo escrita: diria
@@ -1217,7 +1270,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
           prova_reuniao_ata, prova_reuniao_gerar_ata,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
-          prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata,
+          prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,
           prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,
           prova_semana_a_125, prova_semana_barra_troca_de_tela,
           prova_semana_abre_e_volta_no_domingo, prova_semana_hoje_vira_a_semana,

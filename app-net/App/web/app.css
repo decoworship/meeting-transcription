@@ -793,6 +793,39 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   padding: 2px var(--espaco-2);
 }
 
+/* O tocador gruda no pé da janela, como as abas grudam no topo. É o último
+ * filho da reunião, e por isso o sticky o leva até o fim da rolagem. */
+.tocador {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-suspenso);
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+}
+.tocador__botao { min-width: 2.5rem; justify-content: center; }
+.tocador__tempo {
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+.tocador__posicao { flex: 1 1 auto; min-width: 0; accent-color: var(--cor-acao); }
+
+/* A dica ocupa o espaço da direita do pé, como na prancha (ref/aberta.png):
+ * some quando a janela é estreita, senão espremeria o botão e a régua. */
+.tocador__dica {
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .tocador__dica { display: none; }
+}
+
 /* Busca, estado e botões ficam colados no topo junto com os filtros: são as
  * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
  * rolar de volta para desligar um falante anula o filtro. */
