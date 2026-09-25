@@ -304,6 +304,34 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     if (e.key === "Escape" && !detalhe.hidden) esconderDetalhe();
   });
 
+  // O painel da semana flutua por cima da grade (pintarVista) — perto do
+  // canto de cima à direita ele cai bem em cima do próprio cartão que se
+  // acabou de clicar. Nesse caso o segundo clique de um duplo clique cai no
+  // painel, não no cartão de baixo, e o dblclick nativo nunca chega a
+  // acontecer (achado ao provar a troca de tela, com "Sherlock Diário" às
+  // 9h — cedo o bastante para cair na coluna de hoje, sob o painel). Por
+  // isso o primeiro clique é sempre no cartão (o painel ainda não teria
+  // subido por cima dele), e é lembrado aqui; se um segundo clique vem a
+  // tempo — mesmo que caia no painel — é tratado como o duplo clique do
+  // cartão de baixo, e o clique não segue para o que o painel tinha ali.
+  let ultimoCliqueDeCartao = null;
+  raiz.addEventListener("click", (e) => {
+    const doCartao = e.target.closest(".semana__cartao");
+    if (doCartao) {
+      ultimoCliqueDeCartao = { caminho: doCartao.dataset.gravacao, quando: performance.now() };
+      return;
+    }
+    const porBaixo = document.elementsFromPoint(e.clientX, e.clientY)
+      .find((el) => el.classList.contains("semana__cartao"));
+    if (porBaixo && ultimoCliqueDeCartao?.caminho === porBaixo.dataset.gravacao
+        && performance.now() - ultimoCliqueDeCartao.quando < 500) {
+      e.stopPropagation();
+      const g = gravacoes.find((x) => x.caminho === porBaixo.dataset.gravacao);
+      if (g) abrirGravacao(g);
+    }
+    ultimoCliqueDeCartao = null;
+  }, true);
+
   // O teto do painel da lista: da posição dele com a lista no topo até o pé da
   // janela. Medido, e não calculado no CSS a partir da barra do topo: a barra
   // de ferramentas quebra em duas linhas em janela média, e com o teto contado
