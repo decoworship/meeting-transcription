@@ -474,3 +474,15 @@ export function pararAudio() {
   for (const o of document.querySelectorAll("[data-tocando]"))
     o.removeAttribute("data-tocando");
 }
+
+/** Um ícone do sprite do index.html (`#i-…`), por nó e sem innerHTML. */
+export function icone(id) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icone");
+  const uso = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  uso.setAttribute("href", `#${id}`);
+  svg.appendChild(uso);
+  return svg;
+}

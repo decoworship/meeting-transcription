@@ -351,7 +351,7 @@ def main() -> int:
 
             # ---- critério A: sair e voltar
             pagina.click("#ir-gravador")
-            pagina.wait_for_selector(".gravador")
+            pagina.wait_for_selector(".gravador-tela")
             conferir("a bolinha continua acesa fora de Reuniões", estado() == "true")
 
             pagina.click("#ir-reunioes")
@@ -382,7 +382,7 @@ def main() -> int:
 
             # ---- o fim chega com a tela em outro lugar
             pagina.click("#ir-gravador")
-            pagina.wait_for_selector(".gravador")
+            pagina.wait_for_selector(".gravador-tela")
             pagina.evaluate("window.__terminar()")
             pagina.wait_for_timeout(50)
             conferir("critério B: a bolinha apaga ao terminar", estado() == "false")
@@ -402,7 +402,7 @@ def main() -> int:
             pagina.click("text=Transcrever")
             pagina.wait_for_selector(".aa-progresso")
             pagina.click("#ir-gravador")
-            pagina.wait_for_selector(".gravador")
+            pagina.wait_for_selector(".gravador-tela")
             pagina.evaluate("window.__terminar('o motor de ASR não respondeu')")
             pagina.wait_for_timeout(50)
             conferir("critério B: a bolinha apaga também quando falha", estado() == "false")
@@ -451,7 +451,7 @@ def main() -> int:
             # O que dói perder é o texto, então o que se confere é ele: escrito
             # numa tela, encontrado na outra, e sobrevivendo a parar a gravação.
             pagina.click("#ir-gravador")
-            pagina.wait_for_selector(".gravador")
+            pagina.wait_for_selector(".gravador-tela")
             conferir("sem gravação o bloco de notas fica fechado",
                      pagina.is_disabled(".notas__texto"))
 

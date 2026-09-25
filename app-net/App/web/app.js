@@ -1,4 +1,4 @@
-import { pedir } from "/ponte.js";
+import { pedir, assinar } from "/ponte.js";
 import { telaDaReuniao, abrirPainel } from "/reuniao.js";
 import { telaDeAjustes } from "/configuracoes.js";
 import { telaDoGravador } from "/gravador.js";
@@ -122,6 +122,44 @@ function destino(qual) {
   for (const b of document.querySelectorAll(".trilho__item"))
     b.removeAttribute("aria-current");
   document.getElementById(qual)?.setAttribute("aria-current", "page");
+  destinoAtual = qual;
+  pintarChip();
+}
+
+// ─────────────────────────────────────────────── o chip de gravando
+
+/**
+ * "Gravando 00:31:24 · voltar ao Gravador", no cabeçalho de qualquer tela que
+ * não seja o Gravador (spec §3.1).
+ *
+ * **Só o texto muda**, cinco vezes por segundo: o botão é o mesmo nó do começo
+ * ao fim, então quem digita numa busca não perde o cursor (F-2). E o anúncio é
+ * de estado — começou, parou —, nunca do relógio.
+ */
+const chip = document.getElementById("chip-gravando");
+const textoDoChip = chip.querySelector(".chip-gravando__texto");
+let destinoAtual = null;
+let estadoDoGravador = null;
+
+function relogioDoChip(segundos) {
+  const s = Math.max(0, Math.round(segundos));
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+}
+
+function pintarChip(g = estadoDoGravador) {
+  const antes = estadoDoGravador?.gravando;
+  estadoDoGravador = g;
+  const gravando = Boolean(g?.gravando);
+  if (antes !== undefined && antes !== gravando)
+    anunciar(gravando ? "gravação começou" : "gravação parou");
+  const ver = gravando && destinoAtual !== "ir-gravador";
+  if (chip.hidden === ver) chip.hidden = !ver;
+  if (ver) {
+    const texto = `Gravando ${relogioDoChip(g.duracao_s)} · voltar ao Gravador`;
+    if (textoDoChip.textContent !== texto) textoDoChip.textContent = texto;
+    chip.dataset.mudo = String(Boolean(g.mudo));
+  }
 }
 
 // ─────────────────────────────────────────────────────────── lista
@@ -255,7 +293,11 @@ export function abrirAjustes(aba) {
 export function abrirGravador() {
   navegar();
   destino("ir-gravador");
-  return telaDoGravador({ cabecalho, tela });
+  return telaDoGravador({
+    cabecalho, tela, acoesDaBarra,
+    abrirGravacao: (g) => abrirGravacao(g),
+    abrirAjustes: (aba) => abrirAjustes(aba),
+  });
 }
 
 // ─────────────────────────────────────────────────────────── ligação
@@ -302,6 +344,10 @@ async function faltaModelo() {
     return false;
   }
 }
+
+chip.addEventListener("click", () => abrirGravador());
+assinar("gravador", (evento) => pintarChip(evento.gravador));
+pedir("gravador").then((r) => pintarChip(r.gravador)).catch(() => {});
 
 async function inicio() {
   // Antes de qualquer tela: se já havia uma transcrição rodando quando esta

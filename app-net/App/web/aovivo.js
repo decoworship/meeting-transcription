@@ -17,8 +17,9 @@
 // que ninguém está olhando.
 
 import { assinar, pedir } from "/ponte.js";
-import { alerta } from "/pecas.js";
+import { alerta, icone } from "/pecas.js";
 import { listaDeTrechos } from "/lista-de-trechos.js";
+import { novaLinha, mostraDono, contarPalavras } from "/legenda-regras.js";
 
 /** O rótulo que a faixa do microfone dá, e que é certeza e não palpite. */
 const DONO = "You";
@@ -28,7 +29,14 @@ const DONO = "You";
  *
  * @returns `{ raiz, encerrar }`. Quem sai de tela chama `encerrar()`.
  */
-export function painelAoVivo() {
+export function painelAoVivo(opcoes = {}) {
+  // O relógio que carimba a legenda: o da gravação, que o Gravador passa. Sem
+  // ele (a prova do painel sozinho), os segundos desde a montagem.
+  const montado = performance.now();
+  //: O "o texto aparece…" do estado vazio, que some na primeira fala.
+  let vazioNo = null;
+  const tempo = opcoes.tempo ?? (() => (performance.now() - montado) / 1000);
+
   const raiz = document.createElement("section");
   raiz.className = "bloco aovivo";
 
@@ -37,7 +45,19 @@ export function painelAoVivo() {
 
   const titulo = document.createElement("h2");
   titulo.className = "bloco__titulo";
-  titulo.textContent = "O que já foi dito";
+  titulo.textContent = "Transcrição ao vivo";
+  // É rascunho, e a tela diz isso ao lado do nome: quem é cada um e os últimos
+  // minutos só a passada final sabe.
+  const selo = document.createElement("span");
+  selo.className = "aa-etiqueta aovivo__selo";
+  selo.textContent = "rascunho";
+  titulo.appendChild(selo);
+
+  // "Seguindo a fala": o estado do seguimento, à direita do título. Some quando
+  // a pessoa rola para cima, e o "voltar ao vivo" aparece no lugar.
+  const seguindoRotulo = document.createElement("span");
+  seguindoRotulo.className = "aovivo__seguindo";
+  seguindoRotulo.textContent = "Seguindo a fala";
 
   // **O atraso, dito de frente — e o modo certo.** A dica ficava cravada em
   // "blocos de 3 minutos" e mentia quando a legenda era o que rodava. Ela nasce
@@ -45,7 +65,8 @@ export function painelAoVivo() {
   const dica = document.createElement("p");
   dica.className = "aovivo__dica";
 
-  topo.append(titulo, dica);
+  topo.append(titulo, seguindoRotulo);
+  dica.className = "aovivo__rodape";
 
   // O "voltar ao vivo", que só existe quando o seguimento se soltou.
   const voltar = document.createElement("button");
@@ -63,7 +84,7 @@ export function painelAoVivo() {
   // lista virtualizada precisa estar no DOM para o observador enxergá-la. Foi
   // um dos dois defeitos que deixaram este painel sem desenhar nada até
   // 10/09/2026.
-  raiz.append(topo, aviso, corpo, voltar);
+  raiz.append(topo, aviso, corpo, voltar, dica);
 
   // A coluna rola sozinha — é o que a decisão D1 pede (duas colunas com
   // rolagens separadas enquanto grava) e o que permite ler o que foi dito há
@@ -87,6 +108,7 @@ export function painelAoVivo() {
     seguindo = noFim;
     lista.seguir(seguindo);
     voltar.hidden = seguindo;
+    seguindoRotulo.hidden = !seguindo;
   });
 
   voltar.addEventListener("click", () => {
@@ -102,47 +124,65 @@ export function painelAoVivo() {
     if (ev.legenda) acrescentarLegenda(ev.legenda);
   });
 
-  //: O balão que está crescendo, e de quem ele é. A legenda não vem em
-  //: segmentos — vem em texto que firma aos poucos —, então **quem dá forma é a
-  //: tela**: enquanto o dono não muda, o texto cresce no mesmo balão; quando
-  //: muda, começa outro. É o que faz uma conversa parecer conversa.
-  let balao = null;
-  let donoDoBalao = null;
-  //: O balão volátil, com o que o motor ainda pode reescrever. Ele vive fora da
+  //: A linha que está crescendo: `{ no, texto, dono, ate_s, palavras }`. A
+  //: legenda não vem em segmentos — vem em texto que firma aos poucos —, então
+  //: **quem dá forma é a tela**: o texto cresce na mesma linha até o dono trocar
+  //: ou haver pausa (a régua do legenda-regras.js). Cada linha nova ganha o
+  //: próprio tempo, e o dono só aparece na primeira da sequência.
+  let linha = null;
+  //: A linha volátil, com o que o motor ainda pode reescrever. Ela vive fora da
   //: lista porque não é um item: é um rascunho que some quando firma.
   let volatil = null;
 
   function acrescentarLegenda(g) {
-    if (g.novo) {
-      if (balao === null || donoDoBalao !== g.dono) {
-        balao = document.createElement("div");
-        balao.className = "fala";
-        balao.dataset.dono = String(g.dono);
-        const t = document.createElement("p");
-        t.className = "fala__texto";
-        balao.appendChild(t);
-        donoDoBalao = g.dono;
-        corpo.insertBefore(balao, volatil);
-        lista.seguirAoFim();
+    const t = tempo();
+    if (g.novo && g.novo.trim()) {
+      if (novaLinha(linha, { dono: g.dono, t })) {
+        const anterior = linha;
+        const no = linhaDeFala(t, g.dono, mostraDono(anterior, g.dono), "");
+        corpo.insertBefore(no.raiz, volatil?.raiz ?? null);
+        linha = { no, texto: "", dono: g.dono, ate_s: t, palavras: 0 };
+        esconderVazio();
       }
-      const t = balao.querySelector(".fala__texto");
-      t.textContent = (t.textContent + g.novo).replace(/\s+/g, " ").trimStart();
+      linha.texto = (linha.texto + g.novo).replace(/\s+/g, " ").trimStart();
+      linha.no.texto.textContent = linha.texto;
+      linha.ate_s = t;
+      linha.palavras = contarPalavras(linha.texto);
+      lista.seguirAoFim();
     }
 
     // O tentativo, em cinza e fora do fluxo firme: quem lê precisa saber que
     // aquilo ainda pode mudar. Sem essa distinção a tela treme e ninguém
     // entende por quê.
     const texto = (g.tentativo || "").trim();
-    if (!texto) { volatil?.remove(); volatil = null; return; }
+    if (!texto) { volatil?.raiz.remove(); volatil = null; return; }
     if (!volatil) {
-      volatil = document.createElement("div");
-      volatil.className = "fala fala--volatil";
-      volatil.appendChild(document.createElement("p")).className = "fala__texto";
-      corpo.appendChild(volatil);
+      volatil = linhaDeFala(null, g.dono, true, "");
+      volatil.raiz.classList.add("fala--volatil");
+      corpo.appendChild(volatil.raiz);
+      esconderVazio();
     }
-    volatil.dataset.dono = String(g.dono);
-    volatil.querySelector(".fala__texto").textContent = texto;
+    volatil.raiz.dataset.dono = String(g.dono);
+    // O dono do rascunho segue a mesma regra: continuação da linha firme do
+    // mesmo dono não repete o nome.
+    volatil.dono.textContent = mostraDono(linha, g.dono) ? rotuloDoDono(g.dono) : "";
+    volatil.texto.textContent = texto;
     lista.seguirAoFim();
+  }
+
+  function esconderVazio() { if (vazioNo) vazioNo.hidden = true; }
+
+  /**
+   * O momento marcado aparece no trecho: a etiqueta pendura na última linha
+   * firme. É só vista — o registro do momento é a marca nas notas.
+   */
+  function marcarMomento() {
+    const alvo = linha?.no.raiz ?? corpo.querySelector(".fala:not(.fala--volatil):last-of-type");
+    if (!alvo || alvo.querySelector(".fala__momento")) return;
+    const m = document.createElement("span");
+    m.className = "fala__momento";
+    m.append(icone("i-marca"), document.createTextNode("momento marcado"));
+    alvo.querySelector(".fala__corpo").appendChild(m);
   }
 
   // Duas coisas, numa pergunta só, ao montar:
@@ -155,8 +195,9 @@ export function painelAoVivo() {
   //    eventos. O núcleo os guarda justamente para esta volta.
   pedir("aovivo").then((r) => {
     if (!raiz.isConnected) return;
+    opcoes.aoSaber?.(r);
     dica.textContent = r.aovivo_modo === "legenda"
-      ? "O texto aparece conforme a fala, e o que ainda pode mudar fica em cinza."
+      ? "Rascunho da legenda. Quem é cada um e os últimos minutos entram na transcrição do fim."
       : r.aovivo_modo === "bloco"
         ? "Em blocos de 3 minutos — o texto aparece depois que cada bloco fecha."
         : "";
@@ -222,37 +263,63 @@ export function painelAoVivo() {
    * vê a reunião inteira de uma vez.
    */
   function trecho(t, indice) {
-    const fala = document.createElement("div");
-    fala.className = "fala";
-    fala.dataset.indice = String(indice);
-    fala.dataset.dono = String((t.speaker || "") === DONO);
-
-    const texto = document.createElement("p");
-    texto.className = "fala__texto";
-    texto.textContent = (t.text || "").trim();
-
-    const quando = document.createElement("span");
-    quando.className = "fala__tempo";
-    quando.textContent = relogio(t.start);
-
-    fala.append(texto, quando);
-    return fala;
+    const dono = (t.speaker || "") === DONO;
+    const no = linhaDeFala(t.start, dono, true, (t.text || "").trim());
+    no.raiz.dataset.indice = String(indice);
+    return no.raiz;
   }
 
   function vazio() {
     const p = document.createElement("p");
+    vazioNo = p;
     p.className = "aovivo__dica";
     p.textContent = "O texto aparece conforme a reunião acontece.";
     return p;
   }
 
-  return { raiz, encerrar() { cancelar(); lista.encerrar(); } };
+  return { raiz, marcarMomento, encerrar() { cancelar(); lista.encerrar(); } };
 }
 
-/** mm:ss, ou h:mm:ss quando passa da hora. */
+const rotuloDoDono = (dono) => (dono ? "Você" : "Outros");
+
+/**
+ * Uma linha da legenda: tempo · dono · texto.
+ *
+ * **Ao vivo não se diz quem falou — só se é seu ou não.** Decidido em
+ * 10/09/2026: a costura de falantes por bloco divide gente demais (15
+ * identidades para 8 pessoas, docs/FASE7-RESULTADOS.md §11.2), e "Falante 7"
+ * numa reunião de quatro é uma afirmação errada com cara de certeza. "Você" é o
+ * que a faixa do microfone sabe, e é fato. Quem é cada um vem na passada final.
+ *
+ * @param t segundos, ou nulo para o rascunho ("agora").
+ */
+function linhaDeFala(t, dono, comDono, texto) {
+  const raiz = document.createElement("div");
+  raiz.className = "fala";
+  raiz.dataset.dono = String(dono);
+
+  const quando = document.createElement("span");
+  quando.className = "fala__tempo";
+  quando.textContent = t === null ? "agora" : relogio(t);
+
+  const quem = document.createElement("span");
+  quem.className = "fala__dono";
+  quem.textContent = comDono ? rotuloDoDono(dono) : "";
+
+  const corpoDaFala = document.createElement("div");
+  corpoDaFala.className = "fala__corpo";
+  const p = document.createElement("p");
+  p.className = "fala__texto";
+  p.textContent = texto;
+  corpoDaFala.appendChild(p);
+
+  raiz.append(quando, quem, corpoDaFala);
+  return { raiz, texto: p, dono: quem };
+}
+
+/** "00:29:12" — o mesmo relógio da faixa do Gravador e das notas. */
 function relogio(s) {
   const t = Math.max(0, Math.floor(s || 0));
-  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), seg = t % 60;
-  const mm = String(m).padStart(2, "0"), ss = String(seg).padStart(2, "0");
-  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(Math.floor(t / 3600))}:${p(Math.floor((t % 3600) / 60))}:${p(t % 60)}`;
 }

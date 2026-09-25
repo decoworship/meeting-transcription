@@ -67,18 +67,29 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
     marcar.className = "aa-btn aa-btn-secundario";
     marcar.type = "button";
     marcar.textContent = "Marcar momento";
-    marcar.addEventListener("click", () => {
-      const marca = `\n[${relogio(opcoes.tempo())}] `;
-      const pos = campo.selectionStart ?? campo.value.length;
-      campo.value = campo.value.slice(0, pos) + marca + campo.value.slice(pos);
-      campo.focus();
-      campo.selectionStart = campo.selectionEnd = pos + marca.length;
-      agendar();
-    });
+    marcar.addEventListener("click", () => marcarMomento());
     acoes.appendChild(marcar);
   }
 
   raiz.append(topo, campo, acoes);
+
+  /**
+   * Põe o tempo de agora onde está o cursor.
+   *
+   * @param focar leva o cursor ao campo depois. O Gravador passa `false` quando
+   *   a aba de Notas não está à vista: tirar o foco de quem digita uma pergunta
+   *   para pôr num campo escondido é o F-2 da FASE7-FRONTEND.
+   */
+  function marcarMomento({ focar = true } = {}) {
+    if (!opcoes.tempo || campo.disabled) return false;
+    const marca = `\n[${relogio(opcoes.tempo())}] `;
+    const pos = campo.selectionStart ?? campo.value.length;
+    campo.value = campo.value.slice(0, pos) + marca + campo.value.slice(pos);
+    if (focar) campo.focus();
+    campo.selectionStart = campo.selectionEnd = pos + marca.length;
+    agendar();
+    return true;
+  }
 
   // Os momentos marcados, como botões que tocam dali (UI-4). Uma lista ao lado
   // do campo, e não dentro dele — uma <textarea> não tem botão —, refeita a
@@ -186,6 +197,7 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
         trocando = false;
       }
     },
+    marcarMomento,
     /** Grava agora, sem esperar o atraso. Para quem está saindo da tela. */
     salvarAgora: salvar,
     definirHabilitado(ligado, aviso = "") {

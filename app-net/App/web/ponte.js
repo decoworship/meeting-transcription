@@ -21,7 +21,11 @@ window.chrome.webview.addEventListener("message", (evento) => {
   // É por aqui que o nível de áudio chega cinco vezes por segundo sem a página
   // ficar perguntando — a única coisa neste app que flui sem alguém pedir.
   if (resposta.id === 0) {
-    for (const fn of assinantes.get(resposta.tipo) ?? []) fn(resposta);
+    // Cada assinante isolado: o erro de uma tela (o chip, um painel) não pode
+    // pular as outras — a faixa do Gravador é uma delas.
+    for (const fn of assinantes.get(resposta.tipo) ?? []) {
+      try { fn(resposta); } catch (e) { console.error(`assinante de "${resposta.tipo}" quebrou:`, e); }
+    }
     return;
   }
 

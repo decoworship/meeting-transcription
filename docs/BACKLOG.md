@@ -250,6 +250,19 @@ fases recentes mudaram.
 
 **Gatilho:** esquecer o mute do gravador de novo por causa do mute do Teams.
 
+### GRA-4 · "Gravar sem reunião da agenda" não tem como ser exato — `feature` · `espera`
+
+O `fixar-evento` só conhece "esta reunião" e "nenhuma escolhida", e "nenhuma
+escolhida" devolve a escolha ao automático do núcleo, que rotula a gravação
+com a reunião do momento (`pre_definido`). Por isso o Gravador **esconde** o
+botão sempre que há um `pre_definido` (plano 3, revisão final de 25/09/2026):
+ele só aparece quando gravar sem reunião é o que de fato acontece. A versão
+exata é um valor "nenhuma" no `fixar-evento` (`Bandeja/Gravador.Fixar`) que
+desliga o automático até a gravação terminar.
+
+**Gatilho:** querer gravar sem rótulo com uma reunião da agenda em curso — uma
+conversa de corredor no horário de uma reunião que não aconteceu.
+
 ---
 
 ## 5. Diagnóstico e suporte
