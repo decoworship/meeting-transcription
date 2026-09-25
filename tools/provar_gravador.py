@@ -452,7 +452,31 @@ def prova_dispositivo_caiu(pagina) -> None:
 for _p in (prova_mudo_na_faixa, prova_dispositivo_caiu):
     _p.antes = GRAVANDO
 
-PROVAS = [prova_monta, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_vinculo_durante_a_gravacao(pagina) -> None:
+    pagina.wait_for_timeout(200)
+    pagina.click(".grav-faixa .grav-vinculo")
+    pagina.wait_for_selector(".popover .grav-vinculo__form", timeout=2000)
+    conferir(pagina.input_value("#grav-faixa-cliente") == "Algar" and pagina.input_value("#grav-faixa-projeto") == "Agentes",
+             "o editor abre com o par gravado")
+    pagina.fill("#grav-faixa-projeto", "Agente de Crédito")
+    pagina.click(".popover >> text=Usar")
+    pagina.wait_for_timeout(100)
+    salvos = pedidos(pagina, "salvar-reuniao")
+    conferir(len(salvos) == 1 and salvos[0]["gravacao"].endswith("hoje_14-00-00")
+             and salvos[0]["projeto"] == "Agente de Crédito",
+             f"trocar o projeto gravando manda salvar-reuniao com a gravação corrente ({salvos})")
+    conferir(texto(pagina, ".grav-faixa .grav-vinculo") == "Algar › Agente de Crédito", "a faixa mostra o novo par")
+    pagina.evaluate("() => window.__empurrar({ duracao_s: 1900 })")
+    conferir(texto(pagina, ".grav-faixa__tempo") == "00:31:40" and not pedidos(pagina, "parar-gravacao"),
+             "e a gravação segue")
+    pagina.click(".grav-faixa__acoes >> text=Parar")
+    pagina.wait_for_selector(".grav-antes:not([hidden])", timeout=2000)
+    conferir(len(pedidos(pagina, "salvar-reuniao")) == 1, "parar não escreve o vínculo de novo")
+
+
+prova_vinculo_durante_a_gravacao.antes = GRAVANDO
+
+PROVAS = [prova_monta, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]
