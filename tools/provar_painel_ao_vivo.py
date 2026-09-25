@@ -159,7 +159,8 @@ def main() -> int:
                 dono: e.dataset.dono,
                 vol: e.classList.contains('fala--volatil'),
                 x: Math.round(e.getBoundingClientRect().left),
-                txt: e.textContent.trim().replace(/\\s+/g, ' ') }))""")
+                rotulo: e.querySelector('.fala__dono').textContent,
+                txt: e.querySelector('.fala__texto').textContent.trim().replace(/\\s+/g, ' ') }))""")
             separadores = pg.locator(".aovivo__bloco").count()
 
             # ── 4: perguntar ao modelo ─────────────────────────────────────
@@ -247,12 +248,15 @@ def main() -> int:
     # O bloco deu 2 falas; a legenda deve ter agrupado em mais 2, não em 3.
     agrupou = any(f["txt"] == "bom dia pessoal, tudo bem?" for f in firmes)
     um_volatil = len(volateis) == 1
+    # Desde o plano 3 a legenda é linha (tempo · dono · texto), não balão: o
+    # lado deu lugar ao rótulo, que diz só o que a faixa do microfone sabe.
     lados = bool(donos and outros
-                 and min(f["x"] for f in donos) > max(f["x"] for f in outros))
+                 and all(f["rotulo"] in ("Você", "") for f in donos)
+                 and all(f["rotulo"] in ("Outros", "") for f in outros))
 
     print(f"\n   agrupou o texto do mesmo dono num balão só: {agrupou}")
     print(f"   manteve exatamente um balão volátil:          {um_volatil}")
-    print(f"   dono à direita, os outros à esquerda:         {lados}")
+    print(f"   o dono diz Você, os outros dizem Outros:      {lados}")
 
     print("\n4. perguntar ao modelo:")
     print(f"   enquanto espera:  estado={esperando['estado']!r} botão travado="

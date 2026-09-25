@@ -1238,7 +1238,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   color: var(--cor-texto-suave);
 }
 
-.aovivo__topo { margin-bottom: var(--espaco-3); }
+.aovivo__topo { display: flex; align-items: center; justify-content: space-between; gap: var(--espaco-3); }
 .aovivo__dica { margin: var(--espaco-1) 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 
 /* A coluna rola sozinha: é o que permite reler o que foi dito há dez minutos
@@ -1379,6 +1379,64 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   border: 1px dashed var(--cor-borda);
   background: none;
 }
+
+/* ── A legenda em linhas (plano 3): tempo · Você/Outros · texto.
+ *
+ * Substitui os balões dentro do painel ao vivo — o preparo continua com eles.
+ * Três colunas fixas para o texto de todas as linhas começar no mesmo x, que é
+ * o que faz uma coluna larga ler como transcrição e não como conversa. */
+.aovivo .aovivo__corpo { gap: var(--espaco-3); padding: var(--espaco-4) 0; }
+.aovivo .fala {
+  display: grid;
+  grid-template-columns: 5.5rem 4.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--espaco-3);
+  max-width: none;
+  align-self: stretch;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.aovivo .fala[data-dono="true"] { align-self: stretch; background: none; }
+.aovivo .fala__tempo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  text-align: left;
+}
+.aovivo .fala[data-dono="true"] .fala__tempo { text-align: left; }
+.fala__dono { font-size: var(--texto-pequeno); font-weight: 600; color: var(--cor-texto-suave); }
+.fala[data-dono="true"] .fala__dono { color: var(--cor-acao); }
+.aovivo .fala__texto { color: var(--cor-texto-forte); line-height: 1.5; }
+.aovivo .fala--volatil { opacity: 1; border: 0; }
+.aovivo .fala--volatil .fala__texto,
+.aovivo .fala--volatil .fala__tempo { color: var(--cor-texto-suave); font-style: italic; }
+.fala__momento {
+  display: inline-flex;
+  margin-top: var(--espaco-2);
+  padding: 3px var(--espaco-3);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-destaque-bg);
+  color: var(--cor-destaque-texto);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+}
+.aovivo__selo { margin-left: var(--espaco-3); vertical-align: middle; }
+.aovivo__seguindo {
+  display: inline-flex; align-items: center; gap: var(--espaco-2);
+  font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
+}
+.aovivo__seguindo::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-sucesso);
+}
+.aovivo__seguindo[hidden] { display: none; }
+.aovivo__rodape {
+  margin: 0; padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+  font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
+}
+.aovivo__rodape:empty { display: none; }
 
 /* ───────────────────────────────────────────────────── falantes */
 

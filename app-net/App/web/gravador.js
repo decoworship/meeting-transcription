@@ -240,7 +240,7 @@ export async function telaDoGravador(ctx) {
   // Duas colunas enquanto grava — controle e notas à esquerda, o que já foi dito
   // à direita, com rolagens separadas (decisão D1). Parada a gravação, volta a
   // ser uma coluna, e é o CSS que faz isso pelo data-atributo.
-  const previa = painelAoVivo();
+  const previa = painelAoVivo({ tempo: () => estado.duracao_s });
   // **A caixa de perguntar é bloco próprio, e cai na coluna da esquerda** — a
   // regra `> *:not(.aovivo) { grid-column: 1 }` põe lá tudo o que não é a
   // prévia. É o que separa o que está sendo dito do que um modelo deduziu.

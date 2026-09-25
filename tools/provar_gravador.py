@@ -203,7 +203,63 @@ def prova_monta(pagina) -> None:
     conferir(pagina.text_content("#titulo") == "Gravador", "o Gravador monta, com o título na barra")
 
 
-PROVAS = [prova_monta]
+GRAVANDO = """
+Object.assign(window.__estado, { gravando: true, cor: "vermelho", status: "Gravando",
+  duracao_s: 1884, gravacao: "C:\\\\Rec\\\\hoje_14-00-00", titulo: "Comunicação Beegol + App",
+  participantes: ["Carol Souza", "Rafael Prado", "André Yuri"], fixado: "e3" });
+window.__vinculos["C:\\\\Rec\\\\hoje_14-00-00"] = { cliente: "Algar", projeto: "Agentes" };
+"""
+
+
+def legenda(pagina, t: float, novo: str, tentativo: str = "", dono: bool = False) -> None:
+    """Um pedaço da legenda chegando no segundo `t` da gravação."""
+    pagina.evaluate("(t) => window.__empurrar({ duracao_s: t })", t)
+    pagina.evaluate("([n, te, d]) => window.__legenda(n, te, d)", [novo, tentativo, dono])
+
+
+LINHAS = """() => [...document.querySelectorAll('.aovivo .fala')].map((e) => ({
+  tempo: e.querySelector('.fala__tempo').textContent,
+  dono: e.querySelector('.fala__dono').textContent,
+  texto: e.querySelector('.fala__texto').textContent,
+  volatil: e.classList.contains('fala--volatil') }))"""
+
+
+def prova_legenda_quebra_na_pausa(pagina) -> None:
+    pedacos = [(100, "eu vou"), (101.1, "consolidar"), (102.2, "as referências"),
+               (103.3, "e compartilhar"),
+               (106.7, "aí a gente"), (107.8, "valida"), (108.9, "com o Rafael"), (110.0, "antes de fechar"),
+               (113.4, "concordo e"), (114.5, "o jurídico"), (115.6, "precisa ver"), (116.7, "os textos")]
+    for t, novo in pedacos:
+        legenda(pagina, t, " " + novo)
+    linhas = pagina.evaluate(LINHAS)
+    conferir(len(linhas) == 3, f"doze pedaços dos Outros com duas pausas viram três linhas ({len(linhas)})")
+    conferir([l["tempo"] for l in linhas] == ["00:01:40", "00:01:46", "00:01:53"],
+             f"cada linha com o próprio tempo ({[l['tempo'] for l in linhas]})")
+    conferir([l["dono"] for l in linhas] == ["Outros", "", ""],
+             f"e \"Outros\" só na primeira da sequência ({[l['dono'] for l in linhas]})")
+    conferir(linhas and linhas[0]["texto"] == "eu vou consolidar as referências e compartilhar",
+             f"o texto cresce na mesma linha ({linhas[0]['texto'] if linhas else None!r})")
+
+    legenda(pagina, 118, "", "também vale validar", True)
+    linhas = pagina.evaluate(LINHAS)
+    vol = [l for l in linhas if l["volatil"]]
+    conferir(len(vol) == 1 and vol[0]["tempo"] == "agora" and vol[0]["dono"] == "Você",
+             f"o rascunho é uma linha só, \"agora\", com o dono ({vol})")
+    italico = pagina.evaluate("() => getComputedStyle(document.querySelector('.fala--volatil .fala__texto')).fontStyle")
+    conferir(italico == "italic", "e em itálico")
+    legenda(pagina, 119, " também vale validar", "", True)
+    linhas = pagina.evaluate(LINHAS)
+    conferir(not any(l["volatil"] for l in linhas) and linhas[-1]["dono"] == "Você",
+             "o rascunho some quando firma, e a fala firme é do Você")
+    no_fim = pagina.evaluate("""() => { const c = document.querySelector('.aovivo__corpo');
+        return c.scrollHeight - c.scrollTop - c.clientHeight < 4; }""")
+    conferir(no_fim, "a rolagem segue o fim")
+
+
+prova_legenda_quebra_na_pausa.antes = GRAVANDO
+
+
+PROVAS = [prova_monta, prova_legenda_quebra_na_pausa]
 
 
 def fotografar(navegador, porta: int, pasta: Path) -> None:
