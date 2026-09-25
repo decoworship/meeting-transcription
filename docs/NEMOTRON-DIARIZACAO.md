@@ -99,9 +99,25 @@ favorece um pouco. O app de hoje carrega nomes do reconhecimento de vozes e usa
 a faixa do mic para o dono. A diferença é grande o bastante para não ser o
 casamento, mas é por isso que a §5 existe.
 
-<!-- TABELA -->
+**Nas quatro reuniões do acervo com export do Gemini**, ganhou em todas, em
+todos os modos:
 
-**Ao vivo custa quase nada em acerto** — no pior caso, 0,4 ponto do offline.
+```
+                     2026-08-20   2026-08-21   2026-08-25   2026-08-27
+duração                32 min        8 min       15 min       49 min
+app de hoje             92,6%        95,0%        97,9%        96,6%
+offline                 96,6%        97,8%        98,8%        98,0%
+low_latency     1,04 s  96,5%        97,4%        98,8%        98,0%
+very_low_latency 0,64 s 96,4%        97,4%        98,8%        98,0%
+ultra_low_latency 0,32 s 96,4%       97,4%        98,6%        98,1%
+```
+
+**O erro cai de 41% a 56% no offline** — 7,4 → 3,4 em 20/08, 5,0 → 2,2 em
+21/08, 2,1 → 1,2 em 25/08, 3,4 → 2,0 em 27/08. O ganho é maior nas duas em
+que o app mais erra.
+
+**Ao vivo custa quase nada em acerto** — no pior caso, 0,4 ponto do offline, e
+em 27/08 o `ultra_low_latency` chega a passar o offline por 0,1.
 
 ---
 
@@ -113,16 +129,23 @@ ligadas, 67–100% de uso, 5,7 GB — e ficou só como piso.
 
 ```
                      velocidade      ocupação da placa ao vivo
-offline               81–223x            —
+offline              81–226x            —
 low_latency            9–13x           ~10%
 very_low_latency        7–8x           ~13%
 ultra_low_latency         4x           ~25%
 
-VRAM do processo: ~1,2 GB (pesos fp32 + arena do onnxruntime)
+VRAM do processo: ~1,2 GB até 32 min de áudio, ~2,0 GB com 49 min
 ```
 
 A velocidade do offline oscila entre rodadas sem carga aparente de outro
 processo; a faixa é o que se viu.
+
+**A VRAM cresce com a duração, e é da ferramenta, não do modelo.** O
+`Nemotron3.logits` passa o mel da gravação inteira pelo `embed.onnx` de uma vez,
+e 49 min de mel pesam. Os passos do `step.onnx` têm tamanho fixo (cache + FIFO +
+bloco). O sidecar tem de embutir por bloco — que é o que o streaming de verdade
+faz de qualquer jeito, porque o áudio chega aos poucos —, e aí o pico fica no
+dos pesos.
 
 **O streaming é caro por passo, não por modelo.** Cada passo reprocessa o cache
 inteiro (264 + 264 quadros) para avançar um bloco de 3 a 9. É por isso que a

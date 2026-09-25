@@ -770,13 +770,17 @@ comprovadamente erra menos entra aqui, com medição antes.
 
 **Gatilho: é o que falta para decidir o `MOD-2` e o `VIVO-7`.** O
 `nvidia/Nemotron-3-Diarization` já está medido, portado e documentado
-([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): nas reuniões com Gemini ele
-acerta mais o falante que o pyannote de hoje, roda em onnxruntime sem torch —
-o formato do sidecar —, e o port decide 100% igual ao `transformers`.
+([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): nas **quatro** reuniões com
+Gemini ele acerta mais o falante que o pyannote de hoje: o erro cai de 41% a
+56% no offline, e o streaming fica a até 0,4 ponto dele. Roda em onnxruntime
+sem torch, que é o formato do sidecar, e o port decide 100% igual ao
+`transformers`.
 
 **O que não se sabe, e decide:** quanto ele custa **com a legenda rodando**. A
 2060 é dividida com o Meet e com a legenda, e sozinho o streaming já ocupa ~10%
-da placa em `low_latency` e ~25% em `ultra_low_latency`, com ~1,2 GB de VRAM.
+da placa em `low_latency` e ~25% em `ultra_low_latency`, com ~1,2 GB de VRAM
+(a ferramenta chega a 2 GB em 49 min porque embute o arquivo inteiro de uma vez;
+por bloco, não cresce).
 Na passada final a pergunta é mais fácil — nada roda junto —, mas é a mesma
 medição que diz se ele pode ficar residente.
 
