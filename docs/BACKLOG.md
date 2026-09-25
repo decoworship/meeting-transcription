@@ -91,12 +91,15 @@ busca no **conteúdo** das transcrições (pede op nova no núcleo), a vista de
 semana com calendário, e a lista de Atas, que continua como está até o plano 2
 trazer a ata para dentro da reunião.
 
-### UI-4 · O tempo marcado na nota não leva ao áudio — `feature` · `espera`
+### UI-4 · O tempo marcado na nota não leva ao áudio — `feature` · `feito`
 
 `[00:12:34]` numa nota é texto. Na revisão, cada trecho já toca o áudio a partir
 dele; a nota podia fazer o mesmo, e o dado já está lá.
 
 **Gatilho:** usar "marcar momento" e querer ouvir aquele trecho.
+
+**Feito em 25/09/2026** (plano 2b): na aba Notas da reunião, cada linha com
+`[hh:mm:ss]` vira um botão que toca dali, pelo tocador fixo do pé.
 
 ### UI-5 · Atalhos de teclado — `feature` · `espera`
 
