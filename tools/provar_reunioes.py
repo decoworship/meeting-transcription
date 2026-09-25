@@ -601,6 +601,48 @@ def prova_barra_esvazia_no_preparo(pagina) -> None:
     conferir(sobra == 0, f"no preparo, a barra do topo não tem o que era da reunião ({sobra})")
 
 
+def abrir_preparo(pagina) -> None:
+    linha_por_titulo(pagina, "Semanal")
+    pagina.evaluate("() => window.__linha.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))")
+    pagina.wait_for_selector("#vocabulario", timeout=5000)
+
+
+TERMOS = "() => [...document.querySelectorAll('#vocabulario .etiquetas__termo')].map((e) => e.firstChild.textContent)"
+
+
+def prova_preparo_vocabulario(pagina) -> None:
+    pagina.evaluate("""() => {
+        window.__vinculo = { cliente: 'Vivo', projeto: 'Sherlock' };
+        window.__prefs = { language: 'pt', model_size: 'large-v3', initial_prompt: 'Beegol, NOC\\nnoc; CCIL' };
+    }""")
+    abrir_preparo(pagina)
+    pagina.wait_for_timeout(100)
+    conferir(pagina.evaluate(TERMOS) == ["Beegol", "NOC", "CCIL"],
+             f"o vocabulário do projeto vira etiquetas, sem repetir ({pagina.evaluate(TERMOS)})")
+    pagina.click("#vocabulario-novo")
+    pagina.keyboard.type("Sherlock")
+    pagina.keyboard.press("Enter")
+    conferir(pagina.evaluate(TERMOS)[-1] == "Sherlock", "Enter põe o termo")
+    conferir(pagina.evaluate("() => document.activeElement.id") == "vocabulario-novo", "e o cursor fica no campo")
+    pagina.evaluate("""() => { const c = document.getElementById('vocabulario-novo');
+        const d = new DataTransfer(); d.setData('text/plain', 'Algar, Mobi, NOC');
+        c.dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true })); }""")
+    conferir(pagina.evaluate(TERMOS) == ["Beegol", "NOC", "CCIL", "Sherlock", "Algar", "Mobi"],
+             f"colar uma lista põe cada termo, e o repetido não entra ({pagina.evaluate(TERMOS)})")
+    pagina.click("#vocabulario .etiquetas__tirar[aria-label='Tirar CCIL']")
+    conferir("CCIL" not in pagina.evaluate(TERMOS), "o × tira a etiqueta")
+    pagina.focus("#vocabulario-novo")
+    pagina.keyboard.press("Backspace")
+    conferir(pagina.evaluate(TERMOS)[-1] == "Algar", "Backspace no campo vazio tira a última")
+    pagina.keyboard.type("Pendente")
+    pagina.focus("#cliente")
+    conferir(pagina.evaluate(TERMOS)[-1] == "Pendente", "sair do campo com texto digitado não perde o termo")
+    pagina.wait_for_timeout(50)
+    salvo = pagina.evaluate("() => window.__pedidos.filter((q) => q.op === 'salvar-projeto').pop()")
+    conferir(salvo and salvo["prefs"]["initial_prompt"] == "Beegol, NOC, Sherlock, Algar, Pendente",
+             f"e o projeto guarda a lista no formato de sempre ({salvo and salvo['prefs']['initial_prompt']!r})")
+
+
 def prova_reuniao_ata(pagina) -> None:
     abrir_reuniao(pagina, "Comunicação")
     largura = "() => Math.round(document.querySelector('.reuniao-aberta').getBoundingClientRect().width)"
@@ -1305,7 +1347,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
           prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
-          prova_reuniao_ata, prova_reuniao_gerar_ata,
+          prova_reuniao_ata, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,
           prova_notas_tocam,

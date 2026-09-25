@@ -657,6 +657,45 @@ html {
 select.aa-entrada { appearance: auto; }
 textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
+/* O rótulo do campo de etiquetas não é o <span> filho direto de .campo que a
+ * regra acima veste — é um <label> próprio, porque .campo__rotulo também
+ * aponta o "for" do campo de digitar. Mesmo peso visual do resto dos rótulos. */
+.campo__rotulo { font-size: var(--texto-pequeno); font-weight: 600; }
+
+/* O vocabulário como etiquetas: a caixa tem cara de campo, e as etiquetas
+ * quebram linha dentro dela antes do campo de digitar. */
+.etiquetas__caixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: 2.5rem;
+  cursor: text;
+}
+.etiquetas__lista { display: contents; }
+.etiquetas__termo { gap: var(--espaco-1); padding-right: var(--espaco-1); }
+.etiquetas__tirar {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+}
+.etiquetas__tirar:hover { color: var(--cor-texto-forte); }
+.etiquetas__tirar:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.etiquetas__novo {
+  flex: 1 1 8rem;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--cor-texto);
+  font: inherit;
+  outline: none;
+}
+
 .acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
 
 /* O estado da transcrição à esquerda e o "parar" à direita, na mesma linha

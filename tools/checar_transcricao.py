@@ -488,9 +488,9 @@ def main() -> int:
 
             pagina.click(".sugestao >> nth=0")
             pagina.wait_for_timeout(80)
-            conferir("clicar na sugestão a joga no vocabulário",
-                     pagina.input_value("#vocabulario").strip() != "",
-                     pagina.input_value("#vocabulario"))
+            n_termos = pagina.locator("#vocabulario .etiquetas__termo").count()
+            conferir("clicar na sugestão a joga no vocabulário", n_termos > 0,
+                     pagina.inner_text("#vocabulario"))
 
             # ---- a ata na aba da reunião (item 3 da Fase 3; aba desde o plano 2 da UI)
             pagina.evaluate("window.chrome.webview._transcritas.add('C:/g/a')")

@@ -4,6 +4,8 @@ import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
          ultimoResultado, cancelar } from "/transcricoes.js";
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, botaoApagarGravacao } from "/app.js";
+import { campoDeEtiquetas } from "/etiquetas.js";
+import { separarTermos } from "/reuniao-regras.js";
 
 // ───────────────────────────────────────────── preparar / transcrever
 
@@ -151,15 +153,20 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
 
   // ---- vocabulário
   const vocab = secao("Vocabulário");
-  const caixa = campo("Termos do projeto", "textarea", { id: "vocabulario", linhas: 4 });
+  const termos = campoDeEtiquetas({
+    id: "vocabulario", rotulo: "Termos do projeto",
+    // Cada termo posto ou tirado grava no projeto — o equivalente do blur da
+    // caixa de antes, que gravava ao sair dela.
+    aoMudar: () => guardarVocabulario(),
+  });
   const dica = document.createElement("p");
   dica.className = "campo__dica";
   // O aviso de 224 tokens do app antigo morreu de propósito: a correção
   // fonética a jusante recupera o termo mesmo quando o modelo erra a grafia,
   // então a lista não tem mais teto (FASE0 5-A).
   dica.textContent =
-    "Nomes de pessoas, jargão, nomes de sistemas. Sem limite de tamanho — "
-    + "o que o modelo escrever parecido é corrigido depois.";
+    "Nomes de pessoas, jargão, nomes de sistemas — Enter ou vírgula separam. "
+    + "Sem limite de tamanho: o que o modelo escrever parecido é corrigido depois.";
   // Os termos que as notas revelaram, oferecidos um a um.
   //
   // Sugestão e não injeção: o nome vai para o vocabulário quando a pessoa
@@ -167,15 +174,13 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // a primeira palavra de uma frase (FASE3.md §3).
   const sugestoes = document.createElement("div");
   sugestoes.className = "sugestoes";
-  vocab.append(caixa, dica, sugestoes);
+  vocab.append(termos.raiz, dica, sugestoes);
 
-  function sugerirTermos(termos) {
+  function sugerirTermos(candidatos) {
     sugestoes.replaceChildren();
-    const caixaVocab = document.getElementById("vocabulario");
-    if (!caixaVocab) return;
 
-    const jaTem = new Set(caixaVocab.value.split(",").map((t) => t.trim()).filter(Boolean));
-    const novos = termos.filter((t) => !jaTem.has(t));
+    const jaTem = new Set(separarTermos(termos.valor()).map((t) => t.toLocaleLowerCase("pt-BR")));
+    const novos = candidatos.filter((t) => !jaTem.has(t.toLocaleLowerCase("pt-BR")));
     if (novos.length === 0) return;
 
     const rotulo = document.createElement("span");
@@ -190,8 +195,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
       b.textContent = `+ ${termo}`;
       b.title = "Acrescentar ao vocabulário";
       b.addEventListener("click", () => {
-        const atual = caixaVocab.value.trim();
-        caixaVocab.value = atual ? `${atual}, ${termo}` : termo;
+        termos.acrescentar(termo);
         b.remove();
         if (sugestoes.querySelectorAll(".sugestao").length === 0) sugestoes.replaceChildren();
       });
@@ -252,7 +256,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
     if (prefs.model_size) document.getElementById("modelo").value = prefs.model_size;
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
     document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
-    document.getElementById("vocabulario").value = prefs.initial_prompt ?? "";
+    termos.definir(prefs.initial_prompt ?? "");
     // Qual pipeline separa os falantes não tem campo nesta tela — escolhe-se em
     // Ajustes › Clientes, por projeto, e aqui ele só viaja. Guardá-lo é o que
     // impede as duas gravações abaixo de o substituírem por uma constante.
@@ -294,8 +298,8 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
     // projeto "sem nome" só para ter onde salvar criaria lixo no cadastro.
     if (!cliente || !projeto) return;
 
-    const caixaVocab = document.getElementById("vocabulario");
-    if (!caixaVocab) return;
+    // A tela pode ter saído.
+    if (!termos.raiz.isConnected) return;
     if (!prefsProntas) return;
 
     try {
@@ -308,7 +312,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
           diarization: document.getElementById("diarizacao").value === "sim",
           diar_model: modeloDeDiarizacao,
           condition_on_previous_text: false,
-          initial_prompt: caixaVocab.value.trim(),
+          initial_prompt: termos.valor(),
         },
       });
     } catch {
@@ -339,9 +343,9 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   campoCliente.addEventListener("blur", guardarVinculo);
   campoProjeto.addEventListener("blur", guardarVinculo);
 
-  // As preferências do motor e o vocabulário seguem o mesmo caminho do vínculo:
-  // gravam ao sair do campo, e não só ao transcrever.
-  caixa.querySelector("textarea").addEventListener("blur", guardarVocabulario);
+  // As preferências do motor seguem o mesmo caminho do vínculo: gravam ao
+  // sair do campo, e não só ao transcrever. O vocabulário grava a cada termo
+  // posto ou tirado, pelo `aoMudar` do campo de etiquetas.
   for (const id of ["modelo", "idioma", "diarizacao"])
     document.getElementById(id).addEventListener("change", guardarVocabulario);
 
@@ -369,7 +373,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // do mesmo defeito — com o agravante de mandar o vocabulário vazio ao motor.
   botao.addEventListener("click", async () => {
     await preferenciasProntas;
-    transcrever(g, botao, painel, modeloDeDiarizacao, aoTerminar);
+    transcrever(g, botao, painel, modeloDeDiarizacao, termos.valor(), aoTerminar);
   });
 
   await preferenciasProntas;
@@ -483,12 +487,14 @@ function acompanhar(g, botao, painel, aoTerminar) {
 /**
  * @param modeloDeDiarizacao o que o projeto escolheu, ou null para o padrão do
  *   app. Vem de fora porque quem o carrega é a tela de preparo.
+ * @param vocabulario o valor do campo de etiquetas, no formato de sempre.
+ *   Vem de fora pelo mesmo motivo: `transcrever` é irmã de `telaDePreparo`,
+ *   não aninhada nela, e não enxerga o campo.
  */
-async function transcrever(g, botao, painel, modeloDeDiarizacao = null, aoTerminar) {
+async function transcrever(g, botao, painel, modeloDeDiarizacao = null, vocabulario, aoTerminar) {
   botao.disabled = true;
 
   try {
-    const vocabulario = document.getElementById("vocabulario").value.trim();
     const diar = document.getElementById("diarizacao").value;
 
     // Guardar antes de transcrever, e não depois: se a transcrição falhar, o
