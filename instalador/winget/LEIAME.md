@@ -59,6 +59,9 @@ wingetcreate update decoworship.PulseMeet `
   --submit --token $env:GITHUB_TOKEN
 ```
 
+A partir da versão seguinte à 0.7.1, o arquivo do release é
+`PulseMeet-<versão>-instalador.exe` (docs/MARCA.md): a URL do `--urls` muda junto.
+
 Isso abre um PR em `microsoft/winget-pkgs`. Enquanto esse PR não for aceito, a
 instalação por uma linha só é a forma com `--manifest` acima.
 

@@ -5,7 +5,7 @@ Guia para o Claude Code (claude.ai/code) trabalhar neste repositório.
 ## O que é
 
 Aplicativo Windows nativo que grava reuniões em duas faixas e as transcreve com
-separação de falantes. **Um executável** (`MeetingApp.exe`) que é bandeja e
+separação de falantes. **Um executável** (`PulseMeet.exe`) que é bandeja e
 janela ao mesmo tempo: C#/.NET 8 com a interface em WebView2, e os modelos
 rodando em sidecars Python.
 
@@ -107,12 +107,20 @@ pedir a informação ao usuário já custou duas idas e voltas com respostas
 erradas.
 
 **O app se chama PulseMeet desde 19/08/2026**, e o símbolo é o monograma M.
-Nenhum dos dois está fechado, então **a marca é uma constante só**: `Marca.Nome`
-em `Nucleo/Marca.cs` e o `#define Marca` do `.iss`, com um teste que falha se os
-dois discordarem. O que carrega o nome antigo por baixo — `AppId`,
-`MeetingApp.exe`, a pasta de instalação, o mutex, os namespaces e os
-`LogicalName` dos recursos — **não muda nunca**, e cada um quebra algo diferente
-se mudar. O símbolo é `assets/logo.svg`, e `tools/gerar_icone.py` gera dele os
+**O nome foi fechado pelo dono em 24/09/2026**, e desde então o executável é
+`PulseMeet.exe` e o instalador, `PulseMeet-<versão>-instalador.exe` (plano 7 do
+redesenho). **A marca é uma constante só**: `Marca.Nome` em `Nucleo/Marca.cs` e
+o `#define Marca` do `.iss`, com um teste que falha se os dois discordarem — e
+que confere também o `AssemblyName` do app e os scripts que copiam o `.exe`.
+Quem tinha o `MeetingApp.exe` tem os atalhos repontados pelo
+`tools/repontar_atalhos.ps1`, que o instalador e o `publicar.sh` rodam.
+**Publicar só de uma árvore que tem a troca**: o `publicar.sh` de um ramo antigo
+copia um `MeetingApp.exe` que nenhum atalho abre mais — ramo antigo recebe a main
+antes de publicar. O que
+carrega o nome antigo por baixo — `AppId`, a pasta de instalação, o mutex, os
+namespaces, o `RootNamespace` e os `LogicalName` dos recursos, e a pasta de
+dados do WebView2 — **não muda nunca**, e cada um quebra algo diferente se
+mudar. O símbolo é `assets/logo.svg`, e `tools/gerar_icone.py` gera dele os
 seis `.ico`. Tudo em [docs/MARCA.md](docs/MARCA.md). **O winget é o único ponto
 com prazo**: enquanto os manifestos não forem submetidos, o `PackageIdentifier`
 ainda pode ser trocado de graça.
@@ -151,7 +159,7 @@ tools/empacotar_motor_de_ata.sh               # llama.cpp + GGUF (não vai no in
 tools/empacotar_modelos_de_diarizacao.sh      # os 57 MB que substituíram o token
 
 # a interface do disco, para desenhar sem recompilar
-MeetingApp.exe --web C:\caminho\para\app-net\App\web
+PulseMeet.exe --web C:\caminho\para\app-net\App\web
 
 uv sync   # só para as ferramentas de medição em tools/
 ```

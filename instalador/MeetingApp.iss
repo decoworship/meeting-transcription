@@ -46,10 +46,14 @@
 ; compara os dois e falha se discordarem, porque uma versão em que o instalador
 ; diz um nome e a bandeja diz outro passa despercebida até chegar no usuário.
 ;
-; O que NÃO segue a marca, por baixo: o AppId, o DefaultDirName, o AppMutex, o
-; nome do .exe e o OutputBaseFilename. Trocar qualquer um deles transforma a
-; atualização num segundo programa instalado, ou deixa o atalho de quem já tem
-; o app apontando para o vazio.
+; O que NÃO segue a marca, por baixo: o AppId, o DefaultDirName e o AppMutex.
+; Trocar qualquer um deles transforma a atualização num segundo programa
+; instalado, ou deixa o instalador copiar por cima de um app gravando.
+;
+; O nome do .exe e o do instalador seguem desde 24/09/2026 (docs/MARCA.md): o
+; MeetingApp.exe é apagado ([InstallDelete]), e o que apontava para ele — os
+; atalhos, os fixados, o iniciar com o Windows — é refeito para o PulseMeet.exe
+; ([Icons], [Registry] e o repontar_atalhos.ps1 no [Run]).
 #define Marca "PulseMeet"
 
 [Setup]
@@ -73,6 +77,10 @@ VersionInfoVersion={#VersaoNumerica}
 AppPublisher=decoworship
 DefaultDirName={localappdata}\Programs\MeetingApp
 DefaultGroupName={#Marca}
+; Sem reaproveitar o grupo de uma instalação anterior: o de antes da 0.4.0 se
+; chama "MeetingApp", e o Inno o manteria para sempre. O velho é apagado no
+; [InstallDelete].
+UsePreviousGroup=no
 DisableProgramGroupPage=yes
 DisableDirPage=no
 ; Sem UAC: instalação por usuário. Ver o motivo 1 no cabeçalho.
@@ -87,9 +95,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; aberto vira um pedido educado para fechar, em vez de um erro de cópia no meio.
 AppMutex=Global\MeetingApp
 OutputDir={#Saida}
-OutputBaseFilename=MeetingApp-{#Versao}-instalador
+OutputBaseFilename={#Marca}-{#Versao}-instalador
 SetupIconFile={#Payload}\logo.ico
-UninstallDisplayIcon={app}\MeetingApp.exe
+UninstallDisplayIcon={app}\{#Marca}.exe
 ; lzma2/max e solid: o payload é dominado por DLLs de CUDA, que comprimem bem, e
 ; o instalador é entregue por link — cada 100 MB conta mais que o minuto a mais
 ; de compressão.
@@ -111,8 +119,19 @@ Name: "atalhonaarea"; Description: "Criar atalho na área de trabalho"; \
 Name: "iniciarcomwindows"; Description: "Iniciar o {#Marca} junto com o Windows"; \
   GroupDescription: "Ao ligar o computador:"
 
+[InstallDelete]
+; O executável se chamava MeetingApp.exe até a 0.7.x, e o grupo do menu Iniciar
+; "MeetingApp" até a 0.3.0 (docs/MARCA.md). Sem isto, os dois ficariam para trás:
+; um .exe velho que abre a versão velha, e uma pasta no menu Iniciar com um
+; atalho para ele.
+Type: files; Name: "{app}\MeetingApp.exe"
+Type: filesandordirs; Name: "{userprograms}\MeetingApp"
+
 [Files]
-Source: "{#Payload}\MeetingApp.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Payload}\{#Marca}.exe"; DestDir: "{app}"; Flags: ignoreversion
+; O que reponta os atalhos que a pessoa fez para o .exe de antes da marca; roda
+; no [Run], e é o mesmo que o tools/publicar.sh usa.
+Source: "{#Payload}\repontar_atalhos.ps1"; DestDir: "{app}"; Flags: ignoreversion
 ; O carregador nativo do WebView2 não entra no single-file: ele é carregado por
 ; nome, do disco, antes de o host gerenciado existir.
 Source: "{#Payload}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
@@ -166,22 +185,33 @@ Source: "{#Payload}\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; \
   Flags: deleteafterinstall; Check: not TemWebView2
 
 [Icons]
-Name: "{group}\{#Marca}"; Filename: "{app}\MeetingApp.exe"
-Name: "{userdesktop}\{#Marca}"; Filename: "{app}\MeetingApp.exe"; \
+Name: "{group}\{#Marca}"; Filename: "{app}\{#Marca}.exe"
+Name: "{userdesktop}\{#Marca}"; Filename: "{app}\{#Marca}.exe"; \
   Tasks: atalhonaarea
 
 [Registry]
 ; Inicialização por usuário, na chave Run do próprio usuário — não há serviço,
 ; não há tarefa agendada, e desinstalar leva a chave junto.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
-  ValueType: string; ValueName: "MeetingApp"; ValueData: """{app}\MeetingApp.exe"""; \
+  ValueType: string; ValueName: "{#Marca}"; ValueData: """{app}\{#Marca}.exe"""; \
   Flags: uninsdeletevalue; Tasks: iniciarcomwindows
+; O valor de quando o .exe era MeetingApp.exe. O repontar_atalhos.ps1 o troca
+; pelo novo ao instalar, levando junto a escolha do Gerenciador de Tarefas; aqui
+; ele só sai junto na desinstalação, se tiver sobrado.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; \
+  ValueType: none; ValueName: "MeetingApp"; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; \
   StatusMsg: "Instalando o componente WebView2 do Windows…"; \
   Check: not TemWebView2; Flags: waituntilterminated
-Filename: "{app}\MeetingApp.exe"; Description: "Abrir o {#Marca}"; \
+; O fixado na barra de tarefas e o iniciar com o Windows ainda apontam para o
+; MeetingApp.exe que o [InstallDelete] apagou. Idempotente: sem nada velho, não
+; acha nada.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; \
+  Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\repontar_atalhos.ps1"" -Pasta ""{app}"" -Aplicar"; \
+  StatusMsg: "Atualizando os atalhos…"; Flags: runhidden waituntilterminated
+Filename: "{app}\{#Marca}.exe"; Description: "Abrir o {#Marca}"; \
   Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]

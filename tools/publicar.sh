@@ -94,10 +94,10 @@ export PATH="$HOME/.dotnet:$PATH"
 # O app aberto é intocável. Já custou uma transcrição do usuário no meio, e
 # copiar por cima de um .exe em execução falha de qualquer forma no Windows.
 #
-# Confere pelo CAMINHO e não pelo nome do processo: desde a Fase 2.5 o app antigo
-# e o novo se chamam MeetingApp.exe, e barrar pelo nome impediria de publicar na
-# pasta de teste enquanto o usuário trabalha no app de produção — que é
-# exatamente o arranjo que esta fase pede.
+# Confere pelo CAMINHO e não pelo nome do processo: barrar pelo nome impediria
+# de publicar numa pasta de teste enquanto o usuário trabalha no app de
+# produção. Os DOIS nomes: o .exe se chama PulseMeet.exe desde 24/09/2026
+# (docs/MARCA.md), e o que está aberto na hora da troca ainda é o MeetingApp.exe.
 #
 # Com --so-build nada é copiado para lugar nenhum, então não há o que proteger:
 # barrar ali obrigaria a fechar o app para só montar o binário — que é
@@ -105,10 +105,10 @@ export PATH="$HOME/.dotnet:$PATH"
 # enquanto o app grava a reunião do dia.
 if (( ! SO_BUILD )) && [[ -n "${DESTINO:-}" ]]; then
   aberto=$(/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -Command \
-    "(Get-Process MeetingApp -ErrorAction SilentlyContinue).Path" 2>/dev/null | tr -d '\r')
+    "(Get-Process PulseMeet,MeetingApp -ErrorAction SilentlyContinue).Path" 2>/dev/null | tr -d '\r')
   alvo=$(wslpath -w "$DESTINO" 2>/dev/null || echo "$DESTINO")
   if grep -qiF "$alvo" <<<"$aberto"; then
-    echo "ERRO: o MeetingApp está aberto e é ele que vai ser substituído." >&2
+    echo "ERRO: o PulseMeet está aberto e é ele que vai ser substituído." >&2
     echo "" >&2
     echo "      FECHE O APP e rode de novo — pelo menu da bandeja, em Sair." >&2
     echo "      Fechar a janela não basta: ela apenas esconde o app." >&2
@@ -149,7 +149,7 @@ dotnet publish "$RAIZ/app-net/App/MeetingApp.App.csproj" \
   -p:SegredoDoGoogle="$SEGREDO" \
   -o "$SAIDA" --nologo -v q
 
-EXE="$SAIDA/MeetingApp.exe"
+EXE="$SAIDA/PulseMeet.exe"
 
 echo "==> conferindo as réguas"
 bytes=$(stat -c%s "$EXE")
@@ -201,11 +201,24 @@ fi
 
 echo "==> instalando em $DESTINO"
 mkdir -p "$DESTINO"
-cp "$SAIDA/MeetingApp.exe" "$DESTINO/"
+cp "$SAIDA/PulseMeet.exe" "$DESTINO/"
 # O carregador nativo do WebView2 não entra no single-file: ele é carregado por
 # nome, do disco, antes de o host gerenciado existir.
 cp "$SAIDA/WebView2Loader.dll" "$DESTINO/"
-ls -la "$DESTINO/MeetingApp.exe"
+ls -la "$DESTINO/PulseMeet.exe"
+
+# A troca de nome do .exe, na máquina que se atualiza por aqui e não pelo
+# instalador. O menu Iniciar, a área de trabalho, os fixados e o iniciar com o
+# Windows apontam para o MeetingApp.exe; o repontar_atalhos.ps1 os leva para o
+# PulseMeet.exe, e só então o velho sai — apagado antes, o menu Iniciar abriria
+# o vazio. Uma vez só: depois da troca não há MeetingApp.exe para achar.
+if [[ -f "$DESTINO/MeetingApp.exe" ]]; then
+  echo "==> o executável agora é PulseMeet.exe: repontando os atalhos"
+  (cd /mnt/c && /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -NoProfile -NonInteractive \
+     -ExecutionPolicy Bypass -File "$(wslpath -w "$RAIZ/tools/repontar_atalhos.ps1")" \
+     -Pasta "$(wslpath -w "$DESTINO")" -Aplicar | tr -d '\r' | sed 's/^/    /')
+  rm -f "$DESTINO/MeetingApp.exe"
+fi
 
 # O que é pesado NÃO é copiado: o destino ganha junções do Windows para a
 # instalação oficial. São 4,3 GB de Python embarcado, 3,5 GB de motor de ata e
