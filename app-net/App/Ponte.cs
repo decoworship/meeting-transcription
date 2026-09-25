@@ -61,6 +61,12 @@ internal sealed class Pedido
     [JsonPropertyName("pessoa")] public string? Pessoa { get; init; }
     [JsonPropertyName("indice")] public int? Indice { get; init; }
 
+    /// <summary>
+    /// O carimbo da amostra que a tela mostrou: o núcleo só age se o índice
+    /// ainda for ela (Vozes.Achar).
+    /// </summary>
+    [JsonPropertyName("criada_em")] public string? CriadaEm { get; init; }
+
     /// <summary>De onde o diálogo de pasta começa.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
 
@@ -203,6 +209,9 @@ internal sealed class Resposta
 
     /// <summary>A biblioteca de vozes como a tela precisa vê-la.</summary>
     [JsonPropertyName("vozes")] public List<PessoaResumo>? Vozes { get; init; }
+
+    /// <summary>Pares de pessoas que parecem a mesma (Vozes.Parecidos), junto das vozes.</summary>
+    [JsonPropertyName("parecidos")] public List<ParDeVozes>? Parecidos { get; init; }
 
     /// <summary>A pasta escolhida no diálogo, ou nulo se foi cancelado.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
@@ -431,8 +440,22 @@ internal sealed class PessoaResumo
     [JsonPropertyName("amostras")] public List<AmostraResumo> Amostras { get; init; } = [];
 }
 
+/// <summary>Duas pessoas que parecem a mesma, e o quanto.</summary>
+internal sealed class ParDeVozes
+{
+    [JsonPropertyName("a")] public required string A { get; init; }
+    [JsonPropertyName("b")] public required string B { get; init; }
+    [JsonPropertyName("semelhanca")] public double Semelhanca { get; init; }
+}
+
 internal sealed class AmostraResumo
 {
+    /// <summary>
+    /// O quanto ela se parece com o resto do perfil (Vozes.SemelhancaNoPerfil),
+    /// ou nulo sem com o que comparar. É o número da fila de revisão.
+    /// </summary>
+    [JsonPropertyName("semelhanca")] public double? Semelhanca { get; init; }
+
     /// <summary>A posição dentro do perfil: é por ela que se aprova ou esquece.</summary>
     [JsonPropertyName("indice")] public int Indice { get; init; }
     [JsonPropertyName("criada_em")] public required string CriadaEm { get; init; }
@@ -958,17 +981,26 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "vozes":
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id);
                     break;
 
+                // As ops da tela de vozes levam o criada_em da amostra que a
+                // tela mostrou; se o índice já é outra, nada muda e a tela
+                // ouve por quê (Vozes.Achar).
                 case "aprovar-voz":
-                    new Vozes().Aprovar(p.Pessoa ?? "", p.Indice ?? -1);
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id, new Vozes().Aprovar(p.Pessoa ?? "", p.Indice ?? -1, p.CriadaEm));
                     break;
 
                 case "esquecer-voz":
-                    new Vozes().Esquecer(p.Pessoa ?? "", p.Indice ?? -1);
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id, new Vozes().Esquecer(p.Pessoa ?? "", p.Indice ?? -1, p.CriadaEm));
+                    break;
+
+                case "mover-voz":
+                    ResponderVozes(p.Id, new Vozes().Mover(p.Pessoa ?? "", p.Indice ?? -1, p.Nome ?? "", p.CriadaEm));
+                    break;
+
+                case "apagar-voz":
+                    ResponderVozes(p.Id, new Vozes().Apagar(p.Pessoa ?? ""));
                     break;
 
                 case "juntar-vozes":
@@ -976,7 +1008,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     // perfis reconhecem pior que um: o centroide de cada um é
                     // mais fraco. Ver Vozes.Juntar.
                     new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "");
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id);
                     break;
 
                 case "salvar-config":
@@ -2557,7 +2589,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// ao lado. Separar em duas telas obrigaria a decidir sem a comparação, que
     /// é justamente o que a decisão exige.
     /// </remarks>
-    private static List<PessoaResumo> VozesConhecidas()
+    private void ResponderVozes(int id, bool fez = true)
+    {
+        var (vozes, parecidos) = VozesConhecidas();
+        Responder(new Resposta
+        {
+            Id = id, Vozes = vozes, Parecidos = parecidos,
+            Erro = fez ? null : "a biblioteca de vozes mudou; a tela foi atualizada",
+        });
+    }
+
+    private static (List<PessoaResumo>, List<ParDeVozes>) VozesConhecidas()
     {
         var vozes = new Vozes();
         var lista = new List<PessoaResumo>();
@@ -2574,6 +2616,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 resumo.Amostras.Add(new AmostraResumo
                 {
                     Indice = i,
+                    Semelhanca = vozes.SemelhancaNoPerfil(pessoa, i) is double s
+                                     ? Math.Round(s, 2) : null,
                     CriadaEm = a.CriadaEm,
                     DuracaoS = a.DuracaoS,
                     Gravacao = a.Origem.Gravacao,
@@ -2595,7 +2639,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             lista.Add(resumo);
         }
-        return lista;
+        var parecidos = vozes.Parecidos()
+            .Select(par => new ParDeVozes { A = par.A, B = par.B, Semelhanca = Math.Round(par.Semelhanca, 2) })
+            .ToList();
+        return (lista, parecidos);
     }
 
     /// <summary>
