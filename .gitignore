@@ -75,4 +75,8 @@ motores/*/modelos/
 # modelo do pyannote na primeira execução. Versioná-lo poria 25 MB no histórico
 # para guardar algo que um comando reproduz.
 tools/_wespeaker_resnet34.onnx
+
+# Os grafos do Nemotron-3-Diarization, idem: tools/exportar_nemotron3_onnx.py os
+# gera do checkpoint (~380 MB).
+tools/_nemotron3/
 __pycache__/

@@ -775,7 +775,78 @@ desses é o item — não há mais o que otimizar deste lado.
 
 ---
 
-## 8. Débito técnico e testes
+### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `espera`
+
+**Gatilho: o `MOD-1` fechar com folga ao lado da legenda.** Medido em
+25/09/2026 ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): o
+`nvidia/Nemotron-3-Diarization` em streaming acerta o falante quase como no
+offline — 0,4 ponto a menos no pior caso, a 0,32 s de latência —, e ambos acima
+do pyannote de hoje. É a rota para o que o `VIVO-5` procurava, com 8 falantes
+em vez de 4, e sem o `transcribe_cpp`: roda em onnxruntime, no sidecar.
+
+**E nomeia desde o primeiro segundo**, por matrícula: 15 s de cada pessoa
+conhecida postos antes do áudio fazem dos primeiros slots essas pessoas (95,8% e
+100% das palavras no slot certo, ao vivo). O que isso pede — de onde vem a lista
+de quem matricular, e se os 4 s que o banco guarda bastam — está na §5 do
+documento.
+
+**Relacionado:** o `VIVO-2` (diarizar a legenda depois) e o `VIVO-1` (carimbar o
+turno) — sem tempo no turno, não há onde pôr o falante.
+
+---
+
+## 8. Melhoria de modelos
+
+Aberto em 25/09/2026 pelo dono do produto. **O `DIST-5` acha candidatos; este
+tema é o que se faz com o que passou na régua dele** — medir contra o que temos,
+portar para o formato do app, e trocar. A qualidade que o §10 deixa de fora é a
+de *ajuste* (limiar, prompt, pós-processamento); trocar o modelo por um que
+comprovadamente erra menos entra aqui, com medição antes.
+
+### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · `aberto` · **próximo passo**
+
+**Gatilho: é o que falta para decidir o `MOD-2` e o `VIVO-7`.** O
+`nvidia/Nemotron-3-Diarization` já está medido, portado e documentado
+([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): nas **quatro** reuniões com
+Gemini ele acerta mais o falante que o pyannote de hoje: o erro cai de 41% a
+56% no offline, e o streaming fica a até 0,4 ponto dele. Roda em onnxruntime
+sem torch, que é o formato do sidecar, e o port decide 100% igual ao
+`transformers`.
+
+**O que não se sabe, e decide:** quanto ele custa **com a legenda rodando**. A
+2060 é dividida com o Meet e com a legenda, e sozinho o streaming já ocupa ~10%
+da placa em `low_latency` e ~25% em `ultra_low_latency`, com ~1,2 GB de VRAM
+(a ferramenta chega a 2 GB em 49 min porque embute o arquivo inteiro de uma vez;
+por bloco, não cresce).
+Na passada final a pergunta é mais fácil — nada roda junto —, mas é a mesma
+medição que diz se ele pode ficar residente.
+
+**O item:**
+
+1. medir a legenda e o Nemotron em streaming juntos, numa gravação do acervo:
+   atraso da legenda, quadros perdidos, VRAM somada;
+2. cortar o custo do passo antes de desistir de um modo: fp16 (o conversor
+   quebra no RoPE — §2 do documento), IO binding, grafo CUDA;
+3. repetir as quatro reuniões com Gemini, que é a régua (`tools/medir_nemotron3.py medir`).
+
+**Critério de saída:** um modo de streaming em que a legenda não perde tempo
+real, ou a conclusão escrita de que só a passada final cabe.
+
+### MOD-2 · O Nemotron-3 no lugar do pyannote, na passada final — `feature` · `espera`
+
+**Gatilho: o `MOD-1` fechar.** O caminho é curto porque o reconhecimento de vozes
+não depende do diarizador: o `vetor_de_voz` do sidecar recebe trechos, e com os
+falantes do Nemotron ele reconheceu 7 de 8 pessoas contra o banco real (§5 do
+documento). Nada muda no banco, no formato, nem nas vozes aprendidas.
+
+**O que custa:** os 380 MB dos grafos no pacote de modelos, e a pergunta que o
+pyannote não tinha — o teto de **8 falantes** por reunião. O acervo tem 99,7%
+dos blocos de 5 min dentro dele ([FASE7-RESULTADOS.md](FASE7-RESULTADOS.md) §2);
+por reunião inteira, falta contar.
+
+---
+
+## 9. Débito técnico e testes
 
 ### DEB-1 · O caminho da ata na ponte não tem teste — `débito` · `aberto`
 
@@ -790,13 +861,14 @@ dava para rodá-lo num teste com um motor falso.
 
 ---
 
-## 9. O que **não** entra
+## 10. O que **não** entra
 
 Para a lista não virar depósito de novo:
 
 - **qualidade de transcrição, de diarização e de ata** — saiu deste backlog em
   27/08/2026 por decisão do dono do produto, e é tratada fora dele. A disposição
-  item a item está em [FASE6.md](FASE6.md), no bloco de fechamento;
+  item a item está em [FASE6.md](FASE6.md), no bloco de fechamento. **A troca de
+  modelo, com medição antes, voltou em 25/09/2026 como tema 8**;
 - **o que está na lista de "não se reabre"** do CLAUDE.md — a âncora de relógio,
   o resampler, o mute que escreve silêncio. Custaram caro para acertar, são
   invisíveis quando certos, e "melhorar de passagem" já perdeu em campo;
