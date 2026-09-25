@@ -86,16 +86,13 @@ DESLIGADO = PAINEL.replace(
     "<script>\nwindow.__impedimento = 'perguntar durante a reunião está desligado "
     "em Ajustes › Transcrição.';\nwindow.chrome")
 
+# Desde o plano 3 a grade do Gravador é .grav-grade: a legenda larga à
+# esquerda, Notas · Perguntar em abas à direita (D-B).
 COLUNAS = """<!doctype html><meta charset="utf-8">
 <link rel="stylesheet" href="/app.css">
-<div class="painel" id="p" data-aovivo="true">
-  <div class="bloco" id="cartao">cartao</div>
-  <div class="bloco" id="reuniao">reuniao</div>
-  <div class="bloco" id="agenda">a agenda</div>
-  <div class="bloco" id="notas">notas</div>
-  <div class="bloco" id="disp">dispositivos</div>
-  <div class="bloco" id="pasta">pasta</div>
+<div class="grav-grade" id="p" data-legenda="true">
   <section class="bloco aovivo" id="previa">a prévia</section>
+  <section class="bloco grav-abas" id="abas">notas</section>
 </div>"""
 
 BLOCO = {
@@ -295,10 +292,10 @@ def main() -> int:
     tem_rolagem = rolagem["overflow"] == "auto" and rolagem["teto"] not in ("none", "")
     print(f"   a pilha tem teto ({rolagem['teto']}) e rolagem:      {tem_rolagem}")
 
-    esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
-    colunas = len({c["x"] for c in esq}) == 1 and previa["x"] > max(c["x"] for c in esq)
-    print(f"   duas colunas, nada vazando para a direita:    {colunas}")
+    abas = next(c for c in caixas if c["id"] == "abas")
+    colunas = previa["x"] < abas["x"]
+    print(f"   a legenda à esquerda, as abas à direita:      {colunas}")
 
     if erros:
         print("\nERROS DE JAVASCRIPT:\n  " + "\n  ".join(erros))

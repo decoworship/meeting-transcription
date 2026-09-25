@@ -361,7 +361,63 @@ def prova_resto_embaixo(pagina) -> None:
              f"dispositivos e pasta continuam no Gravador ({titulos})")
 
 
-PROVAS = [prova_monta, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
+def prova_gravando_faixa_e_grade(pagina) -> None:
+    conferir(texto(pagina, "#subtitulo").startswith("gravando desde"), "o subtítulo diz desde quando grava")
+    conferir(texto(pagina, "#acoes-da-barra") == "Placa: legenda ao vivo", "e o selo da placa na barra")
+    conferir(texto(pagina, ".grav-faixa__tempo") == "00:31:24", "a faixa tem o relógio")
+    conferir(texto(pagina, ".grav-faixa__titulo") == "Comunicação Beegol + App"
+             and texto(pagina, ".grav-faixa__convidados") == "3 convidados", "o título e os convidados")
+    pagina.wait_for_timeout(200)
+    conferir(texto(pagina, ".grav-faixa .grav-vinculo") == "Algar › Agentes", "o cliente › projeto da gravação")
+    rotulos = pagina.eval_on_selector_all(".grav-faixa .faixa", "els => els.map((e) => [e.textContent, e.title])")
+    conferir(rotulos == [["Seu microfone", "Headset AN01 Hands-Free"], ["Áudio da reunião", "Alto-falantes (Realtek Audio)"]],
+             f"os medidores, com o dispositivo no title ({rotulos})")
+    botoes = pagina.eval_on_selector_all(".grav-faixa__acoes button", "els => els.map((e) => e.textContent)")
+    conferir(botoes == ["Marcar momento", "Mutar", "Parar"], f"Marcar momento · Mutar · Parar ({botoes})")
+    caixas = pagina.evaluate("""() => ['.grav-grade > .aovivo', '.grav-grade > .grav-abas'].map((s) => {
+        const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; })""")
+    conferir(caixas[0][0] < caixas[1][0] and caixas[0][1] > caixas[1][1] * 1.5,
+             f"a legenda larga à esquerda, as abas à direita ({caixas})")
+    abas = pagina.eval_on_selector_all("[role='tab']", "els => els.map((e) => [e.textContent, e.getAttribute('aria-selected')])")
+    conferir(abas == [["Notas", "true"], ["Perguntar", "false"]], f"Notas e Perguntar em abas ({abas})")
+    pagina.focus("#grav-aba-notas")
+    pagina.keyboard.press("ArrowRight")
+    conferir(pagina.is_visible(".perguntar") and not pagina.is_visible(".notas__texto")
+             and pagina.evaluate("() => document.activeElement.id") == "grav-aba-perguntar",
+             "a seta troca de aba e leva o foco junto")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "sem rolagem lateral")
+
+
+def prova_gravando_nao_rouba_foco(pagina) -> None:
+    pagina.click(".notas__texto")
+    pagina.keyboard.type("Definir o tom")
+    antes = pagina.evaluate("() => document.querySelector('.grav-faixa').outerHTML.length")
+    pagina.evaluate("() => { for (let i = 0; i < 20; i++) window.__empurrar({ duracao_s: 1890 + i }); }")
+    pagina.keyboard.type(" da comunicação")
+    conferir(pagina.evaluate("() => document.activeElement.className").find("notas__texto") >= 0
+             and pagina.input_value(".notas__texto").endswith("Definir o tom da comunicação"),
+             "vinte estados seguidos não tiram o cursor das notas")
+    conferir(texto(pagina, ".grav-faixa__tempo") == "00:31:49", "e o relógio andou")
+
+
+def prova_gravando_marcar_momento(pagina) -> None:
+    legenda(pagina, 1838, " Precisamos alinhar o tom de comunicação", "", True)
+    pagina.click("#grav-aba-perguntar")
+    pagina.fill(".perguntar__caixa .aa-entrada", "quem ficou")
+    pagina.click(".grav-faixa__acoes >> text=Marcar momento")
+    conferir("[00:30:38]" in pagina.input_value(".notas__texto"),
+             "Marcar momento escreve nas notas com a aba Perguntar ativa")
+    conferir(pagina.evaluate("() => document.activeElement.textContent") == "Marcar momento",
+             "sem levar o foco ao campo de notas escondido")
+    conferir(pagina.input_value(".perguntar__caixa .aa-entrada") == "quem ficou", "e a pergunta continua lá")
+    conferir(texto(pagina, ".aovivo .fala .fala__momento") == "momento marcado", "e o momento aparece no trecho")
+
+
+for _p in (prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco, prova_gravando_marcar_momento):
+    _p.antes = GRAVANDO
+
+PROVAS = [prova_monta, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+          prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]
 
