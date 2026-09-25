@@ -88,3 +88,14 @@ export function parecidosVisiveis(pares, recusados, nomes) {
   const existe = new Set(nomes);
   return pares.filter((p) => existe.has(p.a) && existe.has(p.b) && !recusados.has(chaveDoPar(p.a, p.b)));
 }
+
+/**
+ * A ordem da lista: quem tem voz boa primeiro, e dentro de cada saúde quem
+ * tem mais amostras ativas. "Pouca voz" junta no fim, que é onde se procura
+ * de quem o app precisa ouvir mais.
+ */
+export function ordenarPessoas(vozes) {
+  const n = (p) => p.amostras.filter((a) => !inerte(a)).length;
+  const boa = (p) => (saude(p).rotulo === "boa" ? 0 : 1);
+  return [...vozes].sort((x, y) => boa(x) - boa(y) || n(y) - n(x) || x.nome.localeCompare(y.nome, "pt-BR"));
+}

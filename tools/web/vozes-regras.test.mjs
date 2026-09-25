@@ -69,3 +69,9 @@ test("parecidos: some o recusado e o par de quem não existe mais", () => {
   assert.deepEqual(R.parecidosVisiveis(pares, recusados, ["Elio", "Élio", "Ana", "Bia"]).map((p) => p.a), ["Elio"]);
   assert.deepEqual(R.parecidosVisiveis(pares, new Set(), ["Elio", "Ana", "Bia"]).map((p) => p.a), ["Ana"]);
 });
+
+test("ordem: boa antes de pouca voz, e mais amostras primeiro", () => {
+  const vozes = [P("Elio", [A(), A()]), P("Heitor", [A(), A(), A(), A(), A()]),
+                 P("Élio", [A(), A(), A(), A()]), P("Rafael", [A(), A(), A()])];
+  assert.deepEqual(R.ordenarPessoas(vozes).map((p) => p.nome), ["Heitor", "Élio", "Rafael", "Elio"]);
+});

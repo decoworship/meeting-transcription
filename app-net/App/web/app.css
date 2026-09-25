@@ -2264,3 +2264,175 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .grav-marcar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
 .fala__momento { align-items: center; gap: var(--espaco-2); }
 .fala__momento .icone { width: 13px; height: 13px; }
+
+/* ── Ajustes › Vozes: mestre-detalhe (plano 6 do redesenho, UI-2). O mesmo
+ * esqueleto de Clientes: o bloco sem respiro, a lista e o detalhe encostados
+ * na borda, cada parte pondo o seu. */
+.vozes { padding: 0; gap: 0; overflow: hidden; }
+.vozes__cabeca { padding: var(--espaco-5); border-bottom: 1px solid var(--cor-borda); }
+.vozes__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.vozes__corpo { display: grid; grid-template-columns: minmax(14rem, 17rem) 1fr; min-height: 34rem; }
+.vozes__mestre {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--cor-borda);
+  min-width: 0;
+}
+
+.vozes__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vozes__item:hover { background: var(--cor-superficie-2); }
+.vozes__item[aria-current="true"] { background: var(--cor-acao-suave); }
+.vozes__item:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.vozes__textos { display: grid; gap: var(--espaco-1); min-width: 0; }
+.vozes__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.vozes__sub { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); }
+
+.vozes__contagem {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+}
+.vozes__contagem[data-zero="true"] { background: var(--cor-superficie-2); color: var(--cor-texto-suave); }
+
+.vozes__rotulo {
+  margin: 0;
+  padding: var(--espaco-4) var(--espaco-4) var(--espaco-2);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* A saúde é uma pílula: verde quando basta, âmbar quando falta voz. */
+.vozes__saude {
+  flex: none;
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vozes__saude[data-saude="boa"] { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+.vozes__saude[data-saude="pouca"] { background: var(--cor-atencao-bg); color: var(--cor-atencao); }
+
+.vozes__pessoas { flex: 1; }
+.vozes__vazio { padding: var(--espaco-3) var(--espaco-4); }
+
+.vozes__fora { border-top: 1px solid var(--cor-borda); }
+.vozes__fora > summary {
+  padding: var(--espaco-3) var(--espaco-4);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  cursor: pointer;
+}
+.vozes__fora > summary:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.vozes__fora-texto { margin: 0; padding: 0 var(--espaco-4) var(--espaco-3); }
+
+.vozes__detalhe { min-width: 0; padding-bottom: var(--espaco-5); }
+.vozes__detalhe-cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5) var(--espaco-5) var(--espaco-4);
+}
+.vozes__detalhe-nome { margin: 0 0 var(--espaco-1); font-family: var(--fonte-titulo, inherit); font-size: var(--texto-titulo-m); }
+.vozes__detalhe-cabeca .vozes__sub { font-size: var(--texto-pequeno); }
+.vozes__detalhe-acoes { display: flex; align-items: center; gap: var(--espaco-2); }
+.vozes__detalhe-acoes .popover,
+.vozes__amostra-acoes .popover { left: auto; right: 0; }
+
+.vozes__fila { display: grid; gap: var(--espaco-3); padding: 0 var(--espaco-5); }
+.vozes__nada { margin: 0; }
+
+.vozes__caso,
+.vozes__sugestao {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-superficie);
+}
+.vozes__caso-topo { display: flex; align-items: flex-start; gap: var(--espaco-3); }
+.vozes__caso-textos { display: grid; gap: var(--espaco-1); min-width: 0; flex: 1; }
+.vozes__marcada { margin: 0; font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.vozes__proc { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); overflow-wrap: anywhere; }
+.vozes__motivo { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); font-style: italic; }
+.vozes__semelhanca {
+  display: inline-block;
+  padding: var(--espaco-1) var(--espaco-3);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-rotulo);
+  white-space: nowrap;
+}
+.vozes__respostas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2); }
+.vozes__caso .vozes__respostas { padding-left: calc(2.5rem + var(--espaco-3)); }
+.vozes__perigo { color: var(--cor-erro); }
+.vozes__sugestao {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-style: dashed;
+  background: transparent;
+}
+
+/* O play da fila é maior: é o gesto principal ali. */
+.tocar--grande { width: 2.5rem; height: 2.5rem; flex: none; }
+.tocar--grande svg { width: 15px; height: 15px; }
+
+.vozes__amostras, .vozes__inertes { padding: 0 var(--espaco-5); }
+.vozes__inertes { margin-top: var(--espaco-4); }
+.vozes__inertes > .vozes__rotulo { padding-left: 0; }
+.vozes__amostra {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-2);
+  border-top: 1px solid var(--cor-borda);
+}
+.vozes__amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
+/* Apagada e não colorida: não é alerta, é coisa inerte (VOZES.md §8). */
+.vozes__amostra[data-inerte="true"] { opacity: .55; }
+.vozes__amostra-acoes { display: flex; align-items: center; gap: var(--espaco-2); }
+.vozes__menu { display: grid; gap: var(--espaco-1); min-width: 11rem; }
+.vozes__menu .aa-btn { justify-content: flex-start; }
+
+.vozes-obra { margin: 0; }
+
+/* Estreito, a lista de pessoas vai para cima do detalhe. */
+@media (max-width: 1100px) {
+  .vozes__corpo { grid-template-columns: 1fr; }
+  .vozes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
+  .vozes__pessoas { max-height: 16rem; overflow: auto; }
+}
+.aa-pagina:has(.vozes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}

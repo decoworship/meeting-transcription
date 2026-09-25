@@ -12,7 +12,8 @@
 
 import { pedir } from "/ponte.js";
 import { abaClientes } from "/clientes.js";
-import { alerta, campo, confirmar, avisar, perguntarTexto } from "/pecas.js";
+import { abaVozes } from "/vozes.js";
+import { alerta, campo, confirmar } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
 function tamanho(bytes) {
@@ -21,9 +22,6 @@ function tamanho(bytes) {
   if (gb >= 1) return `${gb.toFixed(1).replace(".", ",")} GB`;
   return `${Math.round(bytes / 1e6)} MB`;
 }
-
-/** "4,2s" — a duração de uma amostra de voz. */
-const segundos = (s) => `${s.toFixed(1).replace(".", ",")}s`;
 
 /** "10/08/2026" a partir do ISO que o núcleo grava. */
 function dia(iso) {
@@ -1091,272 +1089,6 @@ function abaTranscricao(config, gravar, diarizadores = []) {
 //
 // Mora em clientes.js desde o plano 4a do redesenho (mestre-detalhe).
 
-// ─────────────────────────────────────────────────────────── aba Vozes
-
-/**
- * Toca o recorte de 4 segundos que gerou uma amostra.
- *
- * Usa o mesmo <audio> da revisão, e não um por linha: com dezenas de amostras,
- * um elemento por linha significaria dezenas de conexões abertas — e dois
- * trechos tocando juntos, que é pior ainda para quem está tentando decidir se
- * a voz é da mesma pessoa.
- */
-function ouvirTrecho(relativo, botao) {
-  const audio = document.getElementById("audio");
-  const url = `https://vozes.local/${relativo.split("/").map(encodeURIComponent).join("/")}`;
-
-  // Clicar de novo no que está tocando para. É o gesto que se espera, e sem
-  // ele não há como interromper um trecho a não ser esperando os 4 segundos.
-  if (audio.src === url && !audio.paused) {
-    audio.pause();
-    botao.removeAttribute("data-tocando");
-    return;
-  }
-
-  for (const b of document.querySelectorAll(".tocar[data-tocando]"))
-    b.removeAttribute("data-tocando");
-
-  audio.src = url;
-  audio.currentTime = 0;
-  botao.dataset.tocando = "true";
-  audio.onended = () => botao.removeAttribute("data-tocando");
-  audio.play().catch((e) => {
-    botao.removeAttribute("data-tocando");
-    botao.title = `não tocou: ${e.message}`;
-  });
-}
-
-function linhaDeAmostra(pessoa, a, aoMudar) {
-  const linha = document.createElement("div");
-  linha.className = "amostra";
-  linha.dataset.quarentena = String(a.quarentena);
-  // Inerte por qualquer um dos dois motivos: mesma aparência, porque a
-  // consequência é a mesma — esta amostra não participa de nada.
-  linha.dataset.outroModelo =
-    String(a.outro_modelo === true || a.regras_antigas === true);
-
-  const tocar = document.createElement("button");
-  tocar.className = "tocar";
-  tocar.type = "button";
-  tocar.disabled = !a.trecho;
-  tocar.title = a.trecho
-    ? "Ouvir este trecho"
-    : "Esta amostra foi guardada sem o trecho de áudio";
-  tocar.setAttribute("aria-label", "Ouvir o trecho");
-  if (a.trecho) tocar.addEventListener("click", () => ouvirTrecho(a.trecho, tocar));
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  const uso = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  uso.setAttribute("href", "#i-tocar");
-  svg.appendChild(uso);
-  tocar.appendChild(svg);
-
-  const proc = document.createElement("span");
-  proc.className = "amostra__proc";
-  // A procedência inteira numa linha: é ela que responde "de onde veio isto?",
-  // que é a primeira pergunta de quem julga uma amostra suspeita.
-  proc.textContent = [
-    dia(a.criada_em), a.faixa, segundos(a.duracao_s),
-    a.dispositivo, a.gravacao,
-    // Dito na mesma linha da procedência porque é procedência: de qual modelo
-    // esta voz veio. Sem isto a tela mostraria amostras de alguém que o app
-    // não reconhece, sem nada explicando a contradição.
-    a.outro_modelo === true ? "de um modelo de voz antigo" : null,
-    // Duas causas diferentes para a mesma inércia, e a diferença importa para
-    // quem decide se apaga ou espera: uma volta se o modelo voltar, a outra
-    // não volta nunca.
-    a.regras_antigas === true ? "aprendida antes da guarda de contaminação" : null,
-  ].filter(Boolean).join(" · ");
-
-  const acoes = document.createElement("span");
-  acoes.className = "amostra__acoes";
-
-  if (a.quarentena) {
-    const aprovar = document.createElement("button");
-    aprovar.className = "aa-btn aa-btn-secundario";
-    aprovar.type = "button";
-    aprovar.textContent = "Aprovar";
-    aprovar.title = "Esta voz soou diferente do resto do perfil. Aprovar a "
-      + "aceita como uma condição nova da mesma pessoa.";
-    aprovar.addEventListener("click", () =>
-      aoMudar("aprovar-voz", pessoa, a.indice));
-    acoes.appendChild(aprovar);
-  }
-
-  const esquecer = document.createElement("button");
-  esquecer.className = "aa-btn aa-btn-texto";
-  esquecer.type = "button";
-  esquecer.textContent = "Esquecer";
-  esquecer.addEventListener("click", async () => {
-    // Apagar amostra é irreversível e some com trabalho de reuniões passadas.
-    // Um clique distraído não pode bastar.
-    if (await confirmar("A voz aprendida nesta amostra deixa de ser reconhecida "
-                        + "nas próximas reuniões.",
-                        { titulo: `Esquecer esta amostra de ${pessoa}?`,
-                          ok: "Esquecer" }))
-      aoMudar("esquecer-voz", pessoa, a.indice);
-  });
-  acoes.appendChild(esquecer);
-
-  linha.append(tocar, proc, acoes);
-  return linha;
-}
-
-/**
- * Pergunta com qual pessoa juntar, numa caixa do app.
- *
- * Um <select> e não um campo de texto: o destino tem de ser alguém que já
- * existe, e digitar o nome de novo é exatamente o gesto que criou o problema —
- * uma segunda grafia. Devolve o nome escolhido, ou nulo se desistiu.
- */
-function escolherPessoa(de, outras) {
-  return new Promise((resolver) => {
-    const dialogo = document.createElement("dialog");
-    dialogo.className = "modal";
-
-    const corpo = document.createElement("div");
-    corpo.className = "modal__corpo";
-
-    const h = document.createElement("h2");
-    h.className = "modal__titulo";
-    h.textContent = `Juntar "${de}" com quem?`;
-
-    const escolha = campo("Manter o nome", "select", { opcoes: outras });
-    const sel = escolha.querySelector("select");
-
-    const acoes = document.createElement("div");
-    acoes.className = "modal__acoes";
-
-    const nao = document.createElement("button");
-    nao.className = "aa-btn aa-btn-secundario";
-    nao.type = "button";
-    nao.textContent = "Cancelar";
-    nao.addEventListener("click", () => dialogo.close(""));
-
-    const sim = document.createElement("button");
-    sim.className = "aa-btn aa-btn-primario";
-    sim.type = "button";
-    sim.textContent = "Continuar";
-    sim.addEventListener("click", () => dialogo.close("sim"));
-
-    acoes.append(nao, sim);
-    corpo.append(h, escolha, acoes);
-    dialogo.appendChild(corpo);
-
-    dialogo.addEventListener("close", () => {
-      const v = dialogo.returnValue === "sim" ? sel.value : null;
-      dialogo.remove();
-      resolver(v);
-    }, { once: true });
-    dialogo.addEventListener("click", (e) => {
-      if (e.target === dialogo) dialogo.close("");
-    });
-
-    document.body.appendChild(dialogo);
-    dialogo.returnValue = "";
-    dialogo.showModal();
-    sel.focus();
-  });
-}
-
-function abaVozes(vozes, aoMudar) {
-  const painel = document.createElement("div");
-  painel.className = "painel";
-
-  const emQuarentena = vozes.reduce(
-    (s, p) => s + p.amostras.filter((a) => a.quarentena).length, 0);
-
-  const b = bloco("Vozes conhecidas",
-    "Aprendidas quando você nomeia um falante. Na reunião seguinte, quem já "
-    + "está aqui chega nomeado.");
-
-  if (vozes.length === 0) {
-    const vazio = document.createElement("p");
-    vazio.className = "campo__dica";
-    vazio.textContent = "Ninguém ainda. Nomeie um falante numa transcrição e a "
-      + "voz dele aparece aqui.";
-    b.appendChild(vazio);
-  }
-
-  if (emQuarentena > 0) {
-    b.appendChild(alerta(
-      `${emQuarentena} ${emQuarentena === 1 ? "amostra soou" : "amostras soaram"}`
-      + " diferente do resto do perfil e aguardam sua revisão.", "atencao"));
-  }
-
-  for (const p of vozes) {
-    // **Uma pessoa por vez, dobrada.** Quarenta amostras de cinco pessoas são
-    // duzentas linhas, e achar a que se quer conferir vira rolagem. O <details>
-    // nativo faz isso sem estado nosso, sem JavaScript de abre-e-fecha, e já
-    // vem com teclado e leitor de tela funcionando.
-    const pessoa = document.createElement("details");
-    pessoa.className = "pessoa";
-
-    const topo = document.createElement("summary");
-    topo.className = "pessoa__topo";
-    const h = document.createElement("span");
-    h.className = "pessoa__nome";
-    h.textContent = p.nome;
-    const quantas = document.createElement("span");
-    quantas.className = "campo__dica";
-    const n = p.amostras.length;
-    const emQuar = p.amostras.filter((a) => a.quarentena).length;
-    quantas.textContent = `${n} ${n === 1 ? "amostra" : "amostras"}`
-      + (emQuar ? ` · ${emQuar} aguardando revisão` : "");
-    topo.append(h, quantas);
-    pessoa.appendChild(topo);
-
-    // **Aberta quando há o que revisar.** O que pede atenção não pode estar
-    // escondido atrás de um clique: quem abre esta tela por causa do aviso lá
-    // em cima precisa ver a amostra sem procurá-la.
-    pessoa.open = emQuar > 0;
-
-    // Juntar dois perfis. O nome é digitado à mão uma vez por reunião, e
-    // ninguém digita igual sempre — "Andre Yuri" e "André Yuri" viram duas
-    // pessoas, e o reconhecimento passa a comparar contra dois centróides
-    // fracos em vez de um forte. Ver Nucleo/Vozes.Juntar.
-    const outras = vozes.map((o) => o.nome).filter((nome) => nome !== p.nome);
-    if (outras.length > 0) {
-      const juntar = document.createElement("button");
-      juntar.className = "aa-btn aa-btn-texto pessoa__juntar";
-      juntar.type = "button";
-      juntar.textContent = "Juntar com…";
-      juntar.addEventListener("click", async (e) => {
-        // Sem isto o clique fecharia o <details> junto — o botão vive dentro
-        // do <summary>, e o navegador trata qualquer clique nele como o gesto
-        // de dobrar.
-        e.preventDefault();
-        e.stopPropagation();
-
-        const alvo = await escolherPessoa(p.nome, outras);
-        if (!alvo) return;
-        if (!await confirmar(
-              `As ${n} ${n === 1 ? "amostra" : "amostras"} de "${p.nome}" passam `
-              + `para "${alvo}", e "${p.nome}" deixa de existir. `
-              + "As gravações e os trechos de áudio não são tocados.",
-              { titulo: `Juntar "${p.nome}" com "${alvo}"?`, ok: "Juntar" })) return;
-
-        aoMudar("juntar-vozes", p.nome, undefined, alvo);
-      });
-      topo.appendChild(juntar);
-    }
-
-    for (const a of p.amostras)
-      pessoa.appendChild(linhaDeAmostra(p.nome, a, aoMudar));
-
-    b.appendChild(pessoa);
-  }
-
-  painel.appendChild(b);
-  painel.appendChild(obra(
-    "O ciclo completo nunca foi visto com áudio real.",
-    "Nomear alguém numa reunião e ela chegar nomeada na seguinte está "
-    + "implementado e não comprovado. Esta tela é o instrumento para comprovar: "
-    + "depois de nomear um falante, a pessoa tem que aparecer aqui."));
-
-  return painel;
-}
-
 // ─────────────────────────────────────────────────────────── a tela
 
 const ABAS = [
@@ -1381,13 +1113,13 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, diarizadores, vozes, gravador, gravacoes, tipos;
+  let config, clientes, catalogo, diarizadores, vozes, parecidos, gravador, gravacoes, tipos;
   try {
     // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
     // As gravações e os tipos de ata só servem a Clientes (as contagens e o
     // tipo padrão do projeto); sem eles, a seção perde isso e o resto vale.
-    [{ config }, { clientes }, { catalogo, diarizadores }, { vozes },
+    [{ config }, { clientes }, { catalogo, diarizadores }, { vozes, parecidos },
      { gravador }, { gravacoes }, { tipos }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
       pedir("gravador"),
@@ -1431,15 +1163,6 @@ export async function telaDeAjustes(ctx, aba = "geral") {
     }
   }
 
-  async function mexerNaVoz(op, pessoa, indice, nome) {
-    // `nome` só o "juntar-vozes" usa: é a pessoa de DESTINO. As outras três ops
-    // ignoram o campo, como o contrato do sidecar manda (docs/SIDECAR.md: campo
-    // desconhecido é ignorado pelos dois lados).
-    const r = await pedir(op, { pessoa, indice, nome });
-    vozes = r.vozes;
-    desenharPainel();
-  }
-
   const raiz = document.createElement("div");
   raiz.className = "ajustes";
 
@@ -1462,7 +1185,7 @@ export async function telaDeAjustes(ctx, aba = "geral") {
         clientes, catalogo, diarizadores: diarizadores ?? [],
         gravacoes: gravacoes ?? [], tipos: tipos ?? [],
       }, () => recarregar(), estado),
-      vozes: () => abaVozes(vozes, mexerNaVoz),
+      vozes: () => abaVozes({ vozes, parecidos: parecidos ?? [] }, estado),
     }[atual]();
     conteudo.appendChild(estado);
     painel.replaceChildren(conteudo);
