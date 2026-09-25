@@ -706,6 +706,27 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .notas__acoes { display: flex; gap: var(--espaco-2); }
 
+/* Os momentos marcados (UI-4): uma coluna de botões com a marca em mono. */
+.notas__momentos { display: grid; gap: var(--espaco-1); margin-top: var(--espaco-3); }
+.notas__momento {
+  display: block;
+  text-align: left;
+  padding: var(--espaco-1) var(--espaco-2);
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: none;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notas__momento:hover { background: var(--cor-superficie-2); }
+.notas__momento:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.notas__marca { font-family: var(--fonte-mono); color: var(--cor-acao); }
+
 /* Os termos que as notas sugeriram, como etiquetas clicáveis. */
 .sugestoes {
   display: flex;

@@ -17,7 +17,7 @@ import { telaDeRevisao, abrirPainel as abrirPainelDaRevisao } from "/revisao.js"
 import { montarAta } from "/atas.js";
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, acoesDaBarra } from "/app.js";
-import { tocadorDaReuniao } from "/tocador.js";
+import { tocadorDaReuniao, ouvir } from "/tocador.js";
 
 const ABAS = ["transcricao", "ata", "notas"];
 
@@ -106,7 +106,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     // barra é a reunião, e não a aba.
     transcricao: (p) => telaDeRevisao(g, dados, { cabecalho: () => {}, tela: p, aoRefazer, aoApagar }),
     ata: (p) => montarAta(p, g, { aoContar: (n) => contar(abas.get("ata").botao, rotuloDePendencias(n)) }),
-    notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18 }).raiz),
+    notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18, aoTocar: (s) => ouvir(g, s) }).raiz),
   };
 
   // A página inteira rola num lugar só (.conteudo), e uma aba mais curta a

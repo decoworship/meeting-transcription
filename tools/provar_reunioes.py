@@ -798,6 +798,25 @@ def prova_ata_so_acompanha_a_ata(pagina) -> None:
     conferir(botao == "Refazer ata", f"e o botão continua sendo o da ata ({botao!r})")
 
 
+def prova_notas_tocam(pagina) -> None:
+    pagina.evaluate("() => { window.__notas = 'abertura\\n[00:00:04] Carol começa\\nsem tempo'; }")
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.click(".reuniao-aberta [data-aba='notas']")
+    pagina.wait_for_selector("#painel-notas .notas__momento", timeout=5000)
+    momentos = pagina.eval_on_selector_all("#painel-notas .notas__momento", "els => els.map((e) => e.textContent)")
+    conferir(momentos == ["00:00:04 Carol começa"], f"cada linha com tempo vira um botão ({momentos})")
+    pagina.click("#painel-notas .notas__momento")
+    tocou = pagina.evaluate("() => window.__tocou")
+    conferir(tocou and tocou["t"] == 4, f"e o botão toca dali ({tocou})")
+    pagina.focus("#painel-notas .notas__texto")
+    pagina.keyboard.press("Control+End")
+    pagina.keyboard.type("\n[00:01:00] novo")
+    conferir(pagina.eval_on_selector_all("#painel-notas .notas__momento", "els => els.length") == 2,
+             "escrever uma marca nova acrescenta o botão")
+    conferir(pagina.evaluate("() => document.activeElement.classList.contains('notas__texto')"),
+             "sem tirar o cursor de quem escreve")
+
+
 def prova_trilho_sem_atas(pagina) -> None:
     conferir(pagina.locator("#ir-atas").count() == 0, "Atas saiu do trilho: a ata mora na reunião")
     ordem = pagina.eval_on_selector_all(".trilho__item", "els => els.map((e) => e.id)")
@@ -1289,6 +1308,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_reuniao_ata, prova_reuniao_gerar_ata,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,
+          prova_notas_tocam,
           prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,
           prova_semana_a_125, prova_semana_barra_troca_de_tela,
           prova_semana_abre_e_volta_no_domingo, prova_semana_hoje_vira_a_semana,
