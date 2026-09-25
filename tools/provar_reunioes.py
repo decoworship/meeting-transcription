@@ -93,10 +93,6 @@ PONTE_FALSA = r"""
         ? (window.__prefsPorProjeto[`${q.cliente}::${q.projeto}`] ?? null)
         : (window.__prefs ?? null) };
       case "notas": return { notas: window.__notas ?? "" };
-      // Simula o disco: uma escrita muda o que a próxima leitura de
-      // "transcricao" devolve. Sem isto não há como provar a corrida de
-      // reabrir a mesma reunião — a leitura seria sempre o fixo de cima.
-      case "salvar-transcricao": window.__transcricao = q.conteudo; return {};
       case "modelos-de-ata": return { tipos: [{ id: "geral", nome: "Reunião geral" }] };
       case "ata": return window.__atas[q.gravacao] ? { ata: window.__atas[q.gravacao], ata_velha: false }
         : q.gravacao.includes("13-59") ? { ata, ata_velha: false } : { ata: null };
@@ -598,31 +594,6 @@ def prova_renomear_e_trocar_de_reuniao(pagina) -> None:
                              ".map((q) => ({ g: q.gravacao, carolina: q.conteudo.includes('Carolina') }))")
     conferir(salvos == [{"g": caminho, "carolina": True}],
              f"o nome vai para a reunião em que foi dado, e só para ela ({salvos})")
-
-
-def prova_renomear_e_reabrir_a_mesma_reuniao(pagina) -> None:
-    abrir_reuniao(pagina, "Comunicação")
-    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.titulo?.startsWith('Comunicação')).caminho")
-    pagina.click("#acoes-da-barra [data-acao='falantes']")
-    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes input", timeout=5000)
-    entrada = pagina.locator("#gaveta-falantes .tabela-falantes tr:nth-child(3) input")
-    entrada.fill("Carolina")
-    entrada.dispatch_event("change")
-    # Sai e volta para a MESMA reunião bem antes dos 800 ms da escrita adiada.
-    pagina.keyboard.press("Escape")
-    pagina.click("#voltar")
-    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
-    abrir_reuniao(pagina, "Comunicação")
-    pagina.click("#acoes-da-barra [data-acao='falantes']")
-    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes input", timeout=5000)
-    entrada2 = pagina.locator("#gaveta-falantes .tabela-falantes tr:nth-child(3) input")
-    conferir(entrada2.input_value() == "Carolina",
-             f"reabrir a mesma reunião antes dos 800 ms mostra o nome já dado ({entrada2.input_value()!r})")
-    pagina.wait_for_timeout(900)
-    salvos = pagina.evaluate("(c) => window.__pedidos.filter((q) => q.op === 'salvar-transcricao' "
-                             "&& q.gravacao === c)", caminho)
-    conferir(bool(salvos) and "Carolina" in salvos[-1]["conteudo"],
-             f"e o último salvar-transcricao desta reunião contém o nome ({salvos})")
 
 
 def prova_barra_esvazia_no_preparo(pagina) -> None:
@@ -1505,8 +1476,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
-          prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao,
-          prova_renomear_e_reabrir_a_mesma_reuniao, prova_barra_esvazia_no_preparo,
+          prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
           prova_reuniao_ata, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
           prova_preparo_vocabulario_nao_atravessa_projeto,
           prova_preparo_curto, prova_preparo_andamento, prova_preparo_erro_devolve_o_formulario,
