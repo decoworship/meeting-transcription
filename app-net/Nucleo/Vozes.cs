@@ -336,7 +336,7 @@ public sealed class Vozes
     /// Guarda uma amostra, marcando para revisão se ela destoar do perfil.
     /// </summary>
     /// <returns>A amostra como ficou — o chamador precisa saber se caiu em quarentena.</returns>
-    public AmostraDeVoz Aprender(string pessoa, AmostraDeVoz amostra)
+    private AmostraDeVoz AprenderNaTrava(string pessoa, AmostraDeVoz amostra)
     {
         if (!_dados.Pessoas.TryGetValue(pessoa, out var perfil))
         {
@@ -479,7 +479,7 @@ public sealed class Vozes
     /// Sem isto, uma condição nova ficaria para sempre fora do reconhecimento e
     /// a pessoa deixaria de ser reconhecida justamente onde ela mudou.
     /// </remarks>
-    public bool Aprovar(string pessoa, int indice, string? criadaEm = null)
+    private bool AprovarNaTrava(string pessoa, int indice, string? criadaEm = null)
     {
         if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
 
@@ -499,7 +499,7 @@ public sealed class Vozes
     }
 
     /// <summary>Tira uma amostra do perfil — o que a revisão humana decide.</summary>
-    public bool Esquecer(string pessoa, int indice, string? criadaEm = null)
+    private bool EsquecerNaTrava(string pessoa, int indice, string? criadaEm = null)
     {
         if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
 
@@ -546,7 +546,7 @@ public sealed class Vozes
     /// parecida sem que ninguém tivesse pedido, que é o erro caro.
     /// </para>
     /// </remarks>
-    public int Juntar(string de, string para)
+    private int JuntarNaTrava(string de, string para, int? amostras = null)
     {
         de = (de ?? "").Trim();
         para = (para ?? "").Trim();
@@ -554,6 +554,7 @@ public sealed class Vozes
         if (de.Length == 0 || para.Length == 0) return 0;
         if (string.Equals(de, para, StringComparison.Ordinal)) return 0;
         if (!_dados.Pessoas.TryGetValue(de, out var origem)) return 0;
+        if (amostras is int n && n != origem.Amostras.Count) return 0;
 
         if (!_dados.Pessoas.TryGetValue(para, out var destino))
         {
@@ -625,10 +626,14 @@ public sealed class Vozes
     /// pessoa; tirar a última amostra de alguém apaga o perfil vazio, como o
     /// <see cref="Esquecer"/> faz.
     /// </remarks>
-    public bool Mover(string pessoa, int indice, string para, string? criadaEm = null)
+    private bool MoverNaTrava(string pessoa, int indice, string para, string? criadaEm = null)
     {
         para = (para ?? "").Trim();
-        if (para.Length == 0 || string.Equals(pessoa, para, StringComparison.Ordinal)) return false;
+        // Estes dois são erro de quem pediu, e não a biblioteca ter mudado:
+        // dizem o motivo em vez de cair no "false" da recusa por carimbo.
+        if (para.Length == 0) throw new ArgumentException("falta o nome de para quem mover");
+        if (string.Equals(pessoa, para, StringComparison.Ordinal))
+            throw new ArgumentException($"a amostra já é de {para}");
         if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
 
         var a = perfil.Amostras[indice];
@@ -649,9 +654,14 @@ public sealed class Vozes
     }
 
     /// <summary>Esquece uma pessoa inteira, com os trechos de áudio dela.</summary>
-    public bool Apagar(string pessoa)
+    /// <param name="amostras">
+    /// Quantas amostras a tela mostrou; se já não são essas, recusa — a pessoa
+    /// mudou por baixo (o mesmo papel do <c>criada_em</c> nas ops por amostra).
+    /// </param>
+    private bool ApagarNaTrava(string pessoa, int? amostras = null)
     {
         if (!_dados.Pessoas.TryGetValue(pessoa ?? "", out var perfil)) return false;
+        if (amostras is int n && n != perfil.Amostras.Count) return false;
 
         foreach (var a in perfil.Amostras)
         {
@@ -696,6 +706,46 @@ public sealed class Vozes
             }
         return [.. pares.OrderByDescending(p => p.Item3)];
     }
+
+    /// <summary>
+    /// A trava de toda escrita no vozes.json, no processo inteiro.
+    /// </summary>
+    /// <remarks>
+    /// Cada instância guarda uma cópia da biblioteca, e gravar reescreve o
+    /// arquivo inteiro a partir dela. Uma transcrição abre a sua no começo e
+    /// aprende no fim; se a tela apagou uma pessoa no meio, a cópia velha a
+    /// trazia de volta sem os trechos. Por isso toda mudança relê o arquivo
+    /// dentro da trava e aplica sobre o que está no disco agora — o que ela
+    /// decide (limiares, quarentena) continua o mesmo.
+    /// </remarks>
+    private static readonly object Trava = new();
+
+    private T Mudando<T>(Func<T> mudanca)
+    {
+        lock (Trava)
+        {
+            _dados = Carregar();
+            return mudanca();
+        }
+    }
+
+    /// <inheritdoc cref="AprenderNaTrava"/>
+    public AmostraDeVoz Aprender(string pessoa, AmostraDeVoz amostra) => Mudando(() => AprenderNaTrava(pessoa, amostra));
+
+    /// <inheritdoc cref="AprovarNaTrava"/>
+    public bool Aprovar(string pessoa, int indice, string? criadaEm = null) => Mudando(() => AprovarNaTrava(pessoa, indice, criadaEm));
+
+    /// <inheritdoc cref="EsquecerNaTrava"/>
+    public bool Esquecer(string pessoa, int indice, string? criadaEm = null) => Mudando(() => EsquecerNaTrava(pessoa, indice, criadaEm));
+
+    /// <inheritdoc cref="MoverNaTrava"/>
+    public bool Mover(string pessoa, int indice, string para, string? criadaEm = null) => Mudando(() => MoverNaTrava(pessoa, indice, para, criadaEm));
+
+    /// <inheritdoc cref="ApagarNaTrava"/>
+    public bool Apagar(string pessoa, int? amostras = null) => Mudando(() => ApagarNaTrava(pessoa, amostras));
+
+    /// <inheritdoc cref="JuntarNaTrava"/>
+    public int Juntar(string de, string para, int? amostras = null) => Mudando(() => JuntarNaTrava(de, para, amostras));
 
     public string CaminhoDoTrecho(string relativo) => Path.Combine(_pasta, relativo);
 

@@ -67,6 +67,12 @@ internal sealed class Pedido
     /// </summary>
     [JsonPropertyName("criada_em")] public string? CriadaEm { get; init; }
 
+    /// <summary>
+    /// Quantas amostras a tela mostrou da pessoa, em apagar e juntar: o núcleo
+    /// recusa se já não são essas.
+    /// </summary>
+    [JsonPropertyName("amostras")] public int? Amostras { get; init; }
+
     /// <summary>De onde o diálogo de pasta começa.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
 
@@ -1000,15 +1006,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "apagar-voz":
-                    ResponderVozes(p.Id, new Vozes().Apagar(p.Pessoa ?? ""));
+                    ResponderVozes(p.Id, new Vozes().Apagar(p.Pessoa ?? "", p.Amostras),
+                                   $"o perfil de {p.Pessoa} mudou desde que a tela o mostrou; nada foi apagado");
                     break;
 
                 case "juntar-vozes":
                     // Duas grafias do mesmo nome viram dois perfis, e dois
                     // perfis reconhecem pior que um: o centroide de cada um é
                     // mais fraco. Ver Vozes.Juntar.
-                    new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "");
-                    ResponderVozes(p.Id);
+                    int juntadas = new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "", p.Amostras);
+                    ResponderVozes(p.Id, p.Amostras is null || juntadas > 0,
+                                   $"o perfil de {p.Pessoa} mudou desde que a tela o mostrou; nada foi juntado");
                     break;
 
                 case "salvar-config":
@@ -2589,13 +2597,14 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// ao lado. Separar em duas telas obrigaria a decidir sem a comparação, que
     /// é justamente o que a decisão exige.
     /// </remarks>
-    private void ResponderVozes(int id, bool fez = true)
+    private void ResponderVozes(int id, bool fez = true,
+                                string motivo = "a biblioteca de vozes mudou; a tela foi atualizada")
     {
         var (vozes, parecidos) = VozesConhecidas();
         Responder(new Resposta
         {
             Id = id, Vozes = vozes, Parecidos = parecidos,
-            Erro = fez ? null : "a biblioteca de vozes mudou; a tela foi atualizada",
+            Erro = fez ? null : motivo,
         });
     }
 

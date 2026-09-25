@@ -104,7 +104,7 @@ public sealed class VozesTelaTests : IDisposable
         Assert.False(v.Mover("Carol", 0, "Rafael", "outra"));
         Assert.False(v.Esquecer("Carol", 0, "outra"));
         Assert.False(v.Aprovar("Carol", 0, "outra"));
-        Assert.False(v.Mover("Carol", 0, "Carol", v.Perfil("Carol")!.Amostras[0].CriadaEm));
+        Assert.Throws<ArgumentException>(() => v.Mover("Carol", 0, "Carol", v.Perfil("Carol")!.Amostras[0].CriadaEm));
         Assert.Equal(2, new Vozes(_pasta).Perfil("Carol")!.Amostras.Count);
 
         // Sem o carimbo, vale o índice — como antes.
@@ -143,5 +143,48 @@ public sealed class VozesTelaTests : IDisposable
         var par = Assert.Single(pares);
         Assert.Equal(["Elio", "Élio"], new[] { par.A, par.B }.Order(StringComparer.Ordinal));
         Assert.True(par.Semelhanca >= Vozes.LimiarDeReconhecimento);
+    }
+
+    [Fact]
+    public void UmaTranscricaoAprendendoNaoDesfazOQueATelaFez()
+    {
+        // A transcrição abre a biblioteca no começo e aprende no fim; no meio,
+        // a tela apagou a Carol e moveu uma amostra do Marcos.
+        var v = new Vozes(_pasta);
+        v.Aprender("Carol", Amostra(Vetor(1)));
+        var m = v.Aprender("Marcos", Amostra(Vetor(2)));
+        v.Aprender("Marcos", Amostra(Vetor(2, 0.05f, 2)));
+
+        var daTranscricao = new Vozes(_pasta);
+        var daTela = new Vozes(_pasta);
+        Assert.True(daTela.Apagar("Carol"));
+        Assert.True(daTela.Mover("Marcos", 0, "Heitor", m.CriadaEm));
+
+        daTranscricao.Aprender("Rafael", Amostra(Vetor(3)));
+
+        var agora = new Vozes(_pasta);
+        Assert.Equal(["Heitor", "Marcos", "Rafael"], agora.Pessoas());
+        Assert.Single(agora.Perfil("Marcos")!.Amostras);
+    }
+
+    [Fact]
+    public void MoverParaSiMesmaOuSemNomeDizOMotivo()
+    {
+        var v = new Vozes(_pasta);
+        var a = v.Aprender("Carol", Amostra(Vetor(1)));
+        Assert.Throws<ArgumentException>(() => v.Mover("Carol", 0, "Carol", a.CriadaEm));
+        Assert.Throws<ArgumentException>(() => v.Mover("Carol", 0, "  ", a.CriadaEm));
+    }
+
+    [Fact]
+    public void ApagarEJuntarRecusamSeAContagemMudou()
+    {
+        var v = new Vozes(_pasta);
+        v.Aprender("Carol", Amostra(Vetor(1)));
+        v.Aprender("Carol", Amostra(Vetor(1)));
+        Assert.False(v.Apagar("Carol", amostras: 1));
+        Assert.Equal(0, v.Juntar("Carol", "Ana", amostras: 1));
+        Assert.Equal(["Carol"], new Vozes(_pasta).Pessoas());
+        Assert.Equal(2, v.Juntar("Carol", "Ana", amostras: 2));
     }
 }

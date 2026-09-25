@@ -13,7 +13,7 @@
 import { pedir } from "/ponte.js";
 import { abaClientes } from "/clientes.js";
 import { abaVozes } from "/vozes.js";
-import { alerta, campo, confirmar } from "/pecas.js";
+import { alerta, campo, confirmar, pararAudio } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
 function tamanho(bytes) {
@@ -1203,6 +1203,8 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       for (const outro of colunaAbas.children)
         outro.setAttribute("aria-selected", String(outro === botao));
       estado.textContent = "";
+      // O trecho de voz que tocava não segue para a outra seção.
+      pararAudio();
       desenharPainel();
     });
     colunaAbas.appendChild(botao);

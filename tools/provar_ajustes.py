@@ -433,6 +433,9 @@ def prova_vozes_tocar(pagina) -> None:
     src = pagina.evaluate("() => document.getElementById('audio').getAttribute('src')")
     conferir(src == "https://vozes.local/Carol/a.wav", f"o play toca o trecho no <audio> único ({src})")
     conferir(pagina.evaluate("() => document.querySelectorAll('audio').length") == 1, "e não cria outro <audio>")
+    pagina.click(".aba >> text=Geral")
+    parou = pagina.evaluate("() => { const a = document.getElementById('audio'); return a.paused && !a.hasAttribute('src'); }")
+    conferir(parou, "sair de Vozes para o trecho que tocava")
 
 
 @vozes
@@ -492,6 +495,7 @@ def prova_vozes_juntar_sugerido(pagina) -> None:
     q = pedidos(pagina, "juntar-vozes")[-1]
     conferir(q["pessoa"] == "Elio" and q["nome"] == "Élio",
              f"'Juntar' confirma e leva quem tem menos voz para quem tem mais ({q})")
+    conferir(q.get("amostras") == 2, f"levando quantas amostras a tela mostrou ({q})")
     conferir("Elio" not in textos(pagina, ".vozes__pessoas .vozes__nome"), "e a lista perde o que sumiu")
 
 
@@ -525,7 +529,9 @@ def prova_vozes_perfil(pagina) -> None:
     pagina.wait_for_selector("dialog[open]", timeout=2000)
     pagina.click("dialog[open] button.aa-btn-primario")
     pagina.wait_for_timeout(150)
-    conferir(pedidos(pagina, "apagar-voz")[-1]["pessoa"] == "Carol Souza", "Apagar perfil confirma e apaga")
+    q = pedidos(pagina, "apagar-voz")[-1]
+    conferir(q["pessoa"] == "Carol Souza" and q.get("amostras") == 12,
+             f"Apagar perfil confirma e apaga, com a contagem que a tela mostrou ({q})")
     conferir(pagina.locator(".vozes__revisar").get_attribute("aria-current") == "true", "e volta para a fila")
 
 
@@ -562,6 +568,8 @@ def prova_vozes_abaixo(pagina) -> None:
              "a amostra em revisão, dentro do perfil, ainda tem o Aprovar")
     conferir(pagina.is_visible(".vozes-obra") or pagina.locator(".painel .obra, .painel .campo__dica").count() > 0,
              "e a nota do que falta comprovar continua embaixo")
+    conferir("contagem de amostras" in pagina.inner_text(".vozes-obra"),
+             "e diz que 'boa' e 'pouca voz' são contagem, não qualidade medida")
 
 
 @vozes

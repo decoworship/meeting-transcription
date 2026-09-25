@@ -153,7 +153,9 @@ export function abaVozes(dados, estado) {
   const obra = el("p", "campo__dica vozes-obra",
     "O ciclo completo ainda não foi visto com áudio real: nomear alguém numa reunião e ela "
     + "chegar nomeada na seguinte está implementado e não comprovado. Esta tela é o "
-    + "instrumento para comprovar — depois de nomear um falante, a pessoa tem que aparecer aqui.");
+    + "instrumento para comprovar — depois de nomear um falante, a pessoa tem que aparecer aqui. "
+    + "“Boa” e “pouca voz” são uma contagem de amostras em uso (quatro ou mais é “boa”), "
+    + "e não uma qualidade medida.");
   painel.appendChild(obra);
 
   /** Roda uma op de voz; o núcleo devolve a biblioteca inteira de volta. */
@@ -292,7 +294,7 @@ export function abaVozes(dados, estado) {
     acoes.append(
       botao("Juntar", "aa-btn-secundario", async () => {
         if (!await confirmarJuntar(de, para, n(de))) return;
-        mexer("juntar-vozes", { pessoa: de, nome: para }, `${de} juntado a ${para}`);
+        mexer("juntar-vozes", { pessoa: de, nome: para, amostras: n(de) }, `${de} juntado a ${para}`);
       }),
       botao("Não são", "aa-btn-texto", () => {
         recusados.add(chaveDoPar(par.a, par.b));
@@ -404,7 +406,7 @@ export function abaVozes(dados, estado) {
         // Renomear para quem já existe é juntar — e juntar confirma.
         if (vozes.some((o) => o.nome === para) && !await confirmarJuntar(p.nome, para, p.amostras.length)) return;
         escolha.vista = para;
-        mexer("juntar-vozes", { pessoa: p.nome, nome: para }, `${p.nome} agora é ${para}`);
+        mexer("juntar-vozes", { pessoa: p.nome, nome: para, amostras: p.amostras.length }, `${p.nome} agora é ${para}`);
       });
       const outras = vozes.map((o) => o.nome).filter((n) => n !== p.nome);
       const juntar = botao("Juntar com…", "aa-btn-texto", async () => {
@@ -412,7 +414,7 @@ export function abaVozes(dados, estado) {
         const alvo = await escolherPessoa(p.nome, outras);
         if (!alvo || !await confirmarJuntar(p.nome, alvo, p.amostras.length)) return;
         escolha.vista = alvo;
-        mexer("juntar-vozes", { pessoa: p.nome, nome: alvo }, `${p.nome} juntado a ${alvo}`);
+        mexer("juntar-vozes", { pessoa: p.nome, nome: alvo, amostras: p.amostras.length }, `${p.nome} juntado a ${alvo}`);
       });
       juntar.disabled = outras.length === 0;
       const apagar = botao("Apagar perfil", "aa-btn-texto vozes__perigo", async () => {
@@ -422,7 +424,7 @@ export function abaVozes(dados, estado) {
                              + "transcrições não são tocadas.",
                              { titulo: `Apagar o perfil de ${p.nome}?`, ok: "Apagar" })) return;
         escolha.vista = "revisar";
-        mexer("apagar-voz", { pessoa: p.nome }, `perfil de ${p.nome} apagado`);
+        mexer("apagar-voz", { pessoa: p.nome, amostras: p.amostras.length }, `perfil de ${p.nome} apagado`);
       });
       menu.append(renomear, juntar, apagar);
       return { raiz: menu, focar: () => renomear.focus() };
