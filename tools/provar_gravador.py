@@ -416,7 +416,43 @@ def prova_gravando_marcar_momento(pagina) -> None:
 for _p in (prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco, prova_gravando_marcar_momento):
     _p.antes = GRAVANDO
 
-PROVAS = [prova_monta, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_mudo_na_faixa(pagina) -> None:
+    conferir(not pagina.is_visible(".grav-avisos .aa-alerta"), "sem mudo, sem aviso")
+    pagina.click(".grav-faixa__acoes >> text=Mutar")
+    pagina.wait_for_selector(".grav-avisos [data-aviso='mudo']", timeout=2000)
+    conferir(pagina.get_attribute(".grav-faixa", "data-mudo") == "true", "mudo, a faixa se marca")
+    borda = pagina.evaluate("""() => [getComputedStyle(document.querySelector('.grav-faixa')).borderTopColor,
+        getComputedStyle(document.querySelector('.aa-alerta--erro, .grav-avisos .aa-alerta')).borderTopColor]""")
+    conferir(borda[0] != pagina.evaluate("() => getComputedStyle(document.querySelector('.grav-abas')).borderTopColor"),
+             f"com a borda de erro ({borda[0]})")
+    conferir(texto(pagina, ".grav-avisos [data-aviso='mudo']").startswith("Microfone mudo. Sua voz não está sendo gravada."),
+             "o aviso entra já no primeiro segundo")
+    irmao = pagina.evaluate("() => document.querySelector('.grav-faixa').nextElementSibling.className")
+    conferir(irmao == "grav-avisos", f"logo abaixo da faixa ({irmao})")
+    conferir(texto(pagina, ".grav-faixa__acoes button:nth-child(2)") == "Desmutar", "o botão da faixa vira Desmutar")
+    pagina.evaluate("() => { window.__desmutar = document.querySelector('.grav-desmutar'); }")
+    pagina.evaluate("() => { for (let i = 0; i < 10; i++) window.__empurrar({ mudo_ha_s: 5 + i }); }")
+    conferir(pagina.evaluate("() => window.__desmutar === document.querySelector('.grav-desmutar')"),
+             "o Desmutar do aviso sobrevive a cinco estados por segundo")
+    pagina.evaluate("() => window.__empurrar({ mudo_ha_s: 75 })")
+    conferir("há 1 min" in texto(pagina, ".grav-avisos [data-aviso='mudo']"), "aos 60 s, a frase dos minutos")
+    pagina.click(".grav-desmutar")
+    pagina.wait_for_timeout(100)
+    conferir(len(pedidos(pagina, "mutar")) == 2 and not pagina.is_visible(".grav-avisos .aa-alerta"),
+             "Desmutar manda mutar, e o aviso some")
+
+
+def prova_dispositivo_caiu(pagina) -> None:
+    pagina.evaluate("""() => { const f = JSON.parse(JSON.stringify(window.__estado.faixas));
+        f[1].desconectado = true; window.__empurrar({ faixas: f }); }""")
+    conferir("O dispositivo de áudio da reunião caiu." == texto(pagina, ".grav-avisos [data-aviso='caiu']"),
+             "o dispositivo que caiu aparece no mesmo lugar")
+
+
+for _p in (prova_mudo_na_faixa, prova_dispositivo_caiu):
+    _p.antes = GRAVANDO
+
+PROVAS = [prova_monta, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]
