@@ -1371,7 +1371,19 @@ def prova_semana_barra_troca_de_tela(pagina) -> None:
     # reunião aberta tem outro título, e é pela troca de título que a barra
     # se esvazia (cabecalho, em app.js).
     ir_para_semana(pagina)
-    pagina.dblclick(".semana__cartao >> text=Sherlock Diário")
+    cartao = ".semana__cartao >> text=Sherlock Diário"
+    # "Sherlock Diário" é 9h de hoje — cedo o bastante para cair na coluna de
+    # hoje, sob onde o painel abriria por padrão. Um clique nele não pode
+    # esconder o próprio cartão atrás do painel que acabou de abrir: foi assim
+    # que o duplo clique seguinte deixou de achar o cartão (conserto rodada 1,
+    # mostrarDetalhe muda o painel para a esquerda quando cobriria o cartão).
+    pagina.click(cartao)
+    centro = pagina.eval_on_selector(
+        cartao, "e => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + Math.min(r.height / 2, 10)]; }")
+    no_ponto = pagina.evaluate(
+        "([x, y]) => document.elementFromPoint(x, y)?.closest('.semana__cartao') != null", centro)
+    conferir(no_ponto, "um clique no cartão não o esconde atrás do painel que acabou de abrir")
+    pagina.dblclick(cartao)
     pagina.wait_for_selector(".reuniao-aberta [role='tab']", timeout=5000)
     conferir(pagina.locator(".barra .semana-nav, .barra [data-vista]").count() == 0,
              "na reunião aberta, a barra não mostra a navegação da semana")
@@ -1379,6 +1391,19 @@ def prova_semana_barra_troca_de_tela(pagina) -> None:
     pagina.wait_for_selector(".semana .semana__dia", timeout=5000)
     conferir(pagina.locator(".barra .semana-nav").count() == 1 and pagina.is_visible(".semana-nav"),
              "de volta a Reuniões, a semana e a navegação voltam, uma vez só")
+
+
+def prova_semana_fechar_nao_abre_a_reuniao(pagina) -> None:
+    # Conserto rodada 1: o painel muda de lado quando cobriria o cartão
+    # clicado, mas o próprio ✕ dele continua por cima da grade. Clicar nele
+    # logo depois de clicar o cartão não pode ser lido como o duplo clique
+    # que abre a reunião — o painel tem de fechar, e só isso.
+    ir_para_semana(pagina)
+    cartao = ".semana__cartao >> text=Sherlock Diário"
+    pagina.click(cartao)
+    pagina.click(".semana__detalhe [aria-label='Fechar o painel']")
+    conferir(not pagina.is_visible(".semana__detalhe"), "o ✕ fecha o painel")
+    conferir(pagina.locator(".reuniao-aberta").count() == 0, "e não abre a reunião")
 
 
 def prova_data_nao_rouba_o_foco(pagina) -> None:
@@ -1419,7 +1444,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,
           prova_notas_tocam,
           prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,
-          prova_semana_a_125, prova_semana_barra_troca_de_tela,
+          prova_semana_a_125, prova_semana_barra_troca_de_tela, prova_semana_fechar_nao_abre_a_reuniao,
           prova_semana_abre_e_volta_no_domingo, prova_semana_hoje_vira_a_semana,
           prova_semana_fim_de_semana_numa_linha, prova_semana_filtro_esconde,
           prova_popover_fecha_com_shift_tab, prova_semana_clique_mostra_o_resumo,

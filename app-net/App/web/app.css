@@ -342,6 +342,9 @@ html {
   max-height: calc(100vh - var(--altura-da-barra) - 2 * var(--espaco-4));
 }
 .semana__detalhe .reunioes__painel-titulo { padding-right: var(--espaco-6); }
+/* Quando abrir à direita cairia sobre o cartão que se acabou de clicar
+ * (mostrarDetalhe, reunioes.js): abre à esquerda em vez disso. */
+.semana__detalhe--esquerda { right: auto; left: var(--espaco-6); }
 .semana__fechar { position: absolute; top: var(--espaco-2); right: var(--espaco-2); z-index: 1; }
 .semana__cartao[aria-pressed="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
 .semana__dia {

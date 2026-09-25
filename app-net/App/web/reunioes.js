@@ -304,34 +304,6 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     if (e.key === "Escape" && !detalhe.hidden) esconderDetalhe();
   });
 
-  // O painel da semana flutua por cima da grade (pintarVista) — perto do
-  // canto de cima à direita ele cai bem em cima do próprio cartão que se
-  // acabou de clicar. Nesse caso o segundo clique de um duplo clique cai no
-  // painel, não no cartão de baixo, e o dblclick nativo nunca chega a
-  // acontecer (achado ao provar a troca de tela, com "Sherlock Diário" às
-  // 9h — cedo o bastante para cair na coluna de hoje, sob o painel). Por
-  // isso o primeiro clique é sempre no cartão (o painel ainda não teria
-  // subido por cima dele), e é lembrado aqui; se um segundo clique vem a
-  // tempo — mesmo que caia no painel — é tratado como o duplo clique do
-  // cartão de baixo, e o clique não segue para o que o painel tinha ali.
-  let ultimoCliqueDeCartao = null;
-  raiz.addEventListener("click", (e) => {
-    const doCartao = e.target.closest(".semana__cartao");
-    if (doCartao) {
-      ultimoCliqueDeCartao = { caminho: doCartao.dataset.gravacao, quando: performance.now() };
-      return;
-    }
-    const porBaixo = document.elementsFromPoint(e.clientX, e.clientY)
-      .find((el) => el.classList.contains("semana__cartao"));
-    if (porBaixo && ultimoCliqueDeCartao?.caminho === porBaixo.dataset.gravacao
-        && performance.now() - ultimoCliqueDeCartao.quando < 500) {
-      e.stopPropagation();
-      const g = gravacoes.find((x) => x.caminho === porBaixo.dataset.gravacao);
-      if (g) abrirGravacao(g);
-    }
-    ultimoCliqueDeCartao = null;
-  }, true);
-
   // O teto do painel da lista: da posição dele com a lista no topo até o pé da
   // janela. Medido, e não calculado no CSS a partir da barra do topo: a barra
   // de ferramentas quebra em duas linhas em janela média, e com o teto contado
@@ -522,11 +494,32 @@ export async function telaDeReunioes({ cabecalho, tela }) {
     marcarCartao();
   }
 
+  // O painel da semana flutua por cima da grade (pintarVista) — perto do
+  // canto de cima à direita ele cai bem em cima do próprio cartão que se
+  // acabou de clicar (achado ao provar a troca de tela, com "Sherlock
+  // Diário" às 9h — cedo o bastante para cair na coluna de hoje, sob o
+  // painel). Cobrir o cartão que se acabou de clicar não é só feio: o
+  // duplo clique e os próprios controles do painel (o ✕, "abrir") ficam por
+  // cima dele, e um clique ali cai no cartão, não no controle. Por isso o
+  // painel se muda para a esquerda quando abre sobre o cartão clicado — e
+  // só sobre ele: um cartão mais alto que caia por baixo do painel depois
+  // de trocar de lado não empurra o painel de volta. Numa janela estreita
+  // o bastante para nenhum dos dois lados livrar o cartão, o painel cobre
+  // mesmo — Enter e o "abrir" do próprio painel continuam abrindo a reunião.
   function mostrarDetalhe(g) {
     escolhida = g.caminho;
     desenharPainel(g);
     detalhe.hidden = false;
+    detalhe.classList.remove("semana__detalhe--esquerda");
     marcarCartao();
+    const cartaoEl = linhas.get(g.caminho);
+    if (cartaoEl) {
+      const doCartao = cartaoEl.getBoundingClientRect();
+      const doPainel = detalhe.getBoundingClientRect();
+      const sobrepoe = doCartao.right > doPainel.left && doCartao.left < doPainel.right
+                     && doCartao.bottom > doPainel.top && doCartao.top < doPainel.bottom;
+      if (sobrepoe) detalhe.classList.add("semana__detalhe--esquerda");
+    }
   }
 
   function esconderDetalhe() {
