@@ -723,14 +723,14 @@ def prova_tocador(pagina) -> None:
     conferir(pagina.is_visible(".reuniao-aberta .tocador"), "a reunião tem o tocador")
     conferir(pagina.evaluate(TOCADOR) == {"rotulo": "Tocar", "tempo": "00:00 / 30:00", "posicao": "0"},
              f"parado, no zero, com a duração da reunião ({pagina.evaluate(TOCADOR)})")
-    # A reunião "Comunicação" tem poucos trechos e não enche a janela: o
-    # `.tocador` não fica encostado no fundo (t.bottom == innerHeight), mas
-    # continua fixo no pé — nunca passa dele, e o CSS que o leva até lá é o
-    # sticky. Ver task-4-brief.md Step 7.
+    # A reunião "Comunicação" tem poucos trechos e não enche a janela por si só
+    # — mesmo assim o tocador tem que encostar no pé, como na prancha
+    # (ref/aberta.png): a coluna da reunião tem altura mínima até lá
+    # (.reuniao-aberta) e o painel da aba cresce para empurrá-lo (conserto
+    # rodada 1, revertendo a folga do Step 7 do brief).
     no_pe = pagina.evaluate("""() => {
-        const el = document.querySelector('.tocador');
-        const t = el.getBoundingClientRect();
-        return t.bottom <= innerHeight + 1 && getComputedStyle(el).position === 'sticky';
+        const t = document.querySelector('.tocador').getBoundingClientRect();
+        return Math.abs(t.bottom - innerHeight) <= 1;
     }""")
     conferir(no_pe, "e ele fica no pé da janela")
     pagina.click("#corpo-transcricao .trecho >> nth=1")
@@ -748,6 +748,24 @@ def prova_tocador(pagina) -> None:
     conferir(pagina.evaluate(TOCADOR)["tempo"] == "15:00 / 30:00", "e o tempo acompanha")
     pagina.click(".reuniao-aberta [data-aba='notas']")
     conferir(pagina.is_visible(".reuniao-aberta .tocador"), "o tocador continua na aba Notas")
+
+    # Numa reunião comprida a coluna passa da altura mínima e quem rola é o
+    # .conteudo — o tocador precisa continuar grudado no pé, e não só na
+    # primeira pintura: é o sticky que segura, não a altura mínima.
+    pagina.evaluate(TRANSCRICAO_LONGA)
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.wait_for_function(
+        "() => document.querySelectorAll('.revisao .trecho, .revisao [data-indice]').length > 60",
+        timeout=5000)
+    pagina.evaluate("() => { document.querySelector('.conteudo').scrollTop = 3000; }")
+    pagina.wait_for_timeout(150)
+    preso = pagina.evaluate("""() => {
+        const t = document.querySelector('.tocador').getBoundingClientRect();
+        return Math.abs(t.bottom - innerHeight) <= 1;
+    }""")
+    conferir(preso, "e continua grudado no pé com a transcrição comprida rolada")
 
 
 def prova_tocador_troca_de_reuniao(pagina) -> None:

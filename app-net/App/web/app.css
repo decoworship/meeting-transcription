@@ -737,18 +737,47 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * .aa-pagina (margin auto num item de grade) encolhe até o conteúdo: a aba Ata
  * ficava com 390 px no meio da tela, e a página pulava de largura a cada troca
  * de aba. O border-box impede o padding de somar aos 100%. */
+/* Os 64px de baixo têm o mesmo defeito dos de cima (comentário acima): o
+ * tocador tem que encostar no pé de verdade (ref/aberta.png), e um respiro ali
+ * embaixo deixaria uma faixa de fundo entre ele e a borda da janela. O
+ * tocador já tem o próprio padding (--espaco-2/--espaco-3) para não colar o
+ * texto na régua. */
 .aa-pagina:has(> .reuniao-aberta) {
   box-sizing: border-box;
   width: 100%;
   padding-top: var(--espaco-5);
+  padding-bottom: 0;
 }
 
 /* ─────────────────────────────────────────────────── a reunião aberta
  *
  * Transcrição · Ata · Notas (reuniao.js). A aba escolhida tem o fio embaixo
  * e o texto forte; as outras, o texto suave. Ver o mockup, prancha "Reunião ·
- * transcrição, ata e notas". */
-.reuniao-aberta { display: grid; gap: var(--espaco-4); --altura-das-abas: 2.5rem; }
+ * transcrição, ata e notas".
+ *
+ * **Coluna flexível, com altura mínima até o pé da janela.** O tocador tem que
+ * grudar no fundo mesmo numa reunião de dois trechos (ref/aberta.png) — sem
+ * altura mínima, a coluna encolhe até o conteúdo e o tocador flutua logo
+ * abaixo do último trecho, longe do pé. A conta desconta a barra do topo (a
+ * mesma --altura-da-barra que .reuniao-aberta__abas usa) e o respiro do topo
+ * da .aa-pagina desta tela (--espaco-5 — ver .aa-pagina:has(> .reuniao-aberta)
+ * mais abaixo, que também zera o respiro de baixo pelo mesmo motivo). Numa
+ * reunião comprida o painel da aba cresce além disso, a coluna passa da
+ * altura mínima, e quem rola é o .conteudo — o tocador continua grudado por
+ * ser sticky. */
+.reuniao-aberta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  --altura-das-abas: 2.5rem;
+  min-height: calc(100vh - var(--altura-da-barra) - var(--espaco-5));
+}
+
+/* O painel da aba aberta cresce para ocupar o que sobra da coluna — é o que
+ * empurra o tocador até o fim mesmo quando o conteúdo é curto. As abas têm
+ * altura fixa (--altura-das-abas) e por isso não crescem; o tocador também não
+ * cresce, só gruda embaixo. */
+.reuniao-aberta__painel { flex: 1 1 auto; }
 
 /* As abas grudam abaixo da barra do topo, como as de Ajustes: no minuto 50 de
  * uma reunião de duas horas, anotar ou conferir a ata não pode custar rolar até
