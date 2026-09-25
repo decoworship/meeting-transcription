@@ -33,6 +33,17 @@ public sealed class PreferenciasDoProjeto
     /// ainda é a ferramenta de produção.
     /// </remarks>
     [JsonPropertyName("initial_prompt")] public string? InitialPrompt { get; set; }
+
+    /// <summary>
+    /// O tipo de ata padrão das reuniões do projeto: o id de um modelo de ata.
+    /// </summary>
+    /// <remarks>
+    /// Vazio é "o padrão do app", e não nulo: nulo não se escreve
+    /// (<c>WhenWritingNull</c>), então voltar ao padrão nunca chegaria ao disco.
+    /// O preparo não manda esta chave, e a mescla do <see cref="Projetos.Salvar"/>
+    /// a preserva. Ver o plano 4a do redesenho de UI.
+    /// </remarks>
+    [JsonPropertyName("tipo_de_ata")] public string? TipoDeAta { get; set; }
 }
 
 /// <summary>
@@ -135,8 +146,19 @@ public sealed class Projetos
         var alvo = ps[projeto] as JsonObject ?? new JsonObject();
         var novo = JsonSerializer.SerializeToNode(prefs, ProjetosJson.Default.PreferenciasDoProjeto)!
             .AsObject();
+        // Texto vazio é "limpar": Ajustes › Clientes o manda quando se tira o
+        // último termo, se volta a "Detectar sozinho" ou a "Padrão do app". Nulo
+        // não chega aqui (WhenWritingNull) e continua sendo "não mexi" — é o que
+        // o preparo manda para as chaves que não conhece, como tipo_de_ata. Quem
+        // lê já trata a chave ausente como não definida (CorrecaoDaLegenda,
+        // Pipeline, o preparo), e o app Python também (projects.py).
         foreach (var (chave, valor) in novo)
-            alvo[chave] = valor?.DeepClone();
+        {
+            if (valor is JsonValue v && v.TryGetValue(out string? texto) && texto.Length == 0)
+                alvo.Remove(chave);
+            else
+                alvo[chave] = valor?.DeepClone();
+        }
         ps[projeto] = alvo;
 
         Gravar();

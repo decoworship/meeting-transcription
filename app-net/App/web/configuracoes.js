@@ -11,7 +11,9 @@
 // sim.
 
 import { pedir } from "/ponte.js";
-import { alerta, campo, confirmar, avisar, perguntarTexto } from "/pecas.js";
+import { abaClientes } from "/clientes.js";
+import { abaVozes } from "/vozes.js";
+import { alerta, campo, confirmar, pararAudio } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
 function tamanho(bytes) {
@@ -20,9 +22,6 @@ function tamanho(bytes) {
   if (gb >= 1) return `${gb.toFixed(1).replace(".", ",")} GB`;
   return `${Math.round(bytes / 1e6)} MB`;
 }
-
-/** "4,2s" — a duração de uma amostra de voz. */
-const segundos = (s) => `${s.toFixed(1).replace(".", ",")}s`;
 
 /** "10/08/2026" a partir do ISO que o núcleo grava. */
 function dia(iso) {
@@ -1087,578 +1086,8 @@ function abaTranscricao(config, gravar, diarizadores = []) {
 }
 
 // ──────────────────────────────────────────────────────── aba Clientes
-
-function abaClientes(clientes, catalogo, diarizadores) {
-  const painel = document.createElement("div");
-  painel.className = "painel";
-
-  const nomes = Object.keys(clientes).sort((a, b) => a.localeCompare(b, "pt-BR"));
-
-  const b = bloco("Clientes e projetos",
-    "Cada projeto guarda o vocabulário, o idioma e o modelo usados nas "
-    + "reuniões dele.");
-
-  if (nomes.length === 0) {
-    const vazio = document.createElement("p");
-    vazio.className = "campo__dica";
-    vazio.textContent = "Nenhum cliente ainda. Eles nascem ao preparar uma "
-      + "transcrição: digitar um nome novo ali já o cria.";
-    b.appendChild(vazio);
-  }
-
-  for (const nome of nomes) {
-    const pessoa = document.createElement("div");
-    pessoa.className = "pessoa";
-
-    const topo = document.createElement("div");
-    topo.className = "pessoa__topo";
-    const h = document.createElement("p");
-    h.className = "pessoa__nome";
-    h.textContent = nome;
-    const quantos = document.createElement("span");
-    quantos.className = "campo__dica";
-    const n = clientes[nome].length;
-    quantos.textContent = `${n} ${n === 1 ? "projeto" : "projetos"}`;
-
-    const acoes = document.createElement("span");
-    acoes.className = "amostra__acoes";
-    acoes.append(
-      botaoRenomear("cliente", nome, (novo) =>
-        pedir("renomear-cliente", { cliente: nome, nome: novo })),
-      botaoApagar(
-        `Apagar o cliente "${nome}" e os ${n} ${n === 1 ? "projeto" : "projetos"} dele?\n\n`
-        + "Isto esquece o vocabulário e as preferências. As transcrições já "
-        + "feitas continuam onde estão.",
-        () => pedir("apagar-cliente", { cliente: nome })),
-    );
-
-    topo.append(h, quantos, acoes);
-    pessoa.appendChild(topo);
-
-    for (const projeto of [...clientes[nome]].sort((a, b) => a.localeCompare(b, "pt-BR")))
-      pessoa.appendChild(linhaDeProjeto(nome, projeto, catalogo, diarizadores));
-
-    b.appendChild(pessoa);
-  }
-
-  painel.appendChild(b);
-  const comoNascem = document.createElement("p");
-  comoNascem.className = "campo__dica";
-  comoNascem.textContent = "Cliente e projeto novos nascem na tela de preparo: "
-    + "digite um nome que ainda não existe e ele passa a valer. Aqui se renomeia "
-    + "e se apaga o que já existe — renomear leva junto o vocabulário e as "
-    + "preferências do projeto.";
-  painel.appendChild(comoNascem);
-
-  return painel;
-}
-
-/** O par de botões que renomeia, com o nome atual já no campo. */
-function botaoRenomear(oQue, atual, aoConfirmar) {
-  const b = document.createElement("button");
-  b.className = "aa-btn aa-btn-texto";
-  b.type = "button";
-  b.textContent = "Renomear";
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    const novo = await perguntarTexto(`Novo nome do ${oQue}`, atual,
-                                     { titulo: `Renomear ${oQue}` });
-    if (!novo || novo === atual) return;
-    try {
-      await aoConfirmar(novo);
-    } catch (err) {
-      await avisar(err.message, { titulo: "Não deu para renomear" });
-      return;
-    }
-    recarregar();
-  });
-  return b;
-}
-
-/**
- * O botão que apaga, sempre com confirmação que diz o que se perde.
- *
- * O texto da confirmação nomeia o alvo e a consequência, em vez de perguntar
- * "tem certeza?" — quem lê "tem certeza" clica em sim por reflexo.
- */
-function botaoApagar(pergunta, aoConfirmar) {
-  const b = document.createElement("button");
-  b.className = "aa-btn aa-btn-texto";
-  b.type = "button";
-  b.textContent = "Apagar";
-  b.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    if (!await confirmar(pergunta, { titulo: "Apagar", ok: "Apagar" })) return;
-    try {
-      await aoConfirmar();
-    } catch (err) {
-      await avisar(err.message, { titulo: "Não deu para apagar" });
-      return;
-    }
-    recarregar();
-  });
-  return b;
-}
-
-/**
- * Um projeto que abre nos parâmetros dele.
- *
- * Sanfona, e não navegação para outra tela: comparar dois projetos do mesmo
- * cliente é o gesto que se faz aqui — "o outro está usando qual modelo?" — e
- * trocar de tela a cada um transformaria a comparação em ida e volta.
- */
-function linhaDeProjeto(cliente, projeto, catalogo, diarizadores) {
-  const caixa = document.createElement("div");
-  caixa.className = "projeto";
-
-  const topo = document.createElement("button");
-  topo.className = "projeto__topo";
-  topo.type = "button";
-  topo.setAttribute("aria-expanded", "false");
-
-  const seta = document.createElement("span");
-  seta.className = "projeto__seta";
-  seta.textContent = "▸";
-
-  const nome = document.createElement("span");
-  nome.textContent = projeto;
-
-  const resumo = document.createElement("span");
-  resumo.className = "campo__dica";
-
-  topo.append(seta, nome, resumo);
-
-  // As ações ficam fora do <button> do topo: botão dentro de botão é HTML
-  // inválido, e o clique de um acabaria disparando o outro.
-  const acoes = document.createElement("span");
-  acoes.className = "amostra__acoes projeto__acoes";
-  acoes.append(
-    botaoRenomear("projeto", projeto, (novo) =>
-      pedir("renomear-projeto", { cliente, projeto, nome: novo })),
-    botaoApagar(
-      `Apagar o projeto "${projeto}" de ${cliente}?\n\n`
-      + "Isto esquece o vocabulário e as preferências dele. As transcrições já "
-      + "feitas continuam onde estão.",
-      () => pedir("apagar-projeto", { cliente, projeto })),
-  );
-
-  const corpo = document.createElement("div");
-  corpo.className = "projeto__corpo";
-  corpo.hidden = true;
-
-  let prefs = null;
-
-  /** "large-v3 · pt · com falantes" — o que dá para saber sem abrir. */
-  function resumir() {
-    if (!prefs) return;
-    const partes = [
-      prefs.model_size || "modelo padrão",
-      prefs.language || "idioma automático",
-      prefs.diarization === false ? "sem falantes" : "com falantes",
-    ];
-    resumo.textContent = partes.join(" · ");
-  }
-
-  async function gravar(mudanca) {
-    Object.assign(prefs, mudanca);
-    estadoDoProjeto.textContent = "salvando…";
-    try {
-      await pedir("salvar-projeto", { cliente, projeto, prefs });
-      estadoDoProjeto.textContent = "salvo";
-      resumir();
-    } catch (e) {
-      estadoDoProjeto.textContent = `não salvou: ${e.message}`;
-    }
-  }
-
-  const estadoDoProjeto = document.createElement("p");
-  estadoDoProjeto.className = "campo__dica";
-
-  async function montar() {
-    if (!prefs) prefs = (await pedir("prefs", { cliente, projeto })).prefs ?? {};
-    corpo.replaceChildren();
-    resumir();
-
-    const asr = catalogo.filter((i) => i.pacote.familia === "asr");
-    // Do disco, e não do catálogo: a família "diarizacao" saiu dele na Fase 4,
-    // quando os pesos passaram a viajar dentro do instalador — e este seletor
-    // ficou com uma opção morta oferecendo uma escolha que não existia. Vem na
-    // mesma leitura do catálogo, na subida da tela. Ver
-    // Motores.ModelosDeDiarizacao e FASE6 §4.6.
-    const diar = diarizadores;
-
-    // O modelo do projeto pode ser um que não está mais no catálogo — projeto
-    // criado no app Python, ou pacote removido. Mostrar "(padrão)" e não a
-    // primeira opção da lista: escolher por conta própria mudaria em silêncio
-    // como as reuniões deste cliente são transcritas.
-    const campoModelo = campo("Modelo de transcrição", "select", {
-      opcoes: ["(usar o padrão do app)", ...asr.map((i) => i.pacote.nome)],
-    });
-    const selModelo = campoModelo.querySelector("select");
-    selModelo.options[0].value = "";
-    asr.forEach((i, n) => { selModelo.options[n + 1].value = i.pacote.id; });
-    selModelo.value = prefs.model_size ?? "";
-    if (selModelo.selectedIndex === -1) {
-      const solto = document.createElement("option");
-      solto.value = prefs.model_size;
-      solto.textContent = `${prefs.model_size} (não instalado)`;
-      selModelo.appendChild(solto);
-      selModelo.value = prefs.model_size;
-    }
-    selModelo.addEventListener("change", (e) =>
-      gravar({ model_size: e.target.value || null }));
-
-    const campoIdioma = campo("Idioma", "input", {
-      valor: prefs.language ?? "",
-      dica: "vazio = detectar sozinho",
-    });
-    campoIdioma.querySelector("input").addEventListener("change", (e) =>
-      gravar({ language: e.target.value.trim() || null }));
-
-    const campoDiar = campo("Modelo de diarização", "select", {
-      opcoes: ["(usar o padrão do app)", ...diar],
-    });
-    const selDiar = campoDiar.querySelector("select");
-    selDiar.options[0].value = "";
-    diar.forEach((nome, n) => { selDiar.options[n + 1].value = nome; });
-    selDiar.value = prefs.diar_model ?? "";
-    // Um modelo escolhido que não está mais em disco não pode sumir em silêncio:
-    // ele decide como este cliente é transcrito, e cair para o padrão sem avisar
-    // mudaria isso sem ninguém pedir. Mesma regra do modelo de transcrição.
-    if (selDiar.selectedIndex === -1) {
-      const solto = document.createElement("option");
-      solto.value = prefs.diar_model;
-      solto.textContent = `${prefs.diar_model} (não instalado)`;
-      selDiar.appendChild(solto);
-      selDiar.value = prefs.diar_model;
-    }
-    selDiar.addEventListener("change", (e) =>
-      gravar({ diar_model: e.target.value || null }));
-
-    const linha = document.createElement("div");
-    linha.className = "linha";
-    linha.append(campoModelo, campoIdioma, campoDiar);
-
-    const separar = document.createElement("label");
-    separar.className = "campo campo--linha";
-    const caixaSep = document.createElement("input");
-    caixaSep.type = "checkbox";
-    caixaSep.checked = prefs.diarization !== false;
-    caixaSep.addEventListener("change", (e) => gravar({ diarization: e.target.checked }));
-    const rotSep = document.createElement("span");
-    rotSep.textContent = "Separar os falantes";
-    separar.append(caixaSep, rotSep);
-
-    const vocab = campo("Vocabulário", "textarea", {
-      linhas: 3, valor: prefs.initial_prompt ?? "",
-    });
-    vocab.querySelector("textarea").addEventListener("change", (e) =>
-      gravar({ initial_prompt: e.target.value.trim() || null }));
-
-    const dicaVocab = document.createElement("p");
-    dicaVocab.className = "campo__dica";
-    // O mesmo texto do preparo, pelo mesmo motivo: o teto de 224 tokens do
-    // initial_prompt morreu quando a correção fonética entrou.
-    dicaVocab.textContent = "Nomes de pessoas, jargão, nomes de sistemas. Sem "
-      + "limite de tamanho — o que o modelo escrever parecido é corrigido depois. "
-      + "É este vocabulário que alimenta a correção fonética.";
-
-    corpo.append(linha, separar, vocab, dicaVocab, estadoDoProjeto);
-  }
-
-  let montado = false;
-  topo.addEventListener("click", async () => {
-    const abrindo = corpo.hidden;
-    corpo.hidden = !abrindo;
-    topo.setAttribute("aria-expanded", String(abrindo));
-    seta.textContent = abrindo ? "▾" : "▸";
-    if (abrindo && !montado) {
-      montado = true;
-      corpo.textContent = "carregando…";
-      await montar();
-    }
-  });
-
-  // O resumo aparece antes de abrir, e o que ele carrega fica guardado: é o que
-  // responde "qual modelo este projeto usa?" sem exigir um clique por projeto,
-  // e sem pedir as mesmas preferências duas vezes quando o projeto for aberto.
-  pedir("prefs", { cliente, projeto })
-    .then((r) => { prefs = r.prefs ?? {}; resumir(); })
-    .catch(() => {});
-
-  const linhaTopo = document.createElement("div");
-  linhaTopo.className = "projeto__linha";
-  linhaTopo.append(topo, acoes);
-
-  caixa.append(linhaTopo, corpo);
-  return caixa;
-}
-
-// ─────────────────────────────────────────────────────────── aba Vozes
-
-/**
- * Toca o recorte de 4 segundos que gerou uma amostra.
- *
- * Usa o mesmo <audio> da revisão, e não um por linha: com dezenas de amostras,
- * um elemento por linha significaria dezenas de conexões abertas — e dois
- * trechos tocando juntos, que é pior ainda para quem está tentando decidir se
- * a voz é da mesma pessoa.
- */
-function ouvirTrecho(relativo, botao) {
-  const audio = document.getElementById("audio");
-  const url = `https://vozes.local/${relativo.split("/").map(encodeURIComponent).join("/")}`;
-
-  // Clicar de novo no que está tocando para. É o gesto que se espera, e sem
-  // ele não há como interromper um trecho a não ser esperando os 4 segundos.
-  if (audio.src === url && !audio.paused) {
-    audio.pause();
-    botao.removeAttribute("data-tocando");
-    return;
-  }
-
-  for (const b of document.querySelectorAll(".tocar[data-tocando]"))
-    b.removeAttribute("data-tocando");
-
-  audio.src = url;
-  audio.currentTime = 0;
-  botao.dataset.tocando = "true";
-  audio.onended = () => botao.removeAttribute("data-tocando");
-  audio.play().catch((e) => {
-    botao.removeAttribute("data-tocando");
-    botao.title = `não tocou: ${e.message}`;
-  });
-}
-
-function linhaDeAmostra(pessoa, a, aoMudar) {
-  const linha = document.createElement("div");
-  linha.className = "amostra";
-  linha.dataset.quarentena = String(a.quarentena);
-  // Inerte por qualquer um dos dois motivos: mesma aparência, porque a
-  // consequência é a mesma — esta amostra não participa de nada.
-  linha.dataset.outroModelo =
-    String(a.outro_modelo === true || a.regras_antigas === true);
-
-  const tocar = document.createElement("button");
-  tocar.className = "tocar";
-  tocar.type = "button";
-  tocar.disabled = !a.trecho;
-  tocar.title = a.trecho
-    ? "Ouvir este trecho"
-    : "Esta amostra foi guardada sem o trecho de áudio";
-  tocar.setAttribute("aria-label", "Ouvir o trecho");
-  if (a.trecho) tocar.addEventListener("click", () => ouvirTrecho(a.trecho, tocar));
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  const uso = document.createElementNS("http://www.w3.org/2000/svg", "use");
-  uso.setAttribute("href", "#i-tocar");
-  svg.appendChild(uso);
-  tocar.appendChild(svg);
-
-  const proc = document.createElement("span");
-  proc.className = "amostra__proc";
-  // A procedência inteira numa linha: é ela que responde "de onde veio isto?",
-  // que é a primeira pergunta de quem julga uma amostra suspeita.
-  proc.textContent = [
-    dia(a.criada_em), a.faixa, segundos(a.duracao_s),
-    a.dispositivo, a.gravacao,
-    // Dito na mesma linha da procedência porque é procedência: de qual modelo
-    // esta voz veio. Sem isto a tela mostraria amostras de alguém que o app
-    // não reconhece, sem nada explicando a contradição.
-    a.outro_modelo === true ? "de um modelo de voz antigo" : null,
-    // Duas causas diferentes para a mesma inércia, e a diferença importa para
-    // quem decide se apaga ou espera: uma volta se o modelo voltar, a outra
-    // não volta nunca.
-    a.regras_antigas === true ? "aprendida antes da guarda de contaminação" : null,
-  ].filter(Boolean).join(" · ");
-
-  const acoes = document.createElement("span");
-  acoes.className = "amostra__acoes";
-
-  if (a.quarentena) {
-    const aprovar = document.createElement("button");
-    aprovar.className = "aa-btn aa-btn-secundario";
-    aprovar.type = "button";
-    aprovar.textContent = "Aprovar";
-    aprovar.title = "Esta voz soou diferente do resto do perfil. Aprovar a "
-      + "aceita como uma condição nova da mesma pessoa.";
-    aprovar.addEventListener("click", () =>
-      aoMudar("aprovar-voz", pessoa, a.indice));
-    acoes.appendChild(aprovar);
-  }
-
-  const esquecer = document.createElement("button");
-  esquecer.className = "aa-btn aa-btn-texto";
-  esquecer.type = "button";
-  esquecer.textContent = "Esquecer";
-  esquecer.addEventListener("click", async () => {
-    // Apagar amostra é irreversível e some com trabalho de reuniões passadas.
-    // Um clique distraído não pode bastar.
-    if (await confirmar("A voz aprendida nesta amostra deixa de ser reconhecida "
-                        + "nas próximas reuniões.",
-                        { titulo: `Esquecer esta amostra de ${pessoa}?`,
-                          ok: "Esquecer" }))
-      aoMudar("esquecer-voz", pessoa, a.indice);
-  });
-  acoes.appendChild(esquecer);
-
-  linha.append(tocar, proc, acoes);
-  return linha;
-}
-
-/**
- * Pergunta com qual pessoa juntar, numa caixa do app.
- *
- * Um <select> e não um campo de texto: o destino tem de ser alguém que já
- * existe, e digitar o nome de novo é exatamente o gesto que criou o problema —
- * uma segunda grafia. Devolve o nome escolhido, ou nulo se desistiu.
- */
-function escolherPessoa(de, outras) {
-  return new Promise((resolver) => {
-    const dialogo = document.createElement("dialog");
-    dialogo.className = "modal";
-
-    const corpo = document.createElement("div");
-    corpo.className = "modal__corpo";
-
-    const h = document.createElement("h2");
-    h.className = "modal__titulo";
-    h.textContent = `Juntar "${de}" com quem?`;
-
-    const escolha = campo("Manter o nome", "select", { opcoes: outras });
-    const sel = escolha.querySelector("select");
-
-    const acoes = document.createElement("div");
-    acoes.className = "modal__acoes";
-
-    const nao = document.createElement("button");
-    nao.className = "aa-btn aa-btn-secundario";
-    nao.type = "button";
-    nao.textContent = "Cancelar";
-    nao.addEventListener("click", () => dialogo.close(""));
-
-    const sim = document.createElement("button");
-    sim.className = "aa-btn aa-btn-primario";
-    sim.type = "button";
-    sim.textContent = "Continuar";
-    sim.addEventListener("click", () => dialogo.close("sim"));
-
-    acoes.append(nao, sim);
-    corpo.append(h, escolha, acoes);
-    dialogo.appendChild(corpo);
-
-    dialogo.addEventListener("close", () => {
-      const v = dialogo.returnValue === "sim" ? sel.value : null;
-      dialogo.remove();
-      resolver(v);
-    }, { once: true });
-    dialogo.addEventListener("click", (e) => {
-      if (e.target === dialogo) dialogo.close("");
-    });
-
-    document.body.appendChild(dialogo);
-    dialogo.returnValue = "";
-    dialogo.showModal();
-    sel.focus();
-  });
-}
-
-function abaVozes(vozes, aoMudar) {
-  const painel = document.createElement("div");
-  painel.className = "painel";
-
-  const emQuarentena = vozes.reduce(
-    (s, p) => s + p.amostras.filter((a) => a.quarentena).length, 0);
-
-  const b = bloco("Vozes conhecidas",
-    "Aprendidas quando você nomeia um falante. Na reunião seguinte, quem já "
-    + "está aqui chega nomeado.");
-
-  if (vozes.length === 0) {
-    const vazio = document.createElement("p");
-    vazio.className = "campo__dica";
-    vazio.textContent = "Ninguém ainda. Nomeie um falante numa transcrição e a "
-      + "voz dele aparece aqui.";
-    b.appendChild(vazio);
-  }
-
-  if (emQuarentena > 0) {
-    b.appendChild(alerta(
-      `${emQuarentena} ${emQuarentena === 1 ? "amostra soou" : "amostras soaram"}`
-      + " diferente do resto do perfil e aguardam sua revisão.", "atencao"));
-  }
-
-  for (const p of vozes) {
-    // **Uma pessoa por vez, dobrada.** Quarenta amostras de cinco pessoas são
-    // duzentas linhas, e achar a que se quer conferir vira rolagem. O <details>
-    // nativo faz isso sem estado nosso, sem JavaScript de abre-e-fecha, e já
-    // vem com teclado e leitor de tela funcionando.
-    const pessoa = document.createElement("details");
-    pessoa.className = "pessoa";
-
-    const topo = document.createElement("summary");
-    topo.className = "pessoa__topo";
-    const h = document.createElement("span");
-    h.className = "pessoa__nome";
-    h.textContent = p.nome;
-    const quantas = document.createElement("span");
-    quantas.className = "campo__dica";
-    const n = p.amostras.length;
-    const emQuar = p.amostras.filter((a) => a.quarentena).length;
-    quantas.textContent = `${n} ${n === 1 ? "amostra" : "amostras"}`
-      + (emQuar ? ` · ${emQuar} aguardando revisão` : "");
-    topo.append(h, quantas);
-    pessoa.appendChild(topo);
-
-    // **Aberta quando há o que revisar.** O que pede atenção não pode estar
-    // escondido atrás de um clique: quem abre esta tela por causa do aviso lá
-    // em cima precisa ver a amostra sem procurá-la.
-    pessoa.open = emQuar > 0;
-
-    // Juntar dois perfis. O nome é digitado à mão uma vez por reunião, e
-    // ninguém digita igual sempre — "Andre Yuri" e "André Yuri" viram duas
-    // pessoas, e o reconhecimento passa a comparar contra dois centróides
-    // fracos em vez de um forte. Ver Nucleo/Vozes.Juntar.
-    const outras = vozes.map((o) => o.nome).filter((nome) => nome !== p.nome);
-    if (outras.length > 0) {
-      const juntar = document.createElement("button");
-      juntar.className = "aa-btn aa-btn-texto pessoa__juntar";
-      juntar.type = "button";
-      juntar.textContent = "Juntar com…";
-      juntar.addEventListener("click", async (e) => {
-        // Sem isto o clique fecharia o <details> junto — o botão vive dentro
-        // do <summary>, e o navegador trata qualquer clique nele como o gesto
-        // de dobrar.
-        e.preventDefault();
-        e.stopPropagation();
-
-        const alvo = await escolherPessoa(p.nome, outras);
-        if (!alvo) return;
-        if (!await confirmar(
-              `As ${n} ${n === 1 ? "amostra" : "amostras"} de "${p.nome}" passam `
-              + `para "${alvo}", e "${p.nome}" deixa de existir. `
-              + "As gravações e os trechos de áudio não são tocados.",
-              { titulo: `Juntar "${p.nome}" com "${alvo}"?`, ok: "Juntar" })) return;
-
-        aoMudar("juntar-vozes", p.nome, undefined, alvo);
-      });
-      topo.appendChild(juntar);
-    }
-
-    for (const a of p.amostras)
-      pessoa.appendChild(linhaDeAmostra(p.nome, a, aoMudar));
-
-    b.appendChild(pessoa);
-  }
-
-  painel.appendChild(b);
-  painel.appendChild(obra(
-    "O ciclo completo nunca foi visto com áudio real.",
-    "Nomear alguém numa reunião e ela chegar nomeada na seguinte está "
-    + "implementado e não comprovado. Esta tela é o instrumento para comprovar: "
-    + "depois de nomear um falante, a pessoa tem que aparecer aqui."));
-
-  return painel;
-}
+//
+// Mora em clientes.js desde o plano 4a do redesenho (mestre-detalhe).
 
 // ─────────────────────────────────────────────────────────── a tela
 
@@ -1684,14 +1113,18 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, diarizadores, vozes, gravador;
+  let config, clientes, catalogo, diarizadores, vozes, parecidos, gravador, gravacoes, tipos;
   try {
     // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
-    [{ config }, { clientes }, { catalogo, diarizadores }, { vozes },
-     { gravador }] = await Promise.all([
+    // As gravações e os tipos de ata só servem a Clientes (as contagens e o
+    // tipo padrão do projeto); sem eles, a seção perde isso e o resto vale.
+    [{ config }, { clientes }, { catalogo, diarizadores }, { vozes, parecidos },
+     { gravador }, { gravacoes }, { tipos }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
       pedir("gravador"),
+      pedir("gravacoes").catch(() => ({ gravacoes: [] })),
+      pedir("modelos-de-ata").catch(() => ({ tipos: [] })),
     ]);
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
@@ -1730,15 +1163,6 @@ export async function telaDeAjustes(ctx, aba = "geral") {
     }
   }
 
-  async function mexerNaVoz(op, pessoa, indice, nome) {
-    // `nome` só o "juntar-vozes" usa: é a pessoa de DESTINO. As outras três ops
-    // ignoram o campo, como o contrato do sidecar manda (docs/SIDECAR.md: campo
-    // desconhecido é ignorado pelos dois lados).
-    const r = await pedir(op, { pessoa, indice, nome });
-    vozes = r.vozes;
-    desenharPainel();
-  }
-
   const raiz = document.createElement("div");
   raiz.className = "ajustes";
 
@@ -1757,8 +1181,11 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       gravador: () => abaGravador(gravador, mexerNoGravador),
       modelos: () => abaModelos(catalogo, config, gravar),
       transcricao: () => abaTranscricao(config, gravar, diarizadores ?? []),
-      clientes: () => abaClientes(clientes, catalogo, diarizadores ?? []),
-      vozes: () => abaVozes(vozes, mexerNaVoz),
+      clientes: () => abaClientes({
+        clientes, catalogo, diarizadores: diarizadores ?? [],
+        gravacoes: gravacoes ?? [], tipos: tipos ?? [],
+      }, () => recarregar(), estado),
+      vozes: () => abaVozes({ vozes, parecidos: parecidos ?? [] }, estado),
     }[atual]();
     conteudo.appendChild(estado);
     painel.replaceChildren(conteudo);
@@ -1776,10 +1203,21 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       for (const outro of colunaAbas.children)
         outro.setAttribute("aria-selected", String(outro === botao));
       estado.textContent = "";
+      // O trecho de voz que tocava não segue para a outra seção.
+      pararAudio();
       desenharPainel();
     });
     colunaAbas.appendChild(botao);
   }
+
+  // A marca e a versão no pé do menu, como na prancha de Ajustes (4a). Do
+  // diagnóstico, guardado por sessão, que é de onde o bloco Sobre já as lê.
+  const versao = document.createElement("p");
+  versao.className = "abas__versao";
+  colunaAbas.appendChild(versao);
+  diagnostico().then((d) => {
+    if (d?.marca && d?.versao) versao.textContent = `${d.marca} ${d.versao}`;
+  }).catch(() => {});
 
   desenharPainel();
   raiz.append(colunaAbas, painel);

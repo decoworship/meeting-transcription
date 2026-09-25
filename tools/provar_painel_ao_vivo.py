@@ -86,16 +86,13 @@ DESLIGADO = PAINEL.replace(
     "<script>\nwindow.__impedimento = 'perguntar durante a reunião está desligado "
     "em Ajustes › Transcrição.';\nwindow.chrome")
 
+# Desde o plano 3 a grade do Gravador é .grav-grade: a legenda larga à
+# esquerda, Notas · Perguntar em abas à direita (D-B).
 COLUNAS = """<!doctype html><meta charset="utf-8">
 <link rel="stylesheet" href="/app.css">
-<div class="painel" id="p" data-aovivo="true">
-  <div class="bloco" id="cartao">cartao</div>
-  <div class="bloco" id="reuniao">reuniao</div>
-  <div class="bloco" id="agenda">a agenda</div>
-  <div class="bloco" id="notas">notas</div>
-  <div class="bloco" id="disp">dispositivos</div>
-  <div class="bloco" id="pasta">pasta</div>
+<div class="grav-grade" id="p" data-legenda="true">
   <section class="bloco aovivo" id="previa">a prévia</section>
+  <section class="bloco grav-abas" id="abas">notas</section>
 </div>"""
 
 BLOCO = {
@@ -159,7 +156,8 @@ def main() -> int:
                 dono: e.dataset.dono,
                 vol: e.classList.contains('fala--volatil'),
                 x: Math.round(e.getBoundingClientRect().left),
-                txt: e.textContent.trim().replace(/\\s+/g, ' ') }))""")
+                rotulo: e.querySelector('.fala__dono').textContent,
+                txt: e.querySelector('.fala__texto').textContent.trim().replace(/\\s+/g, ' ') }))""")
             separadores = pg.locator(".aovivo__bloco").count()
 
             # ── 4: perguntar ao modelo ─────────────────────────────────────
@@ -247,12 +245,15 @@ def main() -> int:
     # O bloco deu 2 falas; a legenda deve ter agrupado em mais 2, não em 3.
     agrupou = any(f["txt"] == "bom dia pessoal, tudo bem?" for f in firmes)
     um_volatil = len(volateis) == 1
+    # Desde o plano 3 a legenda é linha (tempo · dono · texto), não balão: o
+    # lado deu lugar ao rótulo, que diz só o que a faixa do microfone sabe.
     lados = bool(donos and outros
-                 and min(f["x"] for f in donos) > max(f["x"] for f in outros))
+                 and all(f["rotulo"] in ("Você", "") for f in donos)
+                 and all(f["rotulo"] in ("Outros", "") for f in outros))
 
     print(f"\n   agrupou o texto do mesmo dono num balão só: {agrupou}")
     print(f"   manteve exatamente um balão volátil:          {um_volatil}")
-    print(f"   dono à direita, os outros à esquerda:         {lados}")
+    print(f"   o dono diz Você, os outros dizem Outros:      {lados}")
 
     print("\n4. perguntar ao modelo:")
     print(f"   enquanto espera:  estado={esperando['estado']!r} botão travado="
@@ -291,10 +292,10 @@ def main() -> int:
     tem_rolagem = rolagem["overflow"] == "auto" and rolagem["teto"] not in ("none", "")
     print(f"   a pilha tem teto ({rolagem['teto']}) e rolagem:      {tem_rolagem}")
 
-    esq = [c for c in caixas if c["id"] != "previa"]
     previa = next(c for c in caixas if c["id"] == "previa")
-    colunas = len({c["x"] for c in esq}) == 1 and previa["x"] > max(c["x"] for c in esq)
-    print(f"   duas colunas, nada vazando para a direita:    {colunas}")
+    abas = next(c for c in caixas if c["id"] == "abas")
+    colunas = previa["x"] < abas["x"]
+    print(f"   a legenda à esquerda, as abas à direita:      {colunas}")
 
     if erros:
         print("\nERROS DE JAVASCRIPT:\n  " + "\n  ".join(erros))

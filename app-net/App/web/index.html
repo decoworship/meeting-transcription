@@ -45,6 +45,11 @@
       <circle cx="12" cy="12" r="3"/>
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>
     </g>
+    <!-- A bandeirinha do "Marcar momento" e do "momento marcado" (plano 3). -->
+    <g id="i-marca" fill="none" stroke="currentColor" stroke-width="1.6"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 21V4M6 4h11l-2 4 2 4H6"/>
+    </g>
     <g id="i-tocar" fill="none" stroke="currentColor" stroke-width="1.6"
        stroke-linecap="round" stroke-linejoin="round">
       <path d="M8 5l11 7-11 7z"/>
@@ -60,17 +65,12 @@
        bandeja, e esta é a mesma gravação vista de dentro da janela. -->
   <nav class="trilho" aria-label="Seções">
     <!-- Uma bolinha por destino, acesa pelo trabalho daquele destino:
-         transcrever em Reuniões, gravar no Gravador, escrever ata em Atas.
-         Quem as acende é o web/trilho.js, do estado do núcleo — nunca por
-         tempo. -->
-    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
-            data-ocupado="false">
-      <span class="trilho__icone">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
-        <span class="trilho__ponto" aria-hidden="true"></span>
-      </span>
-      <span>Reuniões</span>
-    </button>
+         gravar no Gravador; transcrever, separar falantes e escrever a ata em
+         Reuniões. Quem as acende é o web/trilho.js, do estado do núcleo —
+         nunca por tempo.
+         O Gravador vem primeiro porque é o primeiro gesto do dia; Atas saiu
+         em 24/09/2026 e virou a aba Ata da reunião (docs/superpowers/specs/
+         2026-09-23-ui-ux.md, D-A). -->
     <button class="trilho__item" id="ir-gravador" type="button" data-ocupado="false">
       <span class="trilho__icone">
         <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gravador"/></svg>
@@ -78,14 +78,13 @@
       </span>
       <span>Gravador</span>
     </button>
-    <!-- Atas fica abaixo do Gravador: é o terceiro destino de todo dia, e o
-         que se visita depois da reunião, não durante. -->
-    <button class="trilho__item" id="ir-atas" type="button" data-ocupado="false">
+    <button class="trilho__item" id="ir-reunioes" type="button" aria-current="page"
+            data-ocupado="false">
       <span class="trilho__icone">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-atas"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-reunioes"/></svg>
         <span class="trilho__ponto" aria-hidden="true"></span>
       </span>
-      <span>Atas</span>
+      <span>Reuniões</span>
     </button>
     <button class="trilho__item trilho__item--fim" id="ir-config" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-config"/></svg>
@@ -98,6 +97,15 @@
       <button class="barra__voltar aa-btn aa-btn-texto" id="voltar" hidden>← Reuniões</button>
       <h1 class="barra__titulo" id="titulo">Reuniões</h1>
       <p class="barra__sub" id="subtitulo"></p>
+      <!-- O que a tela põe na barra, à direita: Lista e Semana em Reuniões. A
+           tela o preenche com acoesDaBarra (app.js), e trocar de tela o esvazia. -->
+      <!-- Gravando, qualquer outra tela mostra este chip (spec §3.1): quem sai para
+           conferir uma reunião antiga não pode perder de vista que está gravando.
+           O app.js o acende e só troca o texto — nunca o refaz. -->
+      <button class="chip-gravando" id="chip-gravando" type="button" hidden>
+        <span class="chip-gravando__ponto" aria-hidden="true"></span><span class="chip-gravando__texto"></span>
+      </button>
+      <div class="barra__acoes" id="acoes-da-barra"></div>
     </header>
 
     <main class="aa-pagina" id="tela" aria-busy="true">
@@ -121,14 +129,6 @@
     <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
   </div>
   <div class="gaveta__corpo" id="corpo-falantes"></div>
-</aside>
-
-<aside class="gaveta gaveta--larga" id="gaveta-notas" hidden aria-label="Notas da reunião">
-  <div class="gaveta__topo">
-    <h2>Notas da reunião</h2>
-    <button class="aa-btn aa-btn-texto" data-fechar>✕</button>
-  </div>
-  <div class="gaveta__corpo" id="corpo-notas"></div>
 </aside>
 
 <aside class="gaveta" id="gaveta-exportar" hidden aria-label="Exportar">

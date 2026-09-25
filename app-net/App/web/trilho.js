@@ -2,9 +2,12 @@
 //
 // Uma por destino, e cada uma acesa pelo trabalho que pertence àquele destino:
 //
-//   Reuniões  — transcrevendo
 //   Gravador  — gravando
-//   Atas      — escrevendo a ata
+//   Reuniões  — transcrevendo, separando falantes, escrevendo a ata
+//
+// A ata acendia a bolinha de Atas até 24/09/2026, quando Atas deixou de ser
+// destino e virou uma aba da reunião. O rótulo da bolinha diz qual das três
+// tarefas está rodando — foi a confusão entre elas o defeito de 14/08.
 //
 // Existem porque este app faz coisas que levam minutos e o usuário sai da tela
 // enquanto elas rodam. Antes da Fase 3 nada disso aparecia fora da tela em que
@@ -13,9 +16,9 @@
 // sabia distinguir. Foi o defeito que o dono do produto viu no primeiro uso.
 //
 // **Gravar não disputa nada com os motores** (capturar áudio não usa GPU), então
-// a bolinha do Gravador pode conviver com qualquer uma das outras duas. As
-// outras duas nunca convivem entre si — o núcleo recusa, porque os modelos não
-// cabem juntos na placa e porque a ata precisa da transcrição pronta.
+// a bolinha do Gravador pode conviver com a de Reuniões. As tarefas de
+// Reuniões nunca rodam juntas — o núcleo recusa, porque os modelos não cabem
+// juntos na placa e porque a ata precisa da transcrição pronta.
 
 import { pedir, assinar } from "/ponte.js";
 import { assinarTranscricoes, transcricoes } from "/transcricoes.js";
@@ -25,7 +28,7 @@ const DESTINO_DA_TAREFA = {
   // A separação de falantes acende a mesma bolinha da transcrição: ela roda
   // sobre a legenda de uma reunião, e é em Reuniões que se vai olhar.
   falantes: "ir-reunioes",
-  ata: "ir-atas",
+  ata: "ir-reunioes",
 };
 
 const ROTULO_DA_TAREFA = {
@@ -43,13 +46,22 @@ function acender(id, ligado, rotuloBase, oQue = "") {
   else botao.removeAttribute("aria-label");
 }
 
-/** Reuniões e Atas: só uma das duas acende, porque só uma das duas roda. */
+/**
+ * As tarefas de placa acendem todas a bolinha de Reuniões, e só uma roda por
+ * vez — o núcleo recusa a segunda.
+ *
+ * **Por destino, e não por tarefa.** Transcrição e falantes acendem a MESMA
+ * bolinha, e pintar tarefa a tarefa apagava na segunda o que a primeira
+ * acendera: de 17/09 a 24/09/2026 a bolinha de Reuniões não acendia com uma
+ * transcrição rodando. O tools/checar_transcricao.py pegou, depois de portado
+ * para a lista nova.
+ */
 function pintarTrabalhos() {
   const atual = transcricoes().atual;
-  for (const [tarefa, id] of Object.entries(DESTINO_DA_TAREFA)) {
-    const minha = atual?.tarefa === tarefa;
-    acender(id, minha, id === "ir-atas" ? "Atas" : "Reuniões",
-            minha ? `${ROTULO_DA_TAREFA[tarefa]} ${atual.nome}` : "");
+  for (const id of new Set(Object.values(DESTINO_DA_TAREFA))) {
+    const minha = DESTINO_DA_TAREFA[atual?.tarefa] === id;
+    acender(id, minha, "Reuniões",
+            minha ? `${ROTULO_DA_TAREFA[atual.tarefa]} ${atual.nome}` : "");
   }
 }
 

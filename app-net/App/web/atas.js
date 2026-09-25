@@ -1,14 +1,22 @@
-// O destino Atas: escolher a reunião, escolher o tipo, gerar e ler.
+// A ata de uma reunião: escolher o tipo, gerar, acompanhar, ler, copiar e
+// exportar. Mora na aba Ata da reunião aberta (reuniao.js).
 //
-// Gerar e ler acontecem aqui, sem passar por Reuniões — decisão do dono do
-// produto (FASE3.md §4). Reuniões continua sendo gravar, transcrever e revisar;
-// a ata tem vida própria: é o que se copia para o e-mail, o que se relê dias
-// depois, e o que se regenera quando a transcrição foi corrigida.
+// Foi um destino próprio de 14/08 a 24/09/2026 (FASE3.md §4): a ata "tinha vida
+// própria" — é o que se copia para o e-mail, o que se relê dias depois, o que se
+// regenera quando a transcrição foi corrigida. Tudo isso continua; o que saiu
+// foi a segunda lista de reuniões que o destino desenhava para chegar a ela.
+// Ver a decisão D-A de docs/superpowers/specs/2026-09-23-ui-ux.md §6.
 
 import { pedir } from "/ponte.js";
 import { alerta, campo } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado, cancelar } from "/transcricoes.js";
-import { duracao, quando, tituloDe, abrirGravacao } from "/app.js";
+import { tituloDe } from "/app.js";
+
+// A transcrição e a separação de falantes dividem o registro com a ata. A aba
+// Ata só acompanha o que é dela: tomar a separação de falantes por uma ata
+// escrevendo mostrava "Escrevendo…", e o Parar daqui a cancelava.
+const ataEmCurso = (caminho) => (emCurso(caminho)?.tarefa === "ata" ? emCurso(caminho) : null);
+const fimDaAta = (caminho) => (ultimoResultado(caminho)?.tarefa === "ata" ? ultimoResultado(caminho) : null);
 
 const ETAPAS = {
   modelo: "Carregando o modelo",
@@ -16,164 +24,13 @@ const ETAPAS = {
   montagem: "Montando a ata",
 };
 
-export async function telaDeAtas(ctx) {
-  const { cabecalho, tela } = ctx;
-  cabecalho("Atas", "", false);
-  tela.setAttribute("aria-busy", "true");
-  tela.replaceChildren();
-
-  let gravacoes, tipos;
-  try {
-    [{ gravacoes }, { tipos }] = await Promise.all([
-      pedir("gravacoes"), pedir("modelos-de-ata"),
-    ]);
-  } catch (e) {
-    tela.setAttribute("aria-busy", "false");
-    tela.replaceChildren(alerta(e.message, "erro"));
-    return;
-  }
-  tela.setAttribute("aria-busy", "false");
-
-  // Só reunião transcrita: a ata é escrita a partir da transcrição, e oferecer
-  // as outras seria oferecer um botão que só sabe dizer não.
-  const prontas = gravacoes.filter((g) => g.transcrita);
-  cabecalho("Atas", prontas.length === 1
-    ? "1 reunião transcrita" : `${prontas.length} reuniões transcritas`, false);
-
-  if (prontas.length === 0) {
-    const vazio = document.createElement("p");
-    vazio.className = "vazio";
-    vazio.textContent =
-      "Nenhuma reunião transcrita ainda. A ata é escrita a partir da transcrição.";
-    tela.append(vazio);
-    return;
-  }
-
-  for (const g of prontas) tela.appendChild(cartaoDeAta(g, tipos, ctx));
-}
-
 /**
- * Um cartão por reunião: o que se sabe dela, o tipo, e o botão.
+ * Copiar e exportar a ata — o que se faz com ela depois de lida.
  *
- * A ata aberta fica no próprio cartão, e não numa tela à parte: ela tem meia
- * página, e mandar o usuário a outro destino para ler meia página o faria voltar
- * a cada reunião que quisesse conferir.
+ * @param depois onde pôr o caminho do arquivo exportado, ou o erro: logo
+ *   depois deste elemento.
  */
-function cartaoDeAta(g, tipos, ctx) {
-  const raiz = document.createElement("div");
-  raiz.className = "aa-cartao ata";
-  raiz.dataset.gravacao = g.caminho;
-
-  const topo = document.createElement("div");
-  topo.className = "ata__topo";
-
-  const esquerda = document.createElement("div");
-  const titulo = document.createElement("p");
-  titulo.className = "gravacao__titulo";
-  titulo.textContent = tituloDe(g);
-  const meta = document.createElement("p");
-  meta.className = "gravacao__meta";
-  for (const parte of [
-    [g.cliente, g.projeto].filter(Boolean).join(" · "),
-    duracao(g.duracao_s), quando(g.nome),
-  ].filter(Boolean)) {
-    const s = document.createElement("span");
-    s.textContent = parte;
-    meta.appendChild(s);
-  }
-  esquerda.append(titulo, meta);
-
-  const escolha = campo("Tipo de reunião", "select", {
-    id: `tipo-${g.nome}`,
-    opcoes: tipos.map((t) => t.nome),
-  });
-  escolha.classList.add("ata__tipo");
-
-  const botao = document.createElement("button");
-  botao.className = "aa-btn aa-btn-primario";
-  botao.type = "button";
-  botao.textContent = "Gerar ata";
-
-  topo.append(esquerda, escolha, botao);
-
-  const painel = document.createElement("div");
-  painel.className = "ata__painel";
-
-  const corpo = document.createElement("div");
-  corpo.className = "ata__corpo";
-
-  raiz.append(topo, painel, corpo);
-
-  const idDoTipo = () => {
-    const nome = escolha.querySelector("select").value;
-    return (tipos.find((t) => t.nome === nome) ?? tipos[0]).id;
-  };
-
-  botao.addEventListener("click", async () => {
-    botao.disabled = true;
-    try {
-      await pedir("gerar-ata", { gravacao: g.caminho, modelo: idDoTipo() });
-      acompanhar(g, botao, painel, corpo);
-    } catch (e) {
-      botao.disabled = false;
-      painel.replaceChildren(alerta(e.message, "erro"));
-    }
-  });
-
-  // Uma ata que já existe abre junto com a tela: quem vem aqui quer lê-la, e
-  // exigir um clique para mostrar o que já está pronto é pedágio.
-  mostrarAtaExistente(g, corpo, botao);
-  if (emCurso(g.caminho)) acompanhar(g, botao, painel, corpo);
-
-  return raiz;
-}
-
-async function mostrarAtaExistente(g, corpo, botao, abrir = false) {
-  try {
-    const r = await pedir("ata", { gravacao: g.caminho });
-    if (!r.ata) return;
-    botao.textContent = "Refazer ata";
-    botao.className = "aa-btn aa-btn-secundario";
-    desenharAta(corpo, r.ata, r.ata_velha, abrir, g);
-  } catch {
-    // Sem ata é o estado normal de quem nunca gerou.
-  }
-}
-
-/**
- * A ata em si, dobrada.
- *
- * <b>Fechada por padrão.</b> A primeira versão abria todas, com o argumento de
- * que quem entra aqui quer ler — e com onze reuniões transcritas a tela virou
- * uma rolagem sem fim, em que chegar à ata seguinte custava minutos de scroll.
- * Ler uma ata é ler <em>uma</em>; a lista serve para achá-la.
- */
-function desenharAta(corpo, markdown, velha, abrir, gravacao) {
-  corpo.replaceChildren();
-
-  const dobra = document.createElement("details");
-  dobra.className = "ata__dobra";
-  dobra.open = abrir;
-
-  const resumo = document.createElement("summary");
-  resumo.className = "ata__resumo";
-  // Duas informações que ajudam a decidir se vale abrir, sem abrir.
-  const linhas = markdown.split("\n").filter((l) => l.trim().length > 0).length;
-  const pendencias = (markdown.match(/^- \[ \]/gm) ?? []).length;
-  resumo.textContent = pendencias > 0
-    ? `Ver a ata — ${pendencias} pendência${pendencias > 1 ? "s" : ""}, ${linhas} linhas`
-    : `Ver a ata — ${linhas} linhas`;
-  dobra.appendChild(resumo);
-
-  if (velha) {
-    dobra.appendChild(alerta(
-      "A transcrição foi corrigida depois que esta ata foi escrita. "
-      + "Vale refazer.", "aviso"));
-  }
-
-  const acoes = document.createElement("div");
-  acoes.className = "ata__acoes";
-
+function botoesDaAta(markdown, gravacao, depois) {
   const copiar = document.createElement("button");
   copiar.className = "aa-btn aa-btn-texto";
   copiar.type = "button";
@@ -185,7 +42,6 @@ function desenharAta(corpo, markdown, velha, abrir, gravacao) {
     copiar.textContent = "Copiado";
     setTimeout(() => { copiar.textContent = "Copiar"; }, 1500);
   });
-  acoes.appendChild(copiar);
 
   // Exportar leva a ata para a pasta das atas, que é configurada à parte da de
   // transcrições — a ata é o que sai para o cliente.
@@ -203,40 +59,133 @@ function desenharAta(corpo, markdown, velha, abrir, gravacao) {
       const onde = document.createElement("p");
       onde.className = "campo__dica";
       onde.textContent = r.arquivo;
-      acoes.after(onde);
+      depois.after(onde);
     } catch (e) {
-      acoes.after(alerta(e.message, "erro"));
+      depois.after(alerta(e.message, "erro"));
     } finally {
       exportar.disabled = false;
       setTimeout(() => { exportar.textContent = "Exportar"; }, 2000);
     }
   });
-  acoes.appendChild(exportar);
 
-  // Ir para a transcrição, do lado de Copiar e Exportar.
-  //
-  // A ata afirma coisas, e a pergunta que ela provoca é sempre a mesma: "onde
-  // foi que isso foi dito?". Até aqui responder custava sair para Reuniões e
-  // achar a reunião na lista — a mesma reunião que já está aberta na tela.
-  //
-  // A revisão é um destino de Reuniões, então o ← de lá volta para a lista de
-  // reuniões, e não para cá. É de propósito: o trilho diz "Reuniões" porque é
-  // onde se está, e acender Atas mentiria sobre onde o voltar leva. Ver
-  // `destino` em app.js.
-  const verTranscricao = document.createElement("button");
-  verTranscricao.className = "aa-btn aa-btn-texto";
-  verTranscricao.type = "button";
-  verTranscricao.textContent = "Ver a transcrição";
-  verTranscricao.title = "Abrir a transcrição desta reunião, com os falantes e o áudio";
-  verTranscricao.addEventListener("click", () => abrirGravacao(gravacao));
-  acoes.appendChild(verTranscricao);
+  return [copiar, exportar];
+}
+
+// ───────────────────────────────────────── a ata na aba da reunião
+
+/**
+ * A ata de uma reunião, na aba Ata da reunião aberta (reuniao.js).
+ *
+ * É o que era o cartão da tela de Atas, sem a dobra e sem o título: numa aba
+ * que é só a ata, dobrá-la esconderia a única coisa que a aba mostra, e o
+ * título da reunião já está na barra do topo.
+ *
+ * @param aoContar recebe o número de pendências a cada vez que a ata é lida —
+ *   ao abrir e depois de cada geração. É o que mantém certo o selo da aba, que
+ *   nasceu do resumo da lista, lido antes de a ata nova existir.
+ */
+export async function montarAta(painel, g, { aoContar } = {}) {
+  let tipos, doProjeto;
+  try {
+    // O tipo de ata padrão do projeto (Ajustes › Clientes, plano 4a). Sem
+    // projeto, ou sem preferência, fica o primeiro da lista, como sempre foi.
+    [{ tipos }, doProjeto] = await Promise.all([
+      pedir("modelos-de-ata"),
+      g.cliente && g.projeto
+        ? pedir("prefs", { cliente: g.cliente, projeto: g.projeto })
+          .then((r) => r.prefs?.tipo_de_ata || null, () => null)
+        : null,
+    ]);
+  } catch (e) {
+    painel.replaceChildren(alerta(e.message, "erro"));
+    return;
+  }
+
+  const raiz = document.createElement("div");
+  raiz.className = "ata";
+  raiz.dataset.gravacao = g.caminho;
+
+  const topo = document.createElement("div");
+  topo.className = "ata__topo";
+  const escolha = campo("Tipo de ata", "select", {
+    id: `tipo-${g.nome}`,
+    opcoes: tipos.map((t) => t.nome),
+  });
+  escolha.classList.add("ata__tipo");
+  const padrao = tipos.find((t) => t.id === doProjeto);
+  if (padrao) escolha.querySelector("select").value = padrao.nome;
+  const botao = document.createElement("button");
+  botao.className = "aa-btn aa-btn-primario";
+  botao.type = "button";
+  botao.textContent = "Gerar ata";
+  botao.dataset.acao = "ata";
+  topo.append(escolha, botao);
+
+  const andamento = document.createElement("div");
+  andamento.className = "ata__painel";
+  const corpo = document.createElement("div");
+  corpo.className = "ata__corpo";
+  raiz.append(topo, andamento, corpo);
+  painel.replaceChildren(raiz);
+
+  const idDoTipo = () => {
+    const nome = escolha.querySelector("select").value;
+    return (tipos.find((t) => t.nome === nome) ?? tipos[0]).id;
+  };
+  const carregar = () => carregarAta(g, corpo, botao, aoContar);
+
+  botao.addEventListener("click", async () => {
+    botao.disabled = true;
+    try {
+      await pedir("gerar-ata", { gravacao: g.caminho, modelo: idDoTipo() });
+      acompanhar(g, botao, andamento, carregar);
+    } catch (e) {
+      botao.disabled = false;
+      andamento.replaceChildren(alerta(e.message, "erro"));
+    }
+  });
+
+  await carregar();
+  if (ataEmCurso(g.caminho)) acompanhar(g, botao, andamento, carregar);
+}
+
+/** Lê a ata do disco e a desenha aberta. Sem ata, o corpo fica vazio e o botão diz gerar. */
+async function carregarAta(g, corpo, botao, aoContar) {
+  let r;
+  try {
+    r = await pedir("ata", { gravacao: g.caminho });
+  } catch {
+    return;   // sem ata é o estado normal de quem nunca gerou
+  }
+  if (!r.ata) {
+    corpo.replaceChildren();
+    return;
+  }
+  botao.textContent = "Refazer ata";
+  botao.className = "aa-btn aa-btn-secundario";
+
+  const cabeca = document.createElement("div");
+  cabeca.className = "ata__cabeca";
+  const estado = document.createElement("p");
+  estado.className = "ata__estado";
+  const linhas = r.ata.split("\n").filter((l) => l.trim().length > 0).length;
+  const pendencias = (r.ata.match(/^- \[ \]/gm) ?? []).length;
+  aoContar?.(pendencias);
+  estado.textContent = pendencias > 0
+    ? `${pendencias} pendência${pendencias > 1 ? "s" : ""} · ${linhas} linhas`
+    : `${linhas} linhas`;
+  cabeca.append(estado, ...botoesDaAta(r.ata, g, cabeca));
 
   const texto = document.createElement("div");
   texto.className = "ata__texto";
-  texto.append(...renderizar(markdown));
+  texto.append(...renderizar(r.ata));
 
-  dobra.append(acoes, texto);
-  corpo.appendChild(dobra);
+  corpo.replaceChildren(cabeca);
+  if (r.ata_velha) {
+    corpo.appendChild(alerta(
+      "A transcrição foi corrigida depois que esta ata foi escrita. Vale refazer.", "aviso"));
+  }
+  corpo.appendChild(texto);
 }
 
 /**
@@ -315,8 +264,13 @@ function comNegrito(texto) {
   return nos;
 }
 
-/** A geração em curso, desenhada do registro do núcleo — como a transcrição. */
-function acompanhar(g, botao, painel, corpo) {
+/**
+ * A geração em curso, desenhada do registro do núcleo — como a transcrição.
+ *
+ * @param aoTerminar o que fazer quando a ata fica pronta: reler e desenhar.
+ *   Quem sabe onde a ata aparece é quem chamou.
+ */
+function acompanhar(g, botao, painel, aoTerminar) {
   botao.disabled = true;
   botao.textContent = "Escrevendo…";
 
@@ -343,16 +297,16 @@ function acompanhar(g, botao, painel, corpo) {
     estado.textContent = `${ETAPAS[t.etapa] ?? t.etapa}: ${t.texto}`;
     preenchimento.style.width = `${t.fracao >= 0 ? Math.round(t.fracao * 100) : 0}%`;
   };
-  const atual = emCurso(g.caminho);
+  const atual = ataEmCurso(g.caminho);
   if (atual) pintar(atual);
 
   const cancelarAssinatura = assinarTranscricoes(() => {
     if (!painel.isConnected) { cancelarAssinatura(); return; }
 
-    const rodando = emCurso(g.caminho);
+    const rodando = ataEmCurso(g.caminho);
     if (rodando) { pintar(rodando); return; }
 
-    const fim = ultimoResultado(g.caminho);
+    const fim = fimDaAta(g.caminho);
     if (!fim) return;
 
     cancelarAssinatura();
@@ -369,6 +323,6 @@ function acompanhar(g, botao, painel, corpo) {
     }
     if (fim.erro) { painel.replaceChildren(alerta(fim.erro, "erro")); return; }
 
-    mostrarAtaExistente(g, corpo, botao, true);
+    aoTerminar();
   });
 }

@@ -20,12 +20,12 @@ public static class V {
 # NUNCA matar um MeetingApp que já esteja rodando: ele pode estar no meio de
 # uma transcrição de meia hora, e derrubá-lo perde o trabalho sem aviso. Já
 # aconteceu — 11/08/2026, transcrição de 25 min morta na metade.
-if (Get-Process MeetingApp -ErrorAction SilentlyContinue) {
+if (Get-Process PulseMeet,MeetingApp -ErrorAction SilentlyContinue) {
   Write-Host "ja existe um MeetingApp aberto; feche-o antes (nao vou matar)."
   exit 1
 }
 $web = '\\wsl$\Ubuntu\home\andre\projects\meeting-transcription\app-net\App\web'
-$p = Start-Process 'C:\Users\andre\MeetingApp\MeetingApp.exe' -PassThru `
+$p = Start-Process 'C:\Users\andre\AppData\Local\Programs\MeetingApp\PulseMeet.exe' -PassThru `
      -ArgumentList (@('--web',$web,'--gravacoes',$Gravacoes) + $(if ($Tela) { @('--tela',$Tela) } else { @() }))
 Start-Sleep -Seconds $Espera
 if ($p.HasExited) { "MORREU: " + $p.ExitCode; exit 1 }

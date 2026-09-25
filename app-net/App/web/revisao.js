@@ -13,31 +13,10 @@
 import { pedir } from "/ponte.js";
 import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
          campoComSugestoes, preencherSugestoes, confirmar } from "/pecas.js";
-import { blocoDeNotas } from "/notas.js";
 import { listaDeTrechos } from "/lista-de-trechos.js";
+import { ouvir } from "/tocador.js";
 
 let estado = null;
-let aguardando = null;
-
-const audio = document.getElementById("audio");
-
-/**
- * Toca a gravação a partir de um instante.
- *
- * O arquivo é o mix — a mesma soma das faixas que o ASR ouviu —, então os
- * tempos da transcrição batem com o que se escuta. Sem isso, conferir se o
- * falante está certo exigiria abrir o WAV noutro programa e procurar o minuto
- * na mão.
- */
-function ouvirA(segundos) {
-  if (!audio.src) {
-    // Mapeado em JanelaDoApp: o WebView2 serve direto do disco, com Range, que
-    // é o que faz pular para o meio de um WAV de 200 MB ser instantâneo.
-    audio.src = `https://gravacoes.local/${encodeURIComponent(estado.gravacao.nome)}/mix.wav`;
-  }
-  audio.currentTime = segundos;
-  audio.play().catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
-}
 
 /**
  * Grava a transcrição, juntando edições próximas numa escrita só.
@@ -45,28 +24,35 @@ function ouvirA(segundos) {
  * Sem espera, renomear três falantes seguidos daria três gravações do arquivo
  * inteiro. Com ela, o trabalho de revisão vira uma escrita a cada segundo
  * parado — e nada se perde, porque cada edição reinicia a contagem.
+ *
+ * **A escrita é da reunião em que a edição foi feita.** O `estado` é de módulo
+ * e troca inteiro quando outra reunião abre; lê-lo na hora do disparo mandava,
+ * a quem trocasse de reunião nos 800 ms, os dados da reunião nova — e o nome
+ * dado na velha nunca chegava ao disco. Trocar de reunião também não cancela a
+ * espera da anterior: cada reunião tem o seu relógio.
  */
 function salvar() {
+  const alvo = estado;
   marcarEstado("salvando…");
-  clearTimeout(aguardando);
-  aguardando = setTimeout(async () => {
+  clearTimeout(alvo.aguardando);
+  alvo.aguardando = setTimeout(async () => {
     try {
       // Os nomes entram nos segmentos só na hora de gravar: durante a revisão
       // eles vivem à parte, para renomear em massa ser trocar uma entrada.
       const copia = {
-        ...estado.dados,
-        segments: estado.dados.segments.map((s) => ({
+        ...alvo.dados,
+        segments: alvo.dados.segments.map((s) => ({
           ...s,
-          speaker: nomeDe(s.speaker ?? "Unknown"),
+          speaker: alvo.nomes.get(s.speaker ?? "Unknown") ?? s.speaker ?? "Unknown",
         })),
       };
       await pedir("salvar-transcricao", {
-        gravacao: estado.gravacao.caminho,
+        gravacao: alvo.gravacao.caminho,
         conteudo: JSON.stringify(copia, null, 2),
       });
-      marcarEstado("salvo");
+      if (alvo === estado) marcarEstado("salvo");
     } catch (e) {
-      marcarEstado(`não salvou: ${e.message}`, true);
+      if (alvo === estado) marcarEstado(`não salvou: ${e.message}`, true);
     }
   }, 800);
 }
@@ -80,7 +66,6 @@ function marcarEstado(texto, erro = false) {
 
 export function abrirPainel(qual) {
   if (qual === "falantes") abrirFalantes();
-  else if (qual === "notas") abrirNotas();
   else if (qual === "exportar") abrirExportacao();
   else if (qual.startsWith("editar")) editar(Number(qual.split(":")[1] ?? 0));
 }
@@ -139,42 +124,14 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   const filtros = document.createElement("div");
   filtros.className = "filtros";
 
-  const botaoFalantes = document.createElement("button");
-  botaoFalantes.className = "aa-btn aa-btn-secundario";
-  botaoFalantes.type = "button";
-  botaoFalantes.textContent = "Falantes";
-  botaoFalantes.addEventListener("click", abrirFalantes);
-
-  // As notas escritas na reunião, ao lado da transcrição dela.
-  //
-  // Em gaveta pelo mesmo motivo dos falantes: mexer nelas sem perder o lugar no
-  // texto. Quem lê a transcrição dias depois quer conferir o que anotou na hora
-  // — e, quando a ata por LLM chegar, é este texto que vale mais que o que o
-  // modelo ouviu (FASE3.md §3).
-  const botaoNotas = document.createElement("button");
-  botaoNotas.className = "aa-btn aa-btn-secundario";
-  botaoNotas.type = "button";
-  botaoNotas.textContent = "Notas";
-  botaoNotas.addEventListener("click", abrirNotas);
-
-  const botaoExportar = document.createElement("button");
-  botaoExportar.className = "aa-btn aa-btn-primario";
-  botaoExportar.type = "button";
-  botaoExportar.textContent = "Exportar";
-  botaoExportar.addEventListener("click", abrirExportacao);
-
-  const parar = document.createElement("button");
-  parar.className = "aa-btn aa-btn-texto";
-  parar.type = "button";
-  parar.textContent = "⏸";
-  parar.title = "Parar o áudio";
-  parar.addEventListener("click", pararAudio);
-
   const estadoSalvo = document.createElement("span");
   estadoSalvo.className = "campo__dica";
   estadoSalvo.id = "estado-salvo";
 
-  ferramentas.append(busca, parar, estadoSalvo, botaoNotas, botaoFalantes, botaoExportar);
+  // Falantes e Exportar moram na barra do topo desde o plano 2b: são da reunião,
+  // e não da aba (reuniao.js). O ⏸ solto saiu junto — o tocador no pé da
+  // reunião é quem mostra que há áudio tocando (tocador.js).
+  ferramentas.append(busca, estadoSalvo);
 
   // As duas que destroem trabalho vão para um invólucro próprio, e o CSS o
   // empurra para a direita atrás de um fio. Antes elas eram apenas o sétimo e o
@@ -384,7 +341,7 @@ function linhaDoTrecho(seg, indice) {
     for (const o of corpo.querySelectorAll("[data-tocando]"))
       o.removeAttribute("data-tocando");
     linha.dataset.tocando = "true";
-    ouvirA(seg.start);
+    ouvir(estado.gravacao, seg.start).catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
   });
   linha.addEventListener("dblclick", () => editar(indice));
   return linha;
@@ -478,22 +435,6 @@ modal.addEventListener("close", () => {
 });
 
 // ───────────────────────────────────────────────────── falantes
-
-/**
- * A gaveta de notas.
- *
- * Monta um editor novo a cada abertura e o joga fora ao fechar: o bloco carrega
- * do disco ao montar e grava ao perder o foco, então guardá-lo entre aberturas
- * só criaria a chance de mostrar um texto velho depois de alguém editar o
- * arquivo por fora.
- */
-function abrirNotas() {
-  const corpo = document.getElementById("corpo-notas");
-  const bloco = blocoDeNotas(estado.gravacao.caminho, { linhas: 18 });
-  corpo.replaceChildren(bloco.raiz);
-  abrirGaveta("gaveta-notas");
-  bloco.campo.focus();
-}
 
 function abrirFalantes() {
   const corpo = document.getElementById("corpo-falantes");

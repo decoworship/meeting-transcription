@@ -2,7 +2,18 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <AssemblyName>MeetingApp</AssemblyName>
+    <!-- O executável se chama PulseMeet.exe desde 24/09/2026 (docs/MARCA.md), e
+         o título e o produto são o que o Gerenciador de Tarefas e as
+         propriedades do arquivo mostram. O MarcaTests confere os três contra o
+         Marca.Nome. -->
+    <AssemblyName>PulseMeet</AssemblyName>
+    <AssemblyTitle>PulseMeet</AssemblyTitle>
+    <Product>PulseMeet</Product>
+    <!-- O namespace fica no nome antigo, e escrito: o padrão do RootNamespace é
+         o AssemblyName, e com ele mudariam o namespace padrão e o nome de
+         qualquer recurso sem LogicalName. Os LogicalName daqui ("MeetingApp.web.",
+         que o Conteudo.cs monta por texto) também não mudam. -->
+    <RootNamespace>MeetingApp</RootNamespace>
     <TargetFramework>net8.0-windows</TargetFramework>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

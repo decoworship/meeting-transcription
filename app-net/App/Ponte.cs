@@ -61,6 +61,18 @@ internal sealed class Pedido
     [JsonPropertyName("pessoa")] public string? Pessoa { get; init; }
     [JsonPropertyName("indice")] public int? Indice { get; init; }
 
+    /// <summary>
+    /// O carimbo da amostra que a tela mostrou: o núcleo só age se o índice
+    /// ainda for ela (Vozes.Achar).
+    /// </summary>
+    [JsonPropertyName("criada_em")] public string? CriadaEm { get; init; }
+
+    /// <summary>
+    /// Quantas amostras a tela mostrou da pessoa, em apagar e juntar: o núcleo
+    /// recusa se já não são essas.
+    /// </summary>
+    [JsonPropertyName("amostras")] public int? Amostras { get; init; }
+
     /// <summary>De onde o diálogo de pasta começa.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
 
@@ -203,6 +215,9 @@ internal sealed class Resposta
 
     /// <summary>A biblioteca de vozes como a tela precisa vê-la.</summary>
     [JsonPropertyName("vozes")] public List<PessoaResumo>? Vozes { get; init; }
+
+    /// <summary>Pares de pessoas que parecem a mesma (Vozes.Parecidos), junto das vozes.</summary>
+    [JsonPropertyName("parecidos")] public List<ParDeVozes>? Parecidos { get; init; }
 
     /// <summary>A pasta escolhida no diálogo, ou nulo se foi cancelado.</summary>
     [JsonPropertyName("pasta")] public string? Pasta { get; init; }
@@ -431,8 +446,22 @@ internal sealed class PessoaResumo
     [JsonPropertyName("amostras")] public List<AmostraResumo> Amostras { get; init; } = [];
 }
 
+/// <summary>Duas pessoas que parecem a mesma, e o quanto.</summary>
+internal sealed class ParDeVozes
+{
+    [JsonPropertyName("a")] public required string A { get; init; }
+    [JsonPropertyName("b")] public required string B { get; init; }
+    [JsonPropertyName("semelhanca")] public double Semelhanca { get; init; }
+}
+
 internal sealed class AmostraResumo
 {
+    /// <summary>
+    /// O quanto ela se parece com o resto do perfil (Vozes.SemelhancaNoPerfil),
+    /// ou nulo sem com o que comparar. É o número da fila de revisão.
+    /// </summary>
+    [JsonPropertyName("semelhanca")] public double? Semelhanca { get; init; }
+
     /// <summary>A posição dentro do perfil: é por ela que se aprova ou esquece.</summary>
     [JsonPropertyName("indice")] public int Indice { get; init; }
     [JsonPropertyName("criada_em")] public required string CriadaEm { get; init; }
@@ -502,6 +531,22 @@ internal sealed class GravacaoResumo
     [JsonPropertyName("com_notas")] public bool ComNotas { get; init; }
 
     [JsonPropertyName("avisos")] public List<string> Avisos { get; init; } = [];
+
+    /// <summary>Os convidados da agenda por nome — é por eles que a busca acha a reunião.</summary>
+    [JsonPropertyName("nomes")] public List<string> Nomes { get; init; } = [];
+
+    /// <summary>
+    /// O estado da ata, para a lista dizer o que a reunião precisa sem abri-la.
+    /// Ver <c>Nucleo/EstadoDaAta.cs</c>.
+    /// </summary>
+    [JsonPropertyName("tem_ata")] public bool TemAta { get; init; }
+    [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
+    [JsonPropertyName("pendencias")] public int Pendencias { get; init; }
+    [JsonPropertyName("pendencias_inicio")] public List<string> PendenciasInicio { get; init; } = [];
+    [JsonPropertyName("resumo")] public string? Resumo { get; init; }
+
+    /// <summary>O começo das notas, para o painel. Ver <c>Notas.Inicio</c>.</summary>
+    [JsonPropertyName("notas_inicio")] public string? NotasInicio { get; init; }
 }
 
 /// <summary>Uma fala da legenda gravada, como a tela a recebe.</summary>
@@ -744,10 +789,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         // Ata mais velha que a transcrição significa que alguém
                         // corrigiu o texto depois — e a ata ficou desatualizada
                         // sem ninguém avisar.
-                        AtaVelha = File.Exists(caminho)
-                                   && File.Exists(Path.Combine(onde, "transcricao.json"))
-                                   && File.GetLastWriteTimeUtc(caminho)
-                                      < File.GetLastWriteTimeUtc(Path.Combine(onde, "transcricao.json")),
+                        AtaVelha = EstadoDaAta.EstaVelha(onde),
                     });
                     break;
                 }
@@ -854,12 +896,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "renomear-cliente":
-                    _projetos.RenomearCliente(p.Cliente ?? "", p.Nome ?? "");
+                    // Falso é nome em uso (ou alvo sumido): dizer, e não responder "ok"
+                    // com nada feito — a tela iria para o outro. Revisão final do 4a.
+                    if (!_projetos.RenomearCliente(p.Cliente ?? "", p.Nome ?? ""))
+                        throw new InvalidOperationException("não deu para renomear: já existe um cliente com esse nome, ou o cliente não existe mais");
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
                 case "renomear-projeto":
-                    _projetos.RenomearProjeto(p.Cliente ?? "", p.Projeto ?? "", p.Nome ?? "");
+                    // Falso é nome em uso (ou alvo sumido): dizer, e não responder "ok"
+                    // com nada feito — a tela iria para o outro. Revisão final do 4a.
+                    if (!_projetos.RenomearProjeto(p.Cliente ?? "", p.Projeto ?? "", p.Nome ?? ""))
+                        throw new InvalidOperationException("não deu para renomear: já existe um projeto com esse nome, ou o projeto não existe mais");
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
@@ -939,25 +987,36 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "vozes":
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id);
                     break;
 
+                // As ops da tela de vozes levam o criada_em da amostra que a
+                // tela mostrou; se o índice já é outra, nada muda e a tela
+                // ouve por quê (Vozes.Achar).
                 case "aprovar-voz":
-                    new Vozes().Aprovar(p.Pessoa ?? "", p.Indice ?? -1);
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id, new Vozes().Aprovar(p.Pessoa ?? "", p.Indice ?? -1, p.CriadaEm));
                     break;
 
                 case "esquecer-voz":
-                    new Vozes().Esquecer(p.Pessoa ?? "", p.Indice ?? -1);
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    ResponderVozes(p.Id, new Vozes().Esquecer(p.Pessoa ?? "", p.Indice ?? -1, p.CriadaEm));
+                    break;
+
+                case "mover-voz":
+                    ResponderVozes(p.Id, new Vozes().Mover(p.Pessoa ?? "", p.Indice ?? -1, p.Nome ?? "", p.CriadaEm));
+                    break;
+
+                case "apagar-voz":
+                    ResponderVozes(p.Id, new Vozes().Apagar(p.Pessoa ?? "", p.Amostras),
+                                   $"o perfil de {p.Pessoa} mudou desde que a tela o mostrou; nada foi apagado");
                     break;
 
                 case "juntar-vozes":
                     // Duas grafias do mesmo nome viram dois perfis, e dois
                     // perfis reconhecem pior que um: o centroide de cada um é
                     // mais fraco. Ver Vozes.Juntar.
-                    new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "");
-                    Responder(new Resposta { Id = p.Id, Vozes = VozesConhecidas() });
+                    int juntadas = new Vozes().Juntar(p.Pessoa ?? "", p.Nome ?? "", p.Amostras);
+                    ResponderVozes(p.Id, p.Amostras is null || juntadas > 0,
+                                   $"o perfil de {p.Pessoa} mudou desde que a tela o mostrou; nada foi juntado");
                     break;
 
                 case "salvar-config":
@@ -2538,7 +2597,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// ao lado. Separar em duas telas obrigaria a decidir sem a comparação, que
     /// é justamente o que a decisão exige.
     /// </remarks>
-    private static List<PessoaResumo> VozesConhecidas()
+    private void ResponderVozes(int id, bool fez = true,
+                                string motivo = "a biblioteca de vozes mudou; a tela foi atualizada")
+    {
+        var (vozes, parecidos) = VozesConhecidas();
+        Responder(new Resposta
+        {
+            Id = id, Vozes = vozes, Parecidos = parecidos,
+            Erro = fez ? null : motivo,
+        });
+    }
+
+    private static (List<PessoaResumo>, List<ParDeVozes>) VozesConhecidas()
     {
         var vozes = new Vozes();
         var lista = new List<PessoaResumo>();
@@ -2555,6 +2625,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 resumo.Amostras.Add(new AmostraResumo
                 {
                     Indice = i,
+                    Semelhanca = vozes.SemelhancaNoPerfil(pessoa, i) is double s
+                                     ? Math.Round(s, 2) : null,
                     CriadaEm = a.CriadaEm,
                     DuracaoS = a.DuracaoS,
                     Gravacao = a.Origem.Gravacao,
@@ -2576,7 +2648,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             }
             lista.Add(resumo);
         }
-        return lista;
+        var parecidos = vozes.Parecidos()
+            .Select(par => new ParDeVozes { A = par.A, B = par.B, Semelhanca = Math.Round(par.Semelhanca, 2) })
+            .ToList();
+        return (lista, parecidos);
     }
 
     /// <summary>
@@ -2679,12 +2754,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
         string? titulo = null;
         int convidados = 0;
+        var nomes = new List<string>();
         if (raiz.TryGetProperty("meeting", out var reuniao))
         {
             if (reuniao.TryGetProperty("title", out var t) && t.ValueKind == JsonValueKind.String)
                 titulo = t.GetString();
             if (reuniao.TryGetProperty("attendees", out var a) && a.ValueKind == JsonValueKind.Array)
+            {
                 convidados = a.GetArrayLength();
+                foreach (var n in a.EnumerateArray())
+                    if (n.ValueKind == JsonValueKind.String && n.GetString() is { Length: > 0 } nome)
+                        nomes.Add(nome);
+            }
         }
 
         // O vínculo com cliente/projeto vem junto na lista, e não por pedido
@@ -2699,6 +2780,11 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             avisos.Add("A transcrição foi interrompida antes de separar os falantes. "
                        + "Transcreva de novo para completá-la — o texto já pronto é aproveitado.");
 
+        // Na lista, e não num pedido por linha: são poucos campos por gravação,
+        // e um pedido por linha faria a lista piscar preenchendo-se aos poucos —
+        // o mesmo argumento do vínculo, logo acima.
+        var ata = EstadoDaAta.Ler(pasta);
+
         return new GravacaoResumo
         {
             Nome = Path.GetFileName(pasta),
@@ -2711,6 +2797,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Projeto = dados.Projeto,
             ComNotas = Notas.Existem(pasta),
             Avisos = avisos,
+            Nomes = nomes,
+            TemAta = ata.Existe,
+            AtaVelha = ata.Velha,
+            Pendencias = ata.Pendencias,
+            PendenciasInicio = [.. ata.PrimeirasPendencias],
+            Resumo = ata.Resumo,
+            NotasInicio = Notas.Inicio(pasta),
         };
     }
 }

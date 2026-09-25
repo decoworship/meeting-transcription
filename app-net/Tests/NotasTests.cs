@@ -120,4 +120,30 @@ public sealed class NotasTests : IDisposable
         Assert.Empty(Notas.TermosSugeridos(""));
         Assert.Empty(Notas.TermosSugeridos("tudo em minúsculas mesmo"));
     }
+
+    [Fact]
+    public void OInicioDasNotasJuntaAsLinhas()
+    {
+        Notas.Salvar(_pasta, "Definir o tom antes do desenho.\n\n[00:30:38] Carol manda as referências.");
+
+        Assert.Equal("Definir o tom antes do desenho. · [00:30:38] Carol manda as referências.",
+                     Notas.Inicio(_pasta));
+    }
+
+    [Fact]
+    public void SemNotasNaoHaInicio()
+    {
+        Assert.Null(Notas.Inicio(_pasta));
+    }
+
+    [Fact]
+    public void NotaLongaECortadaNumaPalavra()
+    {
+        Notas.Salvar(_pasta, string.Join(" ", Enumerable.Repeat("pendência", 40)));
+
+        string inicio = Notas.Inicio(_pasta, 50)!;
+
+        Assert.True(inicio.Length <= 51);
+        Assert.EndsWith("pendência…", inicio);
+    }
 }

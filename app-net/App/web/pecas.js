@@ -318,10 +318,10 @@ export function avisar(texto, opcoes = {}) {
  * @returns o texto aparado, ou nulo se a pessoa desistiu ou deixou vazio.
  */
 export function perguntarTexto(rotulo, valor = "", opcoes = {}) {
-  const { titulo = rotulo, ok = "Salvar" } = opcoes;
+  const { titulo = rotulo, ok = "Salvar", texto = "" } = opcoes;
 
   return new Promise((resolver) => {
-    const { dialogo, corpo, acoes } = caixa(titulo, "");
+    const { dialogo, corpo, acoes } = caixa(titulo, texto);
 
     const entrada = document.createElement("input");
     entrada.className = "aa-entrada";
@@ -473,4 +473,16 @@ export function pararAudio() {
 
   for (const o of document.querySelectorAll("[data-tocando]"))
     o.removeAttribute("data-tocando");
+}
+
+/** Um ícone do sprite do index.html (`#i-…`), por nó e sem innerHTML. */
+export function icone(id) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icone");
+  const uso = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  uso.setAttribute("href", `#${id}`);
+  svg.appendChild(uso);
+  return svg;
 }

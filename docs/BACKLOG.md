@@ -56,11 +56,20 @@ percurso ([FASE5-HANDOFF.md](FASE5-HANDOFF.md) §2). O acervo passou de 44
 gravações, e o uso deixou de ser "uma reunião por vez" — que é o regime em que
 todas as telas foram desenhadas.
 
-### UI-2 · A tela de vozes — `feature` · `aberto`
+### UI-2 · A tela de vozes — `feature` · feito em 25/09/2026
 
 Fila de revisão, play por amostra, ações por amostra (remover, mover, tirar da
 quarentena) e indicador de saúde por perfil. O desenho está escrito em
 [VOZES.md](VOZES.md) §6, e o modelo de dados já é o certo — falta a tela.
+
+**Feito em 25/09/2026** no plano 6 do redesenho
+([plano](superpowers/plans/2026-09-25-ui-06-vozes.md)): Ajustes › Vozes em
+mestre-detalhe, com "Para revisar" (play, semelhança, "É X" / "É outra pessoa"
+/ "Descartar"), a saúde por perfil ("boa" com quatro amostras em uso, "pouca
+voz" abaixo), "Fora de uso" dobrado e a sugestão de juntar do `VOZ-1`. O "Não
+são" da sugestão **não é guardado** — vale até fechar o app; guardar pede um
+campo novo no `vozes.json`. A "confusão entre perfis" do VOZES.md §4b não
+entrou: o núcleo não a calcula.
 
 **Por que subiu de prioridade sozinha:** a decisão de 20/08/2026 pôs a geração 1
 dos vetores fora de circulação. Hoje a biblioteca tem **três estados** para
@@ -68,7 +77,7 @@ explicar — quarentena, modelo antigo e geração antiga — e **só o primeiro
 ação**. A tela mostra 48 amostras apagadas com um motivo em texto, e não há por
 onde reagir a nenhuma delas.
 
-### UI-3 · Busca e filtro nas listas — `feature` · `aberto`
+### UI-3 · Busca e filtro nas listas — `feature` · feito em 24/09/2026
 
 Reuniões e Atas desenham **um cartão por gravação, sem corte, sem busca e sem
 filtro** ([app.js:73](../app-net/App/web/app.js#L73),
@@ -81,12 +90,25 @@ Achar a reunião de duas semanas atrás é rolar. Filtrar por cliente é o corte
 óbvio — cliente e projeto já estão no cartão, justamente porque é por eles que
 se procura.
 
-### UI-4 · O tempo marcado na nota não leva ao áudio — `feature` · `espera`
+**Feito**, pelo plano
+[2026-09-23-ui-01-reunioes-lista.md](superpowers/plans/2026-09-23-ui-01-reunioes-lista.md),
+e conferido pelo dono no acervo real em 24/09/2026: busca sem acento em título,
+cliente, projeto, convidados, data e estado; filtros de cliente, data (atalhos,
+um dia ou uma semana, de segunda a domingo) e estado; grupos por dia; o estado
+da ata na linha e o próximo passo num painel. **Ficou de fora, de propósito:** a
+busca no **conteúdo** das transcrições (pede op nova no núcleo), a vista de
+semana com calendário, e a lista de Atas, que continua como está até o plano 2
+trazer a ata para dentro da reunião.
+
+### UI-4 · O tempo marcado na nota não leva ao áudio — `feature` · `feito`
 
 `[00:12:34]` numa nota é texto. Na revisão, cada trecho já toca o áudio a partir
 dele; a nota podia fazer o mesmo, e o dado já está lá.
 
 **Gatilho:** usar "marcar momento" e querer ouvir aquele trecho.
+
+**Feito em 25/09/2026** (plano 2b): na aba Notas da reunião, cada linha com
+`[hh:mm:ss]` vira um botão que toca dali, pelo tocador fixo do pé.
 
 ### UI-5 · Atalhos de teclado — `feature` · `espera`
 
@@ -128,6 +150,18 @@ na varredura de contraste da Fase 5: todos exigem o app gravando ou
 transcrevendo, e o destino de teste não tem os motores. Nenhum usa cor fora de
 token, mas a conferência é de olho e nunca foi feita.
 Origem: [FASE5-HANDOFF.md](FASE5-HANDOFF.md) §6.2.
+
+### UI-10 · Renomear projeto não religa as reuniões — `bug` · `espera`
+
+Renomear um cliente ou projeto em Ajustes leva o vocabulário e as
+preferências, mas cada reunião guarda o vínculo com o nome antigo
+(`DadosDaReuniao`). Elas somem das contagens do projeto novo, do "Ver as
+reuniões deste projeto", e a correção da legenda passa a não achar
+vocabulário para elas. Hoje a tela só avisa, no pedido do nome novo.
+Gatilho: a primeira vez que alguém renomear e estranhar a contagem; aí,
+religar as reuniões do nome antigo na mesma operação, com a lista delas na
+confirmação.
+Origem: revisão final do plano 4a (`superpowers/plans/2026-09-25-ui-04a-clientes.md`).
 
 ---
 
@@ -181,7 +215,7 @@ engano.
 
 A tela é o **UI-2**. O que sobra aqui é o que não é tela.
 
-### VOZ-1 · Sugerir fusão de perfis parecidos — `feature` · `espera`
+### VOZ-1 · Sugerir fusão de perfis parecidos — `feature` · feito em 25/09/2026 (com o UI-2)
 
 *Fundir "Élio" ↔ "Elio" (0,93)?* — a mesma pessoa inscrita duas vezes com
 grafias diferentes é o defeito que a biblioteca acumula sozinha, e a distância
@@ -224,6 +258,19 @@ Por WebSocket local ([PLANO.md](PLANO.md) §2.1). Não depende de nada que as
 fases recentes mudaram.
 
 **Gatilho:** esquecer o mute do gravador de novo por causa do mute do Teams.
+
+### GRA-4 · "Gravar sem reunião da agenda" não tem como ser exato — `feature` · `espera`
+
+O `fixar-evento` só conhece "esta reunião" e "nenhuma escolhida", e "nenhuma
+escolhida" devolve a escolha ao automático do núcleo, que rotula a gravação
+com a reunião do momento (`pre_definido`). Por isso o Gravador **esconde** o
+botão sempre que há um `pre_definido` (plano 3, revisão final de 25/09/2026):
+ele só aparece quando gravar sem reunião é o que de fato acontece. A versão
+exata é um valor "nenhuma" no `fixar-evento` (`Bandeja/Gravador.Fixar`) que
+desliga o automático até a gravação terminar.
+
+**Gatilho:** querer gravar sem rótulo com uma reunião da agenda em curso — uma
+conversa de corredor no horário de uma reunião que não aconteceu.
 
 ---
 

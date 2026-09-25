@@ -9,10 +9,15 @@
 
 /* A altura da barra do topo, num lugar só.
  *
- * Dois blocos grudam abaixo dela — os controles da revisão e as abas dos
- * ajustes —, e cada um chutava o próprio valor. Um chute errado não quebra
- * nada visivelmente: o bloco só desliza para trás da barra e some, que foi
- * exatamente o defeito das abas em 12/08. */
+ * Os blocos que grudam abaixo dela — os controles da revisão, as abas da
+ * reunião e as dos ajustes, o painel de Reuniões — leem esta variável, e cada
+ * um chutava o próprio valor. Um chute errado não quebra nada visivelmente: o
+ * bloco só desliza para trás da barra e some, que foi exatamente o defeito das
+ * abas em 12/08 — e voltou em 24/09, quando a tipografia da Fase 5 fez a barra
+ * da reunião aberta medir 90 px contra estes 76.
+ *
+ * Por isso o valor daqui é só o da primeira pintura: o app.js mede a barra
+ * (ResizeObserver) e reescreve a variável sempre que ela muda de altura. */
 :root { --altura-da-barra: 4.75rem; }
 
 /* A cor do falante, legível como TEXTO nos dois temas.
@@ -197,8 +202,8 @@ html {
   top: 0;
   z-index: var(--z-suspenso);
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "voltar titulo" "voltar sub";
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas: "voltar titulo chip acoes" "voltar sub chip acoes";
   align-items: center;
   gap: 0 var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-6);
@@ -222,40 +227,411 @@ html {
   font-size: var(--texto-pequeno);
 }
 
+.barra__acoes {
+  grid-area: acoes;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--espaco-3);
+}
+.barra__acoes:empty { display: none; }
+
+/* Sem largura, as ações descem para uma linha própria, em vez de espremer o
+ * título. A barra muda de altura, e os blocos que grudam abaixo dela seguem —
+ * a altura é medida (app.js). */
+@media (max-width: 899px) {
+  .barra { grid-template-columns: auto 1fr; grid-template-areas: "voltar titulo" "voltar sub" "chip chip" "acoes acoes"; }
+  .chip-gravando { justify-self: start; margin-top: var(--espaco-2); }
+  .barra__acoes { justify-content: flex-start; margin-top: var(--espaco-2); }
+}
+
 /* ─────────────────────────────────────────────────────── lista */
 
 #tela { display: grid; gap: var(--espaco-3); align-content: start; }
 
-.gravacao {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--espaco-4);
-  align-items: center;
-  cursor: pointer;
-  text-align: left;
+.vazio { color: var(--cor-texto-suave); }
+
+/* ─────────────────────────────────────────────────────── reuniões
+ *
+ * Uma linha por gravação, agrupadas por dia, com busca e filtros por cima.
+ * O desenho está em docs/superpowers/specs/2026-09-23-ui-ux.md §3.3. */
+
+/* A página de documento do design system centraliza em 980 px e respira 64 px
+ * em cima; a lista com painel precisa da largura da janela. O width é o que
+ * conta: a .aa-pagina tem margin auto dentro da grade do .conteudo, e item de
+ * grade com margem automática encolhe até o conteúdo — tirar só o max-width
+ * deixava a lista em 896 px. E o border-box é o que impede o padding da página
+ * de somar aos 100% e empurrar os filtros para fora da janela. Mesmo remendo
+ * que a revisão já usa; a correção de fundo é o UI-8. */
+.aa-pagina:has(> .reunioes) {
+  box-sizing: border-box;
   width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}
+
+.reunioes { display: grid; gap: var(--espaco-4); }
+
+.reunioes__ferramentas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  align-items: center;
+}
+.reunioes__busca { flex: 1 1 18rem; }
+.reunioes__filtro { flex: 0 0 auto; width: auto; min-width: 11rem; }
+
+/* O filtro de data é um botão, e parece com os seletores ao lado — a seta
+ * inclusive, que o <select> ganha do sistema e o botão desenha aqui. Ligado,
+ * ele fica da cor de ação: é o único filtro cujo valor não se lê de relance
+ * pelo texto, porque "18 de setembro" parece rótulo. */
+.reunioes__data {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  text-align: left;
+  cursor: pointer;
+}
+.reunioes__data::after {
+  content: "";
+  flex: none;
+  width: .45em;
+  height: .45em;
+  margin-top: -.25em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+}
+.reunioes__data--ligada { border-color: var(--cor-acao); color: var(--cor-acao); }
+.reunioes__limpar-data { padding-inline: var(--espaco-2); }
+
+/* ─────────────────────────────────────────── a semana
+ *
+ * Colunas de cartões (reunioes.js, desenharSemana). O número de colunas é dito,
+ * e não deixado ao auto-fit: com ele, a 1200 px — a janela a 100% — o domingo
+ * caía sozinho na linha de baixo, e sábado e domingo entram juntos. Sem
+ * largura para sete, a grade fica em cinco, e os dois descem lado a lado. */
+.semana {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--espaco-3);
+  align-items: start;
+}
+.semana--sete { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+@media (max-width: 1099px) {
+  .semana--sete { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+.semana__sem-resultado { grid-column: 1 / -1; }
+
+/* O painel da reunião, por cima das colunas, à direita (reunioes.js). O
+ * display vem explícito: na janela estreita o painel da lista some, e este
+ * não é o da lista. */
+.semana__detalhe {
+  position: fixed;
+  top: calc(var(--altura-da-barra) + var(--espaco-4));
+  right: var(--espaco-6);
+  z-index: calc(var(--z-suspenso) - 1);
+  width: min(24rem, calc(100vw - 2 * var(--espaco-4)));
+  border-radius: var(--raio-grande);
+  box-shadow: var(--sombra-grande);
+}
+.semana__detalhe .reunioes__painel {
+  display: grid;
+  position: static;
+  max-height: calc(100vh - var(--altura-da-barra) - 2 * var(--espaco-4));
+}
+.semana__detalhe .reunioes__painel-titulo { padding-right: var(--espaco-6); }
+/* Quando abrir à direita cairia sobre o cartão que se acabou de clicar
+ * (mostrarDetalhe, reunioes.js): abre à esquerda em vez disso. */
+.semana__detalhe--esquerda { right: auto; left: var(--espaco-6); }
+.semana__fechar { position: absolute; top: var(--espaco-2); right: var(--espaco-2); z-index: 1; }
+.semana__cartao[aria-pressed="true"] { border-color: var(--cor-acao); background: var(--cor-acao-suave); }
+.semana__dia {
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-3);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+}
+.semana__dia--hoje { border-color: var(--cor-acao); }
+.semana__rotulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0 0 var(--espaco-1);
+  font-size: var(--texto-corpo);
+  font-weight: 700;
+  color: var(--cor-texto-forte);
+}
+.semana__cartao {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  min-width: 0;
+  width: 100%;
+  padding: var(--espaco-2) var(--espaco-3);
+  text-align: left;
   font: inherit;
   color: inherit;
+  background: var(--cor-fundo);
   border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-medio);
+  cursor: pointer;
 }
+.semana__cartao:hover { border-color: var(--cor-borda-forte); }
+.semana__cartao:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.semana__hora { font-family: var(--fonte-mono); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.semana__titulo { font-weight: 600; color: var(--cor-texto-forte); overflow-wrap: anywhere; }
+.semana__vinculo { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); overflow-wrap: anywhere; }
+.semana__aviso { font-size: var(--texto-rotulo); color: var(--cor-atencao); }
+.semana__cartao > .aa-etiqueta { margin-top: var(--espaco-1); }
+.semana__vazio { margin: 0; padding: var(--espaco-1); font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
 
-.gravacao:hover { border-color: var(--cor-borda-forte); }
-.gravacao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+/* Lista e Semana, e a navegação da semana, na barra do topo. */
+.vistas { display: inline-flex; gap: var(--espaco-1); }
+.semana-nav { display: inline-flex; align-items: center; gap: var(--espaco-1); }
+.semana-nav__seta { padding-inline: var(--espaco-3); }
+.semana-nav__hoje--agora { border-color: var(--cor-acao); color: var(--cor-acao); }
 
-.gravacao__titulo { font-weight: 600; margin: 0 0 var(--espaco-1); }
+/* ─────────────────────────────────────────── o painel que abre num botão
+ *
+ * popover.js. Preso à âncora, e não ao documento: rola junto com quem o abriu. */
+.popover__ancora { position: relative; display: inline-flex; }
+.popover {
+  position: absolute;
+  top: calc(100% + var(--espaco-1));
+  left: 0;
+  z-index: var(--z-suspenso);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--espaco-4));
+  padding: var(--espaco-4);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  box-shadow: var(--sombra-media);
+}
+.popover--a-direita { left: auto; right: 0; }
 
-.gravacao__meta {
-  color: var(--cor-texto-suave);
-  font-size: var(--texto-pequeno);
-  margin: 0;
+.filtro-data { display: grid; gap: var(--espaco-3); max-width: 20rem; }
+.filtro-data__atalhos { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
+.filtro-data__modo {
   display: flex;
-  gap: var(--espaco-3);
   flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+}
+.filtro-data__opcoes { display: inline-flex; gap: var(--espaco-1); }
+
+/* Um botão de ligar e desligar. Não é o .filtro dos falantes: lá o desligado
+ * fica apagado, e aqui desligado é só não escolhido. */
+.atalho {
+  border: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+}
+.atalho:hover { border-color: var(--cor-borda-forte); }
+.atalho[aria-pressed="true"] { background: var(--cor-acao-suave); border-color: var(--cor-acao); color: var(--cor-acao); }
+.atalho:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+
+/* ─────────────────────────────────────────── o calendário (calendario.js) */
+.calendario { display: grid; gap: var(--espaco-2); }
+.calendario__topo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; }
+.calendario__mes { text-align: center; font-weight: 600; color: var(--cor-texto-forte); }
+.calendario__anterior, .calendario__proximo { font-size: var(--texto-titulo-m); line-height: 1; }
+.calendario__grade { border-collapse: collapse; margin: 0 auto; }
+.calendario__grade th {
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+  padding-bottom: var(--espaco-1);
+}
+.calendario__grade td { padding: 1px; }
+.calendario__dia {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: var(--raio-pequeno);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  cursor: pointer;
+}
+.calendario__dia:hover { background: var(--cor-superficie-2); }
+.calendario__dia--fora { color: var(--cor-texto-suave); }
+.calendario__dia--na-faixa { background: var(--cor-acao-suave); color: var(--cor-acao); }
+.calendario__dia[aria-current="date"] { font-weight: 700; box-shadow: inset 0 0 0 1px var(--cor-acao); }
+.calendario__dia:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+/* O ponto dos dias com gravação: é o que responde "em que dia foi?" sem abrir
+ * dia por dia. O leitor de tela ouve o mesmo pelo rótulo do botão. */
+.calendario__ponto {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: var(--raio-pilula);
+  background: var(--cor-acao);
 }
 
-.gravacao__avisos { margin-top: var(--espaco-3); display: grid; gap: var(--espaco-2); }
+.reunioes__lista {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  overflow: hidden;
+}
 
-.vazio { color: var(--cor-texto-suave); }
+.reunioes__dia {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4) var(--espaco-2);
+  font: 700 var(--texto-rotulo) / 1.2 var(--fonte-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.reuniao-linha {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  gap: var(--espaco-3);
+  align-items: center;
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.reuniao-linha:last-child { border-bottom: 0; }
+.reuniao-linha:hover { background: var(--cor-linha-hover); }
+/* Por dentro, e não por fora: a lista tem overflow hidden, e um anel por fora
+ * seria cortado nas bordas. */
+.reuniao-linha:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+
+.reuniao-linha__hora {
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-rotulo);
+  color: var(--cor-texto-suave);
+}
+.reuniao-linha__textos { display: grid; gap: 2px; min-width: 0; }
+.reuniao-linha__titulo,
+.reuniao-linha__meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reuniao-linha__titulo { font-weight: 600; color: var(--cor-texto-forte); }
+.reuniao-linha__meta { font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.reuniao-linha__aviso {
+  font-size: var(--texto-rotulo);
+  color: var(--cor-atencao);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reunioes__vazio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+  padding: var(--espaco-5) var(--espaco-4);
+  color: var(--cor-texto-suave);
+}
+.reunioes__vazio p { margin: 0; }
+
+.reunioes__corpo {
+  display: grid;
+  /* O painel encolhe até 17rem na faixa de notebook, para a lista não ficar
+   * espremida entre 900 e 1100 px. */
+  grid-template-columns: minmax(0, 1fr) clamp(17rem, 32vw, 22rem);
+  gap: var(--espaco-4);
+  align-items: start;
+}
+
+.reuniao-linha[aria-pressed="true"],
+.reuniao-linha[aria-pressed="true"]:hover { background: var(--cor-acao-suave); }
+
+/* Gruda logo abaixo da barra do topo, que também é sticky — pela mesma
+ * variável que as abas dos ajustes e os controles da revisão já usam. */
+/* O painel rola sozinho quando o que ele mostra é mais alto que a janela.
+ * Sticky sem teto, o fim dele só aparecia quando a lista inteira rolava até o
+ * fim (percurso do dono, 24/09/2026). O teto parte de onde o painel começa com
+ * a lista no topo (--topo-do-painel, medido em reunioes.js), e não da barra:
+ * assim ele cabe inteiro antes e depois de grudar. */
+.reunioes__painel {
+  position: sticky;
+  top: calc(var(--altura-da-barra) + var(--espaco-4));
+  box-sizing: border-box;
+  max-height: calc(100vh - var(--topo-do-painel, 12rem) - var(--espaco-4));
+  overflow-y: auto;
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+}
+.reunioes__painel:empty { display: none; }
+
+.reunioes__painel-titulo {
+  margin: 0;
+  font-family: var(--fonte-display);
+  font-size: 1.3rem;
+  line-height: 1.2;
+  color: var(--cor-texto-forte);
+}
+.reunioes__painel-meta,
+.reunioes__painel-vinculo { margin: 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.reunioes__painel-resumo { margin: 0; color: var(--cor-texto-forte); }
+
+.reunioes__painel-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  padding-bottom: var(--espaco-3);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.reunioes__painel-secao { display: grid; gap: var(--espaco-1); }
+.reunioes__painel-secao p { margin: 0; }
+.reunioes__rotulo {
+  margin: 0;
+  font: 700 var(--texto-rotulo) / 1.2 var(--fonte-ui);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+.reunioes__pendencias {
+  margin: 0;
+  padding-left: var(--espaco-4);
+  display: grid;
+  gap: var(--espaco-1);
+  font-size: var(--texto-pequeno);
+}
+
+/* Sem largura para o painel, ele some, e o clique na linha abre a reunião
+ * (ESTREITA, em reunioes.js). Os dois números andam juntos. */
+@media (max-width: 899px) {
+  .reunioes__corpo { grid-template-columns: 1fr; }
+  .reunioes__painel { display: none; }
+}
+
 
 /* ──────────────────────────────────────────── preparar a transcrição */
 
@@ -285,6 +661,45 @@ html {
 select.aa-entrada { appearance: auto; }
 textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
+/* O rótulo do campo de etiquetas não é o <span> filho direto de .campo que a
+ * regra acima veste — é um <label> próprio, porque .campo__rotulo também
+ * aponta o "for" do campo de digitar. Mesmo peso visual do resto dos rótulos. */
+.campo__rotulo { font-size: var(--texto-pequeno); font-weight: 600; }
+
+/* O vocabulário como etiquetas: a caixa tem cara de campo, e as etiquetas
+ * quebram linha dentro dela antes do campo de digitar. */
+.etiquetas__caixa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: 2.5rem;
+  cursor: text;
+}
+.etiquetas__lista { display: contents; }
+.etiquetas__termo { gap: var(--espaco-1); padding-right: var(--espaco-1); }
+.etiquetas__tirar {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pilula);
+  cursor: pointer;
+}
+.etiquetas__tirar:hover { color: var(--cor-texto-forte); }
+.etiquetas__tirar:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.etiquetas__novo {
+  flex: 1 1 8rem;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--cor-texto);
+  font: inherit;
+  outline: none;
+}
+
 .acoes { display: flex; gap: var(--espaco-3); justify-self: start; align-items: center; }
 
 /* O estado da transcrição à esquerda e o "parar" à direita, na mesma linha
@@ -307,6 +722,24 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   border-radius: inherit;
   transition: width var(--transicao-lenta);
 }
+
+/* O preparo transcrevendo: o andamento em cima, as quatro etapas numa linha. */
+.preparo__andamento { display: grid; gap: var(--espaco-2); margin-bottom: var(--espaco-4); }
+.preparo__etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--texto-pequeno);
+}
+.preparo__etapas li { color: var(--cor-texto-suave); }
+.preparo__etapas li[data-estado="feita"]::before { content: "✓ "; color: var(--cor-acao); }
+.preparo__etapas li[data-estado="atual"] { color: var(--cor-texto-forte); font-weight: 600; }
+.preparo__resumo { margin: 0 0 var(--espaco-4); color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.preparo__motor > summary { cursor: pointer; color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.preparo__motor[open] > summary { margin-bottom: var(--espaco-3); }
 
 /* ────────────────────────────────────────────────── notas da reunião */
 
@@ -334,6 +767,27 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .notas__acoes { display: flex; gap: var(--espaco-2); }
 
+/* Os momentos marcados (UI-4): uma coluna de botões com a marca em mono. */
+.notas__momentos { display: grid; gap: var(--espaco-1); margin-top: var(--espaco-3); }
+.notas__momento {
+  display: block;
+  text-align: left;
+  padding: var(--espaco-1) var(--espaco-2);
+  border: 1px solid transparent;
+  border-radius: var(--raio-pequeno);
+  background: none;
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-pequeno);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notas__momento:hover { background: var(--cor-superficie-2); }
+.notas__momento:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.notas__marca { font-family: var(--fonte-mono); color: var(--cor-acao); }
+
 /* Os termos que as notas sugeriram, como etiquetas clicáveis. */
 .sugestoes {
   display: flex;
@@ -358,10 +812,130 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .revisao { display: grid; gap: var(--espaco-3); }
 
 /* O .aa-pagina do design system respira 64px em cima, que é o certo para uma
- * página de documento. A revisão não é uma: a barra de ferramentas gruda no
- * topo logo abaixo do cabeçalho, e esses 64px só empurram a transcrição para
+ * página de documento. A reunião aberta não é uma: na Transcrição, a barra de
+ * ferramentas gruda no topo logo abaixo das abas, e esses 64px só empurram a transcrição para
  * fora da janela — na tela em que mais se lê do app inteiro. */
-.aa-pagina:has(> .revisao) { padding-top: var(--espaco-5); }
+/* A reunião ocupa a largura da página inteira em qualquer aba. Sem o width, a
+ * .aa-pagina (margin auto num item de grade) encolhe até o conteúdo: a aba Ata
+ * ficava com 390 px no meio da tela, e a página pulava de largura a cada troca
+ * de aba. O border-box impede o padding de somar aos 100%. */
+/* Os 64px de baixo têm o mesmo defeito dos de cima (comentário acima): o
+ * tocador tem que encostar no pé de verdade (ref/aberta.png), e um respiro ali
+ * embaixo deixaria uma faixa de fundo entre ele e a borda da janela. O
+ * tocador já tem o próprio padding (--espaco-2/--espaco-3) para não colar o
+ * texto na régua. */
+.aa-pagina:has(> .reuniao-aberta) {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: var(--espaco-5);
+  padding-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────── a reunião aberta
+ *
+ * Transcrição · Ata · Notas (reuniao.js). A aba escolhida tem o fio embaixo
+ * e o texto forte; as outras, o texto suave. Ver o mockup, prancha "Reunião ·
+ * transcrição, ata e notas".
+ *
+ * **Coluna flexível, com altura mínima até o pé da janela.** O tocador tem que
+ * grudar no fundo mesmo numa reunião de dois trechos (ref/aberta.png) — sem
+ * altura mínima, a coluna encolhe até o conteúdo e o tocador flutua logo
+ * abaixo do último trecho, longe do pé. A conta desconta a barra do topo (a
+ * mesma --altura-da-barra que .reuniao-aberta__abas usa) e o respiro do topo
+ * da .aa-pagina desta tela (--espaco-5 — ver .aa-pagina:has(> .reuniao-aberta)
+ * mais abaixo, que também zera o respiro de baixo pelo mesmo motivo). Numa
+ * reunião comprida o painel da aba cresce além disso, a coluna passa da
+ * altura mínima, e quem rola é o .conteudo — o tocador continua grudado por
+ * ser sticky. */
+.reuniao-aberta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  --altura-das-abas: 2.5rem;
+  min-height: calc(100vh - var(--altura-da-barra) - var(--espaco-5));
+}
+
+/* O painel da aba aberta cresce para ocupar o que sobra da coluna — é o que
+ * empurra o tocador até o fim mesmo quando o conteúdo é curto. As abas têm
+ * altura fixa (--altura-das-abas) e por isso não crescem; o tocador também não
+ * cresce, só gruda embaixo. */
+.reuniao-aberta__painel { flex: 1 1 auto; }
+
+/* As abas grudam abaixo da barra do topo, como as de Ajustes: no minuto 50 de
+ * uma reunião de duas horas, anotar ou conferir a ata não pode custar rolar até
+ * o topo. A altura é fixa porque a barra da revisão gruda logo abaixo delas —
+ * são dois sticky irmãos, e sem a conta um cobre o outro (ver .controles). */
+.reuniao-aberta__abas {
+  display: flex;
+  gap: var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: calc(var(--z-suspenso) - 1);
+  box-sizing: border-box;
+  height: var(--altura-das-abas);
+  background: var(--cor-fundo);
+}
+.reuniao-aberta .controles { top: calc(var(--altura-da-barra) + var(--altura-das-abas)); }
+
+.reuniao-aberta__aba {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-1);
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: 600 var(--texto-corpo) / 1.2 var(--fonte-ui);
+  cursor: pointer;
+}
+.reuniao-aberta__aba:hover { color: var(--cor-texto-forte); }
+.reuniao-aberta__aba[aria-selected="true"] { color: var(--cor-texto-forte); border-bottom-color: var(--cor-acao); }
+.reuniao-aberta__aba:focus-visible { outline: none; box-shadow: var(--anel-foco); border-radius: var(--raio-pequeno); }
+
+.reuniao-aberta__conta {
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+  color: var(--cor-texto-suave);
+  background: var(--cor-superficie-2);
+  border-radius: var(--raio-pilula);
+  padding: 2px var(--espaco-2);
+}
+
+/* O tocador gruda no pé da janela, como as abas grudam no topo. É o último
+ * filho da reunião, e por isso o sticky o leva até o fim da rolagem. */
+.tocador {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-suspenso);
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+}
+.tocador__botao { min-width: 2.5rem; justify-content: center; }
+.tocador__tempo {
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+.tocador__posicao { flex: 1 1 auto; min-width: 0; accent-color: var(--cor-acao); }
+
+/* A dica ocupa o espaço da direita do pé, como na prancha (ref/aberta.png):
+ * some quando a janela é estreita, senão espremeria o botão e a régua. */
+.tocador__dica {
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .tocador__dica { display: none; }
+}
 
 /* Busca, estado e botões ficam colados no topo junto com os filtros: são as
  * ferramentas de revisar, e revisar é justamente percorrer o texto. Ter de
@@ -612,40 +1186,8 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 /* ─────────────────────────────────────────── a prévia ao vivo
  *
- * Duas colunas ENQUANTO GRAVA, uma coluna parado — é a decisão D1 da
- * docs/FASE7-FRONTEND.md. Quem manda é o data-aovivo que o gravador.js escreve,
- * e não uma classe trocada por JavaScript: assim o layout acompanha o estado do
- * gravador sem ninguém redesenhar nada. */
-.painel[data-aovivo="true"] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  align-items: start;
-  gap: var(--espaco-4);
-}
-/* **Tudo o que não é a prévia fica na coluna 1**, e sem esta linha o layout
- * quebra de um jeito que parece sobreposição: o `grid-row: 1 / -1` abaixo **não
- * atravessa linhas implícitas** — sem `grid-template-rows`, o `-1` resolve para
- * o fim da grade explícita, que tem uma linha só. A prévia ficava só na linha 1,
- * e os outros blocos, em posicionamento automático, fluíam pelas DUAS colunas:
- * a agenda ia parar na direita, debaixo da legenda. Visto em uso em 10/09/2026. */
-.painel[data-aovivo="true"] > *:not(.aovivo) { grid-column: 1; }
-
-/* A prévia ocupa a coluna da direita inteira; o resto empilha na esquerda. */
-.painel[data-aovivo="true"] > .aovivo {
-  grid-column: 2;
-  grid-row: 1 / -1;
-  position: sticky;
-  top: var(--espaco-4);
-}
-/* Parado não há prévia que valha: some, e a tela volta a ser a de sempre. */
-.painel[data-aovivo="false"] > .aovivo { display: none; }
-
-/* Numa janela estreita, duas colunas de 400 px não cabem — e é a tela do app
- * que está gravando, então ela nunca pode ficar apertada. Volta a empilhar. */
-@media (max-width: 1100px) {
-  .painel[data-aovivo="true"] { display: block; }
-  .painel[data-aovivo="true"] > .aovivo { position: static; }
-}
+ * A grade de duas colunas enquanto grava mora agora em .grav-grade (plano 3,
+ * decisão D-B): a legenda larga à esquerda, Notas · Perguntar em abas à direita. */
 
 /* A legenda que ainda vai ganhar falantes. Ao lado do título, e não no corpo:
  * é estado do bloco, não conteúdo dele. */
@@ -665,12 +1207,13 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   color: var(--cor-texto-suave);
 }
 
-.aovivo__topo { margin-bottom: var(--espaco-3); }
+.aovivo__topo { display: flex; align-items: center; justify-content: space-between; gap: var(--espaco-3); }
 .aovivo__dica { margin: var(--espaco-1) 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 
 /* A coluna rola sozinha: é o que permite reler o que foi dito há dez minutos
  * sem perder o fim, e o que o "voltar ao vivo" devolve. */
 .aovivo__corpo { max-height: 60vh; overflow-y: auto; }
+.grav-grade .aovivo__corpo { max-height: none; min-height: 0; flex: 1 1 auto; }
 
 .aovivo__voltar { margin-top: var(--espaco-2); width: 100%; }
 
@@ -806,6 +1349,64 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   border: 1px dashed var(--cor-borda);
   background: none;
 }
+
+/* ── A legenda em linhas (plano 3): tempo · Você/Outros · texto.
+ *
+ * Substitui os balões dentro do painel ao vivo — o preparo continua com eles.
+ * Três colunas fixas para o texto de todas as linhas começar no mesmo x, que é
+ * o que faz uma coluna larga ler como transcrição e não como conversa. */
+.aovivo .aovivo__corpo { gap: var(--espaco-3); padding: var(--espaco-4) 0; }
+.aovivo .fala {
+  display: grid;
+  grid-template-columns: 5.5rem 4.5rem minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--espaco-3);
+  max-width: none;
+  align-self: stretch;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+.aovivo .fala[data-dono="true"] { align-self: stretch; background: none; }
+.aovivo .fala__tempo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-pequeno);
+  color: var(--cor-texto-suave);
+  text-align: left;
+}
+.aovivo .fala[data-dono="true"] .fala__tempo { text-align: left; }
+.fala__dono { font-size: var(--texto-pequeno); font-weight: 600; color: var(--cor-texto-suave); }
+.fala[data-dono="true"] .fala__dono { color: var(--cor-acao); }
+.aovivo .fala__texto { color: var(--cor-texto-forte); line-height: 1.5; }
+.aovivo .fala--volatil { opacity: 1; border: 0; }
+.aovivo .fala--volatil .fala__texto,
+.aovivo .fala--volatil .fala__tempo { color: var(--cor-texto-suave); font-style: italic; }
+.fala__momento {
+  display: inline-flex;
+  margin-top: var(--espaco-2);
+  padding: 3px var(--espaco-3);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-destaque-bg);
+  color: var(--cor-destaque-texto);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+}
+.aovivo__selo { margin-left: var(--espaco-3); vertical-align: middle; }
+.aovivo__seguindo {
+  display: inline-flex; align-items: center; gap: var(--espaco-2);
+  font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
+}
+.aovivo__seguindo::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cor-sucesso);
+}
+.aovivo__seguindo[hidden] { display: none; }
+.aovivo__rodape {
+  margin: 0; padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+  font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
+}
+.aovivo__rodape:empty { display: none; }
 
 /* ───────────────────────────────────────────────────── falantes */
 
@@ -1063,6 +1664,237 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .obra strong { color: var(--cor-texto); }
 
+/* ─────────────────────────────────────────── o Gravador (plano 3)
+ *
+ * Dois estados sempre no DOM; quem troca é o data-gravando da raiz, pelo
+ * atributo `hidden` das duas seções. Nada aqui depende de JavaScript desenhar a
+ * cada 200 ms: as alturas são fixas para a tela não pular com o medidor. */
+/* A página inteira, como a lista: o gabarito ocupa a largura da janela, e o
+ * centralizado em 980 px do design system espremia a legenda — que é a coluna
+ * que mais precisa de largura. Mesmo remendo de .aa-pagina:has(> .reunioes). */
+.aa-pagina:has(> .gravador-tela) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}
+.gravador-tela { display: grid; gap: var(--espaco-4); }
+.grav-antes, .grav-gravando { display: grid; gap: var(--espaco-4); }
+.grav-antes[hidden], .grav-gravando[hidden] { display: none; }
+
+.grav-rotulo {
+  margin: 0;
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+/* ---- o herói */
+.grav-heroi {
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  align-items: start;
+  gap: var(--espaco-5);
+}
+.grav-heroi__texto { display: grid; gap: var(--espaco-3); align-content: start; }
+.grav-heroi__rotulo { color: var(--cor-acao); }
+.grav-heroi__titulo {
+  margin: 0;
+  font-family: var(--fonte-display);
+  font-size: var(--texto-display);
+  line-height: 1.15;
+  color: var(--cor-texto-forte);
+}
+.grav-heroi__fatos { margin: 0; color: var(--cor-texto-suave); }
+.grav-heroi__vinculo { display: flex; align-items: center; gap: var(--espaco-3); flex-wrap: wrap; }
+.grav-heroi__vinculo[hidden] { display: none; }
+.grav-heroi__dica { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.grav-heroi__acoes { display: flex; gap: var(--espaco-3); flex-wrap: wrap; margin-top: var(--espaco-3); }
+.grav-gravar::before {
+  content: ""; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--cor-erro); margin-right: var(--espaco-2);
+}
+
+/* O botão de cliente › projeto: pílula com a seta, como o filtro da lista. */
+.grav-vinculo {
+  display: inline-flex; align-items: center; gap: var(--espaco-2);
+  padding: 4px var(--espaco-3);
+  border: 1px solid var(--cor-borda-controle);
+  border-radius: var(--raio-pilula);
+  background: transparent;
+  color: var(--cor-texto-forte);
+  font: 600 var(--texto-pequeno) / 1.4 var(--fonte-ui);
+  cursor: pointer;
+}
+.grav-vinculo::after {
+  content: ""; width: 6px; height: 6px; margin-left: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+.grav-vinculo:hover { background: var(--cor-superficie-2); }
+.grav-vinculo:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.grav-vinculo__form { display: grid; gap: var(--espaco-3); padding: var(--espaco-4); width: 18rem; }
+
+/* ---- vai gravar */
+.grav-vai {
+  display: grid; gap: var(--espaco-3);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-fundo);
+}
+.grav-vai__item { display: grid; gap: 2px; }
+.grav-vai__nome { font-weight: 600; color: var(--cor-texto-forte); }
+.grav-vai__valor { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.grav-vai__trocar { font-size: var(--texto-pequeno); color: var(--cor-acao); }
+
+/* ---- hoje na agenda e a última gravação */
+.grav-antes__baixo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  align-items: start;
+  gap: var(--espaco-4);
+}
+.grav-agenda { gap: 0; padding: 0; }
+.grav-agenda > .bloco__topo { padding: var(--espaco-4) var(--espaco-5); border-bottom: 1px solid var(--cor-borda); }
+.grav-agenda__lista { display: grid; }
+.reuniao.grav-agenda__linha {
+  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  border-radius: 0;
+  padding: var(--espaco-3) var(--espaco-5);
+}
+.grav-agenda__linha .reuniao__titulo { margin: 0; }
+.grav-agenda__linha .reuniao__fatos:empty { display: none; }
+.grav-agenda__fim { display: flex; align-items: center; gap: var(--espaco-2); }
+.grav-agenda__dica, .grav-agenda__lista > .bloco__texto, .grav-agenda__lista > .aa-alerta {
+  margin: 0; padding: var(--espaco-3) var(--espaco-5);
+  font-size: var(--texto-pequeno); color: var(--cor-texto-suave);
+}
+.grav-resto .grav-agenda { order: -1; }
+
+.grav-ultima { gap: var(--espaco-2); }
+.grav-ultima[hidden] { display: none; }
+.grav-ultima__titulo { margin: var(--espaco-2) 0 0; font-weight: 600; color: var(--cor-texto-forte); }
+.grav-ultima__fatos { margin: 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.grav-ultima__estado { display: flex; justify-content: space-between; margin-top: var(--espaco-3); font-size: var(--texto-pequeno); }
+.grav-ultima__pct { color: var(--cor-texto-suave); font-variant-numeric: tabular-nums; }
+.grav-ultima__barra[hidden] { display: none; }
+.grav-ultima > .aa-btn { justify-self: start; margin-top: var(--espaco-3); }
+
+/* ---- a faixa gravando */
+.grav-faixa {
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(12rem, 16rem) auto;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-5);
+}
+.grav-faixa__tempo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--texto-titulo-g);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--cor-texto-forte);
+}
+.grav-faixa__info { display: grid; gap: var(--espaco-2); min-width: 0; }
+.grav-faixa__titulo {
+  margin: 0; font-weight: 600; color: var(--cor-texto-forte);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.grav-faixa__linha { display: flex; align-items: center; gap: var(--espaco-3); flex-wrap: wrap; }
+.grav-faixa__convidados { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.grav-faixa__medidores { display: grid; grid-template-columns: 1fr 1fr; gap: var(--espaco-4); }
+.grav-faixa__medidores .faixa { display: grid; grid-template-columns: 1fr; gap: var(--espaco-2); }
+.grav-faixa__medidores .faixa__nome { font-weight: 400; font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+.grav-faixa__medidores .medidor { height: 6px; }
+.medidor[data-morto="true"] { background: var(--cor-erro-bg); outline: 1px solid var(--cor-erro); }
+.faixa[data-mudo="true"] .medidor > div { background: var(--cor-texto-suave); }
+.grav-faixa__acoes { display: flex; gap: var(--espaco-2); }
+.grav-parar { color: var(--cor-erro); border-color: var(--cor-erro); }
+.grav-parar::before {
+  content: ""; width: 9px; height: 9px; margin-right: var(--espaco-2);
+  border: 1.5px solid currentColor; border-radius: 2px;
+}
+/* Mudo, a faixa inteira diz: a borda fica na cor do erro, e o aviso logo
+ * abaixo repete em palavras, com o Desmutar à mão. */
+.grav-faixa[data-mudo="true"] { border-color: var(--cor-erro); }
+
+.grav-avisos { display: grid; gap: var(--espaco-2); }
+.grav-avisos:empty { display: none; }
+.grav-avisos .aa-alerta { display: flex; align-items: center; gap: var(--espaco-3); }
+.grav-desmutar { margin-left: auto; }
+
+/* ---- a legenda e as abas (D-B) */
+.grav-grade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(18rem, 1fr);
+  gap: var(--espaco-4);
+  align-items: stretch;
+  height: max(26rem, calc(100vh - var(--altura-da-barra, 64px) - 13rem));
+}
+.grav-grade > * { min-height: 0; }
+.grav-grade > .aovivo { display: flex; flex-direction: column; gap: 0; padding: var(--espaco-4) var(--espaco-5); }
+.grav-grade > .aovivo > .aovivo__topo { padding-bottom: var(--espaco-3); margin-bottom: 0; border-bottom: 1px solid var(--cor-borda); }
+.grav-grade > [hidden] { display: none; }
+/* Sem legenda: as notas ficam largas, à esquerda, e o cartão explica ao lado. */
+.grav-grade[data-legenda="false"] > .grav-abas { grid-column: 1; grid-row: 1; }
+.grav-grade[data-legenda="false"] > .grav-sem-legenda { grid-column: 2; grid-row: 1; align-self: start; }
+
+.grav-abas { display: flex; flex-direction: column; gap: 0; padding: var(--espaco-3) var(--espaco-4) var(--espaco-4); }
+.grav-abas__lista { display: flex; gap: var(--espaco-2); padding-bottom: var(--espaco-3); border-bottom: 1px solid var(--cor-borda); }
+.grav-abas__aba {
+  padding: var(--espaco-2) var(--espaco-3);
+  border: 0; border-radius: var(--raio-medio);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: 600 var(--texto-corpo) / 1.2 var(--fonte-ui);
+  cursor: pointer;
+}
+.grav-abas__aba[hidden] { display: none; }
+.grav-abas__aba[aria-selected="true"] { background: var(--cor-superficie-2); color: var(--cor-texto-forte); }
+.grav-abas__aba:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.grav-abas__painel { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; padding-top: var(--espaco-3); }
+.grav-abas__painel[hidden] { display: none; }
+/* Dentro da aba o bloco de notas perde a moldura e o título: a aba já diz. */
+.grav-abas .notas, .grav-abas .perguntar { border: 0; padding: 0; background: none; flex: 1 1 auto; min-height: 0; }
+.grav-abas .notas { grid-template-rows: auto 1fr auto; }
+.grav-abas .notas__texto { height: 100%; resize: none; }
+/* O Marcar momento das notas mora na faixa enquanto grava. */
+.grav-abas .notas__acoes { display: none; }
+.grav-abas .perguntar > .bloco__titulo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.grav-abas__dica {
+  display: flex; justify-content: space-between; gap: var(--espaco-3);
+  margin: var(--espaco-2) 0 0; font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
+}
+.grav-abas .notas__topo { display: none; }
+
+.grav-sem-legenda[hidden] { display: none; }
+
+.grav-resto { display: grid; gap: var(--espaco-4); }
+
+.grav-selo { white-space: nowrap; }
+
+/* Janela estreita: nada lado a lado, e a grade perde a altura fixa. A tela do
+ * app que está gravando nunca pode ficar apertada. */
+@media (max-width: 1100px) {
+  .grav-faixa { grid-template-columns: auto auto minmax(0, 1fr); }
+  .grav-faixa__medidores { grid-column: 1 / -1; }
+  .grav-faixa__acoes { grid-column: 1 / -1; }
+}
+@media (max-width: 960px) {
+  .grav-heroi, .grav-antes__baixo, .grav-grade { grid-template-columns: minmax(0, 1fr); }
+  .grav-grade { height: auto; }
+  .grav-grade > .aovivo { height: 60vh; }
+  .grav-grade > .grav-abas { min-height: 24rem; }
+  .grav-grade[data-legenda="false"] > .grav-sem-legenda { grid-column: 1; grid-row: auto; }
+  .reuniao.grav-agenda__linha { grid-template-columns: minmax(0, 1fr) auto; }
+  .grav-agenda__linha .reuniao__hora { grid-column: 1 / -1; }
+}
+
 /* ────────────────────────────────────────────────────────── gravador */
 
 /* O cartão do estado. Tudo que muda a cada 200 ms está aqui dentro, e nada
@@ -1206,17 +2038,15 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 .ata { display: grid; gap: var(--espaco-3); }
 
-/* Título à esquerda, tipo e botão à direita: a escolha do tipo fica encostada
- * no botão que a usa, e não perdida no meio do cartão. */
-/* A coluna do botão tem largura fixa, e não `auto`.
- *
- * Com `auto` cada cartão media o próprio botão, e "Refazer ata" é mais largo
- * que "Gerar ata": o seletor e o botão dançavam de linha para linha, cada
- * cartão com um alinhamento diferente do vizinho. Numa lista, o que denuncia
- * isso não é um cartão — são dois, um debaixo do outro. */
+/* O tipo encostado no botão que o usa. A coluna do botão tem largura fixa, e
+ * não `auto`: "Refazer ata" e "Escrevendo…" são mais largos que "Gerar ata", e
+ * com `auto` o botão mudava de tamanho a cada troca de rótulo. Era pior quando
+ * a ata era um cartão numa lista — dois cartões um debaixo do outro, cada um
+ * alinhado de um jeito. */
 .ata__topo {
   display: grid;
-  grid-template-columns: 1fr auto 9.5rem;
+  grid-template-columns: auto 9.5rem;
+  justify-content: start;
   align-items: end;
   gap: var(--espaco-3);
 }
@@ -1224,6 +2054,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__topo > .aa-btn { width: 100%; }
 
 .ata__tipo { min-width: 14rem; margin: 0; }
+
+/* Na coluna do texto, para Copiar e Exportar não irem parar na outra ponta da tela. */
+.ata__corpo { max-width: 68ch; }
+.ata__cabeca { display: flex; align-items: center; gap: var(--espaco-2); flex-wrap: wrap; }
+.ata__estado { margin: 0 auto 0 0; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
 
 /* A ata lida: coluna estreita de propósito. Linha de 100 caracteres cansa, e
  * este é o texto que se lê inteiro, ao contrário da transcrição, que se
@@ -1252,8 +2087,6 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
 .ata__pendencia input { margin-right: var(--espaco-2); }
 
-.ata__acoes { display: flex; justify-content: flex-end; flex-wrap: wrap; }
-
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
 }
@@ -1263,22 +2096,343 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * ação aqui faria o usuário traduzir duas linguagens para o mesmo fato. */
 .trilho__ponto--gravando { background: var(--cor-erro); }
 
-/* A ata dobrada. Fechada por padrão: com onze reuniões na tela, abrir todas
- * transformava a página numa rolagem sem fim. */
-.ata__dobra { display: grid; gap: var(--espaco-2); }
 
-.ata__resumo {
+/* ── Ajustes › Clientes e projetos: mestre-detalhe (plano 4a do redesenho).
+ * O bloco perde o respiro interno: a lista e o detalhe encostam na borda dele,
+ * como na prancha, e cada parte põe o seu. */
+.clientes { padding: 0; gap: 0; overflow: hidden; }
+.clientes__cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.clientes__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.clientes > .campo__dica { padding: var(--espaco-5); }
+
+.clientes__corpo { display: grid; grid-template-columns: minmax(12rem, 16rem) 1fr; min-height: 30rem; }
+.clientes__mestre { border-right: 1px solid var(--cor-borda); min-width: 0; }
+.clientes__busca { display: block; width: calc(100% - 2 * var(--espaco-3)); margin: var(--espaco-3); }
+.clientes__nada { padding: var(--espaco-3) var(--espaco-4); }
+
+.clientes__cliente {
+  display: grid;
+  gap: var(--espaco-1);
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  color: var(--cor-acao);
-  font-size: var(--texto-pequeno);
-  font-weight: 600;
-  list-style: none;
-  padding: var(--espaco-2) 0;
+}
+.clientes__cliente:hover { background: var(--cor-superficie-2); }
+.clientes__cliente[aria-current="true"] { background: var(--cor-acao-suave); }
+.clientes__cliente:focus-visible,
+.clientes__projeto-topo:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+
+.clientes__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.clientes__sub { color: var(--cor-texto-suave); font-size: var(--texto-rotulo); margin: 0; }
+
+.clientes__detalhe { min-width: 0; }
+.clientes__detalhe-cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4) var(--espaco-5);
+  border-bottom: 1px solid var(--cor-borda);
+}
+.clientes__detalhe-nome { margin: 0 0 var(--espaco-1); font-size: var(--texto-corpo); }
+.clientes__detalhe-acoes { display: flex; gap: var(--espaco-2); }
+.clientes__detalhe-acoes .popover { left: auto; right: 0; }
+.clientes__menu { display: grid; gap: var(--espaco-1); }
+.clientes__menu .aa-btn { justify-content: flex-start; }
+.clientes__vazio { padding: var(--espaco-4) var(--espaco-5); }
+
+.clientes__projeto { border-bottom: 1px solid var(--cor-borda); }
+.clientes__projeto-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: var(--espaco-4) var(--espaco-5);
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.clientes__projeto-topo:hover { background: var(--cor-superficie-2); }
+.clientes__projeto--aberto > .clientes__projeto-topo { background: var(--cor-acao-suave); }
+.clientes__projeto-nome { display: grid; gap: var(--espaco-1); min-width: 0; }
+.clientes__tipo {
+  display: grid;
+  justify-items: end;
+  gap: var(--espaco-1);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+  text-align: right;
+}
+.clientes__resumo { opacity: .8; }
+
+.clientes__projeto-corpo {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-3) var(--espaco-5) var(--espaco-5);
+}
+.clientes__campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: var(--espaco-3);
+}
+.clientes__campos .aa-entrada { min-width: 0; width: 100%; }
+.clientes__acoes { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2); }
+.clientes__ver { margin-right: auto; padding-left: 0; text-decoration: underline; }
+.clientes__perigo { color: var(--cor-erro); }
+.clientes__mais {
+  display: grid;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-4);
+  border-top: 1px solid var(--cor-borda);
 }
 
-/* O triângulo padrão do <details> é do navegador e destoa do resto; a seta
- * própria gira ao abrir. */
-.ata__resumo::-webkit-details-marker { display: none; }
-.ata__resumo::before { content: "▸ "; display: inline-block; transition: transform var(--transicao-rapida); }
-.ata__dobra[open] > .ata__resumo::before { transform: rotate(90deg); }
-.ata__resumo:focus-visible { outline: var(--anel-foco); }
+/* Estreito, a lista de clientes vai para cima do detalhe. */
+@media (max-width: 1100px) {
+  .clientes__corpo { grid-template-columns: 1fr; }
+  .clientes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
+  .clientes__lista { max-height: 14rem; overflow: auto; }
+}
+
+/* Mestre-detalhe precisa da largura da janela, como a lista de Reuniões: o
+ * mesmo remendo da .aa-pagina (ver .aa-pagina:has(> .reunioes)), só quando
+ * a seção aberta é Clientes. */
+.aa-pagina:has(.clientes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}
+
+/* Uma seta só nos seletores de Clientes: o DS já desenha a dele, e o
+ * appearance:auto global (select.aa-entrada) punha a do navegador junto. */
+.clientes select.aa-entrada { appearance: none; }
+
+/* A marca e a versão no pé do menu de Ajustes. */
+.abas__versao {
+  margin: var(--espaco-4) 0 0;
+  padding: 0 var(--espaco-3);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+}
+/* Na agenda do Gravador a escolhida é marcada pela etiqueta ("a próxima",
+ * "escolhida"), como no gabarito; o fundo de ação da lista antiga brigava com o
+ * botão principal do herói, que é o azul da tela. */
+.reuniao.grav-agenda__linha[data-escolhida="true"] { background: none; border-color: var(--cor-borda); }
+
+/* O chip de gravando, no cabeçalho das outras telas (spec §3.1). Pílula com o
+ * ponto vermelho do gravador; o relógio em dígitos tabulares para não dançar. */
+.chip-gravando {
+  grid-area: chip;
+  display: inline-flex; align-items: center; gap: var(--espaco-2);
+  padding: 4px var(--espaco-3);
+  border: 1px solid var(--cor-erro);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-erro-bg);
+  color: var(--cor-texto-forte);
+  font: 600 var(--texto-pequeno) / 1.4 var(--fonte-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip-gravando[hidden] { display: none; }
+.chip-gravando:hover { background: var(--cor-superficie-2); }
+.chip-gravando:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.chip-gravando__ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--cor-erro); }
+.chip-gravando[data-mudo="true"] .chip-gravando__ponto { background: var(--cor-destaque); }
+
+/* A bandeirinha do momento: no botão da faixa e na etiqueta da legenda. */
+.grav-marcar .icone, .fala__momento .icone {
+  width: 16px; height: 16px; flex: none;
+}
+.grav-marcar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
+.fala__momento { align-items: center; gap: var(--espaco-2); }
+.fala__momento .icone { width: 13px; height: 13px; }
+
+/* ── Ajustes › Vozes: mestre-detalhe (plano 6 do redesenho, UI-2). O mesmo
+ * esqueleto de Clientes: o bloco sem respiro, a lista e o detalhe encostados
+ * na borda, cada parte pondo o seu. */
+.vozes { padding: 0; gap: 0; overflow: hidden; }
+.vozes__cabeca { padding: var(--espaco-5); border-bottom: 1px solid var(--cor-borda); }
+.vozes__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.vozes__corpo { display: grid; grid-template-columns: minmax(14rem, 17rem) 1fr; min-height: 34rem; }
+.vozes__mestre {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--cor-borda);
+  min-width: 0;
+}
+
+.vozes__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0;
+  border-bottom: 1px solid var(--cor-borda);
+  background: transparent;
+  color: var(--cor-texto);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.vozes__item:hover { background: var(--cor-superficie-2); }
+.vozes__item[aria-current="true"] { background: var(--cor-acao-suave); }
+.vozes__item:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.vozes__textos { display: grid; gap: var(--espaco-1); min-width: 0; }
+.vozes__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.vozes__sub { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); }
+
+.vozes__contagem {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-rotulo);
+  font-weight: 700;
+}
+.vozes__contagem[data-zero="true"] { background: var(--cor-superficie-2); color: var(--cor-texto-suave); }
+
+.vozes__rotulo {
+  margin: 0;
+  padding: var(--espaco-4) var(--espaco-4) var(--espaco-2);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* A saúde é uma pílula: verde quando basta, âmbar quando falta voz. */
+.vozes__saude {
+  flex: none;
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pilula);
+  font-size: var(--texto-rotulo);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vozes__saude[data-saude="boa"] { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+.vozes__saude[data-saude="pouca"] { background: var(--cor-atencao-bg); color: var(--cor-atencao); }
+
+.vozes__pessoas { flex: 1; }
+.vozes__vazio { padding: var(--espaco-3) var(--espaco-4); }
+
+.vozes__fora { border-top: 1px solid var(--cor-borda); }
+.vozes__fora > summary {
+  padding: var(--espaco-3) var(--espaco-4);
+  font-size: var(--texto-pequeno);
+  font-weight: 600;
+  cursor: pointer;
+}
+.vozes__fora > summary:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.vozes__fora-texto { margin: 0; padding: 0 var(--espaco-4) var(--espaco-3); }
+
+.vozes__detalhe { min-width: 0; padding-bottom: var(--espaco-5); }
+.vozes__detalhe-cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5) var(--espaco-5) var(--espaco-4);
+}
+.vozes__detalhe-nome { margin: 0 0 var(--espaco-1); font-family: var(--fonte-titulo, inherit); font-size: var(--texto-titulo-m); }
+.vozes__detalhe-cabeca .vozes__sub { font-size: var(--texto-pequeno); }
+.vozes__detalhe-acoes { display: flex; align-items: center; gap: var(--espaco-2); }
+.vozes__detalhe-acoes .popover,
+.vozes__amostra-acoes .popover { left: auto; right: 0; }
+
+.vozes__fila { display: grid; gap: var(--espaco-3); padding: 0 var(--espaco-5); }
+.vozes__nada { margin: 0; }
+
+.vozes__caso,
+.vozes__sugestao {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-superficie);
+}
+.vozes__caso-topo { display: flex; align-items: flex-start; gap: var(--espaco-3); }
+.vozes__caso-textos { display: grid; gap: var(--espaco-1); min-width: 0; flex: 1; }
+.vozes__marcada { margin: 0; font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.vozes__proc { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); overflow-wrap: anywhere; }
+.vozes__motivo { margin: 0; color: var(--cor-texto-suave); font-size: var(--texto-rotulo); font-style: italic; }
+.vozes__semelhanca {
+  display: inline-block;
+  padding: var(--espaco-1) var(--espaco-3);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-rotulo);
+  white-space: nowrap;
+}
+.vozes__respostas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2); }
+.vozes__caso .vozes__respostas { padding-left: calc(2.5rem + var(--espaco-3)); }
+.vozes__perigo { color: var(--cor-erro); }
+.vozes__sugestao {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border-style: dashed;
+  background: transparent;
+}
+
+/* O play da fila é maior: é o gesto principal ali. */
+.tocar--grande { width: 2.5rem; height: 2.5rem; flex: none; }
+.tocar--grande svg { width: 15px; height: 15px; }
+
+.vozes__amostras, .vozes__inertes { padding: 0 var(--espaco-5); }
+.vozes__inertes { margin-top: var(--espaco-4); }
+.vozes__inertes > .vozes__rotulo { padding-left: 0; }
+.vozes__amostra {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-2);
+  border-top: 1px solid var(--cor-borda);
+}
+.vozes__amostra[data-quarentena="true"] { background: var(--cor-atencao-bg); }
+/* Apagada e não colorida: não é alerta, é coisa inerte (VOZES.md §8). */
+.vozes__amostra[data-inerte="true"] { opacity: .55; }
+.vozes__amostra-acoes { display: flex; align-items: center; gap: var(--espaco-2); }
+.vozes__menu { display: grid; gap: var(--espaco-1); min-width: 11rem; }
+.vozes__menu .aa-btn { justify-content: flex-start; }
+
+.vozes-obra { margin: 0; }
+
+/* Estreito, a lista de pessoas vai para cima do detalhe. */
+@media (max-width: 1100px) {
+  .vozes__corpo { grid-template-columns: 1fr; }
+  .vozes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
+  .vozes__pessoas { max-height: 16rem; overflow: auto; }
+}
+.aa-pagina:has(.vozes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
+}

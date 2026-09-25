@@ -336,7 +336,7 @@ public sealed class Vozes
     /// Guarda uma amostra, marcando para revisão se ela destoar do perfil.
     /// </summary>
     /// <returns>A amostra como ficou — o chamador precisa saber se caiu em quarentena.</returns>
-    public AmostraDeVoz Aprender(string pessoa, AmostraDeVoz amostra)
+    private AmostraDeVoz AprenderNaTrava(string pessoa, AmostraDeVoz amostra)
     {
         if (!_dados.Pessoas.TryGetValue(pessoa, out var perfil))
         {
@@ -479,11 +479,9 @@ public sealed class Vozes
     /// Sem isto, uma condição nova ficaria para sempre fora do reconhecimento e
     /// a pessoa deixaria de ser reconhecida justamente onde ela mudou.
     /// </remarks>
-    public bool Aprovar(string pessoa, int indice)
+    private bool AprovarNaTrava(string pessoa, int indice, string? criadaEm = null)
     {
-        if (!_dados.Pessoas.TryGetValue(pessoa, out var perfil)
-            || indice < 0 || indice >= perfil.Amostras.Count)
-            return false;
+        if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
 
         perfil.Amostras[indice].Quarentena = false;
         Gravar();
@@ -501,11 +499,9 @@ public sealed class Vozes
     }
 
     /// <summary>Tira uma amostra do perfil — o que a revisão humana decide.</summary>
-    public bool Esquecer(string pessoa, int indice)
+    private bool EsquecerNaTrava(string pessoa, int indice, string? criadaEm = null)
     {
-        if (!_dados.Pessoas.TryGetValue(pessoa, out var perfil)
-            || indice < 0 || indice >= perfil.Amostras.Count)
-            return false;
+        if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
 
         string? trecho = perfil.Amostras[indice].Trecho;
         perfil.Amostras.RemoveAt(indice);
@@ -550,7 +546,7 @@ public sealed class Vozes
     /// parecida sem que ninguém tivesse pedido, que é o erro caro.
     /// </para>
     /// </remarks>
-    public int Juntar(string de, string para)
+    private int JuntarNaTrava(string de, string para, int? amostras = null)
     {
         de = (de ?? "").Trim();
         para = (para ?? "").Trim();
@@ -558,6 +554,7 @@ public sealed class Vozes
         if (de.Length == 0 || para.Length == 0) return 0;
         if (string.Equals(de, para, StringComparison.Ordinal)) return 0;
         if (!_dados.Pessoas.TryGetValue(de, out var origem)) return 0;
+        if (amostras is int n && n != origem.Amostras.Count) return 0;
 
         if (!_dados.Pessoas.TryGetValue(para, out var destino))
         {
@@ -576,6 +573,179 @@ public sealed class Vozes
         Registro.Escrever("vozes", $"'{de}' juntado a '{para}' — {quantas} amostra(s)");
         return quantas;
     }
+
+    /// <summary>
+    /// A amostra que a tela mostrou, e não outra que caiu no mesmo índice.
+    /// </summary>
+    /// <remarks>
+    /// A tela manda o índice e o <c>criada_em</c> da amostra que desenhou. Entre
+    /// o desenho e o clique a biblioteca pode ter mudado — uma transcrição
+    /// aprendendo, outra ação que tirou uma amostra antes desta —, e aí o mesmo
+    /// índice é outra voz. Sem o carimbo vale o índice, como sempre valeu.
+    /// </remarks>
+    private bool Achar(string pessoa, int indice, string? criadaEm, out PerfilDeVoz perfil)
+    {
+        if (!_dados.Pessoas.TryGetValue(pessoa ?? "", out perfil!)
+            || indice < 0 || indice >= perfil.Amostras.Count)
+            return false;
+        return criadaEm is not { Length: > 0 }
+               || string.Equals(perfil.Amostras[indice].CriadaEm, criadaEm, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// O quanto uma amostra se parece com o resto do perfil dela — o número da
+    /// fila de revisão.
+    /// </summary>
+    /// <returns>
+    /// A mesma conta que decidiu a quarentena (<see cref="Semelhanca"/>, o melhor
+    /// sub-perfil), contra o perfil <b>sem ela</b>. Nulo quando não há com o que
+    /// comparar: a amostra é inerte, ou é a única do modelo dela.
+    /// </returns>
+    /// <remarks>Só lê: não muda a quarentena nem o reconhecimento.</remarks>
+    public double? SemelhancaNoPerfil(string pessoa, int indice)
+    {
+        if (!Achar(pessoa, indice, null, out var perfil)) return null;
+        var a = perfil.Amostras[indice];
+        if (RegrasDe(a) != RegrasAtuais) return null;
+
+        string modelo = ModeloDe(a);
+        var resto = new PerfilDeVoz
+        {
+            Amostras = [.. perfil.Amostras.Where((o, i) => i != indice && Conta(o, modelo))],
+        };
+        if (resto.Amostras.Count == 0) return null;
+        return Semelhanca(a.Vetor, resto, modelo);
+    }
+
+    /// <summary>
+    /// Passa uma amostra para outra pessoa — "é outra pessoa", na revisão.
+    /// </summary>
+    /// <remarks>
+    /// Sai da quarentena: quem ouviu o trecho decidiu de quem é a voz, e é esse
+    /// julgamento que a quarentena esperava. Mover para quem não existe cria a
+    /// pessoa; tirar a última amostra de alguém apaga o perfil vazio, como o
+    /// <see cref="Esquecer"/> faz.
+    /// </remarks>
+    private bool MoverNaTrava(string pessoa, int indice, string para, string? criadaEm = null)
+    {
+        para = (para ?? "").Trim();
+        // Estes dois são erro de quem pediu, e não a biblioteca ter mudado:
+        // dizem o motivo em vez de cair no "false" da recusa por carimbo.
+        if (para.Length == 0) throw new ArgumentException("falta o nome de para quem mover");
+        if (string.Equals(pessoa, para, StringComparison.Ordinal))
+            throw new ArgumentException($"a amostra já é de {para}");
+        if (!Achar(pessoa, indice, criadaEm, out var perfil)) return false;
+
+        var a = perfil.Amostras[indice];
+        perfil.Amostras.RemoveAt(indice);
+        if (perfil.Amostras.Count == 0) _dados.Pessoas.Remove(pessoa);
+
+        if (!_dados.Pessoas.TryGetValue(para, out var destino))
+        {
+            destino = new PerfilDeVoz();
+            _dados.Pessoas[para] = destino;
+        }
+        a.Quarentena = false;
+        destino.Amostras.Add(a);
+
+        Gravar();
+        Registro.Escrever("vozes", $"amostra de '{pessoa}' movida para '{para}'");
+        return true;
+    }
+
+    /// <summary>Esquece uma pessoa inteira, com os trechos de áudio dela.</summary>
+    /// <param name="amostras">
+    /// Quantas amostras a tela mostrou; se já não são essas, recusa — a pessoa
+    /// mudou por baixo (o mesmo papel do <c>criada_em</c> nas ops por amostra).
+    /// </param>
+    private bool ApagarNaTrava(string pessoa, int? amostras = null)
+    {
+        if (!_dados.Pessoas.TryGetValue(pessoa ?? "", out var perfil)) return false;
+        if (amostras is int n && n != perfil.Amostras.Count) return false;
+
+        foreach (var a in perfil.Amostras)
+        {
+            if (a.Trecho is not { Length: > 0 }) continue;
+            try { File.Delete(Path.Combine(_pasta, a.Trecho)); }
+            catch (IOException) { /* o áudio some depois; o vetor já saiu */ }
+        }
+        _dados.Pessoas.Remove(pessoa!);
+
+        Gravar();
+        Registro.Escrever("vozes", $"'{pessoa}' apagado — {perfil.Amostras.Count} amostra(s)");
+        return true;
+    }
+
+    /// <summary>
+    /// Pares de pessoas que parecem a mesma — o <c>VOZ-1</c>, "Élio" e "Elio".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// O centróide de cada pessoa sai das amostras que contam no modelo de
+    /// sempre, e o corte é o <see cref="LimiarDeReconhecimento"/>: acima dele o
+    /// próprio reconhecimento já confundiria as duas, e é esse o sinal de que
+    /// são uma. Só sugere — juntar continua sendo de quem lê (<see cref="Juntar"/>).
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<(string A, string B, double Semelhanca)> Parecidos()
+    {
+        var centros = new List<(string Nome, float[] Centro)>();
+        foreach (var nome in Pessoas())
+        {
+            var vetores = _dados.Pessoas[nome].Amostras
+                .Where(a => Conta(a, ModeloDeVozPadrao)).Select(a => a.Vetor).ToList();
+            if (vetores.Count > 0) centros.Add((nome, Centroide(vetores)));
+        }
+
+        var pares = new List<(string, string, double)>();
+        for (int i = 0; i < centros.Count; i++)
+            for (int j = i + 1; j < centros.Count; j++)
+            {
+                double s = Cosseno(centros[i].Centro, centros[j].Centro);
+                if (s >= LimiarDeReconhecimento) pares.Add((centros[i].Nome, centros[j].Nome, s));
+            }
+        return [.. pares.OrderByDescending(p => p.Item3)];
+    }
+
+    /// <summary>
+    /// A trava de toda escrita no vozes.json, no processo inteiro.
+    /// </summary>
+    /// <remarks>
+    /// Cada instância guarda uma cópia da biblioteca, e gravar reescreve o
+    /// arquivo inteiro a partir dela. Uma transcrição abre a sua no começo e
+    /// aprende no fim; se a tela apagou uma pessoa no meio, a cópia velha a
+    /// trazia de volta sem os trechos. Por isso toda mudança relê o arquivo
+    /// dentro da trava e aplica sobre o que está no disco agora — o que ela
+    /// decide (limiares, quarentena) continua o mesmo.
+    /// </remarks>
+    private static readonly object Trava = new();
+
+    private T Mudando<T>(Func<T> mudanca)
+    {
+        lock (Trava)
+        {
+            _dados = Carregar();
+            return mudanca();
+        }
+    }
+
+    /// <inheritdoc cref="AprenderNaTrava"/>
+    public AmostraDeVoz Aprender(string pessoa, AmostraDeVoz amostra) => Mudando(() => AprenderNaTrava(pessoa, amostra));
+
+    /// <inheritdoc cref="AprovarNaTrava"/>
+    public bool Aprovar(string pessoa, int indice, string? criadaEm = null) => Mudando(() => AprovarNaTrava(pessoa, indice, criadaEm));
+
+    /// <inheritdoc cref="EsquecerNaTrava"/>
+    public bool Esquecer(string pessoa, int indice, string? criadaEm = null) => Mudando(() => EsquecerNaTrava(pessoa, indice, criadaEm));
+
+    /// <inheritdoc cref="MoverNaTrava"/>
+    public bool Mover(string pessoa, int indice, string para, string? criadaEm = null) => Mudando(() => MoverNaTrava(pessoa, indice, para, criadaEm));
+
+    /// <inheritdoc cref="ApagarNaTrava"/>
+    public bool Apagar(string pessoa, int? amostras = null) => Mudando(() => ApagarNaTrava(pessoa, amostras));
+
+    /// <inheritdoc cref="JuntarNaTrava"/>
+    public int Juntar(string de, string para, int? amostras = null) => Mudando(() => JuntarNaTrava(de, para, amostras));
 
     public string CaminhoDoTrecho(string relativo) => Path.Combine(_pasta, relativo);
 

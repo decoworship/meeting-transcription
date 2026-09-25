@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Monta o instalador do MeetingApp — o artefato que se entrega a outra pessoa.
+# Monta o instalador do PulseMeet — o artefato que se entrega a outra pessoa.
 #
 # Irmão do publicar.sh, e com a mesma filosofia: **réguas objetivas antes de
 # produzir o artefato**, porque cada uma delas corresponde a um defeito que já
@@ -58,20 +58,23 @@ export PATH="$HOME/.dotnet:$PATH"
 VERSAO=$(grep -oP '(?<=<Version>)[^<]+' "$RAIZ/app-net/Directory.Build.props")
 [[ -n "$VERSAO" ]] || { echo "ERRO: não achei <Version> em Directory.Build.props" >&2; exit 1; }
 
-echo "==> MeetingApp $VERSAO"
+echo "==> PulseMeet $VERSAO"
 
 if (( ! PULAR_BUILD )); then
   "$RAIZ/tools/publicar.sh" --so-build
 else
   echo "==> pulando o build, a pedido (--pular-build)"
-  [[ -f "$PUBLICADO/MeetingApp.exe" ]] || {
-    echo "ERRO: --pular-build, mas não há $PUBLICADO/MeetingApp.exe" >&2; exit 1; }
+  [[ -f "$PUBLICADO/PulseMeet.exe" ]] || {
+    echo "ERRO: --pular-build, mas não há $PUBLICADO/PulseMeet.exe" >&2; exit 1; }
 fi
 
 echo "==> montando o payload em $PAYLOAD"
 rm -rf "$PAYLOAD"
 mkdir -p "$PAYLOAD"
-cp "$PUBLICADO/MeetingApp.exe" "$PUBLICADO/WebView2Loader.dll" "$PAYLOAD/"
+cp "$PUBLICADO/PulseMeet.exe" "$PUBLICADO/WebView2Loader.dll" "$PAYLOAD/"
+# O que reponta os atalhos de quem tinha o MeetingApp.exe (docs/MARCA.md); o .iss
+# o instala e o roda no fim.
+cp "$RAIZ/tools/repontar_atalhos.ps1" "$PAYLOAD/"
 cp "$RAIZ/docs/INSTALAR.md" "$RAIZ/CHANGELOG.md" "$PAYLOAD/"
 cp "$RAIZ/assets/logo.ico" "$PAYLOAD/"
 
@@ -92,12 +95,12 @@ reprovar() { echo "ERRO: $1" >&2; exit 1; }
 # O publicar.sh já conferiu tamanho, ícones e ausência de token. Estas são as do
 # INSTALADOR, e a plateia é outra: aqui o defeito viaja.
 
-bytes=$(stat -c%s "$PAYLOAD/MeetingApp.exe")
-(( bytes > 10000000 )) || reprovar "MeetingApp.exe tem $bytes bytes — as flags não pegaram."
+bytes=$(stat -c%s "$PAYLOAD/PulseMeet.exe")
+(( bytes > 10000000 )) || reprovar "PulseMeet.exe tem $bytes bytes — as flags não pegaram."
 
 # Nada secreto no artefato entregue. O do HuggingFace saiu na Fase 4; o do Google
 # fica, por decisão registrada em docs/FASE4.md §4 — e a régua é sobre o outro.
-tokens=$(strings "$PAYLOAD/MeetingApp.exe" | grep -c "hf_[A-Za-z0-9]\{20,\}" || true)
+tokens=$(strings "$PAYLOAD/PulseMeet.exe" | grep -c "hf_[A-Za-z0-9]\{20,\}" || true)
 (( tokens == 0 )) || reprovar "achei $tokens token(s) do HuggingFace no binário."
 
 # A versão do binário tem que ser a mesma do instalador. Sem isto, "Aplicativos
@@ -109,7 +112,7 @@ tokens=$(strings "$PAYLOAD/MeetingApp.exe" | grep -c "hf_[A-Za-z0-9]\{20,\}" || 
 # "\x2e0.1.0+<sha>" e um "^" nunca casaria. E `grep -c ... || true` em vez de
 # `grep -q`, senão o pipefail transforma o SIGPIPE do strings em reprovação do
 # binário correto — o mesmo tropeço que o publicar.sh documenta.
-versoes=$(strings "$PAYLOAD/MeetingApp.exe" | grep -cF "$VERSAO+" || true)
+versoes=$(strings "$PAYLOAD/PulseMeet.exe" | grep -cF "$VERSAO+" || true)
 (( versoes > 0 )) || reprovar "o binário não carrega a versão $VERSAO — rode sem --pular-build."
 
 # ── os motores ───────────────────────────────────────────────────────────────
@@ -240,7 +243,7 @@ lote="$SAIDA/compilar.cmd"
 
 (cd /mnt/c && /mnt/c/Windows/System32/cmd.exe /c "$(wslpath -w "$lote")") | tail -20
 
-FINAL="$SAIDA/MeetingApp-$VERSAO-instalador.exe"
+FINAL="$SAIDA/PulseMeet-$VERSAO-instalador.exe"
 [[ -f "$FINAL" ]] || reprovar "o ISCC terminou mas não produziu $FINAL"
 
 # A última régua, e é sobre o artefato inteiro: um instalador pequeno demais não

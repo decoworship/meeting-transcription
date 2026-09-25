@@ -3,6 +3,47 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.8.0 — 25/09/2026
+
+**O app ganhou cara nova.** É o redesenho de interface que começou em
+23/09, tela por tela, sobre a proposta do dono do produto.
+
+**Reuniões.** A lista ganhou busca, filtros por estado e por dia, e grupos por
+dia; cada reunião diz o que falta nela, e um painel ao lado oferece o próximo
+passo. A **semana** mostra as reuniões num calendário, com um ponto nos dias
+que têm gravação — o painel troca de lado para não cobrir o cartão clicado.
+
+**A reunião aberta** tem abas — **Transcrição · Ata · Notas** — e a ata deixou
+de ser uma tela à parte. **Falantes** e **Exportar** foram para o cabeçalho, e
+um **tocador fixo no pé** substitui o ⏸ solto: clicar num trecho toca dali, e
+trocar de reunião para o som. Nas notas, cada linha com `[hh:mm:ss]` vira um
+botão que toca daquele ponto.
+
+**Transcrever** ficou mais curto: o vocabulário é um campo de etiquetas (Enter
+ou vírgula separam, colar uma lista separa sozinho), as opções do motor dobram
+numa linha, e enquanto transcreve o andamento aparece no topo e o formulário
+vira uma linha de resumo — parar ou dar erro devolve o formulário.
+
+**O Gravador** foi redesenhado. Antes da reunião, a próxima da agenda é o
+destaque, com o que vai ser gravado e a última gravação à mão. Gravando, a faixa
+de cima traz o tempo, os dois níveis, Marcar momento, Mutar e Parar; a legenda
+ao vivo ocupa a coluna larga, e **Notas e Perguntar** viram abas à direita.
+Cliente e projeto podem ser trocados no meio da gravação, e as outras telas
+mostram que há uma gravação correndo.
+
+**Ajustes › Clientes e projetos** virou mestre-detalhe: clientes à esquerda,
+os projetos do escolhido à direita, e cada projeto com vocabulário, idioma,
+modelo, falantes e o **tipo de ata padrão**, que a aba Ata passa a usar. Tirar
+o último termo, ou voltar ao padrão, agora limpa de verdade.
+
+**Ajustes › Vozes** também: as amostras que soaram diferente ficam numa fila
+para revisar, com play e três respostas; cada pessoa mostra a saúde do perfil;
+perfis parecidos aparecem como sugestão de juntar. Uma transcrição rodando ao
+mesmo tempo não desfaz mais o que se apaga, move ou junta nessa tela.
+
+**O executável passa a se chamar `PulseMeet.exe`**, e os atalhos de quem tinha
+o `MeetingApp.exe` são repontados na atualização.
+
 ## 0.7.1 — 22/09/2026
 
 **O torch saiu do app.** A diarização e o reconhecimento de vozes rodavam sobre

@@ -57,6 +57,24 @@ public static class Notas
     }
 
     /// <summary>
+    /// O começo das notas numa linha só, para o painel da lista. Nulo sem notas.
+    /// </summary>
+    /// <remarks>
+    /// As linhas se juntam com " · " e não com espaço: uma nota é uma lista de
+    /// coisas soltas, e juntá-las numa frase inventaria uma frase que ninguém
+    /// escreveu.
+    /// </remarks>
+    public static string? Inicio(string pastaDaGravacao, int limite = 200)
+    {
+        string junto = string.Join(" · ", Ler(pastaDaGravacao)
+            .Replace("\r", "")
+            .Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0));
+        return junto.Length == 0 ? null : Corte.NumaPalavra(junto, limite);
+    }
+
+    /// <summary>
     /// Grava o que foi escrito, ou apaga o arquivo quando não sobrou nada.
     /// </summary>
     /// <remarks>

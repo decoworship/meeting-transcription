@@ -9,6 +9,7 @@
 // falha mais boba que este bloco pode ter.
 
 import { pedir } from "/ponte.js";
+import { momentosDasNotas } from "/reuniao-regras.js";
 
 const ATRASO_MS = 800;
 
@@ -28,6 +29,9 @@ function relogio(segundos) {
  *        gravação correndo. Sem ela, não há botão de marcar momento.
  * @param opcoes.aoMudar chamado depois de cada gravação bem-sucedida, com os
  *        termos que o núcleo achou no texto.
+ * @param opcoes.aoTocar `(segundos) => void`. Com ela, as linhas com tempo
+ *        marcado (`[00:12:34]`) viram botões que tocam dali — UI-4 do BACKLOG.
+ *        Só a reunião a passa: no Gravador a gravação ainda está correndo.
  */
 export function blocoDeNotas(gravacao, opcoes = {}) {
   const raiz = document.createElement("div");
@@ -63,18 +67,59 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
     marcar.className = "aa-btn aa-btn-secundario";
     marcar.type = "button";
     marcar.textContent = "Marcar momento";
-    marcar.addEventListener("click", () => {
-      const marca = `\n[${relogio(opcoes.tempo())}] `;
-      const pos = campo.selectionStart ?? campo.value.length;
-      campo.value = campo.value.slice(0, pos) + marca + campo.value.slice(pos);
-      campo.focus();
-      campo.selectionStart = campo.selectionEnd = pos + marca.length;
-      agendar();
-    });
+    marcar.addEventListener("click", () => marcarMomento());
     acoes.appendChild(marcar);
   }
 
   raiz.append(topo, campo, acoes);
+
+  /**
+   * Põe o tempo de agora onde está o cursor.
+   *
+   * @param focar leva o cursor ao campo depois. O Gravador passa `false` quando
+   *   a aba de Notas não está à vista: tirar o foco de quem digita uma pergunta
+   *   para pôr num campo escondido é o F-2 da FASE7-FRONTEND.
+   */
+  function marcarMomento({ focar = true } = {}) {
+    if (!opcoes.tempo || campo.disabled) return false;
+    const marca = `\n[${relogio(opcoes.tempo())}] `;
+    const pos = campo.selectionStart ?? campo.value.length;
+    campo.value = campo.value.slice(0, pos) + marca + campo.value.slice(pos);
+    if (focar) campo.focus();
+    campo.selectionStart = campo.selectionEnd = pos + marca.length;
+    agendar();
+    return true;
+  }
+
+  // Os momentos marcados, como botões que tocam dali (UI-4). Uma lista ao lado
+  // do campo, e não dentro dele — uma <textarea> não tem botão —, refeita a
+  // cada tecla sem tocar no campo: quem escreve não perde o cursor (F-2).
+  let momentos = null;
+  function desenharMomentos() {
+    if (!momentos) return;
+    const botoes = momentosDasNotas(campo.value).map((m) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "notas__momento";
+      const marca = document.createElement("span");
+      marca.className = "notas__marca";
+      marca.textContent = m.marca;
+      b.append(marca, document.createTextNode(m.texto ? ` ${m.texto}` : ""));
+      b.title = `Ouvir a partir de ${m.marca}`;
+      b.addEventListener("click", () => opcoes.aoTocar(m.segundos));
+      return b;
+    });
+    momentos.replaceChildren(...botoes);
+    momentos.hidden = botoes.length === 0;
+  }
+  if (opcoes.aoTocar) {
+    momentos = document.createElement("div");
+    momentos.className = "notas__momentos";
+    momentos.setAttribute("aria-label", "Momentos marcados");
+    momentos.hidden = true;
+    raiz.appendChild(momentos);
+    campo.addEventListener("input", desenharMomentos);
+  }
 
   // ─────────────────────────────────────────────────────── salvar
 
@@ -125,6 +170,7 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
       // começar, a resposta pode chegar depois da primeira tecla.
       if (campo.value === "" || campo.value === ultimoSalvo) campo.value = r.notas ?? "";
       ultimoSalvo = campo.value;
+      desenharMomentos();
       carregado = true;
       estado.textContent = campo.value ? "salvo" : "";
       opcoes.aoMudar?.(r.termos ?? []);
@@ -151,6 +197,7 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
         trocando = false;
       }
     },
+    marcarMomento,
     /** Grava agora, sem esperar o atraso. Para quem está saindo da tela. */
     salvarAgora: salvar,
     definirHabilitado(ligado, aviso = "") {
