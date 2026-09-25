@@ -255,7 +255,11 @@ export function abrirAjustes(aba) {
 export function abrirGravador() {
   navegar();
   destino("ir-gravador");
-  return telaDoGravador({ cabecalho, tela });
+  return telaDoGravador({
+    cabecalho, tela, acoesDaBarra,
+    abrirGravacao: (g) => abrirGravacao(g),
+    abrirAjustes: (aba) => abrirAjustes(aba),
+  });
 }
 
 // ─────────────────────────────────────────────────────────── ligação

@@ -32,9 +32,14 @@ export function novaLinha(linha, pedaco) {
   return linha.palavras >= PALAVRAS_DE_LINHA_LONGA && pausa >= PAUSA_EM_LINHA_LONGA_S - 1e-9;
 }
 
-/** "Você"/"Outros" só na primeira linha de uma sequência do mesmo dono. */
+/**
+ * "Outros" só na primeira linha de uma sequência dos outros; "Você" em toda
+ * linha sua (spec §3.2 e a prancha grav-gravando.png). A repetição que
+ * incomodava era a dos outros, quebrada em várias linhas pela pausa — a sua
+ * fala é o que se procura na tela, e o nome ao lado é o que a acha.
+ */
 export function mostraDono(anterior, dono) {
-  return !anterior || anterior.dono !== dono;
+  return dono === true || !anterior || anterior.dono !== dono;
 }
 
 export function contarPalavras(texto) {

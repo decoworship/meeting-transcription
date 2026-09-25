@@ -259,15 +259,156 @@ def prova_legenda_quebra_na_pausa(pagina) -> None:
 prova_legenda_quebra_na_pausa.antes = GRAVANDO
 
 
-PROVAS = [prova_monta, prova_legenda_quebra_na_pausa]
+def texto(pagina, seletor: str) -> str:
+    return (pagina.text_content(seletor) or "").strip()
+
+
+def prova_antes_heroi(pagina) -> None:
+    conferir(texto(pagina, "#subtitulo") == "pronto para gravar", "o subtítulo diz \"pronto para gravar\"")
+    rotulo = texto(pagina, ".grav-heroi__rotulo")
+    conferir(rotulo.startswith("Próxima na agenda · começa em") and "min" in rotulo,
+             f"o herói diz quando a próxima começa ({rotulo!r})")
+    conferir(texto(pagina, ".grav-heroi__titulo") == "Comunicação Beegol + App", "com o título da reunião")
+    fatos = texto(pagina, ".grav-heroi__fatos")
+    conferir("7 convidados · organizada por algar.com.br" in fatos, f"horário, convidados e organizador ({fatos!r})")
+    conferir(texto(pagina, ".grav-heroi .grav-vinculo") == "Algar › Agentes"
+             and "o mesmo da última reunião com este título" in texto(pagina, ".grav-heroi__vinculo"),
+             "sugere o cliente › projeto da última reunião com este título")
+    conferir(pagina.is_visible("text=Gravar esta reunião") and pagina.is_visible("text=Gravar sem reunião da agenda"),
+             "os dois botões de gravar")
+    vai = pagina.eval_on_selector_all(".grav-vai__valor", "els => els.map((e) => e.textContent)")
+    conferir(vai == ["Headset AN01 Hands-Free", "Alto-falantes (Realtek Audio)", "andre@beegol.com"],
+             f"\"Vai gravar\" diz microfone, áudio da reunião e a conta ({vai})")
+    conferir(pagina.is_visible("text=Trocar em Ajustes › Gravação"), "com o link para Ajustes")
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "sem rolagem lateral")
+
+
+def prova_antes_agenda(pagina) -> None:
+    fins = pagina.eval_on_selector_all(".grav-agenda__linha",
+        "els => els.map((e) => e.lastElementChild.textContent.trim())")
+    conferir(fins == ["gravada", "gravada", "a próxima", "Gravar esta"],
+             f"hoje na agenda: gravada, gravada, a próxima, Gravar esta ({fins})")
+    conferir("três horas" in texto(pagina, ".grav-agenda__dica"), "com a dica das três horas")
+    pagina.click(".grav-agenda__linha[data-evento='e4'] >> text=Gravar esta")
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    ops = [q["op"] for q in pagina.evaluate("() => window.__pedidos")
+           if q["op"] in ("fixar-evento", "gravar")]
+    fix = pedidos(pagina, "fixar-evento")
+    conferir(ops == ["fixar-evento", "gravar"] and fix[0]["evento"] == "e4",
+             f"\"Gravar esta\" numa linha fixa a reunião e grava ({ops})")
+    conferir(not pedidos(pagina, "salvar-reuniao"),
+             "e não leva a sugestão do herói, que era de outra reunião")
+
+
+def prova_antes_gravar_esta(pagina) -> None:
+    pagina.click("text=Gravar esta reunião")
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    pagina.wait_for_timeout(300)
+    fix = pedidos(pagina, "fixar-evento")
+    conferir(fix and fix[0]["evento"] == "e3", "Gravar esta reunião fixa a do herói")
+    salvos = pedidos(pagina, "salvar-reuniao")
+    conferir(len(salvos) == 1 and salvos[0]["cliente"] == "Algar" and salvos[0]["projeto"] == "Agentes",
+             f"e grava a sugestão na gravação nova, uma vez só ({len(salvos)})")
+    pagina.evaluate("() => { for (let i = 0; i < 10; i++) window.__empurrar({ duracao_s: 3 + i }); }")
+    pagina.wait_for_timeout(200)
+    conferir(len(pedidos(pagina, "salvar-reuniao")) == 1, "cinco estados por segundo não a gravam de novo")
+    conferir(texto(pagina, ".grav-faixa .grav-vinculo") == "Algar › Agentes", "a faixa mostra o par")
+
+
+def prova_antes_sem_agenda(pagina) -> None:
+    conferir(not pagina.is_visible(".grav-agenda"), "sem credencial do Google, a agenda some")
+    conferir(texto(pagina, ".grav-heroi__titulo") == "Pronto para gravar", "o herói diz que está pronto")
+    conferir(pagina.get_by_role("button", name="Gravar", exact=True).is_visible()
+             and not pagina.is_visible("text=Gravar esta reunião"),
+             "com um botão só: Gravar")
+    pagina.get_by_role("button", name="Gravar", exact=True).click()
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    conferir(True, "e ele grava")
+
+
+prova_antes_sem_agenda.antes = """
+window.__proximas = { status: "nao_configurado", eventos: [] };
+window.__estado.agenda_configurada = false; window.__estado.conta = null;
+"""
+
+
+def prova_antes_ultima_gravacao(pagina) -> None:
+    conferir(texto(pagina, ".grav-ultima__titulo") == "Reunião de lideranças", "a última gravação, pelo título")
+    fatos = texto(pagina, ".grav-ultima__fatos")
+    conferir(fatos == "hoje, 11:02 · 37 min · Beegol (interno) › Gestão", f"com quando, duração e cliente ({fatos!r})")
+    conferir(texto(pagina, ".grav-ultima__rotulo").startswith("Transcrev") and texto(pagina, ".grav-ultima__pct") == "46%"
+             and pagina.is_visible(".grav-ultima__barra"), "transcrevendo, com a porcentagem e a barra")
+    pagina.click(".grav-ultima >> text=Abrir reunião")
+    pagina.wait_for_function("document.getElementById('titulo').textContent === 'Reunião de lideranças'", timeout=3000)
+    conferir(True, "Abrir reunião abre a reunião")
+
+
+prova_antes_ultima_gravacao.antes = None  # preenchido abaixo, depois de TRANSCREVENDO
+
+
+def prova_antes_transcrever(pagina) -> None:
+    conferir(texto(pagina, ".grav-ultima .aa-btn") == "Transcrever",
+             "a última, só gravada, oferece Transcrever sem ir a Reuniões")
+    conferir(texto(pagina, ".grav-ultima__rotulo") == "Não transcrita", "e diz o estado")
+
+
+def prova_resto_embaixo(pagina) -> None:
+    ordem = pagina.evaluate("""() => [...document.querySelectorAll('.gravador-tela > *')]
+        .filter((e) => !e.hidden).map((e) => e.className)""")
+    conferir(ordem == ["grav-antes", "grav-resto"], f"o resto vem abaixo do que a prancha mostra ({ordem})")
+    titulos = pagina.eval_on_selector_all(".grav-resto .bloco__titulo", "els => els.map((e) => e.textContent)")
+    conferir("Dispositivos" in titulos and "Pasta das gravações" in titulos,
+             f"dispositivos e pasta continuam no Gravador ({titulos})")
+
+
+PROVAS = [prova_monta, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
+          prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
+          prova_antes_transcrever, prova_resto_embaixo]
+
+
+# A cena da prancha grav-gravando.png, para a foto.
+CENA = [
+    (1752, " A gente pode usar o mesmo padrão do app de cobrança, que o jurídico já aprovou.", False),
+    (1780, " Pode ser, mas lá o público é outro. Aqui o agente fala direto com o cliente final.", True),
+    (1838, " Precisamos alinhar o tom de comunicação antes de seguir para o próximo desenho.", True),
+    (1851, " eu vou consolidar as referências e compartilhar uma proposta ainda esta semana", False),
+    (1862, " aí a gente valida com o Rafael antes de fechar", False),
+    (1870, " concordo e o jurídico precisa ver os textos de cobrança antes", False),
+]
+TRANSCREVENDO = """
+window.__transcricoes = { atual: { gravacao: window.__gravacoes[0].caminho, tarefa: "transcricao",
+  nome: "Reunião de lideranças", etapa: "asr", fracao: 0.46, texto: "transcrevendo" }, ultimo: null };
+"""
+
+
+prova_antes_ultima_gravacao.antes = TRANSCREVENDO
+
+
+def cena_gravando(pagina) -> None:
+    for t, novo, dono in CENA:
+        legenda(pagina, t, novo, "", dono)
+        if t == 1838:
+            pagina.click(".grav-faixa__acoes >> text=Marcar momento")
+    legenda(pagina, 1884, "", "Também vale validar quais mensagens funcionam melhor com o cliente e aí a gente fecha…", True)
+    pagina.evaluate("() => window.__empurrar({ duracao_s: 1884 })")
+    pagina.fill(".notas__texto", "Definir o tom da comunicação com o cliente antes do novo desenho.\n\n"
+                "[00:30:38] Carol compartilha as referências até sexta.\n\nJurídico revisa os textos de cobrança.")
+    pagina.locator(".notas__texto").blur()
+    pagina.wait_for_timeout(1000)
 
 
 def fotografar(navegador, porta: int, pasta: Path) -> None:
     pasta.mkdir(parents=True, exist_ok=True)
     for tema in ["escuro", "claro"]:
-        pagina, _ = abrir(navegador, porta, tema=tema)
-        pagina.screenshot(path=str(pasta / f"gravador-antes-{tema}.png"))
-        pagina.close()
+        for largura, altura in [(1280, 800), (900, 800)]:
+            sufixo = f"{tema}" + ("" if largura == 1280 else f"-{largura}")
+            pagina, _ = abrir(navegador, porta, largura, altura, tema=tema, antes=TRANSCREVENDO)
+            pagina.screenshot(path=str(pasta / f"gravador-antes-{sufixo}.png"))
+            pagina.close()
+            pagina, _ = abrir(navegador, porta, largura, altura, tema=tema, antes=GRAVANDO)
+            cena_gravando(pagina)
+            pagina.screenshot(path=str(pasta / f"gravador-gravando-{sufixo}.png"))
+            pagina.close()
 
 
 def main() -> int:

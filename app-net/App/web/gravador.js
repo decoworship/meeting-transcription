@@ -5,23 +5,37 @@
 //
 //   1. os medidores de nível das duas faixas, ao vivo. É o que teria denunciado
 //      o microfone mudo de 06/08 no primeiro minuto, e não 36 minutos depois;
-//   2. a reunião da agenda que está sendo gravada, com os participantes já
+//   2. a reunião da agenda que está sendo gravada, com os convidados já
 //      reconhecidos — hoje isso só aparece depois, no meta.json;
-//   3. as próximas reuniões, com a marca de qual delas rotularia a gravação se
+//   3. as reuniões de hoje, com a marca de qual delas rotularia a gravação se
 //      ela começasse agora — e o botão de escolher outra. A escolha automática
 //      acerta o caso comum e não tem como acertar o ambíguo (duas reuniões
 //      sobrepostas, ou a que começa em vinte minutos), e o rótulo errado só
 //      aparece depois, na ata.
 //
-// Desenha uma vez e depois só atualiza os nós que mudam. Redesenhar a tela
-// inteira cinco vezes por segundo derrubaria o foco de qualquer select aberto e
-// faria o texto piscar.
+// **Dois estados, uma tela** (plano 3 do redesenho, spec §3.2): antes da
+// reunião, a próxima da agenda como herói e a última gravação com o estado dela;
+// gravando, a faixa em cima, a legenda larga à esquerda e Notas · Perguntar em
+// abas à direita (D-B). Os dois estados estão sempre no DOM, e quem troca é o
+// `data-gravando` da raiz — trocar de estado não reconstrói nada.
+//
+// **O que o app tinha e a prancha não mostra desce, e nada sai** (decisão do
+// dono, 25/09): a lista de convidados por nome, dispositivos e pasta ficam
+// abaixo do que a prancha mostra. Dispositivos e pasta vão para Ajustes num
+// plano próprio.
+//
+// Desenha uma vez e depois só atualiza os nós que mudam. O `aplicar()` roda
+// cinco vezes por segundo enquanto grava: redesenhar ali derrubaria o foco de
+// quem digita nas notas e faria o texto piscar.
 
 import { pedir, assinar } from "/ponte.js";
-import { alerta } from "/pecas.js";
+import { alerta, campoComSugestoes } from "/pecas.js";
 import { blocoDeNotas } from "/notas.js";
 import { painelAoVivo } from "/aovivo.js";
 import { painelDePerguntas } from "/perguntar.js";
+import { popover } from "/popover.js";
+import { estadoDe } from "/reunioes-regras.js";
+import { assinarTranscricoes, emCurso } from "/transcricoes.js";
 
 /** "00:12:34" — aqui o tempo é para cronometrar, ao contrário da lista. */
 function relogio(segundos) {
@@ -31,7 +45,7 @@ function relogio(segundos) {
 }
 
 /**
- * O nível em altura de barra.
+ * O nível em largura de barra.
  *
  * Escala logarítmica, e não o RMS cru: a fala normal fica entre 0,01 e 0,1 de
  * RMS, e uma barra linear passaria a reunião inteira nos primeiros 10% —
@@ -44,25 +58,34 @@ function porcentagem(rms) {
   return Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
 }
 
-const NOME_DA_FAIXA = { mic: "Microfone", system: "Áudio do sistema" };
+const NOME_DA_FAIXA = { mic: "Seu microfone", system: "Áudio da reunião" };
+
+const hora = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 /** "14:30 – 15:00", com o dia na frente quando não é hoje. */
 function quando(inicio, fim) {
   if (!inicio) return "";
   const i = new Date(inicio);
-  const hora = (d) => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
   let texto = hora(i);
   if (fim) texto += ` – ${hora(new Date(fim))}`;
 
   // O horizonte é de doze horas para a frente e três para trás, então no fim da
   // tarde a lista já mostra o dia seguinte — e "09:00" sem o dia seria a reunião
   // de amanhã parecendo a de daqui a pouco.
-  const hoje = new Date();
-  if (i.toDateString() !== hoje.toDateString())
+  if (i.toDateString() !== new Date().toDateString())
     texto = `${i.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "2-digit" })}, ${texto}`;
-
   return texto;
+}
+
+/** "começa em 5 min", "começou há 12 min", "começa às 16:00". */
+function quandoComeca(inicio, fim) {
+  if (!inicio) return "";
+  const min = Math.round((new Date(inicio) - Date.now()) / 60000);
+  if (fim && new Date(fim) < new Date()) return "já terminou";
+  if (min < 0) return `começou há ${-min} min`;
+  if (min === 0) return "começa agora";
+  if (min < 60) return `começa em ${min} min`;
+  return `começa às ${hora(new Date(inicio))}`;
 }
 
 /** O que dizer quando a lista não vem, por status da agenda. */
@@ -73,38 +96,51 @@ const SEM_LISTA = {
   sem_evento: "Nenhuma reunião nas últimas 3 nem nas próximas 12 horas.",
 };
 
-/** Um medidor por faixa: rótulo, barra e o dispositivo em uso. */
+const rotuloDoVinculo = (v) =>
+  v?.cliente ? [v.cliente, v.projeto].filter(Boolean).join(" › ") : "sem cliente";
+
+const el = (tag, classe, texto) => {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texto !== undefined) e.textContent = texto;
+  return e;
+};
+
+const botao = (classe, texto) => {
+  const b = el("button", `aa-btn ${classe}`, texto);
+  b.type = "button";
+  return b;
+};
+
+/** Um medidor por faixa: rótulo e barra; o dispositivo vai no `title`. */
 function medidor(nome) {
-  const raiz = document.createElement("div");
-  raiz.className = "faixa";
-
-  const rotulo = document.createElement("p");
-  rotulo.className = "faixa__nome";
-  rotulo.textContent = NOME_DA_FAIXA[nome] ?? nome;
-
-  const trilho = document.createElement("div");
-  trilho.className = "medidor";
-  const preenchimento = document.createElement("div");
+  const raiz = el("div", "faixa");
+  raiz.dataset.faixa = nome;
+  const rotulo = el("p", "faixa__nome", NOME_DA_FAIXA[nome] ?? nome);
+  const trilho = el("div", "medidor");
+  const preenchimento = el("div");
   trilho.appendChild(preenchimento);
-
-  const dispositivo = document.createElement("p");
-  dispositivo.className = "faixa__dispositivo";
-  dispositivo.textContent = "—";
-
-  raiz.append(rotulo, trilho, dispositivo);
-  return { raiz, preenchimento, dispositivo, trilho };
+  raiz.append(rotulo, trilho);
+  return { raiz, preenchimento, trilho, rotulo };
 }
 
+/**
+ * Monta a tela.
+ *
+ * @param ctx `{ cabecalho, tela, acoesDaBarra, abrirGravacao, abrirAjustes }` —
+ *   a moldura é do app.js, e a tela recebe o que precisa dela.
+ */
 export async function telaDoGravador(ctx) {
   const { cabecalho, tela } = ctx;
   cabecalho("Gravador", "", false);
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let estado, dispositivos;
+  let estado, dispositivos, gravacoes;
   try {
-    [{ gravador: estado }, { dispositivos }] = await Promise.all([
+    [{ gravador: estado }, { dispositivos }, { gravacoes }] = await Promise.all([
       pedir("gravador"), pedir("dispositivos"),
+      pedir("gravacoes").catch(() => ({ gravacoes: [] })),
     ]);
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
@@ -113,212 +149,363 @@ export async function telaDoGravador(ctx) {
   }
   tela.setAttribute("aria-busy", "false");
 
-  const raiz = document.createElement("div");
-  raiz.className = "painel";
+  const raiz = el("div", "gravador-tela");
 
-  // ---- estado e controles
-  const cartao = document.createElement("div");
-  cartao.className = "bloco gravador";
+  // ════════════════════════════════════════════════ antes da reunião
 
-  const linhaEstado = document.createElement("div");
-  linhaEstado.className = "gravador__estado";
-  const ponto = document.createElement("span");
-  ponto.className = "gravador__ponto";
-  const tempo = document.createElement("p");
-  tempo.className = "gravador__tempo";
-  const situacao = document.createElement("p");
-  situacao.className = "gravador__situacao";
-  const textos = document.createElement("div");
-  textos.append(tempo, situacao);
-  linhaEstado.append(ponto, textos);
+  const antes = el("section", "grav-antes");
+  antes.setAttribute("aria-label", "Antes da reunião");
 
-  const acoes = document.createElement("div");
-  acoes.className = "acoes";
-  const principal = document.createElement("button");
-  principal.className = "aa-btn aa-btn-primario aa-btn--grande";
-  principal.type = "button";
-  const mutar = document.createElement("button");
-  mutar.className = "aa-btn aa-btn-secundario";
-  mutar.type = "button";
-  mutar.textContent = "Mutar microfone";
-  acoes.append(principal, mutar);
+  // ---- o herói: a próxima da agenda
+  const heroi = el("div", "bloco grav-heroi");
+  const heroiTexto = el("div", "grav-heroi__texto");
+  const heroiRotulo = el("p", "grav-rotulo grav-heroi__rotulo");
+  const heroiTitulo = el("h2", "grav-heroi__titulo");
+  const heroiFatos = el("p", "grav-heroi__fatos");
+  const heroiVinculo = el("div", "grav-heroi__vinculo");
+  const heroiDica = el("span", "grav-heroi__dica");
+  const heroiAcoes = el("div", "grav-heroi__acoes");
+  const gravarEsta = botao("aa-btn-primario aa-btn--grande grav-gravar", "Gravar esta reunião");
+  const gravarSem = botao("aa-btn-secundario aa-btn--grande", "Gravar sem reunião da agenda");
+  heroiAcoes.append(gravarEsta, gravarSem);
+  heroiTexto.append(heroiRotulo, heroiTitulo, heroiFatos, heroiVinculo, heroiAcoes);
 
-  const avisos = document.createElement("div");
-  avisos.className = "gravador__avisos";
+  // ---- o que vai ser gravado
+  const vai = el("aside", "grav-vai");
+  vai.append(el("p", "grav-rotulo", "Vai gravar"));
+  const itemVai = (icone, nome) => {
+    const item = el("div", "grav-vai__item");
+    item.dataset.icone = icone;
+    const valor = el("span", "grav-vai__valor");
+    item.append(el("span", "grav-vai__nome", nome), valor);
+    vai.appendChild(item);
+    return valor;
+  };
+  const vaiMic = itemVai("mic", "Seu microfone");
+  const vaiAudio = itemVai("audio", "Áudio da reunião");
+  const vaiAgenda = itemVai("agenda", "Agenda");
+  const trocar = el("a", "grav-vai__trocar", "Trocar em Ajustes › Gravação");
+  trocar.href = "#config=gravador";
+  trocar.addEventListener("click", (e) => { e.preventDefault(); ctx.abrirAjustes?.("gravador"); });
+  vai.appendChild(trocar);
+  heroi.append(heroiTexto, vai);
 
+  // ---- hoje na agenda
+  const proximas = el("div", "bloco grav-agenda");
+  const topoProximas = el("div", "bloco__topo");
+  const atualizar = botao("aa-btn-texto aa-btn--pequeno", "Atualizar");
+  topoProximas.append(el("h2", "bloco__titulo", "Hoje na agenda"), atualizar);
+  const listaProximas = el("div", "grav-agenda__lista");
+  const dicaProximas = el("p", "grav-agenda__dica",
+    "A próxima dá nome à gravação. Reunião que já terminou fica aqui por três horas — "
+    + "reunião atrasada termina no papel antes de começar de verdade.");
+  proximas.append(topoProximas, listaProximas, dicaProximas);
+
+  // ---- a última gravação
+  const ultima = el("div", "bloco grav-ultima");
+  ultima.append(el("p", "grav-rotulo", "Última gravação"));
+  const ultimaTitulo = el("p", "grav-ultima__titulo");
+  const ultimaFatos = el("p", "grav-ultima__fatos");
+  const ultimaEstado = el("div", "grav-ultima__estado");
+  const ultimaRotulo = el("span", "grav-ultima__rotulo");
+  const ultimaPct = el("span", "grav-ultima__pct");
+  ultimaEstado.append(ultimaRotulo, ultimaPct);
+  const ultimaBarra = el("div", "aa-progresso grav-ultima__barra");
+  const ultimaPreench = el("div", "aa-progresso__barra");
+  ultimaBarra.appendChild(ultimaPreench);
+  const ultimaAbrir = botao("aa-btn-secundario", "Abrir reunião");
+  ultima.append(ultimaTitulo, ultimaFatos, ultimaEstado, ultimaBarra, ultimaAbrir);
+
+  const baixo = el("div", "grav-antes__baixo");
+  baixo.append(proximas, ultima);
+  antes.append(heroi, baixo);
+
+  // ════════════════════════════════════════════════════════ gravando
+
+  const gravando = el("section", "grav-gravando");
+  gravando.setAttribute("aria-label", "Gravando");
+
+  // ---- a faixa
+  const faixa = el("div", "bloco grav-faixa");
+  const ponto = el("span", "gravador__ponto");
+  const tempo = el("p", "grav-faixa__tempo");
+  const info = el("div", "grav-faixa__info");
+  const faixaTitulo = el("p", "grav-faixa__titulo");
+  const faixaLinha = el("div", "grav-faixa__linha");
+  const faixaConvidados = el("span", "grav-faixa__convidados");
+  info.append(faixaTitulo, faixaLinha);
   const faixas = { mic: medidor("mic"), system: medidor("system") };
-  const medidores = document.createElement("div");
-  medidores.className = "gravador__faixas";
+  const medidores = el("div", "grav-faixa__medidores");
   medidores.append(faixas.mic.raiz, faixas.system.raiz);
+  const acoes = el("div", "grav-faixa__acoes");
+  const marcar = botao("aa-btn-primario", "Marcar momento");
+  const mutar = botao("aa-btn-secundario", "Mutar");
+  const parar = botao("aa-btn-secundario grav-parar", "Parar");
+  acoes.append(marcar, mutar, parar);
+  faixa.append(ponto, tempo, info, medidores, acoes);
 
-  cartao.append(linhaEstado, acoes, avisos, medidores);
+  // O aviso de mudo e as falhas de dispositivo: logo abaixo da faixa, que é
+  // para onde se olha.
+  const avisos = el("div", "grav-avisos");
+  avisos.setAttribute("role", "status");
 
-  // ---- a reunião da agenda
-  const reuniao = document.createElement("div");
-  reuniao.className = "bloco";
-  const tituloReuniao = document.createElement("h2");
-  tituloReuniao.className = "bloco__titulo";
-  const participantes = document.createElement("p");
-  participantes.className = "bloco__texto";
-  reuniao.append(tituloReuniao, participantes);
+  // ---- a legenda e as abas
+  const grade = el("div", "grav-grade");
+  const previa = painelAoVivo({ tempo: () => estado.duracao_s, aoSaber: aoSaberDaLegenda });
 
-  // ---- as reuniões da agenda
-  //
-  // Fica acima das notas porque é o que se olha *antes* de gravar; as notas
-  // valem durante, e dispositivo e pasta se mexem uma vez por mês.
-  const proximas = document.createElement("div");
-  proximas.className = "bloco";
-  const topoProximas = document.createElement("div");
-  topoProximas.className = "bloco__topo";
-  const tituloProximas = document.createElement("h2");
-  tituloProximas.className = "bloco__titulo";
-  tituloProximas.textContent = "Reuniões da agenda";
-  const atualizar = document.createElement("button");
-  atualizar.className = "aa-btn aa-btn-secundario aa-btn--pequeno";
-  atualizar.type = "button";
-  atualizar.textContent = "Atualizar";
-  topoProximas.append(tituloProximas, atualizar);
-  const dicaProximas = document.createElement("p");
-  dicaProximas.className = "bloco__texto";
-  dicaProximas.textContent =
-    "A marcada é a que rotula a gravação se você começar agora. Escolher outra "
-    + "vale até a gravação terminar. As que já terminaram continuam aqui por "
-    + "três horas: reunião atrasada termina no papel antes de começar de verdade.";
-  const listaProximas = document.createElement("div");
-  listaProximas.className = "reunioes";
-  proximas.append(topoProximas, dicaProximas, listaProximas);
+  const semLegenda = el("div", "bloco grav-sem-legenda");
+  semLegenda.hidden = true;
+  const semLegendaMotivo = el("p", "bloco__texto");
+  const semLegendaIr = botao("aa-btn-secundario aa-btn--pequeno", "Abrir Ajustes › Transcrição");
+  semLegendaIr.addEventListener("click", () => ctx.abrirAjustes?.("transcricao"));
+  semLegenda.append(
+    el("h2", "bloco__titulo", "Sem legenda nesta gravação"),
+    el("p", "bloco__texto",
+      "Ligada, a legenda mostra o que está sendo dito enquanto a reunião acontece — "
+      + "Você e Outros, com o tempo de cada fala — e dá para perguntar sobre a reunião "
+      + "no meio dela. O custo: a placa de vídeo fica ocupada a reunião inteira, e o "
+      + "texto é rascunho; a transcrição do fim continua sendo a que vale."),
+    semLegendaMotivo, semLegendaIr);
 
-  // ---- dispositivos
-  const blocoDisp = document.createElement("div");
-  blocoDisp.className = "bloco";
-  const tituloDisp = document.createElement("h2");
-  tituloDisp.className = "bloco__titulo";
-  tituloDisp.textContent = "Dispositivos";
-  const notaDisp = document.createElement("p");
-  notaDisp.className = "bloco__texto";
-  // A trava não é limitação de implementação e sim o que preserva o valor das
-  // duas faixas separadas: reabrir o stream no meio exigiria realinhá-las.
-  notaDisp.textContent =
-    "Não dá para trocar de dispositivo durante uma gravação: as duas faixas "
-    + "começam alinhadas por terem começado juntas.";
+  const abas = el("section", "bloco grav-abas");
+  const listaAbas = el("div", "grav-abas__lista");
+  listaAbas.setAttribute("role", "tablist");
+  listaAbas.setAttribute("aria-label", "Notas e perguntas");
+  abas.appendChild(listaAbas);
 
-  const escolhaMic = seletor("Microfone", "mic", dispositivos.entradas, dispositivos.mic_id);
-  const escolhaLoop = seletor("Áudio do sistema", "loopback",
-                              dispositivos.saidas, dispositivos.loopback_id);
-  blocoDisp.append(tituloDisp, escolhaMic.raiz, escolhaLoop.raiz, notaDisp);
-
-  // ---- pasta
-  const blocoPasta = document.createElement("div");
-  blocoPasta.className = "bloco";
-  const tituloPasta = document.createElement("h2");
-  tituloPasta.className = "bloco__titulo";
-  tituloPasta.textContent = "Pasta das gravações";
-  const caminho = document.createElement("p");
-  caminho.className = "bloco__texto caminho";
-  const dicaPasta = document.createElement("p");
-  dicaPasta.className = "bloco__texto";
-  dicaPasta.textContent = "Trocar em Ajustes › Geral. É a mesma pasta que a lista de reuniões lê.";
-  blocoPasta.append(tituloPasta, caminho, dicaPasta);
-
-  // ---- notas da reunião
-  //
-  // Logo abaixo dos controles, e acima dos dispositivos: é o que se usa durante
-  // a reunião inteira, enquanto dispositivo e pasta se mexem uma vez por mês.
+  // As notas seguem a gravação: começar uma aponta o bloco para a pasta dela.
   // O tempo vem do estado que já chega cinco vezes por segundo — é ele que o
   // "marcar momento" carimba.
   const notas = blocoDeNotas(estado.gravando ? estado.gravacao : null, {
     tempo: () => estado.duracao_s,
-    linhas: 6,
+    linhas: 14,
   });
-
-  // **A prévia, e ela mora aqui e não num destino novo.** É a tela que já está
-  // aberta durante a reunião, que já mostra os medidores e já sabe qual reunião
-  // da agenda está sendo gravada. Um quinto destino no trilho seria um lugar a
-  // mais para procurar durante a única hora em que não se pode procurar nada.
-  // Ver docs/FASE7-FRONTEND.md §6.1.
-  //
-  // Duas colunas enquanto grava — controle e notas à esquerda, o que já foi dito
-  // à direita, com rolagens separadas (decisão D1). Parada a gravação, volta a
-  // ser uma coluna, e é o CSS que faz isso pelo data-atributo.
-  const previa = painelAoVivo({ tempo: () => estado.duracao_s });
-  // **A caixa de perguntar é bloco próprio, e cai na coluna da esquerda** — a
-  // regra `> *:not(.aovivo) { grid-column: 1 }` põe lá tudo o que não é a
-  // prévia. É o que separa o que está sendo dito do que um modelo deduziu.
   const perguntas = painelDePerguntas();
-  raiz.dataset.aovivo = String(estado.gravando);
-  raiz.append(cartao, reuniao, proximas, notas.raiz, blocoDisp, blocoPasta,
-              perguntas.raiz, previa.raiz);
+  // A dica e o "salvo" das notas numa linha só, embaixo, como na prancha.
+  const rodapeNotas = el("div", "grav-abas__dica");
+  rodapeNotas.append(el("span", "", "Marcar momento põe o tempo onde está o cursor."),
+                     notas.raiz.querySelector(".notas__estado"));
+
+  const paineis = {};
+  const botoesAba = {};
+  for (const [id, rotulo, conteudo] of [
+    ["notas", "Notas", [notas.raiz, rodapeNotas]],
+    ["perguntar", "Perguntar", [perguntas.raiz]],
+  ]) {
+    const b = el("button", "grav-abas__aba", rotulo);
+    b.type = "button";
+    b.id = `grav-aba-${id}`;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-controls", `grav-painel-${id}`);
+    b.addEventListener("click", () => mostrarAba(id));
+    b.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      e.preventDefault();
+      const outra = id === "notas" ? "perguntar" : "notas";
+      mostrarAba(outra);
+      botoesAba[outra].focus();
+    });
+    listaAbas.appendChild(b);
+    const p = el("div", "grav-abas__painel");
+    p.id = `grav-painel-${id}`;
+    p.setAttribute("role", "tabpanel");
+    p.setAttribute("aria-labelledby", b.id);
+    p.append(...conteudo);
+    abas.appendChild(p);
+    paineis[id] = p;
+    botoesAba[id] = b;
+  }
+  let abaAtiva = "notas";
+  function mostrarAba(id) {
+    abaAtiva = id;
+    for (const k of Object.keys(paineis)) {
+      paineis[k].hidden = k !== id;
+      botoesAba[k].setAttribute("aria-selected", String(k === id));
+      botoesAba[k].tabIndex = k === id ? 0 : -1;
+    }
+  }
+  mostrarAba("notas");
+  // A caixa de perguntar nasce escondida e só aparece se o núcleo deixar; sem
+  // ela, a aba não tem o que mostrar.
+  new MutationObserver(() => {
+    botoesAba.perguntar.hidden = perguntas.raiz.hidden;
+    if (perguntas.raiz.hidden && abaAtiva === "perguntar") mostrarAba("notas");
+  }).observe(perguntas.raiz, { attributes: true, attributeFilter: ["hidden"] });
+  botoesAba.perguntar.hidden = perguntas.raiz.hidden;
+
+  grade.append(previa.raiz, semLegenda, abas);
+  gravando.append(faixa, avisos, grade);
+
+  // ════════════════════════════════════ o resto: abaixo do que a prancha mostra
+
+  const resto = el("div", "grav-resto");
+
+  // ---- a reunião da agenda, com os convidados por nome
+  const reuniao = el("div", "bloco");
+  const tituloReuniao = el("h2", "bloco__titulo");
+  const participantes = el("p", "bloco__texto");
+  reuniao.append(tituloReuniao, participantes);
+
+  // ---- dispositivos
+  const blocoDisp = el("div", "bloco");
+  const notaDisp = el("p", "bloco__texto",
+    // A trava não é limitação de implementação e sim o que preserva o valor das
+    // duas faixas separadas: reabrir o stream no meio exigiria realinhá-las.
+    "Não dá para trocar de dispositivo durante uma gravação: as duas faixas "
+    + "começam alinhadas por terem começado juntas.");
+  const escolhaMic = seletor("Microfone", "mic", dispositivos.entradas, dispositivos.mic_id);
+  const escolhaLoop = seletor("Áudio do sistema", "loopback", dispositivos.saidas, dispositivos.loopback_id);
+  blocoDisp.append(el("h2", "bloco__titulo", "Dispositivos"), escolhaMic.raiz, escolhaLoop.raiz, notaDisp);
+
+  // ---- pasta
+  const blocoPasta = el("div", "bloco");
+  const caminho = el("p", "bloco__texto caminho");
+  blocoPasta.append(el("h2", "bloco__titulo", "Pasta das gravações"), caminho,
+    el("p", "bloco__texto", "Trocar em Ajustes › Geral. É a mesma pasta que a lista de reuniões lê."));
+
+  resto.append(reuniao, blocoDisp, blocoPasta);
+
+  raiz.append(antes, gravando, resto);
   tela.replaceChildren(raiz);
 
+  // ─────────────────────────────────────────────── cliente › projeto
+
+  // O vínculo da gravação corrente, e a sugestão de antes de gravar. A
+  // sugestão é memória da página: ela só vai para o disco quando a gravação
+  // que ela sugere existe (`aplicarSugestao`).
+  let vinculo = null;
+  let sugestao = null;
+  let sugestaoPendente = false;
+  let clientes = {};
+  pedir("clientes").then((r) => { clientes = r.clientes ?? {}; }).catch(() => {});
+
+  /** O botão "Cliente › Projeto ⌄" que abre o editor, em dois lugares. */
+  function editorDeVinculo(lugar, aoSalvar) {
+    const gatilho = el("button", "grav-vinculo");
+    gatilho.type = "button";
+    gatilho.dataset.lugar = lugar;
+    const texto = el("span", "grav-vinculo__texto");
+    gatilho.append(texto);
+    const { ancora } = popover(gatilho, "Cliente e projeto", (fechar) => {
+      const atual = lugar === "heroi" ? sugestao : vinculo;
+      const form = el("form", "grav-vinculo__form");
+      const cCliente = campoComSugestoes("Cliente", `grav-${lugar}-cliente`, Object.keys(clientes), atual?.cliente ?? "");
+      const cProjeto = campoComSugestoes("Projeto", `grav-${lugar}-projeto`, clientes[atual?.cliente] ?? [], atual?.projeto ?? "");
+      const salvar = botao("aa-btn-primario aa-btn--pequeno", "Usar");
+      salvar.type = "submit";
+      form.append(cCliente, cProjeto, salvar);
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        aoSalvar({
+          cliente: cCliente.querySelector("input").value.trim(),
+          projeto: cProjeto.querySelector("input").value.trim(),
+        });
+        fechar();
+      });
+      return { raiz: form, focar: () => cCliente.querySelector("input").focus() };
+    });
+    return { raiz: ancora, texto };
+  }
+
+  const vinculoHeroi = editorDeVinculo("heroi", (v) => {
+    sugestao = v.cliente ? v : null;
+    heroiDica.textContent = sugestao ? "escolhido agora" : "";
+    vinculoHeroi.texto.textContent = rotuloDoVinculo(sugestao);
+  });
+  heroiVinculo.append(vinculoHeroi.raiz, heroiDica);
+
+  const vinculoFaixa = editorDeVinculo("faixa", (v) => salvarVinculo(v));
+  faixaLinha.append(vinculoFaixa.raiz, faixaConvidados);
+
+  let vinculoDe = null;
+  async function carregarVinculo(g) {
+    if (!g) { vinculo = null; vinculoDe = null; return; }
+    vinculoDe = g;
+    try {
+      const r = await pedir("reuniao", { gravacao: g });
+      if (vinculoDe !== g) return;
+      vinculo = { cliente: r.cliente || "", projeto: r.projeto || "" };
+    } catch {
+      vinculo = { cliente: "", projeto: "" };
+    }
+    vinculoFaixa.texto.textContent = rotuloDoVinculo(vinculo);
+    if (sugestaoPendente) aplicarSugestao();
+  }
+
+  /**
+   * Grava o par no `reuniao.json` da gravação que está correndo. É o mesmo
+   * pedido da reunião aberta; ele só escreve esse arquivo, e a correção de
+   * termos que ele dispara sai cedo enquanto não há falantes — o caso de toda
+   * gravação em curso.
+   */
+  async function salvarVinculo(v) {
+    const g = estado.gravacao;
+    if (!g) return;
+    vinculo = v;
+    vinculoFaixa.texto.textContent = rotuloDoVinculo(v);
+    try {
+      await pedir("salvar-reuniao", { gravacao: g, cliente: v.cliente, projeto: v.projeto });
+    } catch (e) {
+      avisosDeFora.replaceChildren(alerta(`Não guardou o cliente: ${e.message}`, "erro"));
+    }
+  }
+
+  /** A sugestão do herói vai para a gravação que ele começou — uma vez só. */
+  function aplicarSugestao() {
+    sugestaoPendente = false;
+    // Quem já escreveu um vínculo (a bandeja, outra tela) ganha da sugestão.
+    if (!sugestao || vinculo?.cliente) return;
+    salvarVinculo(sugestao);
+  }
+
+  // Falhas que não são do gravador (guardar o cliente): ficam com os avisos.
+  const avisosDeFora = el("div");
+  gravando.insertBefore(avisosDeFora, grade);
+
   // ─────────────────────────────────────────────────────── desenho
+
+  let gravandoDesenhado = null;
+  let listagem = null;
+  let fixadoDesenhado;
 
   function aplicar(g) {
     estado = g;
 
-    // **A única coisa que a prévia faz dentro do aplicar()**, que roda 5×/s: um
-    // atributo. Desenhar a lista aqui seria reconstruí-la cinco vezes por
-    // segundo — o erro que o §7 do documento marca como o a não cometer. Quem
-    // desenha trecho é o evento `aovivo`, uma vez por bloco.
-    raiz.dataset.aovivo = String(g.gravando);
+    if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
 
     ponto.dataset.cor = g.cor;
-    tempo.textContent = g.gravando ? relogio(g.duracao_s) : "Parado";
-    situacao.textContent = g.status;
+    ponto.title = g.status;
+    tempo.textContent = relogio(g.duracao_s);
+    mutar.textContent = g.mudo ? "Desmutar" : "Mutar";
+    mutar.setAttribute("aria-pressed", String(Boolean(g.mudo)));
+    faixa.dataset.mudo = String(Boolean(g.mudo));
 
-    // Este elemento é relógio E rótulo de estado: parado, ele escreve
-    // "Parado" — e o status que o núcleo manda diz a mesma palavra, então o
-    // cartão mostrava "Parado" duas vezes, uma grande e uma pequena logo
-    // abaixo. Comparar os textos em vez de testar `g.gravando` faz a regra
-    // valer para qualquer status futuro que repita o de cima.
-    situacao.hidden = situacao.textContent === tempo.textContent;
-
-    principal.textContent = g.gravando ? "Parar gravação" : "Iniciar gravação";
-    principal.className = g.gravando
-      ? "aa-btn aa-btn-secundario aa-btn--grande" : "aa-btn aa-btn-primario aa-btn--grande";
-    mutar.textContent = g.mudo ? "Desmutar microfone" : "Mutar microfone";
-    mutar.disabled = !g.gravando;
-
-    // O aviso de mute prolongado. Mute esquecido é o modo de falha mais
-    // provável desde que o clique no ícone passou a mutar em vez de parar — uma
-    // gravação de 36 min saiu 95% muda exatamente assim.
-    avisos.replaceChildren();
-    if (g.mudo && g.mudo_ha_s >= 60)
-      avisos.appendChild(alerta(
-        `Microfone mudo há ${Math.floor(g.mudo_ha_s / 60)} min. Sua voz não está sendo gravada.`,
-        "erro"));
-    for (const f of g.faixas) {
-      if (f.desconectado)
-        avisos.appendChild(alerta(`O dispositivo de ${NOME_DA_FAIXA[f.nome] ?? f.nome} caiu.`, "erro"));
-      if (f.falha)
-        avisos.appendChild(alerta(`Falha ao gravar ${NOME_DA_FAIXA[f.nome] ?? f.nome}: ${f.falha}`, "erro"));
-    }
+    desenharAvisos(g);
 
     for (const [nome, m] of Object.entries(faixas)) {
       const f = g.faixas.find((x) => x.nome === nome);
-      m.raiz.hidden = !g.gravando;
       if (!f) continue;
       m.preenchimento.style.width = `${porcentagem(f.nivel)}%`;
-      m.dispositivo.textContent = f.mudo ? `${f.dispositivo} (mudo)` : f.dispositivo;
+      m.raiz.title = f.mudo ? `${f.dispositivo} (mudo)` : f.dispositivo;
       // Sem áudio nenhum passados 45 s é o mesmo limiar do ícone amarelo. O
       // medidor já mostra a barra parada; o atributo é o que a torna vermelha,
       // porque uma barra parada e uma barra baixa se parecem demais.
       m.trilho.dataset.morto = String(!f.ja_ouviu && !f.mudo && g.duracao_s > 45);
+      m.raiz.dataset.mudo = String(Boolean(f.mudo));
     }
-    medidores.hidden = !g.gravando;
 
-    const temReuniao = Boolean(g.titulo);
-    reuniao.hidden = !temReuniao;
-    if (temReuniao) {
+    faixaTitulo.textContent = g.titulo || "Gravação sem reunião da agenda";
+    const nomes = g.participantes ?? [];
+    // "convidados" e não "participantes": a lista vem do convite da agenda, e
+    // ela diz quem foi CHAMADO, não quem apareceu.
+    faixaConvidados.textContent = nomes.length
+      ? `${nomes.length} ${nomes.length === 1 ? "convidado" : "convidados"}` : "";
+
+    reuniao.hidden = !g.titulo;
+    if (g.titulo) {
       tituloReuniao.textContent = g.titulo;
-      // "convidados" e não "participantes", pela mesma razão escrita no
-      // app.js: a lista vem do convite da agenda, e ela diz quem foi CHAMADO,
-      // não quem apareceu. Numa reunião de seis convidados em que três entram,
-      // "6 participantes" é falso na tela do app que está gravando a reunião —
-      // e é justamente essa lista que vira vocabulário da transcrição.
-      const nomes = g.participantes ?? [];
       participantes.textContent = nomes.length
-        ? `${nomes.length} ${nomes.length === 1 ? "convidado" : "convidados"}: `
-          + nomes.join(", ")
+        ? `${nomes.length} ${nomes.length === 1 ? "convidado" : "convidados"}: ${nomes.join(", ")}`
         : "Sem convidados na agenda.";
     }
 
@@ -326,114 +513,230 @@ export async function telaDoGravador(ctx) {
     // soltado a reunião fixada no fim da gravação.
     if ((g.fixado ?? null) !== fixadoDesenhado) desenharProximas();
 
-    // Sem credencial do Google não há o que fazer nesta tela, e sem "usar a
-    // agenda" não há o que oferecer: nos dois casos o bloco some inteiro, em
-    // vez de virar uma linha de desculpa permanente.
-    proximas.hidden = !g.usar_agenda || listagem?.status === "nao_configurado";
+    vaiAgenda.textContent = !g.usar_agenda ? "não usada"
+      : g.conta ?? (g.agenda_configurada ? "não conectada" : "sem credencial");
 
     escolhaMic.campo.disabled = g.gravando;
     escolhaLoop.campo.disabled = g.gravando;
     caminho.textContent = g.pasta;
 
-    // As notas seguem a gravação: começar uma aponta o bloco para a pasta dela,
-    // parar guarda o que estiver escrito e devolve o campo ao repouso. O
-    // apontarPara ignora repetição, então chamar isto cinco vezes por segundo
+    // O apontarPara ignora repetição, então chamar isto cinco vezes por segundo
     // não custa nada.
     notas.apontarPara(g.gravando ? g.gravacao : null);
-    notas.definirHabilitado(
-      Boolean(g.gravando && g.gravacao),
+    notas.definirHabilitado(Boolean(g.gravando && g.gravacao),
       "As notas abrem quando a gravação começa. Depois, edite pela reunião.");
+    marcar.disabled = !(g.gravando && g.gravacao);
+
+    if (g.gravando && g.gravacao && g.gravacao !== vinculoDe) carregarVinculo(g.gravacao);
   }
 
-  // ────────────────────────────────────────── as próximas reuniões
+  /** Começou ou parou: o que muda uma vez por gravação, e não 5×/s. */
+  function trocouDeEstado(g) {
+    const primeira = gravandoDesenhado === null;
+    gravandoDesenhado = g.gravando;
+    raiz.dataset.gravando = String(g.gravando);
+    antes.hidden = g.gravando;
+    gravando.hidden = !g.gravando;
+    // A agenda desce para baixo da grade enquanto grava — escolher outra
+    // reunião vale até a gravação terminar, e ela não pode sumir.
+    if (g.gravando) resto.insertBefore(proximas, reuniao);
+    else baixo.insertBefore(proximas, ultima);
 
-  // A última listagem e o último id fixado desenhado. Guardados porque o
-  // `aplicar` roda cinco vezes por segundo e reconstruir esta lista nesse ritmo
-  // derrubaria o foco de quem estivesse com o Tab em cima de um botão.
-  let listagem = null;
-  let fixadoDesenhado;
+    const desde = new Date(Date.now() - g.duracao_s * 1000);
+    cabecalho("Gravador", g.gravando ? `gravando desde ${hora(desde)}` : "pronto para gravar", false);
+    desenharSelo();
+
+    if (!g.gravando) {
+      vinculo = null;
+      vinculoDe = null;
+      avisosDeFora.replaceChildren();
+      if (!primeira) recarregarGravacoes();
+    }
+    gravarEsta.disabled = gravarSem.disabled = false;
+  }
+
+  /** O aviso de mudo, e queda e falha de dispositivo, logo abaixo da faixa. */
+  let avisoDesenhado = "";
+  function desenharAvisos(g) {
+    const itens = [];
+    if (g.gravando && g.mudo) {
+      const min = Math.floor((g.mudo_ha_s ?? 0) / 60);
+      itens.push(["mudo", min >= 1
+        ? `Microfone mudo há ${min} min. Sua voz não está sendo gravada.`
+        : "Microfone mudo. Sua voz não está sendo gravada."]);
+    }
+    for (const f of g.faixas) {
+      const nome = NOME_DA_FAIXA[f.nome] ?? f.nome;
+      if (f.desconectado) itens.push(["caiu", `O dispositivo de ${nome.toLowerCase()} caiu.`]);
+      if (f.falha) itens.push(["falha", `Falha ao gravar ${nome.toLowerCase()}: ${f.falha}`]);
+    }
+    // Reconstruir só quando o texto muda: o botão Desmutar tem de sobreviver às
+    // cinco voltas por segundo, senão o clique cai num nó que já saiu.
+    const chave = JSON.stringify(itens);
+    if (chave === avisoDesenhado) return;
+    avisoDesenhado = chave;
+    avisos.replaceChildren(...itens.map(([tipo, texto]) => {
+      const a = alerta(texto, "erro");
+      a.dataset.aviso = tipo;
+      if (tipo === "mudo") {
+        const des = botao("aa-btn-secundario aa-btn--pequeno grav-desmutar", "Desmutar");
+        des.addEventListener("click", () => chamar("mutar"));
+        a.appendChild(des);
+      }
+      return a;
+    }));
+  }
+
+  // ─────────────────────────────────────────── o selo da legenda na barra
+
+  let modoDaLegenda = null;
+  function aoSaberDaLegenda(r) {
+    modoDaLegenda = r.aovivo_impedimento ? null : r.aovivo_modo;
+    const sem = modoDaLegenda !== "legenda" && modoDaLegenda !== "bloco";
+    grade.dataset.legenda = String(!sem);
+    previa.raiz.hidden = sem;
+    semLegenda.hidden = !sem;
+    semLegendaMotivo.textContent = r.aovivo_impedimento
+      ? `Por que não há: ${r.aovivo_impedimento}` : "";
+    desenharSelo();
+  }
+
+  function desenharSelo() {
+    if (!ctx.acoesDaBarra) return;
+    if (!estado.gravando || !modoDaLegenda) { ctx.acoesDaBarra(); return; }
+    const selo = el("span", "aa-etiqueta aa-etiqueta--info grav-selo",
+      modoDaLegenda === "legenda" ? "Placa: legenda ao vivo" : "Placa: prévia em blocos");
+    ctx.acoesDaBarra(selo);
+  }
+
+  // ────────────────────────────────────────────────── o herói e a agenda
+
+  function eventoDoHeroi() {
+    const eventos = listagem?.eventos ?? [];
+    const agora = new Date();
+    return eventos.find((e) => e.id === estado.fixado)
+      ?? eventos.find((e) => e.id === listagem?.pre_definido)
+      ?? eventos.find((e) => e.inicio && new Date(e.inicio) > agora)
+      ?? null;
+  }
+
+  /** A gravação de hoje com este título, se houver — "gravada" na lista. */
+  function gravadaHoje(ev) {
+    const hoje = new Date().toDateString();
+    return (gravacoes ?? []).find((g) => g.titulo === ev.titulo && diaDoNome(g.nome) === hoje);
+  }
+
+  function desenharHeroi() {
+    const ev = eventoDoHeroi();
+    heroi.dataset.comReuniao = String(Boolean(ev));
+    if (!ev) {
+      heroiRotulo.textContent = "Sem reunião na agenda";
+      heroiTitulo.textContent = "Pronto para gravar";
+      heroiFatos.textContent = !estado.usar_agenda
+        ? "A agenda não rotula as gravações — ligue em Ajustes › Gravador."
+        : listagem === null ? "Consultando a agenda…"
+          : SEM_LISTA[listagem.status] ?? SEM_LISTA.sem_evento;
+      heroiVinculo.hidden = true;
+      gravarEsta.hidden = true;
+      gravarSem.textContent = "Gravar";
+      gravarSem.className = "aa-btn aa-btn-primario aa-btn--grande grav-gravar";
+      sugestao = null;
+      return;
+    }
+    const escolhida = estado.fixado === ev.id;
+    heroiRotulo.textContent = `${escolhida ? "Escolhida na agenda" : "Próxima na agenda"} · ${quandoComeca(ev.inicio, ev.fim)}`;
+    heroiTitulo.textContent = ev.titulo;
+    heroiFatos.textContent = [
+      quando(ev.inicio, ev.fim),
+      ev.participantes > 0 ? `${ev.participantes} convidado${ev.participantes === 1 ? "" : "s"}` : null,
+      ev.organizador ? `organizada por ${ev.organizador}` : null,
+    ].filter(Boolean).join(" · ");
+    heroiVinculo.hidden = false;
+    gravarEsta.hidden = false;
+    gravarSem.textContent = "Gravar sem reunião da agenda";
+    gravarSem.className = "aa-btn aa-btn-secundario aa-btn--grande";
+
+    // A sugestão: o par da última gravação com o mesmo título. Uma escolha
+    // feita aqui mesmo ganha, até o herói mudar de reunião.
+    if (heroi.dataset.evento !== ev.id) {
+      heroi.dataset.evento = ev.id;
+      const anterior = (gravacoes ?? []).find((g) => g.titulo === ev.titulo && g.cliente);
+      sugestao = anterior ? { cliente: anterior.cliente, projeto: anterior.projeto ?? "" } : null;
+      heroiDica.textContent = anterior ? "o mesmo da última reunião com este título" : "";
+    }
+    vinculoHeroi.texto.textContent = rotuloDoVinculo(sugestao);
+  }
 
   function desenharProximas() {
     fixadoDesenhado = estado.fixado ?? null;
+    // Sem credencial do Google não há o que fazer com a agenda, e sem "usar a
+    // agenda" não há o que oferecer: o bloco some inteiro, em vez de virar uma
+    // linha de desculpa permanente.
+    proximas.hidden = !estado.usar_agenda || listagem?.status === "nao_configurado";
+    desenharHeroi();
     listaProximas.replaceChildren();
 
     if (listagem === null) {
-      const p = document.createElement("p");
-      p.className = "bloco__texto";
-      p.textContent = "Consultando a agenda…";
-      listaProximas.appendChild(p);
+      listaProximas.appendChild(el("p", "bloco__texto", "Consultando a agenda…"));
       return;
     }
-
     if (listagem.status === "erro") {
       listaProximas.appendChild(alerta(
         `Não deu para ler a agenda: ${listagem.detalhe ?? "erro desconhecido"}.`, "erro"));
       return;
     }
-
     const eventos = listagem.eventos ?? [];
     if (eventos.length === 0) {
-      const p = document.createElement("p");
-      p.className = "bloco__texto";
-      p.textContent = SEM_LISTA[listagem.status] ?? SEM_LISTA.sem_evento;
-      listaProximas.appendChild(p);
+      listaProximas.appendChild(el("p", "bloco__texto", SEM_LISTA[listagem.status] ?? SEM_LISTA.sem_evento));
       return;
     }
 
+    const heroiId = eventoDoHeroi()?.id;
     for (const ev of eventos) {
       const fixada = estado.fixado === ev.id;
       // A marca automática só aparece enquanto ninguém escolheu: com uma
-      // reunião fixada, dizer que outra "seria esta" seria falso — não seria.
+      // reunião fixada, dizer que outra "seria esta" seria falso.
       const automatica = !estado.fixado && listagem.pre_definido === ev.id;
-
       // Já terminou no papel. Continua escolhível — é justamente a que se
-      // procura quando a reunião atrasou —, mas não pode ter o mesmo peso
-      // visual da que está para acontecer.
+      // procura quando a reunião atrasou —, mas recuada.
       const terminou = Boolean(ev.fim) && new Date(ev.fim) < new Date();
+      const gravada = terminou && gravadaHoje(ev);
 
-      const linha = document.createElement("div");
-      linha.className = "reuniao";
+      const linha = el("div", "reuniao grav-agenda__linha");
       linha.dataset.escolhida = String(fixada || automatica);
-      linha.dataset.terminou = String(terminou && !fixada);
+      linha.dataset.terminou = String(terminou && !fixada && !gravada);
+      linha.dataset.evento = ev.id;
 
-      const horario = document.createElement("p");
-      horario.className = "reuniao__hora";
-      horario.textContent = quando(ev.inicio, ev.fim);
-
-      const nome = document.createElement("p");
-      nome.className = "reuniao__titulo";
-      nome.textContent = ev.titulo;
-      if (fixada || automatica) {
-        const marca = document.createElement("span");
-        marca.className = "reuniao__marca";
-        marca.dataset.tipo = fixada ? "fixada" : "automatica";
-        marca.textContent = fixada ? "Escolhida" : "Seria esta";
-        nome.appendChild(marca);
-      }
-
-      const fatos = document.createElement("p");
-      fatos.className = "reuniao__fatos";
+      const horario = el("p", "reuniao__hora", quando(ev.inicio, ev.fim));
+      const nome = el("p", "reuniao__titulo", ev.titulo);
+      const fatos = el("p", "reuniao__fatos");
       const partes = [];
-      if (terminou) partes.push("já terminou");
-      if (ev.participantes > 0)
-        partes.push(`${ev.participantes} convidado${ev.participantes === 1 ? "" : "s"}`);
+      if (terminou && !gravada) partes.push("já terminou");
+      if (ev.participantes > 0) partes.push(`${ev.participantes} convidado${ev.participantes === 1 ? "" : "s"}`);
       if (ev.organizador) partes.push(ev.organizador);
       fatos.textContent = partes.join(" · ");
-      fatos.hidden = partes.length === 0;
+      const texto = el("div");
+      texto.append(nome, fatos);
 
-      const texto = document.createElement("div");
-      texto.append(horario, nome, fatos);
-
-      const botao = document.createElement("button");
-      botao.className = fixada
-        ? "aa-btn aa-btn-secundario aa-btn--pequeno"
-        : "aa-btn aa-btn-texto aa-btn--pequeno";
-      botao.type = "button";
-      botao.textContent = fixada ? "Soltar" : "Gravar esta";
-      botao.addEventListener("click", () =>
-        chamar("fixar-evento", { evento: fixada ? "" : ev.id }));
-
-      linha.append(texto, botao);
+      let fim;
+      if (fixada) {
+        const marca = el("span", "aa-etiqueta aa-etiqueta--info", "escolhida");
+        const soltar = botao("aa-btn-texto aa-btn--pequeno", "Soltar");
+        soltar.addEventListener("click", () => chamar("fixar-evento", { evento: "" }));
+        fim = el("div", "grav-agenda__fim");
+        fim.append(marca, soltar);
+      } else if (gravada) {
+        fim = el("span", "aa-etiqueta aa-etiqueta--sucesso", "gravada");
+      } else if (ev.id === heroiId && !estado.gravando) {
+        fim = el("span", "aa-etiqueta aa-etiqueta--info", "a próxima");
+      } else {
+        // Antes de gravar, "Gravar esta" grava; gravando, escolhe o rótulo da
+        // gravação que já corre — vale até ela terminar.
+        fim = botao("aa-btn-texto aa-btn--pequeno", estado.gravando ? "É esta" : "Gravar esta");
+        fim.addEventListener("click", () =>
+          estado.gravando ? chamar("fixar-evento", { evento: ev.id }) : gravarReuniao(ev.id));
+      }
+      linha.append(horario, texto, fim);
       listaProximas.appendChild(linha);
     }
   }
@@ -446,10 +749,7 @@ export async function telaDoGravador(ctx) {
    * minuto em minuto enquanto está aberta, em vez de desenhar uma vez.
    */
   async function carregarProximas() {
-    // Desligar "usar a agenda" é dizer que o calendário não rotula gravação;
-    // oferecer a escolha assim mesmo seria a tela contradizendo o ajuste.
     if (!estado.usar_agenda) { listagem = null; desenharProximas(); return; }
-
     atualizar.disabled = true;
     try {
       const r = await pedir("agenda-proximas");
@@ -462,30 +762,114 @@ export async function telaDoGravador(ctx) {
     desenharProximas();
   }
 
+  // ─────────────────────────────────────────────────── a última gravação
+
+  function desenharUltima() {
+    const g = (gravacoes ?? []).find((x) => x.caminho !== estado.gravacao);
+    ultima.hidden = !g;
+    if (!g) return;
+    ultimaTitulo.textContent = g.titulo || "Gravação sem título";
+    const dia = diaDoNome(g.nome) === new Date().toDateString() ? "hoje" : dataDoNome(g.nome);
+    ultimaFatos.textContent = [
+      `${dia}, ${horaDoNome(g.nome)}`,
+      `${Math.max(1, Math.round((g.duracao_s ?? 0) / 60))} min`,
+      g.cliente ? [g.cliente, g.projeto].filter(Boolean).join(" › ") : null,
+    ].filter(Boolean).join(" · ");
+    const rodando = emCurso(g.caminho);
+    const e = estadoDe(g, rodando);
+    ultimaRotulo.textContent = e.rotulo.replace(/…$/, "");
+    ultima.dataset.estado = e.chave;
+    ultimaBarra.hidden = !rodando;
+    ultimaPct.textContent = rodando?.fracao != null ? `${Math.round(rodando.fracao * 100)}%` : "";
+    if (rodando) ultimaPreench.style.width = `${Math.round((rodando.fracao ?? 0) * 100)}%`;
+    // Acabar de gravar e achar o botão de transcrever sem ir a Reuniões.
+    ultimaAbrir.textContent = !g.transcrita && !rodando ? "Transcrever" : "Abrir reunião";
+    ultimaAbrir.onclick = () => ctx.abrirGravacao?.(g);
+  }
+
+  async function recarregarGravacoes() {
+    try {
+      ({ gravacoes } = await pedir("gravacoes"));
+    } catch { /* fica a lista que havia */ }
+    desenharUltima();
+    desenharProximas();
+  }
+
   // ───────────────────────────────────────────────────── interação
 
   async function chamar(op, campos = {}) {
-    principal.disabled = true;
     try {
       const r = await pedir(op, campos);
       if (r.gravador) aplicar(r.gravador);
+      return true;
     } catch (e) {
-      avisos.replaceChildren(alerta(e.message, "erro"));
-    } finally {
-      principal.disabled = false;
+      avisosDeFora.replaceChildren(alerta(e.message, "erro"));
+      heroiErro(e.message);
+      return false;
     }
   }
 
-  principal.addEventListener("click", () =>
-    chamar(estado.gravando ? "parar-gravacao" : "gravar"));
+  const erroHeroi = el("div");
+  heroiTexto.appendChild(erroHeroi);
+  function heroiErro(texto) { erroHeroi.replaceChildren(alerta(texto, "erro")); }
+
+  /** Grava a reunião da agenda: fixa, e só então começa. */
+  async function gravarReuniao(id) {
+    gravarEsta.disabled = gravarSem.disabled = true;
+    erroHeroi.replaceChildren();
+    const aSugestao = id === eventoDoHeroi()?.id;
+    if (estado.fixado !== id && !await chamar("fixar-evento", { evento: id })) {
+      gravarEsta.disabled = gravarSem.disabled = false;
+      return;
+    }
+    sugestaoPendente = aSugestao && Boolean(sugestao);
+    if (!sugestaoPendente) sugestao = null;
+    if (!await chamar("gravar")) {
+      sugestaoPendente = false;
+      gravarEsta.disabled = gravarSem.disabled = false;
+    }
+  }
+
+  gravarEsta.addEventListener("click", () => {
+    const ev = eventoDoHeroi();
+    if (ev) gravarReuniao(ev.id);
+  });
+  // **Sem reunião da agenda**: solta a escolhida e grava. O núcleo não tem hoje
+  // um "não rotular" — sem nada fixado, a escolha automática dele ainda pode
+  // rotular a gravação com a reunião do momento.
+  gravarSem.addEventListener("click", async () => {
+    gravarEsta.disabled = gravarSem.disabled = true;
+    erroHeroi.replaceChildren();
+    sugestaoPendente = false;
+    if (estado.fixado) await chamar("fixar-evento", { evento: "" });
+    if (!await chamar("gravar")) gravarEsta.disabled = gravarSem.disabled = false;
+  });
+
+  marcar.addEventListener("click", () => {
+    if (notas.marcarMomento({ focar: abaAtiva === "notas" })) previa.marcarMomento();
+  });
   mutar.addEventListener("click", () => chamar("mutar"));
+  parar.addEventListener("click", async () => {
+    parar.disabled = true;
+    await chamar("parar-gravacao");
+    parar.disabled = false;
+  });
 
-  for (const [faixa, escolha] of [["mic", escolhaMic], ["loopback", escolhaLoop]])
-    escolha.campo.addEventListener("change", () =>
-      chamar("escolher-dispositivo", { faixa, dispositivo: escolha.campo.value }));
+  for (const [faixaNome, escolha] of [["mic", escolhaMic], ["loopback", escolhaLoop]])
+    escolha.campo.addEventListener("change", async () => {
+      await chamar("escolher-dispositivo", { faixa: faixaNome, dispositivo: escolha.campo.value });
+      desenharVai();
+    });
 
-  // O núcleo empurra o estado a cada 200 ms enquanto grava, e a cada segundo
-  // quando parado. A tela nunca pergunta em laço.
+  function desenharVai() {
+    const nomeDe = (lista, id) => {
+      const d = id ? lista.find((x) => x.id === id) : lista.find((x) => x.padrao);
+      return d?.nome ?? "Padrão do Windows";
+    };
+    vaiMic.textContent = nomeDe(dispositivos.entradas, escolhaMic.campo.value);
+    vaiAudio.textContent = nomeDe(dispositivos.saidas, escolhaLoop.campo.value);
+  }
+
   atualizar.addEventListener("click", carregarProximas);
 
   // De minuto em minuto, e não a cada 200 ms como o resto desta tela: cada
@@ -496,12 +880,18 @@ export async function telaDoGravador(ctx) {
     carregarProximas();
   }, 60_000);
 
+  const cancelarTranscricoes = assinarTranscricoes(() => {
+    if (!raiz.isConnected) { cancelarTranscricoes(); return; }
+    desenharUltima();
+  });
+
   const cancelar = assinar("gravador", (evento) => {
     // A tela saiu do DOM (o usuário mudou de destino): parar de desenhar e
     // largar a assinatura. Sem isto, um medidor de uma tela fechada continuaria
     // escrevendo em nós órfãos até o app fechar.
     if (!raiz.isConnected) {
       cancelar();
+      cancelarTranscricoes();
       clearInterval(relogioDaAgenda);
       // A prévia também: ela segura um IntersectionObserver, que sobreviveria à
       // tela e ficaria observando um nó órfão até o app fechar.
@@ -512,8 +902,24 @@ export async function telaDoGravador(ctx) {
   });
 
   aplicar(estado);
+  desenharVai();
+  desenharUltima();
   desenharProximas();
   carregarProximas();
+}
+
+/** "2026-09-25_11-02-00" → a data, para comparar com hoje. */
+function diaDoNome(nome) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})_/.exec(nome ?? "");
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]).toDateString() : "";
+}
+function dataDoNome(nome) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})_/.exec(nome ?? "");
+  return m ? `${m[3]}/${m[2]}` : "";
+}
+function horaDoNome(nome) {
+  const m = /_(\d{2})-(\d{2})/.exec(nome ?? "");
+  return m ? `${m[1]}:${m[2]}` : "";
 }
 
 /** Um select de dispositivo, com "Padrão do Windows" primeiro. */

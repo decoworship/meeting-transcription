@@ -38,10 +38,11 @@ test("vale para os dois donos", () => {
   assert.equal(novaLinha(linha(true, 10), { dono: true, t: 14 }), true);
 });
 
-test("o dono só aparece na primeira linha da sequência", () => {
+test("\"Outros\" só aparece na primeira linha da sequência; \"Você\" em toda", () => {
   assert.equal(mostraDono(null, false), true);
   assert.equal(mostraDono(linha(false, 1), false), false);
   assert.equal(mostraDono(linha(true, 1), false), true);
+  assert.equal(mostraDono(linha(true, 1), true), true);
 });
 
 test("palavras contam por espaço", () => {
