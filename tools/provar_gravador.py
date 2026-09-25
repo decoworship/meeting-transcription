@@ -523,7 +523,20 @@ def prova_chip_nas_outras_telas(pagina) -> None:
 prova_chip_nas_outras_telas.antes = GRAVANDO
 prova_chip_nas_outras_telas.hash = "reunioes"
 
-PROVAS = [prova_monta, prova_chip_nas_outras_telas, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_janela_estreita_antes(pagina) -> None:
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 900 px, antes de gravar, sem rolagem lateral")
+
+
+def prova_janela_estreita_gravando(pagina) -> None:
+    conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "a 900 px, gravando, sem rolagem lateral")
+    conferir(pagina.is_visible(".grav-faixa__acoes >> text=Parar"), "e o Parar à vista")
+
+
+prova_janela_estreita_antes.janela = (900, 700)
+prova_janela_estreita_gravando.janela = (900, 700)
+prova_janela_estreita_gravando.antes = GRAVANDO
+
+PROVAS = [prova_monta, prova_janela_estreita_antes, prova_janela_estreita_gravando, prova_chip_nas_outras_telas, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]
