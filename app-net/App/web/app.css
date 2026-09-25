@@ -202,8 +202,8 @@ html {
   top: 0;
   z-index: var(--z-suspenso);
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  grid-template-areas: "voltar titulo acoes" "voltar sub acoes";
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-areas: "voltar titulo chip acoes" "voltar sub chip acoes";
   align-items: center;
   gap: 0 var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-6);
@@ -241,7 +241,8 @@ html {
  * título. A barra muda de altura, e os blocos que grudam abaixo dela seguem —
  * a altura é medida (app.js). */
 @media (max-width: 899px) {
-  .barra { grid-template-columns: auto 1fr; grid-template-areas: "voltar titulo" "voltar sub" "acoes acoes"; }
+  .barra { grid-template-columns: auto 1fr; grid-template-areas: "voltar titulo" "voltar sub" "chip chip" "acoes acoes"; }
+  .chip-gravando { justify-self: start; margin-top: var(--espaco-2); }
   .barra__acoes { justify-content: flex-start; margin-top: var(--espaco-2); }
 }
 
@@ -2100,3 +2101,24 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * "escolhida"), como no gabarito; o fundo de ação da lista antiga brigava com o
  * botão principal do herói, que é o azul da tela. */
 .reuniao.grav-agenda__linha[data-escolhida="true"] { background: none; border-color: var(--cor-borda); }
+
+/* O chip de gravando, no cabeçalho das outras telas (spec §3.1). Pílula com o
+ * ponto vermelho do gravador; o relógio em dígitos tabulares para não dançar. */
+.chip-gravando {
+  grid-area: chip;
+  display: inline-flex; align-items: center; gap: var(--espaco-2);
+  padding: 4px var(--espaco-3);
+  border: 1px solid var(--cor-erro);
+  border-radius: var(--raio-pilula);
+  background: var(--cor-erro-bg);
+  color: var(--cor-texto-forte);
+  font: 600 var(--texto-pequeno) / 1.4 var(--fonte-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chip-gravando[hidden] { display: none; }
+.chip-gravando:hover { background: var(--cor-superficie-2); }
+.chip-gravando:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.chip-gravando__ponto { width: 8px; height: 8px; border-radius: 50%; background: var(--cor-erro); }
+.chip-gravando[data-mudo="true"] .chip-gravando__ponto { background: var(--cor-destaque); }

@@ -493,7 +493,37 @@ window.__aovivo = { aovivo_modo: "nada", aovivo_ate: [], perguntar_impedimento: 
   aovivo_impedimento: "nem a legenda nem a prévia em blocos estão ligadas em Ajustes › Transcrição." };
 """
 
-PROVAS = [prova_monta, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_chip_nas_outras_telas(pagina) -> None:
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    pagina.wait_for_selector("#chip-gravando:not([hidden])", timeout=2000)
+    conferir(texto(pagina, "#chip-gravando") == "Gravando 00:31:24 · voltar ao Gravador",
+             f"em Reuniões, o chip diz que está gravando ({texto(pagina, '#chip-gravando')!r})")
+    pagina.evaluate("() => { window.__chip = document.querySelector('#chip-gravando'); }")
+    pagina.click("#busca-reunioes")
+    pagina.keyboard.type("lider")
+    pagina.evaluate("() => { for (let i = 0; i < 10; i++) window.__empurrar({ duracao_s: 1885 + i }); }")
+    pagina.keyboard.type("anças")
+    conferir(pagina.evaluate("() => document.activeElement.id") == "busca-reunioes"
+             and pagina.input_value("#busca-reunioes") == "lideranças",
+             "digitar na busca com o chip andando não perde o foco")
+    conferir(texto(pagina, "#chip-gravando").startswith("Gravando 00:31:34")
+             and pagina.evaluate("() => window.__chip === document.querySelector('#chip-gravando')"),
+             "o relógio do chip anda sem o chip ser refeito")
+    pagina.click("#chip-gravando")
+    pagina.wait_for_selector(".grav-gravando:not([hidden])", timeout=3000)
+    conferir(texto(pagina, "#titulo") == "Gravador" and not pagina.is_visible("#chip-gravando"),
+             "o chip volta ao Gravador, e lá ele não aparece")
+    pagina.click("#ir-reunioes")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    conferir(pagina.is_visible("#chip-gravando"), "de volta a Reuniões, o chip volta")
+    pagina.evaluate("() => window.__empurrar({ gravando: false, gravacao: null, cor: 'cinza' })")
+    conferir(not pagina.is_visible("#chip-gravando"), "parado, o chip some")
+
+
+prova_chip_nas_outras_telas.antes = GRAVANDO
+prova_chip_nas_outras_telas.hash = "reunioes"
+
+PROVAS = [prova_monta, prova_chip_nas_outras_telas, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]

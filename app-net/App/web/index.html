@@ -94,6 +94,12 @@
       <p class="barra__sub" id="subtitulo"></p>
       <!-- O que a tela põe na barra, à direita: Lista e Semana em Reuniões. A
            tela o preenche com acoesDaBarra (app.js), e trocar de tela o esvazia. -->
+      <!-- Gravando, qualquer outra tela mostra este chip (spec §3.1): quem sai para
+           conferir uma reunião antiga não pode perder de vista que está gravando.
+           O app.js o acende e só troca o texto — nunca o refaz. -->
+      <button class="chip-gravando" id="chip-gravando" type="button" hidden>
+        <span class="chip-gravando__ponto" aria-hidden="true"></span><span class="chip-gravando__texto"></span>
+      </button>
       <div class="barra__acoes" id="acoes-da-barra"></div>
     </header>
 
