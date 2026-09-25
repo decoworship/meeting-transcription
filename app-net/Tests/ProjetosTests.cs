@@ -234,8 +234,34 @@ public sealed class ProjetosTests : IDisposable
         Assert.Equal("pt", relido.Language);
         Assert.Contains("\"tipo_de_ata\": \"cliente\"", File.ReadAllText(Caminho));
 
-        // "Padrão do app" é texto vazio: nulo não se escreve, e não voltaria.
+        // "Padrão do app" é texto vazio, e vazio tira a chave.
         p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto { TipoDeAta = "" });
-        Assert.Equal("", new Projetos(Caminho).Preferencias("Algar", "Agentes")!.TipoDeAta);
+        Assert.Null(new Projetos(Caminho).Preferencias("Algar", "Agentes")!.TipoDeAta);
+    }
+
+    [Fact]
+    public void VazioLimpaAChaveENuloAMantem()
+    {
+        // Limpar o vocabulário, o idioma ou o modelo em Ajustes manda "" — e o
+        // disco tem de esquecer o valor antigo. Nulo continua sendo "não mexi":
+        // é o que o preparo manda para as chaves que não conhece.
+        var p = new Projetos(Caminho);
+        p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto
+        {
+            Language = "pt", ModelSize = "large-v3", DiarModel = "community-1",
+            InitialPrompt = "Beegol", TipoDeAta = "cliente",
+        });
+        p.Salvar("Algar", "Agentes", new PreferenciasDoProjeto
+        {
+            Language = "", ModelSize = "", DiarModel = "", InitialPrompt = "",
+        });
+
+        var r = new Projetos(Caminho).Preferencias("Algar", "Agentes")!;
+        Assert.Null(r.Language);
+        Assert.Null(r.ModelSize);
+        Assert.Null(r.DiarModel);
+        Assert.Null(r.InitialPrompt);
+        Assert.Equal("cliente", r.TipoDeAta);
+        Assert.DoesNotContain("initial_prompt", File.ReadAllText(Caminho));
     }
 }

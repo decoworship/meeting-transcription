@@ -21,6 +21,19 @@ import { telaDeLista } from "/app.js";
 /** Os idiomas que se escolhem por nome. Um código gravado fora desta lista vira opção própria. */
 const IDIOMAS = [["", "Detectar sozinho"], ["pt", "Português"], ["en", "Inglês"], ["es", "Espanhol"]];
 
+// Limpar um valor manda "" e não nulo: o núcleo tira a chave com vazio, e
+// nulo ele ignora — o valor antigo ficaria no disco (Projetos.Salvar).
+
+/** Um nome já em uso, sem olhar caixa nem espaço: "vivo" e "Vivo " são o Vivo. */
+const emUso = (nomes, nome) => nomes.find((n) => n.trim().toLowerCase() === nome.trim().toLowerCase());
+
+async function jaExiste(oQue, nome) {
+  await avisar(`Já existe ${oQue} "${nome}". Escolha outro nome.`, { titulo: "Esse nome já existe" });
+}
+
+const AVISO_DO_NOME = "As reuniões já feitas continuam com o nome antigo: renomear "
+  + "aqui leva o vocabulário e as preferências, e não religa as reuniões.";
+
 // A escolha mora no módulo: criar, renomear ou apagar recarrega a tela, e
 // quem estava num projeto tem de continuar nele.
 const escolha = { cliente: null, projeto: null, busca: "" };
@@ -40,13 +53,14 @@ function botao(rotulo, classe, aoClicar) {
 }
 
 /** Roda a op e recarrega; se falhar, diz por quê e não recarrega. */
-async function executar(titulo, op, recarregar) {
+async function executar(titulo, op, recarregar, aoDarCerto = () => {}) {
   try {
     await op();
   } catch (e) {
     await avisar(e.message, { titulo });
     return;
   }
+  aoDarCerto();
   recarregar();
 }
 
@@ -71,6 +85,8 @@ export function abaClientes({ clientes, gravacoes, catalogo, diarizadores, tipos
   cabeca.append(textos, botao("+ Cliente", "aa-btn-secundario", async () => {
     const cliente = await perguntarTexto("Nome do cliente", "", { titulo: "Novo cliente", ok: "Continuar" });
     if (!cliente) return;
+    const existente = emUso(nomes, cliente);
+    if (existente) { await jaExiste("o cliente", existente); return; }
     const projeto = await perguntarTexto("Nome do primeiro projeto", "",
                                          { titulo: `Primeiro projeto de ${cliente}`, ok: "Criar" });
     if (!projeto) return;
@@ -122,7 +138,7 @@ export function abaClientes({ clientes, gravacoes, catalogo, diarizadores, tipos
 
     function desenharDetalhe() {
       detalhe.replaceChildren(detalheDoCliente(escolha.cliente, clientes[escolha.cliente],
-        { contagem, catalogo, diarizadores, tipos, recarregar, estado }));
+        { contagem, catalogo, diarizadores, tipos, recarregar, estado, nomes }));
     }
 
     mestre.append(busca, lista);
@@ -152,6 +168,8 @@ function detalheDoCliente(cliente, projetos, ctx) {
   const novo = botao("+ Projeto", "aa-btn-secundario", async () => {
     const projeto = await perguntarTexto("Nome do projeto", "", { titulo: `Novo projeto de ${cliente}`, ok: "Criar" });
     if (!projeto) return;
+    const existente = emUso(projetos, projeto);
+    if (existente) { await jaExiste("o projeto", existente); return; }
     escolha.projeto = projeto;
     executar("Não deu para criar",
              () => pedir("salvar-projeto", { cliente, projeto, prefs: {} }), recarregar);
@@ -166,11 +184,14 @@ function detalheDoCliente(cliente, projetos, ctx) {
     const menu = el("div", "clientes__menu");
     const renomear = botao("Renomear cliente", "aa-btn-texto", async () => {
       fechar();
-      const para = await perguntarTexto("Novo nome do cliente", cliente, { titulo: "Renomear cliente" });
+      const para = await perguntarTexto("Novo nome do cliente", cliente,
+                                        { titulo: "Renomear cliente", texto: AVISO_DO_NOME });
       if (!para || para === cliente) return;
-      escolha.cliente = para;
+      const existente = emUso(ctx.nomes.filter((n) => n !== cliente), para);
+      if (existente) { await jaExiste("o cliente", existente); return; }
       executar("Não deu para renomear",
-               () => pedir("renomear-cliente", { cliente, nome: para }), recarregar);
+               () => pedir("renomear-cliente", { cliente, nome: para }), recarregar,
+               () => { escolha.cliente = para; });
     });
     const apagar = botao("Apagar cliente", "aa-btn-texto clientes__perigo", async () => {
       fechar();
@@ -192,9 +213,10 @@ function detalheDoCliente(cliente, projetos, ctx) {
   const lista = el("div", "clientes__projetos");
   const ordenados = ordenar(projetos);
   if (!ordenados.includes(escolha.projeto)) escolha.projeto = ordenados[0] ?? null;
+  const ctxDoProjeto = { ...ctx, projetos };
   const linhas = [];
   for (const p of ordenados)
-    linhas.push(linhaDeProjeto(cliente, p, ctx, () => { for (const l of linhas) l.fechar(); }));
+    linhas.push(linhaDeProjeto(cliente, p, ctxDoProjeto, () => { for (const l of linhas) l.fechar(); }));
   lista.append(...linhas.map((l) => l.raiz));
   if (ordenados.length === 0)
     lista.appendChild(el("p", "campo__dica clientes__vazio", "Nenhum projeto. Crie um em “+ Projeto”."));
@@ -272,7 +294,7 @@ function linhaDeProjeto(cliente, projeto, ctx, fecharOsOutros) {
 
     const vocab = campoDeEtiquetas({
       id: "projeto-vocabulario", rotulo: "Vocabulário",
-      aoMudar: () => gravar({ initial_prompt: vocab.valor() || null }),
+      aoMudar: () => gravar({ initial_prompt: vocab.valor() }),
     });
     vocab.definir(prefs.initial_prompt ?? "");
     vocab.raiz.querySelector(".etiquetas__novo").placeholder = "+ termo";
@@ -284,10 +306,10 @@ function linhaDeProjeto(cliente, projeto, ctx, fecharOsOutros) {
     const campos = el("div", "clientes__campos");
     campos.append(
       seletor("Idioma", "projeto-idioma", idiomas, prefs.language,
-              (v) => gravar({ language: v || null })),
+              (v) => gravar({ language: v })),
       seletor("Modelo", "projeto-modelo",
               [["", "Padrão do app"], ...asr.map((i) => [i.pacote.id, i.pacote.nome])],
-              prefs.model_size, (v) => gravar({ model_size: v || null })),
+              prefs.model_size, (v) => gravar({ model_size: v })),
       seletor("Falantes", "projeto-falantes", [["sim", "Separar"], ["nao", "Não separar"]],
               prefs.diarization === false ? "nao" : "sim",
               (v) => gravar({ diarization: v === "sim" })),
@@ -305,11 +327,14 @@ function linhaDeProjeto(cliente, projeto, ctx, fecharOsOutros) {
         telaDeLista();
       }),
       botao("Renomear", "aa-btn-texto", async () => {
-        const para = await perguntarTexto("Novo nome do projeto", projeto, { titulo: "Renomear projeto" });
+        const para = await perguntarTexto("Novo nome do projeto", projeto,
+                                          { titulo: "Renomear projeto", texto: AVISO_DO_NOME });
         if (!para || para === projeto) return;
-        escolha.projeto = para;
+        const existente = emUso(ctx.projetos.filter((n) => n !== projeto), para);
+        if (existente) { await jaExiste("o projeto", existente); return; }
         executar("Não deu para renomear",
-                 () => pedir("renomear-projeto", { cliente, projeto, nome: para }), recarregar);
+                 () => pedir("renomear-projeto", { cliente, projeto, nome: para }), recarregar,
+                 () => { escolha.projeto = para; });
       }),
       botao("Apagar projeto", "aa-btn-texto clientes__perigo", async () => {
         if (!await confirmar(`Apagar o projeto "${projeto}" de ${cliente}?\n\n`
@@ -324,7 +349,7 @@ function linhaDeProjeto(cliente, projeto, ctx, fecharOsOutros) {
     const mais = el("div", "clientes__mais");
     const diar = seletor("Modelo de diarização", "projeto-diarizacao",
                          [["", "Padrão do app"], ...diarizadores.map((d) => [d, d])],
-                         prefs.diar_model, (v) => gravar({ diar_model: v || null }));
+                         prefs.diar_model, (v) => gravar({ diar_model: v }));
     // O mesmo texto do preparo: o teto de 224 tokens do initial_prompt morreu
     // quando a correção fonética entrou.
     const dica = el("p", "campo__dica", "Vocabulário: nomes de pessoas, jargão, nomes de "

@@ -318,10 +318,10 @@ export function avisar(texto, opcoes = {}) {
  * @returns o texto aparado, ou nulo se a pessoa desistiu ou deixou vazio.
  */
 export function perguntarTexto(rotulo, valor = "", opcoes = {}) {
-  const { titulo = rotulo, ok = "Salvar" } = opcoes;
+  const { titulo = rotulo, ok = "Salvar", texto = "" } = opcoes;
 
   return new Promise((resolver) => {
-    const { dialogo, corpo, acoes } = caixa(titulo, "");
+    const { dialogo, corpo, acoes } = caixa(titulo, texto);
 
     const entrada = document.createElement("input");
     entrada.className = "aa-entrada";

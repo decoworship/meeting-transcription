@@ -1485,6 +1485,15 @@ export async function telaDeAjustes(ctx, aba = "geral") {
     colunaAbas.appendChild(botao);
   }
 
+  // A marca e a versão no pé do menu, como na prancha de Ajustes (4a). Do
+  // diagnóstico, guardado por sessão, que é de onde o bloco Sobre já as lê.
+  const versao = document.createElement("p");
+  versao.className = "abas__versao";
+  colunaAbas.appendChild(versao);
+  diagnostico().then((d) => {
+    if (d?.marca && d?.versao) versao.textContent = `${d.marca} ${d.versao}`;
+  }).catch(() => {});
+
   desenharPainel();
   raiz.append(colunaAbas, painel);
   tela.replaceChildren(raiz);

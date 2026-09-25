@@ -142,6 +142,18 @@ transcrevendo, e o destino de teste não tem os motores. Nenhum usa cor fora de
 token, mas a conferência é de olho e nunca foi feita.
 Origem: [FASE5-HANDOFF.md](FASE5-HANDOFF.md) §6.2.
 
+### UI-10 · Renomear projeto não religa as reuniões — `bug` · `espera`
+
+Renomear um cliente ou projeto em Ajustes leva o vocabulário e as
+preferências, mas cada reunião guarda o vínculo com o nome antigo
+(`DadosDaReuniao`). Elas somem das contagens do projeto novo, do "Ver as
+reuniões deste projeto", e a correção da legenda passa a não achar
+vocabulário para elas. Hoje a tela só avisa, no pedido do nome novo.
+Gatilho: a primeira vez que alguém renomear e estranhar a contagem; aí,
+religar as reuniões do nome antigo na mesma operação, com a lista delas na
+confirmação.
+Origem: revisão final do plano 4a (`superpowers/plans/2026-09-25-ui-04a-clientes.md`).
+
 ---
 
 ## 2. Ata: formato e saída

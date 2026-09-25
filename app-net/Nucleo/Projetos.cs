@@ -146,8 +146,19 @@ public sealed class Projetos
         var alvo = ps[projeto] as JsonObject ?? new JsonObject();
         var novo = JsonSerializer.SerializeToNode(prefs, ProjetosJson.Default.PreferenciasDoProjeto)!
             .AsObject();
+        // Texto vazio é "limpar": Ajustes › Clientes o manda quando se tira o
+        // último termo, se volta a "Detectar sozinho" ou a "Padrão do app". Nulo
+        // não chega aqui (WhenWritingNull) e continua sendo "não mexi" — é o que
+        // o preparo manda para as chaves que não conhece, como tipo_de_ata. Quem
+        // lê já trata a chave ausente como não definida (CorrecaoDaLegenda,
+        // Pipeline, o preparo), e o app Python também (projects.py).
         foreach (var (chave, valor) in novo)
-            alvo[chave] = valor?.DeepClone();
+        {
+            if (valor is JsonValue v && v.TryGetValue(out string? texto) && texto.Length == 0)
+                alvo.Remove(chave);
+            else
+                alvo[chave] = valor?.DeepClone();
+        }
         ps[projeto] = alvo;
 
         Gravar();

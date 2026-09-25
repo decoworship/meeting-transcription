@@ -52,12 +52,15 @@ ESTADO = r"""
       case "modelos-de-ata": return { tipos };
       case "vozes": return { vozes: [] };
       case "gravador": return { gravador: {} };
+      case "diagnostico": return { diagnostico: { marca: "PulseMeet", versao: "0.7.1", texto: "" } };
       case "salvar-projeto":
         (clientes[q.cliente] ??= []);
         if (!clientes[q.cliente].includes(q.projeto)) clientes[q.cliente].push(q.projeto);
         prefs[k] = { ...(prefs[k] ?? {}), ...q.prefs };
         return { clientes };
+      // Como o núcleo: nome em uso é erro, e não um "ok" que não fez nada.
       case "renomear-projeto": {
+        if (clientes[q.cliente].includes(q.nome)) return { erro: "já existe um projeto com esse nome" };
         const l = clientes[q.cliente]; l[l.indexOf(q.projeto)] = q.nome;
         prefs[`${q.cliente}::${q.nome}`] = prefs[k]; delete prefs[k];
         return { clientes };
@@ -66,6 +69,7 @@ ESTADO = r"""
         clientes[q.cliente] = clientes[q.cliente].filter((p) => p !== q.projeto);
         return { clientes };
       case "renomear-cliente":
+        if (clientes[q.nome]) return { erro: "já existe um cliente com esse nome" };
         clientes[q.nome] = clientes[q.cliente]; delete clientes[q.cliente]; return { clientes };
       case "apagar-cliente": delete clientes[q.cliente]; return { clientes };
       default: return null;
@@ -228,6 +232,65 @@ def prova_renomear_e_apagar(pagina) -> None:
              "o ⋯ do cliente guarda renomear e apagar o cliente")
 
 
+def prova_limpar(pagina) -> None:
+    # I-1: limpar manda "" (o núcleo tira a chave), e nunca nulo, que o
+    # WhenWritingNull descarta e deixava o valor antigo no disco.
+    abrir_projeto(pagina, "Agentes")
+    aberto = ".clientes__projeto--aberto"
+    for _ in range(7):
+        pagina.click(f"{aberto} .etiquetas__novo")
+        pagina.keyboard.press("Backspace")
+    pagina.wait_for_timeout(100)
+    pagina.select_option(f"{aberto} #projeto-idioma", "")
+    pagina.select_option(f"{aberto} #projeto-modelo", "")
+    pagina.wait_for_timeout(150)
+    p = pedidos(pagina, "salvar-projeto")[-1]["prefs"]
+    conferir(p["initial_prompt"] == "" and p["language"] == "" and p["model_size"] == "",
+             f"limpar vocabulário, idioma e modelo manda vazio ({p})")
+    conferir(all(v is not None for v in p.values()), "e nenhum nulo")
+
+
+def prova_renomear_para_nome_existente(pagina) -> None:
+    abrir_projeto(pagina, "Agentes")
+    pagina.click(".clientes__projeto--aberto >> text=Renomear")
+    dica = pagina.inner_text("dialog[open]")
+    conferir("reuniões já feitas" in dica, f"o pedido de nome avisa que as reuniões guardam o nome antigo ({dica!r})")
+    pagina.fill("dialog[open] input", "Agente de Crédito")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector("dialog[open] >> text=já existe", timeout=3000)
+    conferir(True, "renomear para um projeto que existe diz que já existe")
+    pagina.click("dialog[open] button")
+    pagina.wait_for_timeout(100)
+    conferir(pedidos(pagina, "renomear-projeto") == [], "e não pede a renomeação")
+    conferir("Agentes" in pagina.inner_text(".clientes__projeto--aberto .clientes__nome"),
+             "e continua no projeto em que estava")
+    pagina.click(".clientes__mais-cliente")
+    pagina.click(".popover >> text=Renomear cliente")
+    pagina.fill("dialog[open] input", "Vivo")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector("dialog[open] >> text=já existe", timeout=3000)
+    pagina.click("dialog[open] button")
+    conferir(pagina.locator(".clientes__cliente[aria-current='true']").inner_text().startswith("Algar"),
+             "renomear o cliente para um que existe avisa e fica no mesmo")
+
+
+def prova_cliente_existente(pagina) -> None:
+    pagina.click(".clientes__cabeca >> text=+ Cliente")
+    pagina.fill("dialog[open] input", "vivo")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_selector("dialog[open] >> text=já existe", timeout=3000)
+    conferir(True, "'+ Cliente' com nome que existe (sem olhar caixa) diz que já existe")
+    pagina.click("dialog[open] button")
+    conferir(pedidos(pagina, "salvar-projeto") == [], "e não cria nada")
+
+
+def prova_acabamento(pagina) -> None:
+    ap = pagina.eval_on_selector(".clientes select.aa-entrada", "s => getComputedStyle(s).appearance")
+    conferir(ap == "none", f"os seletores de Clientes têm uma seta só ({ap})")
+    pe = pagina.inner_text(".abas__versao") if pagina.locator(".abas__versao").count() else ""
+    conferir(pe == "PulseMeet 0.7.1", f"o pé do menu de Ajustes diz a marca e a versão ({pe!r})")
+
+
 def prova_ver_reunioes(pagina) -> None:
     abrir_projeto(pagina, "Agentes")
     pagina.click("text=Ver as reuniões deste projeto")
@@ -245,7 +308,8 @@ def prova_estreita(pagina) -> None:
 prova_estreita.janela = (1000, 700)
 
 PROVAS = [prova_mestre, prova_projeto_aberto, prova_busca, prova_gravar, prova_criar,
-          prova_renomear_e_apagar, prova_ver_reunioes, prova_estreita]
+          prova_renomear_e_apagar, prova_limpar, prova_renomear_para_nome_existente,
+          prova_cliente_existente, prova_acabamento, prova_ver_reunioes, prova_estreita]
 
 
 def main() -> int:

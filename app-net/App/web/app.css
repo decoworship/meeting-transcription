@@ -1960,3 +1960,15 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   max-width: 90rem;
   padding-top: var(--espaco-5);
 }
+
+/* Uma seta só nos seletores de Clientes: o DS já desenha a dele, e o
+ * appearance:auto global (select.aa-entrada) punha a do navegador junto. */
+.clientes select.aa-entrada { appearance: none; }
+
+/* A marca e a versão no pé do menu de Ajustes. */
+.abas__versao {
+  margin: var(--espaco-4) 0 0;
+  padding: 0 var(--espaco-3);
+  color: var(--cor-texto-suave);
+  font-size: var(--texto-rotulo);
+}

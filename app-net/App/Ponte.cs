@@ -867,12 +867,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     break;
 
                 case "renomear-cliente":
-                    _projetos.RenomearCliente(p.Cliente ?? "", p.Nome ?? "");
+                    // Falso é nome em uso (ou alvo sumido): dizer, e não responder "ok"
+                    // com nada feito — a tela iria para o outro. Revisão final do 4a.
+                    if (!_projetos.RenomearCliente(p.Cliente ?? "", p.Nome ?? ""))
+                        throw new InvalidOperationException("não deu para renomear: já existe um cliente com esse nome, ou o cliente não existe mais");
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
                 case "renomear-projeto":
-                    _projetos.RenomearProjeto(p.Cliente ?? "", p.Projeto ?? "", p.Nome ?? "");
+                    // Falso é nome em uso (ou alvo sumido): dizer, e não responder "ok"
+                    // com nada feito — a tela iria para o outro. Revisão final do 4a.
+                    if (!_projetos.RenomearProjeto(p.Cliente ?? "", p.Projeto ?? "", p.Nome ?? ""))
+                        throw new InvalidOperationException("não deu para renomear: já existe um projeto com esse nome, ou o projeto não existe mais");
                     Responder(new Resposta { Id = p.Id, Clientes = MapaDeClientes() });
                     break;
 
