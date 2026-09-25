@@ -476,7 +476,24 @@ def prova_vinculo_durante_a_gravacao(pagina) -> None:
 
 prova_vinculo_durante_a_gravacao.antes = GRAVANDO
 
-PROVAS = [prova_monta, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
+def prova_sem_legenda(pagina) -> None:
+    pagina.wait_for_timeout(200)
+    conferir(not pagina.is_visible(".grav-grade > .aovivo"), "sem legenda, nenhuma coluna de legenda vazia")
+    conferir(pagina.is_visible(".grav-sem-legenda") and "placa de vídeo" in texto(pagina, ".grav-sem-legenda")
+             and "Por que não há: nem a legenda" in texto(pagina, ".grav-sem-legenda"),
+             "um cartão diz o que a legenda faria, quanto custa e por que não há")
+    caixas = pagina.evaluate("""() => ['.grav-grade > .grav-abas', '.grav-grade > .grav-sem-legenda'].map((s) => {
+        const r = document.querySelector(s).getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; })""")
+    conferir(caixas[0][0] < caixas[1][0] and caixas[0][1] > caixas[1][1], f"as notas ficam largas, à esquerda ({caixas})")
+    conferir(texto(pagina, "#acoes-da-barra") == "", "e o selo da placa some")
+
+
+prova_sem_legenda.antes = GRAVANDO + """
+window.__aovivo = { aovivo_modo: "nada", aovivo_ate: [], perguntar_impedimento: "desligado",
+  aovivo_impedimento: "nem a legenda nem a prévia em blocos estão ligadas em Ajustes › Transcrição." };
+"""
+
+PROVAS = [prova_monta, prova_sem_legenda, prova_vinculo_durante_a_gravacao, prova_mudo_na_faixa, prova_dispositivo_caiu, prova_gravando_faixa_e_grade, prova_gravando_nao_rouba_foco,
           prova_gravando_marcar_momento, prova_legenda_quebra_na_pausa, prova_antes_heroi, prova_antes_agenda,
           prova_antes_gravar_esta, prova_antes_sem_agenda, prova_antes_ultima_gravacao,
           prova_antes_transcrever, prova_resto_embaixo]
