@@ -752,6 +752,31 @@ def prova_preparo_erro_devolve_o_formulario(pagina) -> None:
     conferir(pagina.text_content(".preparo__formulario .aa-btn-primario") == "Tentar de novo", "oferecendo tentar de novo")
 
 
+def prova_ata_usa_o_tipo_do_projeto(pagina) -> None:
+    # Plano 4a: o projeto guarda o tipo de ata padrão, e a aba Ata abre nele.
+    # "Comunicação" é de Algar/Agentes; a Vivo/Sherlock não escolheu nenhum.
+    pagina.evaluate("""() => {
+      window.__prefsPorProjeto = { "Algar::Agentes": { tipo_de_ata: "cliente" } };
+      window.__responder = (q) => q.op === "modelos-de-ata"
+        ? { tipos: [{ id: "geral", nome: "Reunião geral" }, { id: "cliente", nome: "Reunião com cliente" }] }
+        : null;
+    }""")
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.click(".reuniao-aberta [data-aba='ata']")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    pagina.wait_for_timeout(100)
+    tipo = pagina.eval_on_selector("#painel-ata .ata__tipo select", "s => s.value")
+    conferir(tipo == "Reunião com cliente", f"a aba Ata abre no tipo do projeto ({tipo!r})")
+    pagina.click("#ir-reunioes")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    abrir_reuniao(pagina, "Sherlock")
+    pagina.click(".reuniao-aberta [data-aba='ata']")
+    pagina.wait_for_selector("#painel-ata .ata__tipo select", timeout=5000)
+    pagina.wait_for_timeout(100)
+    tipo = pagina.eval_on_selector("#painel-ata .ata__tipo select", "s => s.value")
+    conferir(tipo == "Reunião geral", f"e o projeto sem tipo fica no primeiro, como antes ({tipo!r})")
+
+
 def prova_reuniao_ata(pagina) -> None:
     abrir_reuniao(pagina, "Comunicação")
     largura = "() => Math.round(document.querySelector('.reuniao-aberta').getBoundingClientRect().width)"
@@ -1481,7 +1506,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
           prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
-          prova_reuniao_ata, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
+          prova_reuniao_ata, prova_ata_usa_o_tipo_do_projeto, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
           prova_preparo_vocabulario_nao_atravessa_projeto,
           prova_preparo_curto, prova_preparo_andamento, prova_preparo_erro_devolve_o_formulario,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,

@@ -85,9 +85,17 @@ function botoesDaAta(markdown, gravacao, depois) {
  *   nasceu do resumo da lista, lido antes de a ata nova existir.
  */
 export async function montarAta(painel, g, { aoContar } = {}) {
-  let tipos;
+  let tipos, doProjeto;
   try {
-    ({ tipos } = await pedir("modelos-de-ata"));
+    // O tipo de ata padrão do projeto (Ajustes › Clientes, plano 4a). Sem
+    // projeto, ou sem preferência, fica o primeiro da lista, como sempre foi.
+    [{ tipos }, doProjeto] = await Promise.all([
+      pedir("modelos-de-ata"),
+      g.cliente && g.projeto
+        ? pedir("prefs", { cliente: g.cliente, projeto: g.projeto })
+          .then((r) => r.prefs?.tipo_de_ata || null, () => null)
+        : null,
+    ]);
   } catch (e) {
     painel.replaceChildren(alerta(e.message, "erro"));
     return;
@@ -104,6 +112,8 @@ export async function montarAta(painel, g, { aoContar } = {}) {
     opcoes: tipos.map((t) => t.nome),
   });
   escolha.classList.add("ata__tipo");
+  const padrao = tipos.find((t) => t.id === doProjeto);
+  if (padrao) escolha.querySelector("select").value = padrao.nome;
   const botao = document.createElement("button");
   botao.className = "aa-btn aa-btn-primario";
   botao.type = "button";
