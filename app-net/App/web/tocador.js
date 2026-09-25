@@ -22,7 +22,10 @@ export function ouvir(g, segundos) {
   const src = `https://gravacoes.local/${encodeURIComponent(g.nome)}/mix.wav`;
   if (audio.getAttribute("src") !== src) audio.src = src;
   audio.currentTime = segundos;
-  audio.play().catch(() => {});
+  // A promessa do play() volta para quem chamou: é dela que sai o "sem
+  // áudio: …" no estado da revisão. Quem não tem onde mostrar o erro (o
+  // tocador, as notas) a ignora explicitamente.
+  return audio.play();
 }
 
 /** A faixa do pé da reunião. */
@@ -82,7 +85,7 @@ export function tocadorDaReuniao(g) {
 
   botao.addEventListener("click", () => {
     if (tocando) audio.pause();
-    else ouvir(g, audio.hasAttribute("src") ? audio.currentTime : Number(posicao.value));
+    else ouvir(g, audio.hasAttribute("src") ? audio.currentTime : Number(posicao.value)).catch(() => {});
   });
 
   posicao.addEventListener("input", () => {

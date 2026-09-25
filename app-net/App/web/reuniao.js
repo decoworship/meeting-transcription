@@ -106,7 +106,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     // barra é a reunião, e não a aba.
     transcricao: (p) => telaDeRevisao(g, dados, { cabecalho: () => {}, tela: p, aoRefazer, aoApagar }),
     ata: (p) => montarAta(p, g, { aoContar: (n) => contar(abas.get("ata").botao, rotuloDePendencias(n)) }),
-    notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18, aoTocar: (s) => ouvir(g, s) }).raiz),
+    notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18, aoTocar: (s) => ouvir(g, s).catch(() => {}) }).raiz),
   };
 
   // A página inteira rola num lugar só (.conteudo), e uma aba mais curta a

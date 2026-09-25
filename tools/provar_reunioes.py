@@ -87,8 +87,16 @@ PONTE_FALSA = r"""
       case "reuniao": return window.__vinculo ?? { cliente: "", projeto: "" };
       case "legenda-gravada": return { legenda_gravada: [] };
       case "clientes": return { clientes: {} };
-      case "prefs": return { prefs: window.__prefs ?? null };
+      // Por projeto quando a prova pede (window.__prefsPorProjeto), senão o
+      // valor único de sempre — as provas antigas não sabem de projeto.
+      case "prefs": return { prefs: window.__prefsPorProjeto
+        ? (window.__prefsPorProjeto[`${q.cliente}::${q.projeto}`] ?? null)
+        : (window.__prefs ?? null) };
       case "notas": return { notas: window.__notas ?? "" };
+      // Simula o disco: uma escrita muda o que a próxima leitura de
+      // "transcricao" devolve. Sem isto não há como provar a corrida de
+      // reabrir a mesma reunião — a leitura seria sempre o fixo de cima.
+      case "salvar-transcricao": window.__transcricao = q.conteudo; return {};
       case "modelos-de-ata": return { tipos: [{ id: "geral", nome: "Reunião geral" }] };
       case "ata": return window.__atas[q.gravacao] ? { ata: window.__atas[q.gravacao], ata_velha: false }
         : q.gravacao.includes("13-59") ? { ata, ata_velha: false } : { ata: null };
@@ -103,7 +111,10 @@ PONTE_FALSA = r"""
       const q = JSON.parse(cru);
       window.__pedidos.push(q);
       const r = Object.assign({ id: q.id }, responder(q));
-      setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, 0);
+      // Atraso por operação, só quando a prova pede — é a janela em que uma
+      // corrida entre duas respostas fica visível.
+      const atraso = (window.__atrasoPorOp && window.__atrasoPorOp[q.op]) || 0;
+      setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, atraso);
     },
   } };
   window.__pedidos = [];
@@ -589,6 +600,31 @@ def prova_renomear_e_trocar_de_reuniao(pagina) -> None:
              f"o nome vai para a reunião em que foi dado, e só para ela ({salvos})")
 
 
+def prova_renomear_e_reabrir_a_mesma_reuniao(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.titulo?.startsWith('Comunicação')).caminho")
+    pagina.click("#acoes-da-barra [data-acao='falantes']")
+    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes input", timeout=5000)
+    entrada = pagina.locator("#gaveta-falantes .tabela-falantes tr:nth-child(3) input")
+    entrada.fill("Carolina")
+    entrada.dispatch_event("change")
+    # Sai e volta para a MESMA reunião bem antes dos 800 ms da escrita adiada.
+    pagina.keyboard.press("Escape")
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.click("#acoes-da-barra [data-acao='falantes']")
+    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes input", timeout=5000)
+    entrada2 = pagina.locator("#gaveta-falantes .tabela-falantes tr:nth-child(3) input")
+    conferir(entrada2.input_value() == "Carolina",
+             f"reabrir a mesma reunião antes dos 800 ms mostra o nome já dado ({entrada2.input_value()!r})")
+    pagina.wait_for_timeout(900)
+    salvos = pagina.evaluate("(c) => window.__pedidos.filter((q) => q.op === 'salvar-transcricao' "
+                             "&& q.gravacao === c)", caminho)
+    conferir(bool(salvos) and "Carolina" in salvos[-1]["conteudo"],
+             f"e o último salvar-transcricao desta reunião contém o nome ({salvos})")
+
+
 def prova_barra_esvazia_no_preparo(pagina) -> None:
     # Transcrever de novo leva ao preparo com o MESMO título: a troca de título
     # não esvazia a barra, e Falantes ficaria lá, abrindo a gaveta de nada.
@@ -641,6 +677,38 @@ def prova_preparo_vocabulario(pagina) -> None:
     salvo = pagina.evaluate("() => window.__pedidos.filter((q) => q.op === 'salvar-projeto').pop()")
     conferir(salvo and salvo["prefs"]["initial_prompt"] == "Beegol, NOC, Sherlock, Algar, Pendente",
              f"e o projeto guarda a lista no formato de sempre ({salvo and salvo['prefs']['initial_prompt']!r})")
+
+
+def prova_preparo_vocabulario_nao_atravessa_projeto(pagina) -> None:
+    pagina.evaluate("""() => {
+        window.__vinculo = { cliente: 'Vivo', projeto: 'Sherlock' };
+        window.__prefsPorProjeto = {
+          'Vivo::Sherlock': { language: 'pt', model_size: 'large-v3', initial_prompt: 'Beegol, NOC' },
+          'Vivo::Semanal': null,
+        };
+        // A resposta de "prefs" demora: é a janela em que a troca de projeto
+        // ainda não chegou e a etiqueta é posta.
+        window.__atrasoPorOp = { prefs: 300 };
+    }""")
+    abrir_preparo(pagina)
+    pagina.wait_for_timeout(350)
+    conferir(pagina.evaluate(TERMOS) == ["Beegol", "NOC"],
+             f"carga inicial do projeto de sempre ({pagina.evaluate(TERMOS)})")
+
+    pagina.fill("#projeto", "Semanal")
+    pagina.dispatch_event("#projeto", "change")
+    # Antes da resposta do projeto novo chegar (300 ms), põe uma etiqueta.
+    pagina.click("#vocabulario-novo")
+    pagina.keyboard.type("Intruso")
+    pagina.keyboard.press("Enter")
+    pagina.wait_for_timeout(450)
+
+    termos = pagina.evaluate(TERMOS)
+    conferir(termos == [],
+             f"o projeto sem prefs esvazia o vocabulário — nem o antigo nem 'Intruso' sobrevivem ({termos})")
+    salvos = pagina.evaluate("() => window.__pedidos.filter((q) => q.op === 'salvar-projeto')")
+    conferir(not any("Beegol" in (s['prefs']['initial_prompt'] or "") for s in salvos),
+             f"nenhum salvar-projeto grava o vocabulário do projeto antigo no novo ({salvos})")
 
 
 def prova_preparo_curto(pagina) -> None:
@@ -1437,8 +1505,10 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
-          prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
+          prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao,
+          prova_renomear_e_reabrir_a_mesma_reuniao, prova_barra_esvazia_no_preparo,
           prova_reuniao_ata, prova_reuniao_gerar_ata, prova_preparo_vocabulario,
+          prova_preparo_vocabulario_nao_atravessa_projeto,
           prova_preparo_curto, prova_preparo_andamento, prova_preparo_erro_devolve_o_formulario,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_tocador, prova_tocador_troca_de_reuniao, prova_ata_so_acompanha_a_ata,

@@ -31,25 +31,30 @@ let estado = null;
  * dado na velha nunca chegava ao disco. Trocar de reunião também não cancela a
  * espera da anterior: cada reunião tem o seu relógio.
  */
+/** A escrita em si, sem o adiamento. Ver `salvar` e o descarrego em `telaDeRevisao`. */
+function escreverAgora(alvo) {
+  // Os nomes entram nos segmentos só na hora de gravar: durante a revisão
+  // eles vivem à parte, para renomear em massa ser trocar uma entrada.
+  const copia = {
+    ...alvo.dados,
+    segments: alvo.dados.segments.map((s) => ({
+      ...s,
+      speaker: alvo.nomes.get(s.speaker ?? "Unknown") ?? s.speaker ?? "Unknown",
+    })),
+  };
+  return pedir("salvar-transcricao", {
+    gravacao: alvo.gravacao.caminho,
+    conteudo: JSON.stringify(copia, null, 2),
+  });
+}
+
 function salvar() {
   const alvo = estado;
   marcarEstado("salvando…");
   clearTimeout(alvo.aguardando);
   alvo.aguardando = setTimeout(async () => {
     try {
-      // Os nomes entram nos segmentos só na hora de gravar: durante a revisão
-      // eles vivem à parte, para renomear em massa ser trocar uma entrada.
-      const copia = {
-        ...alvo.dados,
-        segments: alvo.dados.segments.map((s) => ({
-          ...s,
-          speaker: alvo.nomes.get(s.speaker ?? "Unknown") ?? s.speaker ?? "Unknown",
-        })),
-      };
-      await pedir("salvar-transcricao", {
-        gravacao: alvo.gravacao.caminho,
-        conteudo: JSON.stringify(copia, null, 2),
-      });
+      await escreverAgora(alvo);
       if (alvo === estado) marcarEstado("salvo");
     } catch (e) {
       if (alvo === estado) marcarEstado(`não salvou: ${e.message}`, true);
@@ -70,7 +75,7 @@ export function abrirPainel(qual) {
   else if (qual.startsWith("editar")) editar(Number(qual.split(":")[1] ?? 0));
 }
 
-export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoApagar }) {
+export async function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoApagar }) {
   // O `cabecalho` mais abaixo também pararia o áudio, mas ele é recebido de
   // fora: quem monta esta tela não pode depender de a moldura fazê-lo.
   pararAudio();
@@ -79,7 +84,36 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   // trocado. Depois seria tarde: `estado` é substituído inteiro logo abaixo, e a
   // referência para a lista velha se perderia com o observador ainda ligado num
   // corpo que já saiu do DOM.
-  estado?.lista?.encerrar();
+  const anterior = estado;
+  anterior?.lista?.encerrar();
+
+  // Descarrega já a escrita adiada da revisão anterior, se houver.
+  //
+  // `dados` já veio lido do disco por quem chamou esta tela — e, se essa
+  // leitura aconteceu antes da escrita pendente pousar, ela trouxe o texto de
+  // ANTES da edição de agora há pouco. Sem este descarrego, reabrir a MESMA
+  // reunião dentro dos 800 ms da espera de `salvar` montava a revisão com esse
+  // texto velho, e uma segunda edição gravava por cima, perdendo o que tinha
+  // acabado de ser dado (por exemplo, um nome renomeado).
+  //
+  // `await` aqui, e não fogo-e-esquece: só depois de a escrita pousar é que
+  // vale reler — ler antes dela pousar traria de volta o mesmo texto velho.
+  if (anterior?.aguardando) {
+    clearTimeout(anterior.aguardando);
+    try {
+      await escreverAgora(anterior);
+      // Só relê se for a MESMA reunião: doutra, `dados` já é o certo, e ler de
+      // novo aqui só atrasaria a tela sem trocar nada.
+      if (anterior.gravacao.caminho === gravacao.caminho) {
+        const r = await pedir("transcricao", { gravacao: gravacao.caminho });
+        if (r.transcricao) dados = JSON.parse(r.transcricao);
+      }
+    } catch {
+      // Sem estado-salvo nesta tela ainda (ela nem montou), não há onde marcar
+      // o erro. A escrita adiada de sempre — 800 ms depois da próxima edição —
+      // tenta de novo.
+    }
+  }
 
   estado = {
     gravacao,
@@ -341,7 +375,7 @@ function linhaDoTrecho(seg, indice) {
     for (const o of corpo.querySelectorAll("[data-tocando]"))
       o.removeAttribute("data-tocando");
     linha.dataset.tocando = "true";
-    ouvir(estado.gravacao, seg.start);
+    ouvir(estado.gravacao, seg.start).catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
   });
   linha.addEventListener("dblclick", () => editar(indice));
   return linha;
