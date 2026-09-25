@@ -16,7 +16,6 @@ import { corDoFalante, abrirGaveta, pararAudio, secao, campo, alerta,
 import { listaDeTrechos } from "/lista-de-trechos.js";
 
 let estado = null;
-let aguardando = null;
 
 const audio = document.getElementById("audio");
 
@@ -44,28 +43,35 @@ function ouvirA(segundos) {
  * Sem espera, renomear três falantes seguidos daria três gravações do arquivo
  * inteiro. Com ela, o trabalho de revisão vira uma escrita a cada segundo
  * parado — e nada se perde, porque cada edição reinicia a contagem.
+ *
+ * **A escrita é da reunião em que a edição foi feita.** O `estado` é de módulo
+ * e troca inteiro quando outra reunião abre; lê-lo na hora do disparo mandava,
+ * a quem trocasse de reunião nos 800 ms, os dados da reunião nova — e o nome
+ * dado na velha nunca chegava ao disco. Trocar de reunião também não cancela a
+ * espera da anterior: cada reunião tem o seu relógio.
  */
 function salvar() {
+  const alvo = estado;
   marcarEstado("salvando…");
-  clearTimeout(aguardando);
-  aguardando = setTimeout(async () => {
+  clearTimeout(alvo.aguardando);
+  alvo.aguardando = setTimeout(async () => {
     try {
       // Os nomes entram nos segmentos só na hora de gravar: durante a revisão
       // eles vivem à parte, para renomear em massa ser trocar uma entrada.
       const copia = {
-        ...estado.dados,
-        segments: estado.dados.segments.map((s) => ({
+        ...alvo.dados,
+        segments: alvo.dados.segments.map((s) => ({
           ...s,
-          speaker: nomeDe(s.speaker ?? "Unknown"),
+          speaker: alvo.nomes.get(s.speaker ?? "Unknown") ?? s.speaker ?? "Unknown",
         })),
       };
       await pedir("salvar-transcricao", {
-        gravacao: estado.gravacao.caminho,
+        gravacao: alvo.gravacao.caminho,
         conteudo: JSON.stringify(copia, null, 2),
       });
-      marcarEstado("salvo");
+      if (alvo === estado) marcarEstado("salvo");
     } catch (e) {
-      marcarEstado(`não salvou: ${e.message}`, true);
+      if (alvo === estado) marcarEstado(`não salvou: ${e.message}`, true);
     }
   }, 800);
 }

@@ -566,6 +566,29 @@ def prova_reuniao_falantes_da_ata(pagina) -> None:
     conferir(quem == ["André", "Carol"], f"aberta na Ata, Falantes mostra os falantes DESTA reunião ({quem})")
 
 
+def prova_renomear_e_trocar_de_reuniao(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    caminho = pagina.evaluate("() => window.__gravacoes.find((g) => g.titulo?.startsWith('Comunicação')).caminho")
+    pagina.click("#acoes-da-barra [data-acao='falantes']")
+    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes input", timeout=5000)
+    entrada = pagina.locator("#gaveta-falantes .tabela-falantes tr:nth-child(3) input")
+    entrada.fill("Carolina")
+    entrada.dispatch_event("change")
+    # Menos de 800 ms depois, outra reunião. A gaveta é modal de verdade (o
+    # fundo fica inert enquanto ela está aberta, pecas.js abrirGaveta), então
+    # sair para a lista primeiro fecha a gaveta — Escape, como quem desiste do
+    # painel — e só então clica em Voltar.
+    pagina.keyboard.press("Escape")
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    abrir_reuniao(pagina, "Sherlock")
+    pagina.wait_for_timeout(1200)
+    salvos = pagina.evaluate("() => window.__pedidos.filter((q) => q.op === 'salvar-transcricao')"
+                             ".map((q) => ({ g: q.gravacao, carolina: q.conteudo.includes('Carolina') }))")
+    conferir(salvos == [{"g": caminho, "carolina": True}],
+             f"o nome vai para a reunião em que foi dado, e só para ela ({salvos})")
+
+
 def prova_barra_esvazia_no_preparo(pagina) -> None:
     # Transcrever de novo leva ao preparo com o MESMO título: a troca de título
     # não esvazia a barra, e Falantes ficaria lá, abrindo a gaveta de nada.
@@ -1191,7 +1214,7 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
           prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
-          prova_reuniao_falantes_da_ata, prova_barra_esvazia_no_preparo,
+          prova_reuniao_falantes_da_ata, prova_renomear_e_trocar_de_reuniao, prova_barra_esvazia_no_preparo,
           prova_reuniao_ata, prova_reuniao_gerar_ata,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata,
