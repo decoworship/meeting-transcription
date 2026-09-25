@@ -1930,7 +1930,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 .clientes__campos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
   gap: var(--espaco-3);
 }
 .clientes__campos .aa-entrada { min-width: 0; width: 100%; }
@@ -1949,4 +1949,14 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   .clientes__corpo { grid-template-columns: 1fr; }
   .clientes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
   .clientes__lista { max-height: 14rem; overflow: auto; }
+}
+
+/* Mestre-detalhe precisa da largura da janela, como a lista de Reuniões: o
+ * mesmo remendo da .aa-pagina (ver .aa-pagina:has(> .reunioes)), só quando
+ * a seção aberta é Clientes. */
+.aa-pagina:has(.clientes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 90rem;
+  padding-top: var(--espaco-5);
 }

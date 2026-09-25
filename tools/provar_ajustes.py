@@ -291,6 +291,7 @@ def main() -> int:
                         pagina, _ = abrir(navegador, porta, largura, altura, tema)
                         abrir_projeto(pagina, "Agentes")
                         pagina.mouse.move(0, 0)
+                        pagina.evaluate("() => document.querySelector('.conteudo').scrollTo(0, 0)")
                         pagina.wait_for_timeout(300)
                         pagina.screenshot(path=str(args.fotos / f"clientes-{tema}-{largura}.png"))
                         pagina.close()
