@@ -50,12 +50,20 @@ export function quando(nome) {
 export const tituloDe = (g) => g.titulo || quando(g.nome);
 
 /**
- * Põe na barra do topo, à direita, o que é da tela — e tira o que havia. A
- * troca de tela esvazia sozinha (cabecalho); a tela que volta com o mesmo
- * título chama isto de novo.
+ * Põe na barra do topo, à direita, o que é da tela — e tira o que havia.
+ *
+ * Todo ponto de navegação a esvazia (`navegar`), e a tela que chega põe o seu.
+ * Esvaziar pela troca de título falhava na única troca em que o título é o
+ * mesmo: da reunião para o preparo dela, em "Transcrever de novo".
  */
 export function acoesDaBarra(...nos) {
   acoes.replaceChildren(...nos);
+}
+
+/** O que toda troca de destino faz antes de desenhar: gavetas fechadas, barra vazia. */
+function navegar() {
+  fecharGavetas();
+  acoes.replaceChildren();
 }
 
 /**
@@ -74,9 +82,6 @@ export function acoesDaBarra(...nos) {
 function cabecalho(t, sub, comVoltar) {
   pararAudio();
   const mudou = titulo.textContent !== t;
-  // O que a tela anterior pôs na barra não é desta. Só na troca de título: o
-  // cabeçalho é reescrito também para trocar o subtítulo, e aí a tela é a mesma.
-  if (mudou) acoes.replaceChildren();
   titulo.textContent = t;
   subtitulo.textContent = sub ?? "";
   voltar.hidden = !comVoltar;
@@ -129,7 +134,7 @@ function destino(qual) {
  * dela.
  */
 export function telaDeLista() {
-  fecharGavetas();
+  navegar();
   destino("ir-reunioes");
   return telaDeReunioes({ cabecalho, tela });
 }
@@ -179,6 +184,7 @@ export function botaoApagarGravacao(g) {
  * último uso. O que o usuário faz aqui é conferir, não digitar do zero.
  */
 async function telaDePreparo(g) {
+  navegar();
   // A escolha do projeto, carregada com as preferências e repassada intacta.
   let modeloDeDiarizacao = null;
 
@@ -726,7 +732,7 @@ async function transcrever(g, botao, painel, modeloDeDiarizacao = null) {
  *   "notas". O painel de Reuniões pede "ata" para o próximo passo da ata.
  */
 export async function abrirGravacao(g, { aba = "transcricao" } = {}) {
-  fecharGavetas();
+  navegar();
   if (!g.transcrita) return telaDePreparo(g);
 
   // Refazer é ação de exceção: some da tela a menos que tenha sido ligada nas
@@ -767,7 +773,7 @@ export async function abrirGravacao(g, { aba = "transcricao" } = {}) {
  * como contexto mantém o app.js como o único lugar que sabe da moldura.
  */
 export function abrirAjustes(aba) {
-  fecharGavetas();
+  navegar();
   destino("ir-config");
   return telaDeAjustes({ cabecalho, tela }, aba);
 }
@@ -780,7 +786,7 @@ export function abrirAjustes(aba) {
  * precisam dela.
  */
 export function abrirGravador() {
-  fecharGavetas();
+  navegar();
   destino("ir-gravador");
   return telaDoGravador({ cabecalho, tela });
 }

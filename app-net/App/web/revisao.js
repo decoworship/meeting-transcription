@@ -137,33 +137,14 @@ export function telaDeRevisao(gravacao, dados, { cabecalho, tela, aoRefazer, aoA
   const filtros = document.createElement("div");
   filtros.className = "filtros";
 
-  const botaoFalantes = document.createElement("button");
-  botaoFalantes.className = "aa-btn aa-btn-secundario";
-  botaoFalantes.type = "button";
-  botaoFalantes.textContent = "Falantes";
-  botaoFalantes.addEventListener("click", abrirFalantes);
-
-  const botaoExportar = document.createElement("button");
-  botaoExportar.className = "aa-btn aa-btn-primario";
-  botaoExportar.type = "button";
-  botaoExportar.textContent = "Exportar";
-  botaoExportar.addEventListener("click", abrirExportacao);
-
-  const parar = document.createElement("button");
-  parar.className = "aa-btn aa-btn-texto";
-  parar.type = "button";
-  parar.textContent = "⏸";
-  parar.title = "Parar o áudio";
-  parar.addEventListener("click", pararAudio);
-
   const estadoSalvo = document.createElement("span");
   estadoSalvo.className = "campo__dica";
   estadoSalvo.id = "estado-salvo";
 
-  // As notas não têm botão aqui desde que viraram a aba Notas da reunião
-  // (reuniao.js). O motivo da gaveta era não tirar o lugar no texto, e a aba o
-  // mantém: cada aba guarda a própria rolagem, e as abas grudam no topo.
-  ferramentas.append(busca, parar, estadoSalvo, botaoFalantes, botaoExportar);
+  // Falantes e Exportar moram na barra do topo desde o plano 2b: são da reunião,
+  // e não da aba (reuniao.js). O ⏸ solto saiu junto — o tocador no pé da
+  // reunião é quem mostra que há áudio tocando (tocador.js).
+  ferramentas.append(busca, estadoSalvo);
 
   // As duas que destroem trabalho vão para um invólucro próprio, e o CSS o
   // empurra para a direita atrás de um fio. Antes elas eram apenas o sétimo e o

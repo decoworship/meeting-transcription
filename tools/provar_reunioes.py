@@ -82,13 +82,13 @@ PONTE_FALSA = r"""
       case "catalogo": return { catalogo: [{ pacote: { id: "large-v3", nome: "Large v3", familia: "asr" },
                                              estado: "instalado", em_uso: true }], diarizadores: [] };
       case "atualizacao": return { atualizacao: { nova: null, versao_instalada: "0.7.1" } };
-      case "config": return { config: {} };
+      case "config": return { config: window.__config ?? {} };
       case "transcricao": return { transcricao: window.__transcricao ?? transcricao };
-      case "reuniao": return { cliente: "", projeto: "" };
+      case "reuniao": return window.__vinculo ?? { cliente: "", projeto: "" };
       case "legenda-gravada": return { legenda_gravada: [] };
       case "clientes": return { clientes: {} };
-      case "prefs": return { prefs: null };
-      case "notas": return { notas: "" };
+      case "prefs": return { prefs: window.__prefs ?? null };
+      case "notas": return { notas: window.__notas ?? "" };
       case "modelos-de-ata": return { tipos: [{ id: "geral", nome: "Reunião geral" }] };
       case "ata": return window.__atas[q.gravacao] ? { ata: window.__atas[q.gravacao], ata_velha: false }
         : q.gravacao.includes("13-59") ? { ata, ata_velha: false } : { ata: null };
@@ -101,10 +101,21 @@ PONTE_FALSA = r"""
     addEventListener(_, f) { this._ouvintes.push(f); },
     postMessage(cru) {
       const q = JSON.parse(cru);
+      window.__pedidos.push(q);
       const r = Object.assign({ id: q.id }, responder(q));
       setTimeout(() => { for (const f of this._ouvintes) f({ data: JSON.stringify(r) }); }, 0);
     },
   } };
+  window.__pedidos = [];
+  // O Chromium sem janela não toca o mix (o endereço gravacoes.local não
+  // existe aqui). A prova quer saber o que se pediu para tocar: de onde, e a
+  // partir de quando. Os eventos são os que o <audio> de verdade dispara.
+  HTMLMediaElement.prototype.play = function () {
+    window.__tocou = { src: this.getAttribute("src"), t: this.currentTime };
+    this.dispatchEvent(new Event("play"));
+    return Promise.resolve();
+  };
+  HTMLMediaElement.prototype.pause = function () { this.dispatchEvent(new Event("pause")); };
   window.__gravacoes = gravacoes;
   window.__atas = {};
   window.__emitir = (ev) => {
@@ -518,6 +529,53 @@ def prova_reuniao_teclado(pagina) -> None:
     paradas = pagina.eval_on_selector_all(".reuniao-aberta [role='tab']",
                                           "els => els.filter((e) => e.tabIndex === 0).length")
     conferir(paradas == 1, f"as abas são uma parada de Tab só ({paradas})")
+
+
+def prova_reuniao_cabecalho(pagina) -> None:
+    abrir_reuniao(pagina, "Comunicação")
+    na_barra = pagina.eval_on_selector_all("#acoes-da-barra [data-acao]", "els => els.map((e) => e.dataset.acao)")
+    conferir(na_barra == ["falantes", "exportar"], f"Falantes e Exportar moram na barra do topo ({na_barra})")
+    nas_ferramentas = pagina.eval_on_selector_all(
+        ".revisao .ferramentas button",
+        "els => els.filter((e) => ['Falantes', 'Exportar', '⏸'].includes(e.textContent.trim())).length")
+    conferir(nas_ferramentas == 0, "e saíram das ferramentas da revisão")
+    pagina.click("#acoes-da-barra [data-acao='exportar']")
+    # abrirExportacao é assíncrona (espera "clientes" na ponte) antes de abrir a
+    # gaveta — sem esperar, o clique do Playwright volta antes da gaveta abrir,
+    # e a prova falha por sorteio.
+    pagina.wait_for_selector("#gaveta-exportar:not([hidden])", timeout=5000)
+    conferir(pagina.is_visible("#gaveta-exportar"), "Exportar abre a gaveta de exportar")
+
+
+def prova_reuniao_falantes_da_ata(pagina) -> None:
+    # Abre outra reunião antes, para o estado da revisão ser o de outra reunião.
+    pagina.evaluate("() => { window.__transcricao = JSON.stringify({ language: 'pt', segments: ["
+                    "{ start: 0, end: 3, text: ' Outra.', speaker: 'Zé da Outra' }] }); }")
+    abrir_reuniao(pagina, "Sherlock")
+    pagina.click("#voltar")
+    pagina.wait_for_selector(".reuniao-linha", timeout=5000)
+    pagina.evaluate("() => { window.__transcricao = null; }")
+    linha_por_titulo(pagina, "Comunicação")
+    pagina.evaluate("() => window.__linha.click()")
+    pagina.click(".reunioes__painel [data-acao='abrir-ata']")
+    pagina.wait_for_selector("#painel-ata .ata__texto", timeout=5000)
+    pagina.click("#acoes-da-barra [data-acao='falantes']")
+    pagina.wait_for_selector("#gaveta-falantes .tabela-falantes", timeout=5000)
+    quem = pagina.eval_on_selector_all("#gaveta-falantes .tabela-falantes tr td:first-child",
+                                       "els => els.map((e) => e.textContent)")
+    conferir(quem == ["André", "Carol"], f"aberta na Ata, Falantes mostra os falantes DESTA reunião ({quem})")
+
+
+def prova_barra_esvazia_no_preparo(pagina) -> None:
+    # Transcrever de novo leva ao preparo com o MESMO título: a troca de título
+    # não esvazia a barra, e Falantes ficaria lá, abrindo a gaveta de nada.
+    pagina.evaluate("() => { window.__config = { permitir_retranscrever: true }; }")
+    abrir_reuniao(pagina, "Comunicação")
+    pagina.click(".ferramentas__perigo >> text=Transcrever de novo")
+    pagina.click(".aa-btn-primario:has-text('Transcrever de novo')")
+    pagina.wait_for_selector("#vocabulario", timeout=5000)
+    sobra = pagina.eval_on_selector_all("#acoes-da-barra > *", "els => els.length")
+    conferir(sobra == 0, f"no preparo, a barra do topo não tem o que era da reunião ({sobra})")
 
 
 def prova_reuniao_ata(pagina) -> None:
@@ -1132,7 +1190,9 @@ PROVAS = [prova_grupos, prova_busca, prova_filtros, prova_filtro_de_data, prova_
           prova_painel, prova_transcricao_em_curso, prova_janela_estreita, prova_ata_na_reuniao_pedida,
           prova_gerar_ata_na_reuniao_pedida, prova_troca_de_etapa, prova_fim_rele_o_nucleo,
           prova_teclado, prova_janela_intermediaria, prova_data_nao_rouba_o_foco,
-          prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_ata, prova_reuniao_gerar_ata,
+          prova_reuniao_abas, prova_reuniao_teclado, prova_reuniao_cabecalho,
+          prova_reuniao_falantes_da_ata, prova_barra_esvazia_no_preparo,
+          prova_reuniao_ata, prova_reuniao_gerar_ata,
           prova_reuniao_pelo_endereco, prova_trilho_sem_atas, prova_endereco_de_atas,
           prova_reuniao_rolagem, prova_ata_so_acompanha_a_ata,
           prova_semana, prova_semana_abre_e_volta, prova_semana_etiqueta, prova_semana_estreita,

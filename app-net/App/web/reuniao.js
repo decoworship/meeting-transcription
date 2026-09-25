@@ -16,7 +16,7 @@
 import { telaDeRevisao, abrirPainel as abrirPainelDaRevisao } from "/revisao.js";
 import { montarAta } from "/atas.js";
 import { blocoDeNotas } from "/notas.js";
-import { duracao, quando, tituloDe } from "/app.js";
+import { duracao, quando, tituloDe, acoesDaBarra } from "/app.js";
 
 const ABAS = ["transcricao", "ata", "notas"];
 
@@ -81,6 +81,21 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     g.convidados > 0 ? `${g.convidados} convidados` : null,
   ].filter(Boolean).join(" · "), true);
 
+  // Falantes e Exportar são da reunião, e não de uma aba: nomear quem falou
+  // serve à ata e às notas também, e exportar leva a transcrição inteira.
+  // Os painéis continuam sendo da revisão (revisao.js), que é quem sabe os nomes.
+  const botaoDaBarra = (acao, rotulo, classe) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `aa-btn ${classe}`;
+    b.dataset.acao = acao;
+    b.textContent = rotulo;
+    b.addEventListener("click", () => abrirPainelDaRevisao(acao));
+    return b;
+  };
+  acoesDaBarra(botaoDaBarra("falantes", "Falantes", "aa-btn-secundario"),
+               botaoDaBarra("exportar", "Exportar", "aa-btn-primario"));
+
   const montar = {
     // A revisão recebe um cabeçalho que não faz nada: quem diz o título da
     // barra é a reunião, e não a aba.
@@ -126,6 +141,14 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     e.preventDefault();
     mostrar(ABAS[destino], { focar: true });
   }
+
+  // **A transcrição monta sempre**, mesmo aberta noutra aba. A gaveta de
+  // falantes lê o estado da revisão, que é de módulo: sem isto, a reunião aberta
+  // direto na Ata mostrava — e renomeava — os falantes da reunião aberta antes.
+  // A lista é virtual, e montar escondida custa uma leva de 80 linhas.
+  const t = abas.get("transcricao");
+  t.montada = true;
+  montar.transcricao(t.painel);
 
   mostrarAba = mostrar;
   mostrar(aba, { focar: aba !== "transcricao" });
