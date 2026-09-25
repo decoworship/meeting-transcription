@@ -30,6 +30,11 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // diarization e diar_model. Silencioso, e o dono só descobre quando a
   // transcrição seguinte sai sem os nomes próprios.
   let prefsProntas = false;
+  // Cada chamada a carregarPreferencias tira um número; só a carga cujo
+  // número ainda é o mais alto quando a resposta chega é aplicada. Sem isto,
+  // trocar de projeto duas vezes rápido deixava a resposta da troca de antes
+  // — que chega depois, por não haver ordem garantida — pisar na de agora.
+  let cargaDeProjeto = 0;
 
   cabecalho(tituloDe(g), `${duracao(g.duracao_s)} · ${quando(g.nome)}`, true);
   tela.replaceChildren();
@@ -269,10 +274,16 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   /** Ao escolher um projeto conhecido, suas preferências voltam. */
   async function carregarPreferencias() {
     if (!campoCliente.value || !campoProjeto.value) return;
+    const minhaCarga = ++cargaDeProjeto;
     const { prefs } = await pedir("prefs", {
       cliente: campoCliente.value,
       projeto: campoProjeto.value,
     });
+
+    // Uma troca de projeto mais nova já começou enquanto esta resposta vinha:
+    // aplicá-la agora pisaria no que a carga mais nova está fazendo (ou já
+    // fez). Só a última pedida vale.
+    if (minhaCarga !== cargaDeProjeto) return;
 
     // A tela pode ter sido trocada enquanto a resposta vinha — escolher o
     // projeto e sair no mesmo segundo é um caminho normal. Sem esta guarda, o
@@ -287,6 +298,11 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
 
     if (!prefs) {
       aviso.textContent = "projeto novo — será criado ao transcrever";
+      // Sem isto, o vocabulário do projeto anterior ficava nos campos do
+      // projeto novo, e a próxima etiqueta posta ou tirada gravava esses
+      // termos velhos nele.
+      termos.definir("");
+      pintarMotor();
       return;
     }
     aviso.textContent = "preferências do projeto carregadas";
@@ -367,7 +383,18 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
    * volta a ser o de hoje, e não uma tela que não guarda mais nada.
    */
   async function carregarEliberar() {
-    try { await carregarPreferencias(); } finally { prefsProntas = true; }
+    // Destranca de novo a cada chamada, não só na primeira: sem isto, trocar
+    // de projeto depois da carga inicial já feita deixava a trava aberta o
+    // tempo todo, e uma etiqueta posta ou tirada no meio da troca gravava o
+    // vocabulário do projeto ANTIGO nos campos do projeto NOVO.
+    prefsProntas = false;
+    const antes = cargaDeProjeto;
+    try { await carregarPreferencias(); } finally {
+      // Só destranca se, entre o início e o fim desta chamada, nenhuma OUTRA
+      // troca de projeto começou (o número subiu mais de um passo) — essa
+      // outra tem a própria chamada, e a própria trava, para destrancar.
+      if (cargaDeProjeto <= antes + 1) prefsProntas = true;
+    }
   }
 
   campoCliente.addEventListener("change", () => {

@@ -29,7 +29,7 @@ Do §4 do spec, valendo para toda tarefa:
 Comandos de prova (rodar da raiz do worktree):
 
 ```bash
-node --test tools/web/                                              # regras
+node --test tools/web/*.test.mjs                                     # regras
 uv run --with playwright python tools/provar_reunioes.py            # telas
 .venv/bin/python tools/checar_transcricao.py                        # transcrição entre telas
 export PATH="$HOME/.dotnet:$PATH"; dotnet test app-net/Tests/MeetingApp.Tests.csproj   # o núcleo (embute web/)
@@ -265,7 +265,7 @@ export function resumoDoMotor({ modelo, idioma, diarizar }) {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node --test tools/web/`
+Run: `node --test tools/web/*.test.mjs`
 Expected: PASS — as provas novas e as 27 de `reunioes-regras.test.mjs`, nenhuma falha.
 
 - [ ] **Step 5: Commit**
@@ -1581,7 +1581,7 @@ Run: `uv run --with playwright python tools/provar_reunioes.py`
 Expected: `tudo certo.`
 Run: `.venv/bin/python tools/checar_transcricao.py`
 Expected: sem `FALHA` — ele espera `.aa-progresso` (continua existindo, agora no andamento) e clica `text=Parar transcrição` (idem).
-Run: `node --test tools/web/`
+Run: `node --test tools/web/*.test.mjs`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
@@ -1610,7 +1610,7 @@ No §5 do spec, a coluna "estado" da linha 2b vira `**feito em 25/09/2026**`. No
 
 - [ ] **Step 2: A prova inteira**
 
-Run: `node --test tools/web/`
+Run: `node --test tools/web/*.test.mjs`
 Expected: PASS, nenhuma falha.
 Run: `uv run --with playwright python tools/provar_reunioes.py --fotos dist/fotos-2b`
 Expected: `tudo certo.`

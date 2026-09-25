@@ -341,7 +341,7 @@ function linhaDoTrecho(seg, indice) {
     for (const o of corpo.querySelectorAll("[data-tocando]"))
       o.removeAttribute("data-tocando");
     linha.dataset.tocando = "true";
-    ouvir(estado.gravacao, seg.start);
+    ouvir(estado.gravacao, seg.start).catch((e) => marcarEstado(`sem áudio: ${e.message}`, true));
   });
   linha.addEventListener("dblclick", () => editar(indice));
   return linha;
