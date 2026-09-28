@@ -53,7 +53,9 @@ ONNXRUNTIME_VERSAO="1.23.2"
 # importa `cublas64_12` mais o `cudnn64_9` que ele já embarca — e esse, por sua
 # vez, procura as sublibs `cudnn_*64_9.dll` no PATH. O `nvidia-curand-cu12` e o
 # `nvidia-cuda-nvrtc-cu12`, que o extra `[cuda]` do onnxruntime traria, não
-# aparecem em nenhum dos dois: ficam de fora, e são ~180 MB.
+# aparecem em nenhum dos dois: ficam de fora, e são ~180 MB. (O `nvrtc` chega
+# mesmo assim, pelo `transcribe-cpp-native-cu12`; ele é tirado depois — ver
+# "o que veio junto e nenhum motor abre".)
 CUBLAS_VERSAO="12.9.2.10"
 CUDART_VERSAO="12.9.79"
 CUDNN_VERSAO="9.8.0.87"
@@ -171,6 +173,34 @@ uv pip install \
   "nvidia-cudnn-cu12==$CUDNN_VERSAO" \
   "nvidia-cufft-cu12==$CUFFT_VERSAO"
 
+# ── o que veio junto e nenhum motor abre ─────────────────────────────────────
+#
+# **Medido, e não deduzido do objdump**, em 26/09/2026 com
+# `tools/conferir_dlls_cuda.py`: os cinco motores que usam a placa (ASR,
+# legenda, pyannote, vetor de voz e o Nemotron-3) rodando em CUDA numa cópia
+# desta pasta **sem** `ata/bin`, com o mesmo dispositivo e saída bit-idêntica
+# antes e depois de cada corte. O objdump não bastava porque o `cublasLt` e o
+# `cudnn64_9` carregam DLLs por nome em tempo de execução — e o `cublasLt` cita
+# o `nvrtc` por nome e roda sem ele.
+#
+# - `nvidia/cuda_nvrtc` (~180 MB): vem do `transcribe-cpp-native-cu12`, que o
+#   declara como dependência; a etapa `--no-deps` acima não o traz, mas não o
+#   tira;
+# - `transcribe_cpp_native` (61 MB): o backend de CPU do PyPI. O `-cu12` traz o
+#   próprio `ggml-cpu.dll`, e é dele que a legenda carrega;
+# - `nvblas`, `cufftw` e o provedor de TensorRT: ninguém os pede.
+#
+# **E o que parecia cortável e não é:** `cudnn_adv64_9` (sem ele o pyannote
+# morre), e os dois `cudnn_engines_*` — sem eles o CUDA EP **cai para CPU no
+# meio da execução**, e `get_providers()` continua dizendo CUDA. Estão na régua
+# abaixo por isso.
+echo "==> tirando o que nenhum motor abre (~240 MB)"
+rm -rf "$DESTINO/python/Lib/site-packages/nvidia/cuda_nvrtc" \
+       "$DESTINO/python/Lib/site-packages/transcribe_cpp_native" \
+       "$DESTINO/python/Lib/site-packages/nvidia/cublas/bin/nvblas64_12.dll" \
+       "$DESTINO/python/Lib/site-packages/nvidia/cufft/bin/cufftw64_11.dll" \
+       "$DESTINO/python/Lib/site-packages/onnxruntime/capi/onnxruntime_providers_tensorrt.dll"
+
 echo "==> os sidecars"
 # **A legenda estava na régua e não estava na cópia** desde 18/09/2026, quando
 # o MOSS saiu e levou junto a linha que criava a pasta: o script reprovava a si
@@ -247,14 +277,15 @@ echo "    onnxruntime: $ORT_PKG $ORT_V (CUDA $ORT_CUDA)"
 # "Cannot load symbol cudnnCreate" no meio da reunião.
 for dll in cublas64_12 cublasLt64_12 cudart64_12 cufft64_11 \
            cudnn64_9 cudnn_graph64_9 cudnn_cnn64_9 cudnn_ops64_9 \
-           cudnn_adv64_9 cudnn_heuristic64_9; do
+           cudnn_adv64_9 cudnn_heuristic64_9 \
+           cudnn_engines_precompiled64_9 cudnn_engines_runtime_compiled64_9; do
   compgen -G "$SITE/nvidia/*/bin/$dll.dll" >/dev/null \
     || compgen -G "$SITE/ctranslate2/$dll.dll" >/dev/null \
     || reprovar "falta a DLL $dll.dll no empacotamento.
       Ela vinha de torch/lib até 22/09/2026 e agora vem dos wheels nvidia-*.
       Sem ela o provedor CUDA não carrega, e a queda para CPU é muda."
 done
-echo "    DLLs de CUDA: as dez no lugar"
+echo "    DLLs de CUDA: as doze no lugar"
 
 # O backend de CUDA é um pacote separado, e é o que o PyPI entrega como
 # stub 0.0.0. Se ele sumir, a legenda carrega e roda em CPU — mesma falha muda.
