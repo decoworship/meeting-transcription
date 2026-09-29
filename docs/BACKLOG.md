@@ -892,6 +892,16 @@ real, ou a conclusão escrita de que só a passada final cabe.
 > pelo dono do produto:** ele entra **ao lado** do pyannote, com duas escolhas
 > independentes — na legenda (`VIVO-7`) e na passada final. O teto de 8
 > falantes não pesa (6 de 111 reuniões, contagem inflada).
+>
+> **Passada final implementada em 29/09/2026:** o Nemotron entra como **um
+> modelo a mais** em `motores/diarizacao/modelos/nemotron-3`, e não como motor
+> — o seletor de Ajustes › Transcrição e o de cada projeto o oferecem sozinhos
+> (`Motores.ModelosDeDiarizacao`). O `motor.py` o reconhece pelos quatro
+> artefatos; o código é `motores/diarizacao/pipeline/nemotron3.py`, com o embed
+> por bloco. O reconhecimento de vozes não muda: continua o wespeaker sobre os
+> trechos de cada rótulo. Padrão continua `community-1`. No Python embarcado,
+> 49 min em 25 s na GPU. **Falta:** a escolha independente na legenda
+> (`VIVO-7`, depois da medição com o Meet do `MOD-1`).
 
 **Gatilho: o `MOD-1` fechar.** O caminho é curto porque o reconhecimento de vozes
 não depende do diarizador: o `vetor_de_voz` do sidecar recebe trechos, e com os

@@ -70,6 +70,7 @@ ALVO="$DESTINO/motores/diarizacao/modelos"
 PIPELINE="$ALVO/community-1"
 PIPELINE31="$ALVO/pyannote-3.1"
 VOZ="$ALVO/wespeaker-voxceleb-resnet34-LM"
+NEMOTRON="$ALVO/nemotron-3"
 
 # Os nomes das pastas são os que o motor procura, e não os do repositório: quem
 # lê é motores/diarizacao/motor.py, e mudar um sem o outro faz o motor cair no
@@ -195,6 +196,32 @@ pegar_onnx wespeaker-voxceleb-resnet34-LM/mel.npy     "$VOZ/mel.npy"
 # O community-1 vence por 6,7 pontos de DER (Fase 0), então o 3.1 não é o
 # padrão. Ele existe para poder comparar na máquina de quem usa, e porque um
 # seletor com uma opção só não é um seletor.
+# O Nemotron-3-Diarization (MOD-2, 29/09/2026): os grafos que
+# tools/exportar_nemotron3_onnx.py gera em tools/_nemotron3, e não o
+# checkpoint — o app não tem transformers nem torch. O config.yaml é só o
+# marcador que faz Motores.ModelosDeDiarizacao oferecer a pasta na tela; quem
+# a reconhece como Nemotron é o motor.py, pelos quatro artefatos.
+echo "==> Nemotron-3 (380 MB)"
+mkdir -p "$NEMOTRON"
+for a in embed.onnx step.onnx mel.npy silencio.npy; do
+  if [[ -f "$NEMOTRON/$a" ]]; then
+    echo "    já está: nemotron-3/$a"
+  elif [[ -f "$RAIZ/tools/_nemotron3/$a" ]]; then
+    cp "$RAIZ/tools/_nemotron3/$a" "$NEMOTRON/$a"
+    echo "    de tools/_nemotron3: nemotron-3/$a"
+  else
+    echo "ERRO: falta tools/_nemotron3/$a — rode tools/exportar_nemotron3_onnx.py" >&2
+    exit 1
+  fi
+done
+cat > "$NEMOTRON/config.yaml" <<'YAML'
+# Nemotron-3-Diarization em ONNX. Não é um pipeline do pyannote: este arquivo
+# só marca a pasta como modelo de diarização para a tela. O motor.py a
+# reconhece pelos quatro artefatos (embed.onnx, step.onnx, mel.npy, silencio.npy).
+modelo: nvidia/Nemotron-3-Diarization
+YAML
+cp "$RAIZ/tools/licencas/OpenMDW-1.1.txt" "$NEMOTRON/LICENSE-OpenMDW-1.1.txt"
+
 echo "==> pipeline de diarização (pyannote 3.1)"
 
 # O peso é só a segmentação: o embedding do 3.1 é o **mesmo** wespeaker que o
@@ -264,6 +291,18 @@ hiperparâmetro do pipeline foi tocado.
 O `embedding/pytorch_model.bin` desta pasta é uma cópia do
 `wespeaker-voxceleb-resnet34-LM` acima — é o mesmo modelo que o 3.1 usa.
 
+## nvidia/Nemotron-3-Diarization
+
+- autoria: NVIDIA
+- origem: https://huggingface.co/nvidia/Nemotron-3-Diarization
+- licença: **OpenMDW-1.1** — o texto está em `nemotron-3/LICENSE-OpenMDW-1.1.txt`
+
+Os pesos **foram convertidos**: o checkpoint foi exportado para dois grafos
+ONNX (`embed.onnx` e `step.onnx`), com a receita do
+`NealCaren/Nemotron-3-Diarization-ONNX`. O `mel.npy` e o `silencio.npy` são o
+banco de filtros mel e o `silence_embeds` do mesmo checkpoint. Nenhum peso foi
+retreinado.
+
 A biblioteca que os carrega, `pyannote.audio`, é MIT.
 
 Se você citar este app num trabalho, cite também os artigos do pyannote —
@@ -289,7 +328,11 @@ for f in "$PIPELINE/config.yaml" \
          "$PIPELINE/embedding/cabeca.onnx" \
          "$PIPELINE/embedding/mel.npy" \
          "$VOZ/voz.onnx" \
-         "$VOZ/mel.npy"; do
+         "$VOZ/mel.npy" \
+         "$NEMOTRON/embed.onnx" \
+         "$NEMOTRON/step.onnx" \
+         "$NEMOTRON/config.yaml" \
+         "$NEMOTRON/LICENSE-OpenMDW-1.1.txt"; do
   [[ -f "$f" ]] || { echo "ERRO: falta $f" >&2; exit 1; }
 done
 

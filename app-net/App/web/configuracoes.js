@@ -1090,9 +1090,12 @@ function abaTranscricao(config, gravar, diarizadores = []) {
 
     const qual = document.createElement("p");
     qual.className = "campo__dica";
-    qual.textContent = "O community-1 é o padrão e ganhou do pyannote 3.1 por "
-      + "6,7 pontos na medição da Fase 0. O 3.1 está aqui para comparar numa "
-      + "reunião sua, que é a única régua que vale.";
+    // O nemotron-3 entrou em 29/09/2026 (MOD-2): ao lado, e não no lugar.
+    // docs/NEMOTRON-DIARIZACAO.md §3b.
+    qual.textContent = "O community-1 é o padrão. O nemotron-3 separou melhor "
+      + "nas quatro reuniões medidas (metade dos erros), é bem mais rápido e usa "
+      + "menos memória da placa; os nomes das vozes conhecidas saem iguais. Ele "
+      + "separa até 8 pessoas além de você.";
     sep.append(campoSep, qual);
   }
   painel.appendChild(sep);

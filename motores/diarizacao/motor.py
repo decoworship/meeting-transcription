@@ -25,7 +25,7 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
-VERSAO = "5"
+VERSAO = "6"
 
 # O mesmo modelo que o app Python usa. Trocar mudaria o espaço vetorial e
 # invalidaria toda voz já aprendida — os vetores de modelos diferentes não são
@@ -110,6 +110,27 @@ def _modelo_onnx_local(nome: str = PADRAO) -> str | None:
     return pasta if all(os.path.isfile(a) for a in artefatos) else None
 
 
+#: Os artefatos do Nemotron-3 (``tools/exportar_nemotron3_onnx.py``). Uma pasta
+#: de ``modelos/`` com os quatro é Nemotron; o resto é pyannote.
+_ARTEFATOS_NEMOTRON3 = ("embed.onnx", "step.onnx", "mel.npy", "silencio.npy")
+
+
+def _nemotron3_local(nome: str) -> str | None:
+    """A pasta do Nemotron-3, ou ``None`` quando ``nome`` não é uma.
+
+    **O Nemotron entra como modelo, e não como motor** (MOD-2 do
+    docs/BACKLOG.md, 29/09/2026). É o que o põe ao lado do pyannote sem nada
+    novo na tela: o seletor de Ajustes › Transcrição e o de cada projeto já
+    listam as pastas de ``modelos/`` que têm ``config.yaml``
+    (``Motores.ModelosDeDiarizacao``), e a escolha chega aqui em ``modelo``.
+    """
+    if not nome or os.path.basename(nome) != nome or nome in (".", ".."):
+        return None
+    pasta = os.path.join(_LOCAIS, nome)
+    ok = all(os.path.isfile(os.path.join(pasta, a)) for a in _ARTEFATOS_NEMOTRON3)
+    return pasta if ok else None
+
+
 def _voz_local() -> str | None:
     """A pasta do modelo de voz, ou ``None`` quando um dos dois artefatos falta.
 
@@ -167,7 +188,11 @@ class Pipeline:
 
         _enviar(id=id_req, tipo="progresso", pct=0.0, texto="carregando o modelo")
 
-        self._carregar_onnx(modelo)
+        nemotron = _nemotron3_local(modelo)
+        if nemotron is not None:
+            self._carregar_nemotron3(nemotron)
+        else:
+            self._carregar_onnx(modelo)
 
         self._modelo = modelo
         self._motor = motor
@@ -204,6 +229,15 @@ class Pipeline:
         _log(f"pipeline onnx carregado: {pasta} "
              f"(segmentação em {self._onnx.seg.provedor}, "
              f"embedding em {self._onnx.emb.provedor})")
+
+    def _carregar_nemotron3(self, pasta: str) -> None:
+        pipeline_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
+        if pipeline_dir not in sys.path:
+            sys.path.append(pipeline_dir)
+        from nemotron3 import Nemotron3
+
+        self._onnx = Nemotron3(pasta, gpu=True)
+        _log(f"Nemotron-3 carregado: {pasta} ({self._onnx.provedor})")
 
     #: Como o modelo de voz se identifica nas amostras guardadas.
     #:

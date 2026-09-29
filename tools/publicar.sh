@@ -317,7 +317,7 @@ for m in asr diarizacao modelos legenda; do
     # porque torch continua sendo o padrão. Falhar aqui, na hora de publicar,
     # é mais barato que descobrir isso na máquina do usuário.
     for arquivo in __init__.py fbank.py sessao.py segmentacao.py embedding.py \
-                   diarizacao.py vendor/__init__.py; do
+                   diarizacao.py nemotron3.py vendor/__init__.py; do
       if [[ ! -f "$DESTINO/motores/diarizacao/pipeline/$arquivo" ]]; then
         echo "ERRO: motores/diarizacao/pipeline/$arquivo não foi publicado — o" >&2
         echo "      motor ONNX de diarização não vai subir." >&2
