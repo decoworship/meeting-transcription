@@ -23,7 +23,7 @@
 #
 # Uso:
 #   tools/montar_instalador.sh
-#   tools/montar_instalador.sh --motores /mnt/c/Users/andre/MeetingApp/motores
+#   tools/montar_instalador.sh --motores /outra/instalacao/motores
 
 set -euo pipefail
 
@@ -131,7 +131,9 @@ versoes=$(strings "$PAYLOAD/PulseMeet.exe" | grep -cF "$VERSAO+" || true)
 # Reprova em vez de sincronizar de propósito: montar um instalador não deve
 # mexer, de lado, na instalação que o usuário está usando para trabalhar.
 #
-# **A instrução da mensagem abaixo envelheceu em 18/08/2026**, quando os motores
+# **Resolvido em 17/09/2026**, quando o publicar.sh passou a instalar na oficial
+# — a mensagem abaixo foi reescrita em 29/09/2026. O histórico:
+# **a instrução da mensagem abaixo envelheceu em 18/08/2026**, quando os motores
 # mudaram de casa: o publicar.sh sincroniza os sidecars na pasta de TRABALHO
 # (C:\Users\andre\MeetingApp), e o MOTORES daqui aponta para a instalação
 # OFICIAL. Rodar o publicar.sh e voltar aqui reprova de novo, com a mesma
@@ -143,9 +145,9 @@ for m in asr diarizacao modelos; do
   if ! diff -q "$RAIZ/motores/$m/motor.py" "$MOTORES/$m/motor.py" >/dev/null; then
     reprovar "motores/$m/motor.py do repositório difere do que está em $MOTORES.
       O instalador empacotaria o sidecar velho. Duas saídas:
-        1. tools/publicar.sh (sem --so-build) e depois ESTE script com
-           --motores /mnt/c/Users/andre/MeetingApp/motores — é lá que o
-           publicar.sh sincroniza, e de lá os pesados saem por junção;
+        1. tools/publicar.sh (sem --so-build), com o app fechado: desde
+           17/09/2026 ele sincroniza na instalação oficial, que é de onde
+           este script lê;
         2. copie o motor.py à mão para $MOTORES."
   fi
 done
@@ -188,7 +190,7 @@ grep -q 'ata\\bin' "$RAIZ/instalador/MeetingApp.iss" \
 
 # Os artefatos ONNX (diarizacao-onnx): desde o porte, é isto que o motor.py
 # carrega em produção — não mais os pytorch_model.bin acima, que agora só
-# alimentam o exportador e o pyannote-3.1. Sem eles a diarização e o
+# alimentam o exportador. Sem eles a diarização e o
 # reconhecimento de vozes falham 100% na máquina de quem instalou, e a
 # régua pertence aqui: é este script que produz o artefato entregue, e o
 # comentário do topo do arquivo diz por quê. Cada um tem seu próprio comando
@@ -201,7 +203,10 @@ for f in community-1/segmentation/model.onnx \
          community-1/embedding/cabeca.onnx \
          community-1/embedding/mel.npy \
          wespeaker-voxceleb-resnet34-LM/voz.onnx \
-         wespeaker-voxceleb-resnet34-LM/mel.npy; do
+         wespeaker-voxceleb-resnet34-LM/mel.npy \
+         nemotron-3/embed.onnx nemotron-3/step.onnx nemotron-3/mel.npy \
+         nemotron-3/silencio.npy nemotron-3/config.yaml \
+         nemotron-3/LICENSE-OpenMDW-1.1.txt; do
   [[ -f "$ONNX_BASE/$f" ]] \
     || reprovar "falta $f — rode tools/empacotar_modelos_de_diarizacao.sh
       (e, se ele reclamar que não encontra a fonte, antes

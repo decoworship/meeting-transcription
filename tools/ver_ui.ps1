@@ -4,7 +4,7 @@
 # própria janela, mesmo que ela esteja atrás de outras. Sem isso a foto vira o
 # que estiver por cima — e trazer a janela para frente roubaria o foco de quem
 # estiver trabalhando na máquina.
-param([string]$Saida = 'C:\Users\andre\MeetingApp\ui.png', [int]$Espera = 9,
+param([string]$Saida = 'C:\Users\andre\AppData\Local\Temp\ui.png', [int]$Espera = 9,
       [string]$Tela = '',
       [string]$Gravacoes = 'C:\Users\andre\Documents\MeetingRecordings')
 Add-Type -AssemblyName System.Drawing

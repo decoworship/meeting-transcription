@@ -20,7 +20,8 @@
 #
 # ── Fase 2.5: o destino mudou de propósito ──────────────────────────────────
 #
-# O padrão é C:\Users\andre\MeetingApp, a instalação de trabalho.
+# O padrão foi C:\Users\andre\MeetingApp, a instalação de trabalho, até
+# 17/09/2026. Desde então é a instalação oficial — ver o CLAUDE.md.
 #
 # ── 18/08/2026: os motores saíram daqui ─────────────────────────────────────
 #

@@ -56,7 +56,7 @@ FOLGA_ENTRE_TURNOS = 0.5
 LIMIAR = 0.70
 
 LOCAIS_VOZ = [
-    "/mnt/c/Users/andre/MeetingApp/motores/diarizacao/modelos/wespeaker-voxceleb-resnet34-LM",
+    "/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/diarizacao/modelos/wespeaker-voxceleb-resnet34-LM",
     str(Path(__file__).resolve().parent.parent
         / "motores/diarizacao/modelos/wespeaker-voxceleb-resnet34-LM"),
 ]

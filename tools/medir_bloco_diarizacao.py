@@ -47,7 +47,7 @@ ACERVO_PADRAO = "/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings"
 # O pipeline embarcado da instalação oficial. Mesmos bytes do HuggingFace —
 # muda só precisar ou não de token e de rede (motores/diarizacao/motor.py).
 LOCAIS = [
-    "/mnt/c/Users/andre/MeetingApp/motores/diarizacao/modelos/community-1",
+    "/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/diarizacao/modelos/community-1",
     str(Path(__file__).resolve().parent.parent
         / "motores/diarizacao/modelos/community-1"),
 ]
