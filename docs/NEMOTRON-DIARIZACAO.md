@@ -159,6 +159,34 @@ de 8 rótulos além do dono, contados pelo pyannote — que parte gente em duas 
 nunca foi revisado. Decidido pelo dono do produto em 29/09/2026: raro demais
 para desenhar em volta.
 
+### Os nomes pelo caminho do app — 29/09/2026
+
+A tabela acima reconhece com 30 s de fala limpa por quadro, e **contra todas as
+gerações do banco**. O app faz diferente (`AprendizadoDeVozes.ReconhecerAsync`):
+trechos dos segmentos da transcrição com 0,5 s de folga, guarda do microfone,
+15 s, e **só amostras `regras = 2`** (`Vozes.Conta`). Refeito desse jeito, sem as
+amostras da própria reunião:
+
+```
+                         pyannote              Nemotron
+27/08  Paloma           ✓ 0,845               ✓ 0,845
+       Eduardo          ✓ 0,802               ✓ 0,802
+       fala com nome     94,9%                 95,1%
+25/08  Diego            ✓ 0,793               ✓ 0,793
+       Aline            ✗ 0,682               ✗ 0,682
+       fala com nome     90,3%                 90,7%
+```
+
+**Os mesmos nomes, com a mesma semelhança.** O que não é reconhecido não o é
+pelos dois, e por causa do banco: Aline tem 2 amostras da geração 2, e Roger e
+Antonio (21/08), que ficaram sem nome no teste de ponta a ponta com o
+`nemotron-3`, têm 2 e 1 — a 0,639 e 0,686, logo abaixo do limiar. Nomeá-los uma
+vez grava amostras novas e resolve, com qualquer diarizador.
+
+**O teste de ponta a ponta** (21/08, `Sidecar.exe --diarizacao nemotron-3`, no
+Python embarcado): 97,7% das palavras com o falante certo contra o Gemini,
+contra 95,0% do pipeline de hoje na mesma reunião.
+
 ## 4. Custo
 
 **Medido com a placa livre** (`nvidia-smi` antes de cada rodada). A primeira
