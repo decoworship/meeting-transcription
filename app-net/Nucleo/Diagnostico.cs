@@ -154,6 +154,21 @@ public sealed class Diagnostico
     public string? NaoTerminou { get; init; }
 
     /// <summary>
+    /// O fim do <c>registro.log</c>, colado no bloco. É o instrumento do
+    /// <c>SUP-1</c> que existia e ninguém chamava.
+    /// </summary>
+    /// <remarks>
+    /// Pedir o arquivo à pessoa já custou duas idas e voltas — veio o bloco no
+    /// lugar do log, e depois o evento errado do Visualizador. Com as últimas
+    /// linhas junto do bloco, uma colagem só traz a foto e o que o app fez.
+    /// Fica fora do <see cref="ComoTexto"/>, que tem de caber numa mensagem: a
+    /// tela o copia num botão à parte. Preenchido pelo <see cref="Coletar"/> pelo mesmo motivo do
+    /// <see cref="NaoTerminou"/>.
+    /// </remarks>
+    [JsonPropertyName("registro_final")]
+    public string? RegistroFinal { get; init; }
+
+    /// <summary>
     /// A versão publicada, sem os metadados que o SDK pendura atrás de <c>+</c>.
     /// </summary>
     /// <remarks>
@@ -258,6 +273,7 @@ public sealed class Diagnostico
             PastaDasGravacoes = pastaDasGravacoes,
             DiscoLivreGb = LivreEmGb(pastaDasGravacoes),
             NaoTerminou = MarcaDeEtapa.Ler() is { } m ? MarcaDeEtapa.Descrever(m) : null,
+            RegistroFinal = Registro.Ultimas(40),
         };
     }
 

@@ -253,4 +253,45 @@ public sealed class ExportacaoTests : IDisposable
         Assert.Contains("Projeto: Agentes", txt);
         Assert.Contains("Data: 11/08/2026 às 08:02", txt);
     }
+
+    private string DocumentoDaAta(string markdown)
+    {
+        string destino = Path.Combine(_pasta, "ata.docx");
+        Exportacao.DocxDaAta(markdown, destino);
+        using var zip = ZipFile.OpenRead(destino);
+        Assert.NotNull(zip.GetEntry("[Content_Types].xml"));
+        using var leitor = new StreamReader(zip.GetEntry("word/document.xml")!.Open());
+        return leitor.ReadToEnd();
+    }
+
+    [Fact]
+    public void AAtaViraWordComTitulosNegritoEListas()
+    {
+        string xml = DocumentoDaAta(
+            "# Ata — GCCB\n\n**Data:** 20/08 · **Cliente:** Coca & Cola\n**Participantes:** Diego\n\n"
+            + "## Descobertas\n\n- preço < 10%\n* volume\n- [ ] Diego: testar\n- [x] feito\n1. primeiro\n");
+
+        Assert.Contains("Ata — GCCB", xml);
+        // O negrito é um run à parte, e o ** não sobra no texto.
+        Assert.Contains("<w:b/><w:sz w:val=\"22\"/></w:rPr><w:t xml:space=\"preserve\">Data:</w:t>", xml);
+        Assert.DoesNotContain("**", xml);
+        // Linhas seguidas são campos distintos, e não se colam num parágrafo.
+        Assert.DoesNotContain("Cola**Participantes", xml);
+        Assert.Contains("Coca &amp; Cola", xml);
+        Assert.Contains("preço &lt; 10%", xml);
+        Assert.Contains("• ", xml);
+        Assert.Contains("☐ ", xml);
+        Assert.Contains("☑ ", xml);
+        Assert.Contains("1. ", xml);
+        Assert.DoesNotContain("[ ]", xml);
+        Assert.DoesNotContain("# ", xml);
+    }
+
+    [Fact]
+    public void UmNegritoSemParNaoVazaAteOFimDaLinha()
+    {
+        string xml = DocumentoDaAta("custo **alto e sem fechar\n");
+        Assert.Contains("**alto e sem fechar", xml);
+        Assert.DoesNotContain("<w:b/>", xml);
+    }
 }

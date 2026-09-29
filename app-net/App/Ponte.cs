@@ -1666,9 +1666,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         string arquivo = Exportacao.NomeDeArquivo(
             string.Join(" - ", partes) + " - ata", "md", Transcritor.DataDaReuniao(pasta));
 
+        // O .md continua indo junto: é o formato que se cola num chat ou num
+        // Notion. O .docx é o que vai para o cliente (ATA-1), e é o caminho que a
+        // tela mostra.
         string caminho = Path.Combine(destino, arquivo);
         File.Copy(origem, caminho, overwrite: true);
-        return caminho;
+
+        string docx = Path.ChangeExtension(caminho, "docx");
+        Exportacao.DocxDaAta(File.ReadAllText(origem), docx);
+        return docx;
     }
 
     /// <summary>
