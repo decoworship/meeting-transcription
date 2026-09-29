@@ -121,6 +121,44 @@ em 27/08 o `ultra_low_latency` chega a passar o offline por 0,1.
 
 ---
 
+## 3b. Na passada final, do jeito que o app monta — o `MOD-2`, 29/09/2026
+
+A §3 tinha duas diferenças em relação ao app, e `tools/medir_mod2.py` tira as
+duas: **os dois diarizadores recebem o `system.wav`** (o app não diariza o mix;
+o dono vem do microfone), e **os dois passam pelo mesmo reconhecimento de
+vozes** — wespeaker sobre 30 s de fala limpa de cada rótulo, `Reconhecer` com
+limiar 0,70, contra o banco real **sem as amostras vindas da própria reunião**.
+As falas do dono saem da conta. O pyannote é o pipeline ONNX que o app roda
+hoje (`motores/diarizacao/pipeline`).
+
+```
+                      separação dos outros      nome certo         tempo     VRAM
+                      pyannote   Nemotron   pyannote  Nemotron   pyannote  Nemotron
+2026-08-20  32 min      93,8%      96,9%      49,5%     51,5%      11x      226x
+2026-08-21   8 min      95,6%      98,5%      94,8%     98,0%      12x      142x
+2026-08-25  15 min      98,9%      99,3%      98,8%     99,3%      12x      178x
+2026-08-27  49 min      98,0%      99,0%      97,2%     98,1%      11x      206x
+7.713 palavras          96,5%      98,3%      80,2%     81,5%    564 s     31 s
+VRAM de pico                                                      ~4,4 GB  ~0,55 GB
+```
+
+**Ganha nas quatro, nas duas notas, e custa uma fração.** O erro de separação
+cai de 3,5% para 1,7% no conjunto — a metade, como na §3, agora com a mesma
+entrada e o mesmo pós-processamento do app. E roda **18× mais rápido com um
+oitavo da VRAM** (o embed por bloco do `tools/medir_mod1.py`).
+
+**O "nome certo" de 20/08 é baixo nos dois pela mesma razão:** o Diego não é
+reconhecido por nenhum — sem as amostras de 20/08, o banco não o tem bem o
+bastante (melhor 0,644 na §5). É o banco, não o diarizador.
+
+**Os mesmos nomes saem dos dois** em todas as reuniões; o Nemotron abre um
+rótulo a mais em 27/08 (dois sem nome, pouca fala), que custa pouco.
+
+**O teto de 8 falantes não pesa:** no acervo, 6 de 111 transcrições têm mais
+de 8 rótulos além do dono, contados pelo pyannote — que parte gente em duas e
+nunca foi revisado. Decidido pelo dono do produto em 29/09/2026: raro demais
+para desenhar em volta.
+
 ## 4. Custo
 
 **Medido com a placa livre** (`nvidia-smi` antes de cada rodada). A primeira

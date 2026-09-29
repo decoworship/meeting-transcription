@@ -883,7 +883,15 @@ medição que diz se ele pode ficar residente.
 **Critério de saída:** um modo de streaming em que a legenda não perde tempo
 real, ou a conclusão escrita de que só a passada final cabe.
 
-### MOD-2 · O Nemotron-3 no lugar do pyannote, na passada final — `feature` · `espera`
+### MOD-2 · O Nemotron-3 ao lado do pyannote, na passada final — `feature` · `aberto` · medido
+
+> **Medido em 29/09/2026** ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §3b),
+> com o `system.wav` e o reconhecimento de vozes do app nos dois braços: o erro
+> de separação cai de 3,5% para 1,7%, o nome certo sobe de 80,2% para 81,5%,
+> e ele roda 18× mais rápido com ~0,55 GB contra ~4,4 GB. **O desenho decidido
+> pelo dono do produto:** ele entra **ao lado** do pyannote, com duas escolhas
+> independentes — na legenda (`VIVO-7`) e na passada final. O teto de 8
+> falantes não pesa (6 de 111 reuniões, contagem inflada).
 
 **Gatilho: o `MOD-1` fechar.** O caminho é curto porque o reconhecimento de vozes
 não depende do diarizador: o `vetor_de_voz` do sidecar recebe trechos, e com os
