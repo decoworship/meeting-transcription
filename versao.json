@@ -1,6 +1,6 @@
 {
-  "versao": "0.8.0",
-  "publicada": "2026-09-25",
-  "notas": "O app ganha cara nova. A reunião aberta tem abas (Transcrição, Ata, Notas), um tocador fixo no pé e Falantes e Exportar no cabeçalho; as marcas de tempo das notas tocam dali. A lista de reuniões ganha busca, filtros e a visão da semana. O Gravador foi redesenhado, com a legenda larga e Notas e Perguntar em abas. Ajustes › Clientes e projetos e Ajustes › Vozes viraram telas de mestre-detalhe. O executável passa a se chamar PulseMeet.exe.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.8.0"
+  "versao": "0.8.1",
+  "publicada": "2026-09-29",
+  "notas": "A ata sai em Word: o Exportar da aba Ata grava um .docx junto do .md. Em Ajustes › Sobre, o botão novo Copiar com o registro leva o diagnóstico e as últimas linhas do que o app fez, para relatar um problema.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.8.1"
 }
