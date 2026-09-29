@@ -158,6 +158,46 @@ compartilhada com o Meet e com a legenda, com a folga intermitente da
 
 ---
 
+## 4b. Ao lado da legenda — o `MOD-1`, 29/09/2026
+
+**Dois processos, como os dois sidecars rodariam:** a legenda
+(`tools/medir_legenda.py`, `transcribe_cpp` CUDA) e o Nemotron em streaming
+(`tools/medir_mod1.py`), os dois no ritmo do relógio, 10 min da
+`2026-08-20_15-59-20`, com o `nvidia-smi` amostrado a cada 0,5 s. Placa livre
+antes (24%, 1,17 GB — só a área de trabalho), **sem o Meet aberto**.
+
+**O embed passou a ser por bloco**, com 8 quadros de contexto à esquerda, que é
+o que um sidecar pode fazer. Decide **100% igual** ao embed da gravação inteira
+(2 min, `low_latency`), e a VRAM deixa de crescer com a duração.
+
+```
+                            legenda              Nemotron              placa
+                      xRT   ciclo  parede    passo p50/p90  atraso máx   uso p90  VRAM máx
+legenda sozinha       3,17   28%    679 s          —             —          30%    2,2 GB
++ low_latency         2,90   30%    697 s    106 / 207 ms     0,45 s        28%    3,7 GB
++ ultra_low_latency   0,78   61%   1261 s    113 / 237 ms     0,75 s        38%    4,5 GB
+```
+
+**`low_latency` cabe.** A legenda perde 8% de vazão (3,17× → 2,90×) e
+continua bem acima de 1,5×; o Nemotron acompanha o relógio com folga — atraso
+mediano de 0,11 s, que não cresce no último terço. **É o critério de saída do
+`MOD-1` cumprido**, e os cortes de custo do passo 2 (fp16, IO binding, grafo
+CUDA) deixam de ser pré-requisito.
+
+**`ultra_low_latency` não cabe, e quem paga é a legenda.** O Nemotron se
+mantém no relógio (1,76×), mas a legenda cai para **0,78×** — abaixo de 1×, a
+fila cresce para sempre. Um passo a cada 240 ms disputa a placa com os feeds de
+200 ms da legenda, e ela perde.
+
+**Ressalvas, que decidem o que medir antes de ligar para o usuário:**
+
+- **sem o Meet.** O Meet ocupou até 5,7 GB e 67–100% da placa na reunião de
+  25/09; 3,7 GB aqui mais o Meet passa dos 6 GB. **Esta é a medição que falta**;
+- a `parede` da legenda passa dos 600 s mesmo sozinha, porque o
+  `medir_legenda.py` dorme a sobra de cada feed e não recupera o que um feed
+  caro atrasou. O número é pessimista, e igual nos três braços;
+- WSL, e não o Python embarcado no Windows; 10 min, e não uma reunião inteira.
+
 ## 5. Memória de vozes
 
 O modelo não guarda voz: a saída é probabilidade por quadro, e o slot é por

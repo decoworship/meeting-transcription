@@ -847,7 +847,14 @@ portar para o formato do app, e trocar. A qualidade que o §10 deixa de fora é 
 de *ajuste* (limiar, prompt, pós-processamento); trocar o modelo por um que
 comprovadamente erra menos entra aqui, com medição antes.
 
-### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · `aberto` · **próximo passo**
+### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · `aberto` · falta medir com o Meet
+
+> **Medido em 29/09/2026, sem o Meet** ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §4b):
+> o **`low_latency` cabe** — a legenda vai de 3,17× a 2,90×, o Nemotron fica
+> no relógio, 3,7 GB somados. O **`ultra_low_latency` não**: a legenda cai a
+> 0,78×. O que falta para fechar é **repetir o `low_latency` numa reunião de
+> verdade, com o Meet aberto** — é a VRAM (3,7 GB + o Meet em 6 GB) que pode
+> reprovar. Os cortes do passo 2 só voltam se ela reprovar.
 
 **Gatilho: é o que falta para decidir o `MOD-2` e o `VIVO-7`.** O
 `nvidia/Nemotron-3-Diarization` já está medido, portado e documentado
