@@ -3,6 +3,18 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.8.1 — 29/09/2026
+
+**A ata sai em Word.** O botão Exportar da aba Ata grava agora um `.docx`, junto
+do `.md` de sempre, na pasta das atas. Os títulos, o negrito, as listas e as
+caixas de pendência ficam como na tela, e o arquivo abre direto no Word para ir
+ao cliente.
+
+**Relatar um problema ficou mais fácil.** Em Ajustes › Sobre, ao lado de
+"Copiar diagnóstico", há um novo botão, **Copiar com o registro**. Ele copia o
+bloco de sempre e, logo abaixo, as últimas linhas do que o app fez. Quando algo
+der errado, é esse que se cola na mensagem.
+
 ## 0.8.0 — 25/09/2026
 
 **O app ganhou cara nova.** É o redesenho de interface que começou em

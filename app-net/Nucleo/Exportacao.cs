@@ -160,6 +160,91 @@ public static class Exportacao
             + "<w:body>" + corpo + "</w:body></w:document>");
     }
 
+    /// <summary>
+    /// A ata em Word, a partir do <c>ata.md</c> (ATA-1 do docs/BACKLOG.md).
+    /// </summary>
+    /// <remarks>
+    /// Converte só o Markdown que o redator escreve: títulos <c>#</c> a
+    /// <c>###</c>, listas com <c>-</c> ou <c>*</c> (e <c>- [ ]</c>, que vira ☐),
+    /// listas numeradas, citação e <c>**negrito**</c> dentro da linha. Uma linha
+    /// é um parágrafo — no <c>ata.md</c>, linhas seguidas são campos distintos
+    /// ("**Data:** …" e "**Participantes:** …"), e juntá-las como o Markdown faz
+    /// colaria os dois. O que não for reconhecido sai como texto, sem perder
+    /// nada.
+    /// </remarks>
+    public static void DocxDaAta(string markdown, string destino)
+    {
+        var corpo = new StringBuilder();
+        foreach (var bruta in markdown.Replace("\r\n", "\n").Split('\n'))
+        {
+            string linha = bruta.TrimEnd();
+            if (linha.Trim().Length == 0) continue;
+
+            var titulo = System.Text.RegularExpressions.Regex.Match(linha, @"^(#{1,6})\s+(.*)$");
+            if (titulo.Success)
+            {
+                int nivel = titulo.Groups[1].Value.Length;
+                int tamanho = nivel switch { 1 => 36, 2 => 28, 3 => 24, _ => 22 };
+                corpo.Append("<w:p><w:pPr><w:spacing w:before=\"240\" w:after=\"80\"/></w:pPr>")
+                     .Append(Trechos(titulo.Groups[2].Value, negritoBase: true, tamanho))
+                     .Append("</w:p>");
+                continue;
+            }
+
+            string recuo = "";
+            string marcador = "";
+            var item = System.Text.RegularExpressions.Regex.Match(
+                linha, @"^(\s*)(?:([-*+])\s+(\[[ xX]\]\s+)?|(\d+[.)])\s+|>\s?)(.*)$");
+            if (item.Success && linha.TrimStart().Length > 0 && !linha.TrimStart().StartsWith("**"))
+            {
+                int nivel = 1 + item.Groups[1].Value.Replace("\t", "  ").Length / 2;
+                bool citacao = !item.Groups[2].Success && !item.Groups[4].Success;
+                recuo = citacao
+                    ? $"<w:pPr><w:ind w:left=\"{360 * nivel}\"/></w:pPr>"
+                    : $"<w:pPr><w:ind w:left=\"{360 * nivel}\" w:hanging=\"280\"/></w:pPr>";
+                marcador = item.Groups[3].Success
+                    ? (item.Groups[3].Value.Trim() == "[ ]" ? "☐ " : "☑ ")
+                    : item.Groups[4].Success ? item.Groups[4].Value + " "
+                    : citacao ? "" : "• ";
+                linha = item.Groups[5].Value;
+            }
+
+            corpo.Append("<w:p>").Append(recuo);
+            if (marcador.Length > 0)
+                corpo.Append("<w:r><w:t xml:space=\"preserve\">").Append(Escapar(marcador)).Append("</w:t></w:r>");
+            corpo.Append(Trechos(linha, negritoBase: false, 22)).Append("</w:p>");
+        }
+
+        using var zip = new ZipArchive(File.Create(destino), ZipArchiveMode.Create);
+        Escrever(zip, "[Content_Types].xml", TiposDeConteudo);
+        Escrever(zip, "_rels/.rels", Relacoes);
+        Escrever(zip, "word/document.xml",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
+            + "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
+            + "<w:body>" + corpo + "</w:body></w:document>");
+    }
+
+    /// <summary>Uma linha em runs, alternando negrito a cada <c>**</c>.</summary>
+    private static string Trechos(string texto, bool negritoBase, int tamanho)
+    {
+        var sb = new StringBuilder();
+        var partes = texto.Split("**");
+        // Número par de partes é um ** sem par: ele volta para o texto, e o
+        // negrito não vaza até o fim da linha.
+        if (partes.Length % 2 == 0)
+            partes = [.. partes[..^2], partes[^2] + "**" + partes[^1]];
+        for (int i = 0; i < partes.Length; i++)
+        {
+            if (partes[i].Length == 0) continue;
+            bool negrito = negritoBase || i % 2 == 1;
+            sb.Append("<w:r><w:rPr>");
+            if (negrito) sb.Append("<w:b/>");
+            sb.Append("<w:sz w:val=\"").Append(tamanho).Append("\"/></w:rPr><w:t xml:space=\"preserve\">")
+              .Append(Escapar(partes[i])).Append("</w:t></w:r>");
+        }
+        return sb.ToString();
+    }
+
     private static string Paragrafo(string texto, bool negrito, string? cor, int tamanho)
     {
         var sb = new StringBuilder("<w:p><w:r><w:rPr>");

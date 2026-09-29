@@ -54,7 +54,7 @@ function botoesDaAta(markdown, gravacao, depois) {
     try {
       const r = await pedir("exportar-ata", { gravacao: gravacao.caminho,
                                               nome: tituloDe(gravacao) });
-      exportar.textContent = "Exportada";
+      exportar.textContent = "Exportada em Word";
       // O caminho fica na tela: exportar sem dizer onde obriga a procurar.
       const onde = document.createElement("p");
       onde.className = "campo__dica";

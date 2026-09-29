@@ -275,9 +275,22 @@ function blocoSobre() {
   botao.textContent = "Copiar diagnóstico";
   botao.disabled = true;
 
+  // O segundo botão leva o fim do registro.log junto (SUP-1): é o que se pede
+  // quando a foto não basta, e pedir o arquivo à parte já deu errado duas vezes.
+  const comRegistro = document.createElement("button");
+  comRegistro.className = "aa-btn aa-btn-texto";
+  comRegistro.type = "button";
+  comRegistro.textContent = "Copiar com o registro";
+  comRegistro.disabled = true;
+
   let texto = "";
+  let textoComRegistro = "";
   diagnostico().then((d) => {
     texto = d.texto;
+    textoComRegistro = d.registro_final
+      ? `${d.texto}\n\núltimas linhas do registro:\n${d.registro_final}`
+      : d.texto;
+    comRegistro.disabled = false;
     // A versão e a placa na linha visível: são as duas que a pessoa quer saber
     // sem clicar em nada. O resto está no bloco copiado.
     linha.textContent = `${d.marca} ${d.versao} — `
@@ -287,21 +300,23 @@ function blocoSobre() {
     linha.textContent = `não deu para ler o diagnóstico: ${e.message}`;
   });
 
-  botao.addEventListener("click", async () => {
+  const copiar = (b, rotulo, conteudo) => b.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(texto);
-      botao.textContent = "Copiado";
-      setTimeout(() => { botao.textContent = "Copiar diagnóstico"; }, 2000);
+      await navigator.clipboard.writeText(conteudo());
+      b.textContent = "Copiado";
+      setTimeout(() => { b.textContent = rotulo; }, 2000);
     } catch {
       // Sem área de transferência, mostrar o texto ainda resolve: dá para
       // selecionar e copiar à mão. Falhar em silêncio, não.
-      linha.textContent = texto;
+      linha.textContent = conteudo();
     }
   });
+  copiar(botao, "Copiar diagnóstico", () => texto);
+  copiar(comRegistro, "Copiar com o registro", () => textoComRegistro);
 
   const acoes = document.createElement("div");
   acoes.className = "acoes";
-  acoes.append(botao);
+  acoes.append(botao, comRegistro);
 
   b.append(linha, acoes, blocoDeAtualizacao());
   return b;

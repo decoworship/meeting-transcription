@@ -44,7 +44,7 @@ tropeço isolado. Nenhum nasceu de alguém percorrer o app do começo ao fim
 perguntando onde ele custa tempo. É o que o UI-1 existe para consertar, e é por
 isso que ele vem primeiro.
 
-### UI-1 · Uma passada de percurso, ponta a ponta — `feature` · `aberto`
+### UI-1 · Uma passada de percurso, ponta a ponta — `feature` · feito pelo redesenho da 0.8.0
 
 Percorrer os quatro destinos com uma reunião real na mão — gravar, transcrever,
 revisar, gerar ata, exportar — e anotar onde o app faz esperar, faz procurar, ou
@@ -55,6 +55,10 @@ em que doeu; não é um redesenho.
 percurso ([FASE5-HANDOFF.md](FASE5-HANDOFF.md) §2). O acervo passou de 44
 gravações, e o uso deixou de ser "uma reunião por vez" — que é o regime em que
 todas as telas foram desenhadas.
+
+**Coberto pelo redesenho de UI/UX** (planos 1 a 6 em `superpowers/plans/`,
+lançado na 0.8.0): cada tela foi repassada com o acervo real. Falta o plano 4b.
+Um percurso novo vale depois de a 0.8 rodar na máquina de outra pessoa.
 
 ### UI-2 · A tela de vozes — `feature` · feito em 25/09/2026
 
@@ -120,7 +124,7 @@ janela ou o menu da bandeja.
 **Gatilho:** perder o começo de uma reunião procurando o botão. Cuidado: atalho
 global do Windows é outra coisa, e mais cara, do que atalho de janela.
 
-### UI-6 · Nada é anunciado — `bug` · `aberto`
+### UI-6 · Nada é anunciado — `bug` · feito
 
 **Não existe uma única região `aria-live` no app** — conferido em 27/08/2026 nos
 `.js`, no `.css` e no `index.html`. Progresso da transcrição, erro da ponte e
@@ -129,6 +133,10 @@ está certo, mas ele diz *"estou carregando"*, não *"terminou"* nem *"falhou"*.
 
 Uma região só, no `index.html`, com o texto que a barra de progresso já compõe,
 fecha a maior parte disto.
+
+**Feito:** o `#anuncio` (`role="status"`, `aria-live="polite"`) mora no
+`index.html`, e o `anunciar()` do `pecas.js` diz a troca de tela e o começo e o
+fim da gravação.
 
 ### UI-7 · A moldura do Windows não repinta ao trocar de tema — `bug` · `espera`
 
@@ -171,7 +179,7 @@ Origem: revisão final do plano 4a (`superpowers/plans/2026-09-25-ui-04a-cliente
 saíram deste backlog em 27/08/2026 e são tratadas fora dele. O que fica é o que
 a ata *é* e por onde ela *sai*.
 
-### ATA-1 · Exportar em DOCX — `feature` · `aberto`
+### ATA-1 · Exportar em DOCX — `feature` · feito em 29/09/2026 (0.8.1)
 
 O botão Exportar copia o `.md`
 ([atas.js:196](../app-net/App/web/atas.js#L196)). A transcrição já sai em
@@ -180,6 +188,11 @@ DOCX à mão, e a ata já é estruturada — o caminho é curto.
 
 **Já dói pela assimetria:** a ata é justamente o que sai para o cliente, e é a
 única das duas saídas que não tem formato de escritório.
+
+**Feito na 0.8.1:** o Exportar da ata escreve o `.docx` ao lado do `.md` na
+pasta das atas (`Exportacao.DocxDaAta`), com títulos, negrito, listas, caixas
+`- [ ]` como ☐ e listas numeradas. Uma linha do `ata.md` é um parágrafo, porque
+ali linhas seguidas são campos distintos.
 
 ### ATA-2 · A ata anterior como contexto — `feature` · `espera`
 
@@ -281,7 +294,12 @@ roda na máquina de outra pessoa precisa deixar rastro**. O bloco de diagnóstic
 da Fase 4 dá a *foto* — versão, placa, modelos. A pergunta que faltou responder
 era outra: **o que o app fez**.
 
-### TRA-2 · Motores em paralelo, medidos no uso real — `feature` · `aberto`
+### TRA-2 · Motores em paralelo, medidos no uso real — `feature` · `espera`
+
+> **Sem objeto desde 17/09/2026:** o MOSS saiu, e o `MotorAceito` devolve
+> sempre `classico`. Não há segundo motor a medir. **Gatilho:** entrar um motor
+> novo de transcrição — aí o primeiro passo abaixo (lista em vez de binário)
+> vale de novo.
 
 **A estratégia, decidida pelo dono do produto em 11/09/2026:** motor novo entra
 **ao lado** do que existe, nunca no lugar; a comparação que decide é o **uso
@@ -349,20 +367,20 @@ reaproveitar — na dúvida, roda o ASR de novo. Falta a prévia escrever nela.
 trocar de motor entre a reunião e a transcrição faz a `Retomada` recusar o
 parcial — corretamente.
 
-### SUP-1 · O app não sabe dizer o que aconteceu — `feature` · `aberto`
+### SUP-1 · O app não sabe dizer o que aconteceu — `feature` · `aberto` (4 de 5 na 0.8.1)
 
 Prometido para a 0.4.1 e **nunca entregue** — conferido no código em
 27/08/2026, com a versão em 0.6.1. São cinco instrumentos:
 
 | instrumento | estado hoje |
 |---|---|
-| assinar o `AoRegistrar` em `AprendizadoDeVozes.ExtrairAsync` | **não existe** — é a única das **três** cargas de GPU do pipeline que não escreve uma linha, nem do motor |
-| `Registro.Ultimas()` no bloco de diagnóstico | existe e **ninguém a chama** fora do teste ([Registro.cs:69](../app-net/Nucleo/Registro.cs#L69)) |
+| assinar o `AoRegistrar` em `AprendizadoDeVozes.ExtrairAsync` | ✅ **existe desde 04/09/2026** — a terceira carga de GPU escreve no registro como `vozes` |
+| `Registro.Ultimas()` no bloco de diagnóstico | ✅ **na 0.8.1** — Ajustes › Sobre ganhou "Copiar com o registro", que leva o bloco e as últimas 40 linhas. O bloco curto continua curto |
 | marcador de transcrição em andamento, apagado ao terminar | ✅ **existe desde 10/09/2026** — `Nucleo/MarcaDeEtapa.cs`, escrito com `WriteThrough` a cada etapa e apagado no `finally` do `ExecutarAsync`. A órfã entra no log e no **bloco colável** do diagnóstico |
 | ler o Event Log (`6008`, `Kernel-Power 41`, `BugCheck 1001`, `Kernel-Boot 27`) | **não existe** — nenhum `EventLogReader` na árvore |
 | amostrar o `nvidia-smi` a cada ~15 s durante a transcrição | **não existe** — [Diagnostico.cs](../app-net/Nucleo/Diagnostico.cs) faz uma chamada só, com *"não chame em laço"* escrito nela |
 
-**Três dos cinco existem.** Os dois primeiros eram de uma linha cada, e valem mais que os outros dois: é
+**Quatro dos cinco existem.** Falta só o que é Windows-only e caro: o Event Log e a amostragem do `nvidia-smi`. Os dois primeiros eram de uma linha cada, e valiam mais que os outros: é
 o registro que separa um desligamento na diarização de um desligamento vinte
 minutos depois. Os dois últimos são Windows-only e usam reflexão — cuidado com o
 `PublishTrimmed` e com os testes `net8.0` portáteis.
@@ -400,6 +418,10 @@ de ser urgente — **vale por si, quando incomodar**.
 ## 6. Distribuição e atualização
 
 ### DIST-1 · Separar os motores do instalador — `feature` · `aberto`
+
+> **Estado em 29/09/2026:** o MOSS saiu (17/09) e as DLLs de CUDA que nenhum
+> motor abre foram cortadas (PR #18, −56 MB). Os números das notas abaixo são
+> de antes disso. A separação em si continua por fazer.
 
 **É o único item deste backlog com prazo.** Enquanto os manifestos não forem
 submetidos ao `microsoft/winget-pkgs`, o `PackageIdentifier` ainda pode ser
@@ -464,6 +486,17 @@ apareceram porque alguém olhou.
 línguas e runtime — e nada mais. Ver o `R0` da [FASE7-ROTA.md](FASE7-ROTA.md), que
 é a mesma varredura na primeira execução.
 
+**Varredura de 29/09/2026:**
+
+- `nvidia/Nemotron-3-Diarization` (23/09, ONNX, até 8 falantes) — já medido e
+  portado; é o `MOD-1`. Não é notícia nova;
+- `ibm-granite/granite-speech-5.0-470m-turboctc` (Apache 2.0, 470M) — **só
+  inglês**; reprova no 1;
+- `audio.cpp` (runtime ggml de áudio, 62 famílias na 0.7 de 26/08) — não é
+  modelo; é candidato a runtime se o `transcribe.cpp` travar. Não muda nada hoje.
+
+Nenhum muda decisão. Próxima: 30/10/2026.
+
 ### DIST-2 · Motores como pacotes por acelerador — `feature` · `espera`
 
 CUDA, Vulkan e CPU como variantes baixáveis, em vez de tudo embutido
@@ -502,7 +535,14 @@ reuniões) e o `VIVO-6` (a legenda sem placa) —, e os dois deram resultado
 negativo para a esperança que os motivou. Ficam escritos porque um número
 negativo economiza a próxima tentativa.
 
-### VIVO-1 · A legenda não carimba o turno — `feature` · `aberto`
+### VIVO-1 · A legenda não carimba o turno — `feature` · feito em 17/09/2026, pelo trecho
+
+> **Feito por outro caminho:** o `legenda.json` guarda `TrechoDaLegenda` com
+> `inicio_ms`/`fim_ms` (o `audio_committed_ms`, 1,1 s de mediana). O
+> `timestamps="word"` foi abandonado porque o `snapshot()` devolve zero palavras
+> em streaming. **Sobra uma coisa:** a janela da pergunta ainda é medida em
+> caracteres (`CaracteresPorMinuto = 800`) — pode passar a usar o tempo dos
+> trechos quando incomodar.
 
 **Gatilho: ele bloqueia outras três coisas, e custa zero.** O `TurnoDaLegenda`
 guarda `dono` e `texto`, e nada de tempo. Sem tempo:
@@ -552,7 +592,11 @@ sobrepor nada.
 **Então o caminho é o `timestamps="word"`**, que já se sabe custar zero. O
 barato não era mais barato: era insuficiente em um terço do acervo.
 
-### VIVO-2 · Diarizar a legenda depois da reunião, em segundo plano — `feature` · `espera`
+### VIVO-2 · Diarizar a legenda depois da reunião, em segundo plano — `feature` · feito
+
+> **Feito:** `Nucleo/FalantesDaLegenda.cs` separa os falantes sobre os
+> trechos no fim da reunião e grava `falantes_prontos` no `legenda.json`; a
+> correção de termos do `VIVO-3` roda junto.
 
 **Depende do `VIVO-1`.** A ideia é entregar *quem falou* no rascunho logo depois
 da reunião, sem esperar a passada final.
@@ -880,5 +924,5 @@ Para a lista não virar depósito de novo:
 - **o tempo real** — é estudo, tem carta própria e não manda fazer nada
   ([FASE7.md](FASE7.md)). A fila dos testes dela e a definição dos três produtos
   estão na [FASE7-FILA.md](FASE7-FILA.md); o que **saiu** do estudo e virou
-  código é o motor MOSS opcional ([FASE7-BACKEND.md](FASE7-BACKEND.md)), que é
-  transcrição depois da reunião como sempre foi — não ao vivo.
+  código foi a legenda ao vivo e a pergunta (tema 7). O motor MOSS opcional
+  ([FASE7-BACKEND.md](FASE7-BACKEND.md)) saiu em 17/09/2026.
