@@ -208,6 +208,93 @@ class Nemotron3:
                 for s in segmentos(self.logits_por_bloco(onda, "offline"))]
 
 
+class FluxoAoVivo:
+    """O Nemotron-3 alimentado aos poucos, para a legenda ao vivo (30/09/2026).
+
+    Recebe o ``system.wav`` em pedaços de qualquer tamanho e processa um bloco
+    sempre que o áudio dele e o contexto à direita já chegaram. É o mesmo laço
+    do :meth:`Nemotron3.logits_por_bloco` — mesmo mel por trecho, mesmo cache —,
+    só que dirigido pelo áudio que chega em vez de pelo arquivo inteiro.
+
+    **Junta a fala limpa de cada vaga**, porque é dela que sai o nome: o núcleo
+    reconhece a voz com o mesmo ``Vozes.Reconhecer`` da passada final. Uma vaga
+    manda o áudio limpo quando cruza cada marca de :attr:`MARCAS_S` — a primeira
+    cedo, para o nome aparecer logo, e a segunda com fala bastante para corrigir
+    um primeiro palpite ruim.
+    """
+
+    AMOSTRAS_POR_EMBED = SUB * HOP          # 1280: um embed = 80 ms
+    MARCAS_S = (6.0, 20.0)
+
+    def __init__(self, eng: "Nemotron3", modo: str = "low_latency"):
+        self.eng = eng
+        self.bl, self.cd, fifo, per = MODOS[modo]
+        self.cache = CacheDeFalantes(fifo, per, eng.sil)
+        self._audio = np.zeros(0, np.float32)
+        self._base = 0          # índice do embed que _audio[0] representa
+        self._prox = 0          # próximo embed a decidir
+        self._limpo: dict[int, list[np.ndarray]] = {}
+        self._marcas: dict[int, int] = {}
+
+    def alimentar(self, pcm: np.ndarray) -> tuple[list[tuple[int, int, int]], list[tuple[int, np.ndarray]]]:
+        """``(ativos, prontos)``: trechos ``(inicio_ms, fim_ms, vaga)`` recém
+        decididos, e ``(vaga, audio)`` das vagas que cruzaram uma marca."""
+        self._audio = np.concatenate([self._audio, pcm.astype(np.float32)])
+        total = self._base + len(self._audio) // self.AMOSTRAS_POR_EMBED
+        ativos, prontos = [], []
+        while self._prox + self.bl + self.cd <= total:
+            ini, fim = self._prox, self._prox + self.bl
+            e0 = max(0, ini - Nemotron3.CONTEXTO_ESQ)
+            a0 = (e0 - self._base) * self.AMOSTRAS_POR_EMBED
+            a1 = (fim + self.cd - self._base) * self.AMOSTRAS_POR_EMBED
+            feats = mel(self._audio[a0:a1], self.eng.filtros)
+            emb = self.eng.embed.run(None, {"features": feats[None]})[0][0]
+            pedaco = emb[ini - e0: ini - e0 + self.bl + self.cd]
+            ant = self.cache.anteriores()
+            entrada = np.concatenate([ant, pedaco])
+            lg = self.eng.step.run(None, {"embeds": entrada[None]})[0][0]
+            self.cache.atualizar(entrada, lg, self.bl)
+            ativo = sigmoid(lg[len(ant) * SUB: (len(ant) + self.bl) * SUB]) > 0.5
+            ativos += self._trechos(ativo, ini * 80)
+            prontos += self._juntar_limpo(ativo, (ini - self._base) * self.AMOSTRAS_POR_EMBED)
+            self._prox = fim
+            # Guarda só o contexto à esquerda do próximo bloco.
+            corte = max(0, self._prox - Nemotron3.CONTEXTO_ESQ) - self._base
+            if corte > 0:
+                self._audio = self._audio[corte * self.AMOSTRAS_POR_EMBED:]
+                self._base += corte
+        return ativos, prontos
+
+    @staticmethod
+    def _trechos(ativo: np.ndarray, inicio_ms: int) -> list[tuple[int, int, int]]:
+        borda = np.zeros((1, ativo.shape[1]), np.int8)
+        mud = np.diff(np.concatenate([borda, ativo.astype(np.int8), borda]), axis=0)
+        out = []
+        for f in range(ativo.shape[1]):
+            for a, b in zip(np.nonzero(mud[:, f] == 1)[0], np.nonzero(mud[:, f] == -1)[0]):
+                out.append((inicio_ms + int(a) * 10, inicio_ms + int(b) * 10, f))
+        return out
+
+    def _juntar_limpo(self, ativo: np.ndarray, a0: int) -> list[tuple[int, np.ndarray]]:
+        prontos = []
+        so_um = ativo.sum(1) == 1
+        for q in np.nonzero(so_um)[0]:
+            f = int(ativo[q].argmax())
+            if self._marcas.get(f, 0) >= len(self.MARCAS_S):
+                continue  # já disse o que tinha a dizer
+            pedaco = self._audio[a0 + q * HOP: a0 + (q + 1) * HOP]
+            if len(pedaco) == HOP:
+                self._limpo.setdefault(f, []).append(pedaco)
+        for f, pedacos in self._limpo.items():
+            k = self._marcas.get(f, 0)
+            if k < len(self.MARCAS_S) and len(pedacos) * HOP / 16000 >= self.MARCAS_S[k]:
+                self._marcas[f] = k + 1
+                prontos.append((f, np.concatenate(pedacos)))
+                if k + 1 == len(self.MARCAS_S):
+                    self._limpo[f] = []
+        return prontos
+
+
 def segmentos(logits: np.ndarray, limiar: float = 0.5) -> list[dict]:
     ativo = (sigmoid(logits) > limiar).astype(np.int8)
     borda = np.zeros((1, ativo.shape[1]), np.int8)

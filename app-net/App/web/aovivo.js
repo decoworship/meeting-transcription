@@ -136,12 +136,17 @@ export function painelAoVivo(opcoes = {}) {
 
   function acrescentarLegenda(g) {
     const t = tempo();
+    // **Quem fala**: `true` é você (a faixa do microfone), um nome é quem os
+    // nomes ao vivo reconheceram (Ajustes, em teste), e `false` são "os outros"
+    // sem nome. As regras da linha comparam este valor, então trocar de
+    // pessoa também abre linha nova.
+    const quem = g.dono ? true : (g.falante || false);
     if (g.novo && g.novo.trim()) {
-      if (novaLinha(linha, { dono: g.dono, t })) {
+      if (novaLinha(linha, { dono: quem, t })) {
         const anterior = linha;
-        const no = linhaDeFala(t, g.dono, mostraDono(anterior, g.dono), "");
+        const no = linhaDeFala(t, quem, mostraDono(anterior, quem), "");
         corpo.insertBefore(no.raiz, volatil?.raiz ?? null);
-        linha = { no, texto: "", dono: g.dono, ate_s: t, palavras: 0 };
+        linha = { no, texto: "", dono: quem, ate_s: t, palavras: 0 };
         esconderVazio();
       }
       linha.texto = (linha.texto + g.novo).replace(/\s+/g, " ").trimStart();
@@ -157,15 +162,15 @@ export function painelAoVivo(opcoes = {}) {
     const texto = (g.tentativo || "").trim();
     if (!texto) { volatil?.raiz.remove(); volatil = null; return; }
     if (!volatil) {
-      volatil = linhaDeFala(null, g.dono, true, "");
+      volatil = linhaDeFala(null, quem, true, "");
       volatil.raiz.classList.add("fala--volatil");
       corpo.appendChild(volatil.raiz);
       esconderVazio();
     }
-    volatil.raiz.dataset.dono = String(g.dono);
+    volatil.raiz.dataset.dono = String(quem === true);
     // O dono do rascunho segue a mesma regra: continuação da linha firme do
     // mesmo dono não repete o nome.
-    volatil.dono.textContent = mostraDono(linha, g.dono) ? rotuloDoDono(g.dono) : "";
+    volatil.dono.textContent = mostraDono(linha, quem) ? rotuloDoDono(quem) : "";
     volatil.texto.textContent = texto;
     lista.seguirAoFim();
   }
@@ -280,7 +285,7 @@ export function painelAoVivo(opcoes = {}) {
   return { raiz, marcarMomento, encerrar() { cancelar(); lista.encerrar(); } };
 }
 
-const rotuloDoDono = (dono) => (dono ? "Você" : "Outros");
+const rotuloDoDono = (dono) => (dono === true ? "Você" : dono || "Outros");
 
 /**
  * Uma linha da legenda: tempo · dono · texto.
@@ -291,12 +296,17 @@ const rotuloDoDono = (dono) => (dono ? "Você" : "Outros");
  * numa reunião de quatro é uma afirmação errada com cara de certeza. "Você" é o
  * que a faixa do microfone sabe, e é fato. Quem é cada um vem na passada final.
  *
+ * **A exceção, em teste desde 30/09/2026:** com "Nomes ao vivo" ligado em
+ * Ajustes, o Nemotron-3 separa os outros durante a reunião e o reconhecimento de
+ * vozes dá o nome — ou "Pessoa N", nunca "Falante 7" de uma costura.
+ *
  * @param t segundos, ou nulo para o rascunho ("agora").
  */
 function linhaDeFala(t, dono, comDono, texto) {
   const raiz = document.createElement("div");
   raiz.className = "fala";
-  raiz.dataset.dono = String(dono);
+  // O CSS pinta pelo "é você ou não"; um nome continua sendo "não".
+  raiz.dataset.dono = String(dono === true);
 
   const quando = document.createElement("span");
   quando.className = "fala__tempo";

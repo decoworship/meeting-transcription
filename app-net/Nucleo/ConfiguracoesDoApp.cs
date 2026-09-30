@@ -164,6 +164,17 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("legenda_ao_vivo")] public bool LegendaAoVivo { get; set; }
 
     /// <summary>
+    /// O nome de quem fala direto na legenda, durante a reunião (30/09/2026, em
+    /// teste).
+    /// </summary>
+    /// <remarks>
+    /// <b>Nasce desligada</b> e só vale com a <see cref="LegendaAoVivo"/>: roda o
+    /// Nemotron-3 ao lado dela, em outro sidecar, e isso custa ~1,5 GB de placa
+    /// a mais (docs/NEMOTRON-DIARIZACAO.md §4b). Ver <see cref="Nucleo.FalantesAoVivo"/>.
+    /// </remarks>
+    [JsonPropertyName("falantes_ao_vivo")] public bool FalantesAoVivo { get; set; }
+
+    /// <summary>
     /// Perguntar ao modelo o que já aconteceu, durante a própria reunião.
     /// </summary>
     /// <remarks>

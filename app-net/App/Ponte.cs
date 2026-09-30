@@ -577,6 +577,11 @@ internal sealed class PedacoDaLegendaJson
     [JsonPropertyName("novo")] public required string Novo { get; init; }
     [JsonPropertyName("tentativo")] public required string Tentativo { get; init; }
     [JsonPropertyName("dono")] public required bool Dono { get; init; }
+
+    /// <summary>Quem dos outros falou, com os nomes ao vivo ligados; senão nulo.</summary>
+    [JsonPropertyName("falante")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Falante { get; init; }
 }
 
 /// <summary>Um bloco de 3 minutos da prévia, como a tela o recebe.</summary>
@@ -679,6 +684,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// </remarks>
     private SessaoAoVivo? _aoVivo;
     private LegendaAoVivo? _legenda;
+    private FalantesAoVivo? _falantesAoVivo;
 
     /// <summary>
     /// A pasta da gravação em curso, para a pergunta saber sobre o que é.
@@ -1415,8 +1421,21 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     return;
                 }
 
+                // Os nomes ao vivo, em teste: um segundo sidecar ao lado da
+                // legenda. Se não ligarem, a legenda segue como sempre foi.
+                if (cfg.FalantesAoVivo)
+                {
+                    if (FalantesAoVivo.OQueImpede(motores, cfg) is { } semNomes)
+                        Registro.Escrever("falantes-ao-vivo", $"não ligaram: {semNomes}");
+                    else
+                    {
+                        _falantesAoVivo = new FalantesAoVivo(pasta, motores, Motores.Ambiente());
+                        _falantesAoVivo.Comecar();
+                    }
+                }
+
                 _legenda = new LegendaAoVivo(pasta, motores, Motores.Ambiente(),
-                                             EmpurrarLegenda);
+                                             EmpurrarLegenda, falantes: _falantesAoVivo);
                 _legenda.Comecar();
                 return;
             }
@@ -1462,6 +1481,12 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         // aqui seguraria quem acabou de parar a gravação. O arquivo cai na pasta
         // um instante depois, que é cedo o bastante: ninguém lê a legenda
         // gravada antes de a tela de transcrever abrir.
+        // **Antes da separação de falantes do fim**, que sobe outro diarizador:
+        // o Nemotron ao vivo não pode estar segurando a placa quando ela começa.
+        try { _falantesAoVivo?.Dispose(); }
+        catch (Exception) { /* a gravação não pode parar por causa dos nomes */ }
+        _falantesAoVivo = null;
+
         if (_legenda is { } legenda)
         {
             _legenda = null;
@@ -1507,7 +1532,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Id = 0, Tipo = "aovivo",
             Legenda = new PedacoDaLegendaJson
             {
-                Novo = p.Novo, Tentativo = p.Tentativo, Dono = p.Dono,
+                Novo = p.Novo, Tentativo = p.Tentativo, Dono = p.Dono, Falante = p.Falante,
             },
         });
 

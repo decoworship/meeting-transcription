@@ -996,6 +996,32 @@ function abaTranscricao(config, gravar, diarizadores = []) {
   }), oQueCustaLegenda);
   painel.appendChild(legenda);
 
+  // ---- os nomes ao vivo, em teste (30/09/2026)
+  //
+  // Só aparece com a legenda ligada, porque só vale com ela: é um segundo
+  // sidecar (o Nemotron-3) ao lado da legenda. O custo medido sem o Meet está
+  // em docs/NEMOTRON-DIARIZACAO.md §4b; com o Meet, é o que o teste descobre.
+  if (config.legenda_ao_vivo === true) {
+    const nomes = bloco("Nomes ao vivo na legenda (teste)");
+    nomes.classList.add("bloco--chave");
+    const oQueENomes = document.createElement("p");
+    oQueENomes.className = "bloco__texto";
+    oQueENomes.textContent = "Em vez de \"Outros\", a legenda mostra o nome de "
+      + "quem está falando — das vozes que o app já conhece — ou \"Pessoa 1\", "
+      + "\"Pessoa 2\" para quem ele não conhece. O nome costuma aparecer depois "
+      + "de alguns segundos de fala da pessoa.";
+    const oQueCustaNomes = document.createElement("p");
+    oQueCustaNomes.className = "campo__dica";
+    oQueCustaNomes.textContent = "Usa o nemotron-3 e ocupa cerca de 1,5 GB a mais "
+      + "da placa durante a reunião. Vale a partir da próxima gravação; se a "
+      + "legenda começar a atrasar, desligue aqui.";
+    nomes.append(oQueENomes, chave(config.falantes_ao_vivo === true, async (v) => {
+      await gravar({ falantes_ao_vivo: v });
+      recarregar();
+    }), oQueCustaNomes);
+    painel.appendChild(nomes);
+  }
+
   // ---- perguntar durante a reunião
   //
   // **Esta convive com as duas de cima**, e é a única que convive: o motor de

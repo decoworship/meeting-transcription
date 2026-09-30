@@ -76,3 +76,25 @@ def test_a_saida_tem_a_forma_do_pyannote():
     assert all(s["falante"].startswith("SPEAKER_") for s in segs)
     assert all(0 <= s["inicio"] < s["fim"] <= len(onda) / taxa + 0.01 for s in segs)
     assert eng(np.zeros(100, np.float32), taxa) == []
+
+
+def test_o_fluxo_ao_vivo_decide_igual_ao_bloco_a_bloco():
+    """Alimentado em quadros de 200 ms, como a legenda, e não de uma vez."""
+    from nemotron3 import FluxoAoVivo, sigmoid
+
+    eng, onda, _ = _modelo()
+    ref = sigmoid(eng.logits_por_bloco(onda, "low_latency")) > 0.5
+    fluxo = FluxoAoVivo(eng, "low_latency")
+    ativos, prontos = [], []
+    for i in range(0, len(onda), 3200):
+        a, p = fluxo.alimentar(onda[i:i + 3200])
+        ativos += a
+        prontos += p
+    got = np.zeros_like(ref)
+    for ini, fim, f in ativos:
+        got[ini // 10:fim // 10, f] = True
+    n = fluxo._prox * 8  # o que o fluxo já decidiu; o rabo espera contexto
+    assert n > len(ref) * 0.95
+    assert (got[:n] == ref[:n]).mean() == 1.0
+    # Em dois minutos de reunião com várias pessoas, alguém junta 6 s limpos.
+    assert prontos and all(len(a) >= 6 * 16000 for _, a in prontos)

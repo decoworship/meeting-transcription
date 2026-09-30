@@ -26,7 +26,7 @@ namespace MeetingApp.Nucleo;
 /// parece. O motor não devolve segmento; quem dá forma é isto.
 /// </para>
 /// </remarks>
-public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono);
+public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono, string? Falante = null);
 
 /// <summary>Uma fala corrida da legenda, como ela fica em disco.</summary>
 public sealed class TurnoDaLegenda
@@ -208,6 +208,10 @@ public sealed class LegendaAoVivo : IDisposable
     private readonly IReadOnlyDictionary<string, string> _ambiente;
     private readonly Action<PedacoDaLegenda> _aoPedaco;
     private readonly string? _idioma;
+    private readonly FalantesAoVivo? _falantes;
+    //: O último nome dado aos outros. O Nemotron anda ~1 s atrás do áudio, e um
+    //: pedaço que firma antes de ele decidir herda quem vinha falando.
+    private string? _ultimoFalante;
     private readonly CancellationTokenSource _cancelar = new();
 
     /// <summary>
@@ -230,8 +234,10 @@ public sealed class LegendaAoVivo : IDisposable
 
     public LegendaAoVivo(string pastaDaGravacao, Motores motores,
                          IReadOnlyDictionary<string, string> ambiente,
-                         Action<PedacoDaLegenda> aoPedaco, string? idioma = "pt-BR")
+                         Action<PedacoDaLegenda> aoPedaco, string? idioma = "pt-BR",
+                         FalantesAoVivo? falantes = null)
     {
+        _falantes = falantes;
         _pasta = pastaDaGravacao;
         _motores = motores;
         _ambiente = ambiente;
@@ -497,6 +503,7 @@ public sealed class LegendaAoVivo : IDisposable
     private void Entregar(MotorSidecar.ParcialDaLegenda p, string mic, string sistema)
     {
         bool dono = false;
+        string? falante = null;
         try
         {
             // A janela que acabou de firmar: do fim anterior até onde o motor
@@ -509,6 +516,8 @@ public sealed class LegendaAoVivo : IDisposable
                 double rmsSis = Faixas.Rms(Faixas.LerJanela(sistema, de, ate), 0, ate - de);
                 dono = rmsMic >= Montagem.RmsMinimoDoDono
                     && rmsMic > rmsSis * Montagem.MargemDoDono;
+                if (!dono && _falantes is { } f)
+                    falante = _ultimoFalante = f.QuemFalou(de, ate) ?? _ultimoFalante;
             }
         }
         catch (Exception)
@@ -535,7 +544,7 @@ public sealed class LegendaAoVivo : IDisposable
         }
 
         if (novo.Length == 0 && p.Tentativo.Length == 0) return;
-        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono));
+        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono, falante));
     }
 
     /// <summary>
@@ -681,7 +690,7 @@ public sealed class LegendaAoVivo : IDisposable
         !existe || segundosEmDisco < ate + FolgaS;
 
     /// <summary>Quanto áudio o WAV tem, pelo tamanho do arquivo.</summary>
-    private static double SegundosEmDisco(string caminho)
+    internal static double SegundosEmDisco(string caminho)
     {
         try
         {

@@ -25,7 +25,7 @@ import sys
 _protocolo = os.fdopen(os.dup(1), "w", encoding="utf-8", newline="\n")
 os.dup2(2, 1)
 
-VERSAO = "6"
+VERSAO = "7"
 
 # O mesmo modelo que o app Python usa. Trocar mudaria o espaço vetorial e
 # invalidaria toda voz já aprendida — os vetores de modelos diferentes não são
@@ -274,6 +274,13 @@ class Pipeline:
 
         import numpy as np
 
+        self.garantir_voz()
+
+        onda, taxa = self._ler_onda(caminho)
+        return self._vetor_dos_trechos(onda, taxa, trechos, id_req)
+
+    def garantir_voz(self) -> None:
+        """Carrega o modelo de voz uma vez. Serve à passada final e ao vivo."""
         if self._voz is None:
             local = _voz_local()
             if local is None:
@@ -299,7 +306,9 @@ class Pipeline:
                                     else "cpu")
             _log(f"modelo de voz onnx carregado: {local} ({self._voz.provedor})")
 
-        onda, taxa = self._ler_onda(caminho)
+    def _vetor_dos_trechos(self, onda, taxa: int, trechos: list[dict], id_req: int) -> list[float]:
+        import numpy as np
+
         # O fbank de pipeline/fbank.py tem 16 kHz na tabela mel e nos passos de
         # janela; o caminho antigo reamostrava sozinho dentro do `model.audio`
         # do pyannote, e este não. O nosso gravador só produz 16 kHz, então
@@ -366,8 +375,69 @@ class Pipeline:
         return sinal, taxa
 
 
+class AoVivo:
+    """Quem está falando, durante a reunião (30/09/2026, em teste).
+
+    Uma requisição aberta, como a da legenda (``motores/legenda/motor.py``):
+    o núcleo manda o ``system.wav`` em quadros e recebe, a cada bloco decidido,
+    os trechos de cada vaga do Nemotron-3; e, quando uma vaga junta fala limpa
+    bastante, o vetor de voz dela — o nome é o núcleo quem põe, com o mesmo
+    ``Vozes.Reconhecer`` da passada final.
+
+    .. code-block:: text
+
+        →  {"id":1,"op":"falantes_ao_vivo","modelo":"nemotron-3"}
+        →  {"id":1,"op":"audio","pcm":"<int16 base64>"}          (repetido)
+        ←  {"id":1,"tipo":"progresso","ativos":[[ini_ms,fim_ms,vaga],…],"ate_ms":N}
+        ←  {"id":1,"tipo":"progresso","vaga":k,"vetor":[…],"modelo":"…"}
+        →  {"id":1,"op":"encerrar"}
+        ←  {"id":1,"tipo":"resultado"}
+    """
+
+    def __init__(self, pipeline: "Pipeline") -> None:
+        self._pipeline = pipeline
+        self.fluxo = None
+        self.id = None
+
+    def abrir(self, id_req: int, modelo: str | None) -> None:
+        pasta = _nemotron3_local(modelo or "nemotron-3")
+        if pasta is None:
+            raise RuntimeError("falantes ao vivo precisam do nemotron-3 em modelos/")
+        pipeline_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pipeline")
+        if pipeline_dir not in sys.path:
+            sys.path.append(pipeline_dir)
+        from nemotron3 import FluxoAoVivo, Nemotron3
+
+        eng = Nemotron3(pasta, gpu=True)
+        self.fluxo = FluxoAoVivo(eng, "low_latency")
+        self.id = id_req
+        self._pipeline.garantir_voz()
+        _log(f"falantes ao vivo abertos ({eng.provedor})")
+
+    def alimentar(self, b64: str) -> None:
+        import base64
+        import numpy as np
+
+        pcm = np.frombuffer(base64.b64decode(b64), dtype="<i2").astype(np.float32) / 32768.0
+        ativos, prontos = self.fluxo.alimentar(pcm)
+        if ativos:
+            _enviar(id=self.id, tipo="progresso", ativos=[list(a) for a in ativos],
+                    ate_ms=self.fluxo._prox * 80)
+        for vaga, audio in prontos:
+            vetor = self._pipeline._voz(audio)
+            _enviar(id=self.id, tipo="progresso", vaga=int(vaga),
+                    vetor=np.asarray(vetor).astype(float).ravel().tolist(),
+                    modelo=MODELO_DE_VOZ)
+
+    def encerrar(self) -> None:
+        _enviar(id=self.id, tipo="resultado")
+        self.fluxo = None
+        self.id = None
+
+
 def main() -> int:
     pipeline = Pipeline()
+    ao_vivo = AoVivo(pipeline)
     _enviar(tipo="pronto", motor="diarizacao", versao=VERSAO)
 
     for linha in sys.stdin:
@@ -384,6 +454,16 @@ def main() -> int:
         id_req = req.get("id")
         try:
             op = req.get("op")
+            if op == "falantes_ao_vivo":
+                ao_vivo.abrir(id_req, req.get("modelo"))
+                continue
+            if op == "audio" and ao_vivo.fluxo is not None:
+                ao_vivo.alimentar(req.get("pcm") or "")
+                continue
+            if op == "encerrar" and ao_vivo.fluxo is not None:
+                ao_vivo.encerrar()
+                continue
+
             if op not in ("diarizar", "voz"):
                 raise RuntimeError(f"operação desconhecida: {op!r}")
 

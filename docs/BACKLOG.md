@@ -819,7 +819,18 @@ desses é o item — não há mais o que otimizar deste lado.
 
 ---
 
-### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `espera`
+### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `aberto` · em teste
+
+> **Versão de teste em 30/09/2026**, a pedido do dono do produto, atrás da chave
+> "Nomes ao vivo na legenda (teste)" em Ajustes › Transcrição
+> (`falantes_ao_vivo`, desligada por padrão, só com a legenda ligada). Um
+> segundo sidecar (`AoVivo` em `motores/diarizacao/motor.py`) recebe o
+> `system.wav` e roda o Nemotron em `low_latency` (`FluxoAoVivo`, que decide
+> 100% igual ao bloco a bloco); cada vaga manda o vetor de voz aos 6 s e aos
+> 20 s de fala limpa, e o núcleo (`Nucleo/FalantesAoVivo.cs`) põe o nome com o
+> `Vozes.Reconhecer` — ou "Pessoa N". Ele é encerrado antes da separação de
+> falantes do fim. **Falta:** medir com o Meet e a caixa de perguntar juntos, e
+> decidir se sai do teste.
 
 **Gatilho: o `MOD-1` fechar com folga ao lado da legenda.** Medido em
 25/09/2026 ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): o
@@ -836,6 +847,46 @@ documento.
 
 **Relacionado:** o `VIVO-2` (diarizar a legenda depois) e o `VIVO-1` (carimbar o
 turno) — sem tempo no turno, não há onde pôr o falante.
+
+---
+
+### VIVO-8 · Os parâmetros do Nemotron da legenda nunca foram medidos — `débito` · `aberto`
+
+**Gatilho: pedido pelo dono do produto em 29/09/2026**, depois do spike de 23/09
+ter levantado a hipótese. O `motores/legenda/motor.py` abre o streaming só com
+`commit_policy`, `timestamps` e `language`: **o lookahead (`att_context_right`)
+e o quadro são os padrões da família**, e nenhum dos dois foi escolhido por
+medição.
+
+**O sintoma que motiva: a legenda quase não pontua.** O card do
+`nemotron-3.5-asr-streaming-0.6b` diz que ele pontua e capitaliza em pt, e as
+`legenda.json` do acervo têm maiúsculas mas ~0 pontuação (até 10.504 palavras
+com 6 pontos). A hipótese é que o lookahead padrão seja curto demais para o
+modelo decidir o ponto. **É hipótese, não medição.**
+
+**O que varrer:**
+
+- `att_context_right` — o único ajuste que o `ParakeetStreamOptions` expõe
+  (ver `VIVO-3`);
+- o quadro — o modelo foi treinado com 80, 160, 320, 560 e 1120 ms. O porte
+  para Apple do `smdesai` usa 560 a 4480 ms e reduz o contexto de atenção de
+  [56,13] para [42,13], o que mostra que esses dois números mexem e o modelo
+  aguenta.
+
+**A régua, nos quatro eixos de uma vez**, sobre o mesmo áudio (o
+`tools/reproduzir_legenda.py` repassa uma gravação como se fosse ao vivo):
+
+1. pontos por mil palavras;
+2. texto contra a passada final, como no `VIVO-4`;
+3. latência até o texto firmar;
+4. ciclo e VRAM ao lado do Meet, com o teto de ~33% da
+   [FASE7-ROTA.md](FASE7-ROTA.md) §4.
+
+Um lookahead maior compra pontuação com latência; **o item fecha escolhendo o
+ponto dessa troca**, não maximizando um eixo só.
+
+**O que destrava:** se a pontuação voltar, o `VIVO-1` pode quebrar o turno no
+ponto final sem o Smart-Turn, e a ata que parte da legenda recebe frases.
 
 ---
 
