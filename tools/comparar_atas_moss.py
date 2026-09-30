@@ -80,9 +80,9 @@ ACERVO = Path("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings")
 #: nunca mostraria isso. O 55 é o limiar recomendado pela §11.2.
 COSTURA = Path.home() / ".cache/pulsemeet-medicoes/costura"
 LIMIAR_COSTURA = 55
-BIN = Path("/mnt/c/Users/andre/MeetingApp/motores/ata/bin")
+BIN = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/ata/bin")
 #: A pasta dos GGUF da instalação oficial.
-MODELOS_WIN = r"C:\Users\andre\MeetingApp\motores\ata\modelos"
+MODELOS_WIN = r"C:\Users\andre\AppData\Local\Programs\MeetingApp\motores\ata\modelos"
 
 #: De onde sai o nome do modelo: o **app.json desta máquina**, não o padrão do
 #: código. Em 03/09/2026 são coisas diferentes — o

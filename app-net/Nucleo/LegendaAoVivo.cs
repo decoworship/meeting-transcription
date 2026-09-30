@@ -26,7 +26,8 @@ namespace MeetingApp.Nucleo;
 /// parece. O motor não devolve segmento; quem dá forma é isto.
 /// </para>
 /// </remarks>
-public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono);
+public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono, string? Falante = null,
+                                     double AteS = 0);
 
 /// <summary>Uma fala corrida da legenda, como ela fica em disco.</summary>
 public sealed class TurnoDaLegenda
@@ -208,6 +209,26 @@ public sealed class LegendaAoVivo : IDisposable
     private readonly IReadOnlyDictionary<string, string> _ambiente;
     private readonly Action<PedacoDaLegenda> _aoPedaco;
     private readonly string? _idioma;
+    private readonly FalantesAoVivo? _falantes;
+    //: O último nome dado aos outros. O Nemotron anda ~1 s atrás do áudio, e um
+    //: pedaço que firma antes de ele decidir herda quem vinha falando.
+    private string? _ultimoFalante;
+
+    //: **O texto firme espera o nome**, com os nomes ao vivo ligados. A legenda
+    //: firma ~0,1 s depois da fala e o Nemotron decide ~1 s depois; soltar na
+    //: hora dava a fala de uma pessoa ao nome de quem vinha antes — visto em
+    //: 30/09/2026, com Diego e Hubener no mesmo balão. O rascunho em cinza segue
+    //: na hora; só a linha firme atrasa até o Nemotron decidir aquele trecho,
+    //: ou até <see cref="EsperaMaximaS"/>. **Enquanto espera, ele aparece como
+    //: rascunho** (ideia do dono do produto, 30/09/2026): o provisório que vai à
+    //: tela é o firme da fila seguido do tentativo do motor, e nada some.
+    private readonly Queue<(string Novo, bool Dono, double De, double Ate, DateTime Chegou)> _fila = new();
+    private readonly object _travaDaFila = new();
+    private string _tentativo = "";
+    private bool _donoDoTentativo;
+
+    /// <summary>Quanto o texto firme espera pelo nome antes de sair sem ele.</summary>
+    public const double EsperaMaximaS = 3.0;
     private readonly CancellationTokenSource _cancelar = new();
 
     /// <summary>
@@ -230,8 +251,11 @@ public sealed class LegendaAoVivo : IDisposable
 
     public LegendaAoVivo(string pastaDaGravacao, Motores motores,
                          IReadOnlyDictionary<string, string> ambiente,
-                         Action<PedacoDaLegenda> aoPedaco, string? idioma = "pt-BR")
+                         Action<PedacoDaLegenda> aoPedaco, string? idioma = "pt-BR",
+                         FalantesAoVivo? falantes = null)
     {
+        _falantes = falantes;
+        if (falantes is not null) falantes.AoDecidir += () => Soltar(comTentativo: false);
         _pasta = pastaDaGravacao;
         _motores = motores;
         _ambiente = ambiente;
@@ -342,6 +366,40 @@ public sealed class LegendaAoVivo : IDisposable
     }
 
     /// <summary>Começa a legendar. Devolve na hora.</summary>
+    /// <summary>
+    /// Solta, em ordem, o texto firme cujo nome já se sabe — ou que esperou
+    /// demais. A sua fala sai na hora: o microfone não espera ninguém.
+    /// </summary>
+    private void Soltar(bool comTentativo)
+    {
+        if (_falantes is not { } f) return;
+        lock (_travaDaFila)
+        {
+            bool soltou = false;
+            while (_fila.TryPeek(out var p))
+            {
+                string? falante = null;
+                if (!p.Dono)
+                {
+                    bool decidido = f.DecididoAteMs >= (long)(p.Ate * 1000);
+                    bool demorou = (DateTime.UtcNow - p.Chegou).TotalSeconds >= EsperaMaximaS;
+                    if (!decidido && !demorou) break;
+                    falante = _ultimoFalante = f.QuemFalou(p.De, p.Ate) ?? _ultimoFalante;
+                }
+                _fila.Dequeue();
+                _aoPedaco(new PedacoDaLegenda(p.Novo, Provisorio(), p.Dono, falante, p.Ate));
+                soltou = true;
+            }
+            if (!soltou && comTentativo)
+                _aoPedaco(new PedacoDaLegenda("", Provisorio(),
+                                              _fila.TryPeek(out var h) ? h.Dono : _donoDoTentativo));
+        }
+    }
+
+    /// <summary>O que ainda pode mudar: o firme que espera o nome, e o tentativo.</summary>
+    private string Provisorio() =>
+        (string.Concat(_fila.Select(q => q.Novo)) + " " + _tentativo).Trim();
+
     public void Comecar() => _laco ??= Task.Run(() => LacoAsync(_cancelar.Token));
 
     /// <summary>
@@ -497,6 +555,7 @@ public sealed class LegendaAoVivo : IDisposable
     private void Entregar(MotorSidecar.ParcialDaLegenda p, string mic, string sistema)
     {
         bool dono = false;
+        string? falante = null;
         try
         {
             // A janela que acabou de firmar: do fim anterior até onde o motor
@@ -521,6 +580,7 @@ public sealed class LegendaAoVivo : IDisposable
         // a cada parcial; o que a tela precisa é do que cresceu. Comparar por
         // prefixo é seguro porque o `stable_prefix` do LocalAgreement só
         // acrescenta — é o que a palavra "stable" promete.
+        long anteriorMs = _ateAnterior;
         string novo = p.Firme.StartsWith(Firme, StringComparison.Ordinal)
             ? p.Firme[Firme.Length..]
             : p.Firme;
@@ -534,8 +594,21 @@ public sealed class LegendaAoVivo : IDisposable
             Gravar();
         }
 
+        if (_falantes is not null)
+        {
+            lock (_travaDaFila)
+            {
+                _tentativo = p.Tentativo;
+                _donoDoTentativo = dono;
+                if (novo.Trim().Length > 0)
+                    _fila.Enqueue((novo, dono, anteriorMs / 1000.0, p.AteMs / 1000.0, DateTime.UtcNow));
+            }
+            Soltar(comTentativo: true);
+            return;
+        }
+
         if (novo.Length == 0 && p.Tentativo.Length == 0) return;
-        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono));
+        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono, falante, p.AteMs / 1000.0));
     }
 
     /// <summary>
@@ -681,7 +754,7 @@ public sealed class LegendaAoVivo : IDisposable
         !existe || segundosEmDisco < ate + FolgaS;
 
     /// <summary>Quanto áudio o WAV tem, pelo tamanho do arquivo.</summary>
-    private static double SegundosEmDisco(string caminho)
+    internal static double SegundosEmDisco(string caminho)
     {
         try
         {

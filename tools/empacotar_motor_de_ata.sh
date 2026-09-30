@@ -8,7 +8,7 @@
 #
 # Uso:
 #   tools/empacotar_motor_de_ata.sh
-#   tools/empacotar_motor_de_ata.sh --destino /mnt/c/Users/andre/MeetingApp
+#   tools/empacotar_motor_de_ata.sh --destino /mnt/c/Users/andre/AppData/Local/Programs/MeetingApp
 #
 # **O build de CUDA tem que casar com o driver, e a 12.4 é a escolha.** O 13.3
 # falha na máquina do usuário com "the provided PTX was compiled with an
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-DESTINO="/mnt/c/Users/andre/MeetingApp"
+DESTINO="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp"
 VERSAO_LLAMA="b10427"
 CUDA="12.4"
 MODELO_REPO="unsloth/Qwen3-4B-Instruct-2507-GGUF"

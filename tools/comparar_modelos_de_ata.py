@@ -43,7 +43,7 @@ from pathlib import Path
 
 GRAVACOES = Path("/mnt/c/Users/andre/Documents/MeetingRecordings")
 CLI = Path("/mnt/c/Users/andre/cli-teste/Sidecar.exe")
-MOTOR = r"C:\Users\andre\MeetingApp\motores\ata"
+MOTOR = r"C:\Users\andre\AppData\Local\Programs\MeetingApp\motores\ata"
 SAIDA = Path("/mnt/c/Users/andre/ata-comparacao")
 
 # Números que valem contar. Percentual, dinheiro, quantidade, data curta — e não

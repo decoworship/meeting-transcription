@@ -323,6 +323,82 @@ public sealed class MotorSidecar : IDisposable
     /// <param name="AteMs">Até onde do áudio o texto firme chega.</param>
     public sealed record ParcialDaLegenda(string Firme, string Tentativo, long AteMs);
 
+    /// <summary>Um trecho em que uma vaga do Nemotron fala, ao vivo.</summary>
+    public sealed record FalaAoVivo(long InicioMs, long FimMs, int Vaga);
+
+    /// <summary>
+    /// Abre uma sessão de falantes ao vivo e a alimenta com o <c>system.wav</c>
+    /// até o canal fechar (30/09/2026, em teste).
+    /// </summary>
+    /// <remarks>
+    /// O mesmo formato da <see cref="LegendarAsync"/> — requisição aberta, quadros
+    /// entrando, progresso saindo —, com duas saídas: os trechos de cada vaga, e o
+    /// vetor de voz de uma vaga quando ela junta fala limpa bastante. O nome é o
+    /// núcleo quem põe. Ver <c>AoVivo</c> em <c>motores/diarizacao/motor.py</c>.
+    /// </remarks>
+    public async Task FalantesAoVivoAsync(
+        ChannelReader<float[]> audio, Action<IReadOnlyList<FalaAoVivo>, long> aoFalar,
+        Action<int, float[], string?> aoVetor, string modelo, CancellationToken ct)
+    {
+        int id = _proximoId++;
+        var escrita = new SemaphoreSlim(1, 1);
+
+        async Task MandarAsync(Requisicao r)
+        {
+            await escrita.WaitAsync(ct);
+            try { await EnviarAsync(r, ct); }
+            finally { escrita.Release(); }
+        }
+
+        await MandarAsync(new Requisicao { Id = id, Op = "falantes_ao_vivo", Modelo = modelo });
+
+        var alimentar = Task.Run(async () =>
+        {
+            await foreach (var quadro in audio.ReadAllAsync(ct))
+                await MandarAsync(new Requisicao { Id = id, Op = "audio", Pcm = ParaBase64(quadro) });
+            await MandarAsync(new Requisicao { Id = id, Op = "encerrar" });
+        }, ct);
+
+        try
+        {
+            while (true)
+            {
+                using var registroDeMorte = ct.Register(() => Matar(_processo));
+
+                var m = await LerMensagemAsync(_processo, ct);
+                if (m is null)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    throw new MotorException($"o motor '{Nome}' morreu durante os falantes ao vivo.");
+                }
+                if (m.Id is not null && m.Id != id) continue;
+
+                switch (m.Tipo)
+                {
+                    case "progresso":
+                        // `ate_ms` vem a cada bloco decidido, com ou sem fala:
+                        // é o horizonte que a legenda espera para pôr o nome.
+                        if (m.Ativos is { } ativos && m.AteMs is long ate)
+                            aoFalar([.. ativos.Where(a => a.Length == 3)
+                                              .Select(a => new FalaAoVivo(a[0], a[1], (int)a[2]))],
+                                    ate);
+                        if (m.Vaga is int vaga && m.Vetor is { Length: > 0 } vetor)
+                            aoVetor(vaga, vetor, m.ModeloDaVoz);
+                        break;
+                    case "resultado":
+                        return;
+                    case "erro":
+                        throw new MotorException(m.MensagemDeErro ?? "erro sem mensagem.");
+                }
+            }
+        }
+        finally
+        {
+            try { await alimentar; } catch (Exception) { }
+            escrita.Dispose();
+        }
+    }
+
     /// <summary>
     /// Abre uma sessão de legenda e a alimenta até o canal fechar.
     /// </summary>

@@ -29,8 +29,8 @@ import sys
 import time
 from pathlib import Path
 
-PYTHON_PADRAO = "/mnt/c/Users/andre/MeetingApp/motores/python/python.exe"
-MOTOR_PADRAO = "/mnt/c/Users/andre/MeetingApp/motores/diarizacao/motor.py"
+PYTHON_PADRAO = "/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/python/python.exe"
+MOTOR_PADRAO = "/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/diarizacao/motor.py"
 
 # Quanto os instantes podem divergir e ainda contar como o mesmo turno. Não é
 # tolerância a erro: é a granularidade da própria janela do pyannote. Zero exigiria

@@ -819,7 +819,19 @@ desses é o item — não há mais o que otimizar deste lado.
 
 ---
 
-### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `espera`
+### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `aberto` · em teste
+
+> **Versão de teste em 30/09/2026**, a pedido do dono do produto, atrás da chave
+> "Nomes ao vivo na legenda (teste)" em Ajustes › Transcrição
+> (`falantes_ao_vivo`, desligada por padrão, só com a legenda ligada). Um
+> segundo sidecar (`AoVivo` em `motores/diarizacao/motor.py`) recebe o
+> `system.wav` e roda o Nemotron em `low_latency` (`FluxoAoVivo`, que decide
+> 100% igual ao bloco a bloco); cada vaga manda o vetor de voz aos 6 s e aos
+> 20 s de fala limpa, e o núcleo (`Nucleo/FalantesAoVivo.cs`) põe o nome com o
+> `Vozes.Reconhecer` — ou "Pessoa N". Ele é encerrado antes da separação de
+> falantes do fim. **Medido em 30/09** com o Meet e a pergunta (§4c): cabe, e
+> 95,2% dos trechos dos outros saem com o nome certo; o erro fica na troca de
+> pessoa. **Falta:** decidir se sai do teste.
 
 **Gatilho: o `MOD-1` fechar com folga ao lado da legenda.** Medido em
 25/09/2026 ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): o
@@ -839,6 +851,46 @@ turno) — sem tempo no turno, não há onde pôr o falante.
 
 ---
 
+### VIVO-8 · Os parâmetros do Nemotron da legenda nunca foram medidos — `débito` · `aberto`
+
+**Gatilho: pedido pelo dono do produto em 29/09/2026**, depois do spike de 23/09
+ter levantado a hipótese. O `motores/legenda/motor.py` abre o streaming só com
+`commit_policy`, `timestamps` e `language`: **o lookahead (`att_context_right`)
+e o quadro são os padrões da família**, e nenhum dos dois foi escolhido por
+medição.
+
+**O sintoma que motiva: a legenda quase não pontua.** O card do
+`nemotron-3.5-asr-streaming-0.6b` diz que ele pontua e capitaliza em pt, e as
+`legenda.json` do acervo têm maiúsculas mas ~0 pontuação (até 10.504 palavras
+com 6 pontos). A hipótese é que o lookahead padrão seja curto demais para o
+modelo decidir o ponto. **É hipótese, não medição.**
+
+**O que varrer:**
+
+- `att_context_right` — o único ajuste que o `ParakeetStreamOptions` expõe
+  (ver `VIVO-3`);
+- o quadro — o modelo foi treinado com 80, 160, 320, 560 e 1120 ms. O porte
+  para Apple do `smdesai` usa 560 a 4480 ms e reduz o contexto de atenção de
+  [56,13] para [42,13], o que mostra que esses dois números mexem e o modelo
+  aguenta.
+
+**A régua, nos quatro eixos de uma vez**, sobre o mesmo áudio (o
+`tools/reproduzir_legenda.py` repassa uma gravação como se fosse ao vivo):
+
+1. pontos por mil palavras;
+2. texto contra a passada final, como no `VIVO-4`;
+3. latência até o texto firmar;
+4. ciclo e VRAM ao lado do Meet, com o teto de ~33% da
+   [FASE7-ROTA.md](FASE7-ROTA.md) §4.
+
+Um lookahead maior compra pontuação com latência; **o item fecha escolhendo o
+ponto dessa troca**, não maximizando um eixo só.
+
+**O que destrava:** se a pontuação voltar, o `VIVO-1` pode quebrar o turno no
+ponto final sem o Smart-Turn, e a ata que parte da legenda recebe frases.
+
+---
+
 ## 8. Melhoria de modelos
 
 Aberto em 25/09/2026 pelo dono do produto. **O `DIST-5` acha candidatos; este
@@ -847,7 +899,18 @@ portar para o formato do app, e trocar. A qualidade que o §10 deixa de fora é 
 de *ajuste* (limiar, prompt, pós-processamento); trocar o modelo por um que
 comprovadamente erra menos entra aqui, com medição antes.
 
-### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · `aberto` · **próximo passo**
+### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · feito em 30/09/2026
+
+> **Fechado com o Meet:** 3,3 GB com legenda, Nemotron ao vivo e Meet; pico de
+> 5,7 GB com uma pergunta, sem a legenda atrasar
+> ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §4c).
+
+> **Medido em 29/09/2026, sem o Meet** ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §4b):
+> o **`low_latency` cabe** — a legenda vai de 3,17× a 2,90×, o Nemotron fica
+> no relógio, 3,7 GB somados. O **`ultra_low_latency` não**: a legenda cai a
+> 0,78×. O que falta para fechar é **repetir o `low_latency` numa reunião de
+> verdade, com o Meet aberto** — é a VRAM (3,7 GB + o Meet em 6 GB) que pode
+> reprovar. Os cortes do passo 2 só voltam se ela reprovar.
 
 **Gatilho: é o que falta para decidir o `MOD-2` e o `VIVO-7`.** O
 `nvidia/Nemotron-3-Diarization` já está medido, portado e documentado
@@ -876,7 +939,25 @@ medição que diz se ele pode ficar residente.
 **Critério de saída:** um modo de streaming em que a legenda não perde tempo
 real, ou a conclusão escrita de que só a passada final cabe.
 
-### MOD-2 · O Nemotron-3 no lugar do pyannote, na passada final — `feature` · `espera`
+### MOD-2 · O Nemotron-3 ao lado do pyannote, na passada final — `feature` · `aberto` · medido
+
+> **Medido em 29/09/2026** ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §3b),
+> com o `system.wav` e o reconhecimento de vozes do app nos dois braços: o erro
+> de separação cai de 3,5% para 1,7%, o nome certo sobe de 80,2% para 81,5%,
+> e ele roda 18× mais rápido com ~0,55 GB contra ~4,4 GB. **O desenho decidido
+> pelo dono do produto:** ele entra **ao lado** do pyannote, com duas escolhas
+> independentes — na legenda (`VIVO-7`) e na passada final. O teto de 8
+> falantes não pesa (6 de 111 reuniões, contagem inflada).
+>
+> **Passada final implementada em 29/09/2026:** o Nemotron entra como **um
+> modelo a mais** em `motores/diarizacao/modelos/nemotron-3`, e não como motor
+> — o seletor de Ajustes › Transcrição e o de cada projeto o oferecem sozinhos
+> (`Motores.ModelosDeDiarizacao`). O `motor.py` o reconhece pelos quatro
+> artefatos; o código é `motores/diarizacao/pipeline/nemotron3.py`, com o embed
+> por bloco. O reconhecimento de vozes não muda: continua o wespeaker sobre os
+> trechos de cada rótulo. Padrão continua `community-1`. No Python embarcado,
+> 49 min em 25 s na GPU. **Falta:** a escolha independente na legenda
+> (`VIVO-7`, depois da medição com o Meet do `MOD-1`).
 
 **Gatilho: o `MOD-1` fechar.** O caminho é curto porque o reconhecimento de vozes
 não depende do diarizador: o `vetor_de_voz` do sidecar recebe trechos, e com os

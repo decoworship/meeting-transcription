@@ -20,7 +20,8 @@
 #
 # ── Fase 2.5: o destino mudou de propósito ──────────────────────────────────
 #
-# O padrão é C:\Users\andre\MeetingApp, a instalação de trabalho.
+# O padrão foi C:\Users\andre\MeetingApp, a instalação de trabalho, até
+# 17/09/2026. Desde então é a instalação oficial — ver o CLAUDE.md.
 #
 # ── 18/08/2026: os motores saíram daqui ─────────────────────────────────────
 #
@@ -317,7 +318,7 @@ for m in asr diarizacao modelos legenda; do
     # porque torch continua sendo o padrão. Falhar aqui, na hora de publicar,
     # é mais barato que descobrir isso na máquina do usuário.
     for arquivo in __init__.py fbank.py sessao.py segmentacao.py embedding.py \
-                   diarizacao.py vendor/__init__.py; do
+                   diarizacao.py nemotron3.py vendor/__init__.py; do
       if [[ ! -f "$DESTINO/motores/diarizacao/pipeline/$arquivo" ]]; then
         echo "ERRO: motores/diarizacao/pipeline/$arquivo não foi publicado — o" >&2
         echo "      motor ONNX de diarização não vai subir." >&2

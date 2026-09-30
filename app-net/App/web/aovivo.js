@@ -117,11 +117,20 @@ export function painelAoVivo(opcoes = {}) {
     voltar.hidden = true;
   });
 
+  //: **A tela que sai do Gravador e volta** redesenha a legenda que já passou
+  //: (30/09/2026): o núcleo guarda os pedaços firmes, e o que chega ao vivo
+  //: antes da resposta espera aqui — entra depois, sem repetir, pelo `seq`.
+  let historicoChegou = false;
+  const aoVoltar = [];
+
   const cancelar = assinar("aovivo", (ev) => {
     // A disciplina de sempre: uma tela que já saiu não desenha mais.
     if (!raiz.isConnected) { cancelar(); return; }
     if (ev.aovivo) acrescentarBloco(ev.aovivo);
-    if (ev.legenda) acrescentarLegenda(ev.legenda);
+    if (ev.legenda) {
+      if (historicoChegou) acrescentarLegenda(ev.legenda);
+      else aoVoltar.push(ev.legenda);
+    }
   });
 
   //: A linha que está crescendo: `{ no, texto, dono, ate_s, palavras }`. A
@@ -135,13 +144,20 @@ export function painelAoVivo(opcoes = {}) {
   let volatil = null;
 
   function acrescentarLegenda(g) {
-    const t = tempo();
+    // O tempo do próprio pedaço quando ele traz — é o que põe a hora certa na
+    // legenda redesenhada ao voltar; o relógio da tela só no rascunho.
+    const t = g.ate_s > 0 ? g.ate_s : tempo();
+    // **Quem fala**: `true` é você (a faixa do microfone), um nome é quem os
+    // nomes ao vivo reconheceram (Ajustes, em teste), e `false` são "os outros"
+    // sem nome. As regras da linha comparam este valor, então trocar de
+    // pessoa também abre linha nova.
+    const quem = g.dono ? true : (g.falante || false);
     if (g.novo && g.novo.trim()) {
-      if (novaLinha(linha, { dono: g.dono, t })) {
+      if (novaLinha(linha, { dono: quem, t })) {
         const anterior = linha;
-        const no = linhaDeFala(t, g.dono, mostraDono(anterior, g.dono), "");
+        const no = linhaDeFala(t, quem, mostraDono(anterior, quem), "");
         corpo.insertBefore(no.raiz, volatil?.raiz ?? null);
-        linha = { no, texto: "", dono: g.dono, ate_s: t, palavras: 0 };
+        linha = { no, texto: "", dono: quem, ate_s: t, palavras: 0 };
         esconderVazio();
       }
       linha.texto = (linha.texto + g.novo).replace(/\s+/g, " ").trimStart();
@@ -157,15 +173,15 @@ export function painelAoVivo(opcoes = {}) {
     const texto = (g.tentativo || "").trim();
     if (!texto) { volatil?.raiz.remove(); volatil = null; return; }
     if (!volatil) {
-      volatil = linhaDeFala(null, g.dono, true, "");
+      volatil = linhaDeFala(null, quem, true, "");
       volatil.raiz.classList.add("fala--volatil");
       corpo.appendChild(volatil.raiz);
       esconderVazio();
     }
-    volatil.raiz.dataset.dono = String(g.dono);
+    volatil.raiz.dataset.dono = String(quem === true);
     // O dono do rascunho segue a mesma regra: continuação da linha firme do
     // mesmo dono não repete o nome.
-    volatil.dono.textContent = mostraDono(linha, g.dono) ? rotuloDoDono(g.dono) : "";
+    volatil.dono.textContent = mostraDono(linha, quem) ? rotuloDoDono(quem) : "";
     volatil.texto.textContent = texto;
     lista.seguirAoFim();
   }
@@ -204,9 +220,18 @@ export function painelAoVivo(opcoes = {}) {
     if (r.aovivo_impedimento)
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
+    let ultimo = 0;
+    for (const g of r.legenda_ate ?? []) { acrescentarLegenda(g); ultimo = Math.max(ultimo, g.seq ?? 0); }
+    soltarOQueChegou(ultimo);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.
+    soltarOQueChegou(0);
   });
+
+  function soltarOQueChegou(ultimo) {
+    historicoChegou = true;
+    for (const g of aoVoltar.splice(0)) if ((g.seq ?? 0) > ultimo) acrescentarLegenda(g);
+  }
 
   function acrescentarBloco(b) {
     const separador = { separador: true, bloco: b };
@@ -280,7 +305,7 @@ export function painelAoVivo(opcoes = {}) {
   return { raiz, marcarMomento, encerrar() { cancelar(); lista.encerrar(); } };
 }
 
-const rotuloDoDono = (dono) => (dono ? "Você" : "Outros");
+const rotuloDoDono = (dono) => (dono === true ? "Você" : dono || "Outros");
 
 /**
  * Uma linha da legenda: tempo · dono · texto.
@@ -291,12 +316,17 @@ const rotuloDoDono = (dono) => (dono ? "Você" : "Outros");
  * numa reunião de quatro é uma afirmação errada com cara de certeza. "Você" é o
  * que a faixa do microfone sabe, e é fato. Quem é cada um vem na passada final.
  *
+ * **A exceção, em teste desde 30/09/2026:** com "Nomes ao vivo" ligado em
+ * Ajustes, o Nemotron-3 separa os outros durante a reunião e o reconhecimento de
+ * vozes dá o nome — ou "Pessoa N", nunca "Falante 7" de uma costura.
+ *
  * @param t segundos, ou nulo para o rascunho ("agora").
  */
 function linhaDeFala(t, dono, comDono, texto) {
   const raiz = document.createElement("div");
   raiz.className = "fala";
-  raiz.dataset.dono = String(dono);
+  // O CSS pinta pelo "é você ou não"; um nome continua sendo "não".
+  raiz.dataset.dono = String(dono === true);
 
   const quando = document.createElement("span");
   quando.className = "fala__tempo";

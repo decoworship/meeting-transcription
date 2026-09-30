@@ -163,6 +163,14 @@ internal sealed class Mensagem
     /// </remarks>
     [JsonPropertyName("modelo")] public string? ModeloDaVoz { get; init; }
 
+    /// <summary>
+    /// Falantes ao vivo: os trechos recém-decididos, <c>[inicio_ms, fim_ms, vaga]</c>.
+    /// </summary>
+    [JsonPropertyName("ativos")] public List<long[]>? Ativos { get; init; }
+
+    /// <summary>Falantes ao vivo: a vaga do Nemotron a que o <see cref="Vetor"/> pertence.</summary>
+    [JsonPropertyName("vaga")] public int? Vaga { get; init; }
+
     // "erro"
     [JsonPropertyName("mensagem")] public string? MensagemDeErro { get; init; }
 }

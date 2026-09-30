@@ -40,7 +40,7 @@ import time
 import wave
 from pathlib import Path
 
-RAIZ_MOTORES = Path("/mnt/c/Users/andre/MeetingApp/motores")
+RAIZ_MOTORES = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores")
 GRAVACOES = Path("/mnt/c/Users/andre/Documents/MeetingRecordings")
 SEGUNDOS = 60
 

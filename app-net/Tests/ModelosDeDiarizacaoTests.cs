@@ -70,9 +70,9 @@ public sealed class ModelosDeDiarizacaoTests : IDisposable
         // A lista vira as opções de um select; ordem do sistema de arquivos
         // faria o seletor trocar de ordem entre máquinas.
         var motores = Motores();
-        Empacotar("pyannote-3.1");
+        Empacotar("nemotron-3");
         Empacotar("community-1");
 
-        Assert.Equal(["community-1", "pyannote-3.1"], motores.ModelosDeDiarizacao());
+        Assert.Equal(["community-1", "nemotron-3"], motores.ModelosDeDiarizacao());
     }
 }

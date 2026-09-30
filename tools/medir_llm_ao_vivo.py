@@ -40,8 +40,8 @@ ACERVO_PADRAO = "/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings"
 
 #: A instalação oficial. É de lá que saem os binários e os modelos que o app
 #: usa de verdade — ver docs/FASE4.md §1.
-BIN = Path("/mnt/c/Users/andre/MeetingApp/motores/ata/bin")
-MODELOS_WIN = r"C:\Users\andre\MeetingApp\motores\ata\modelos"
+BIN = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores/ata/bin")
+MODELOS_WIN = r"C:\Users\andre\AppData\Local\Programs\MeetingApp\motores\ata\modelos"
 
 PERGUNTAS = [
     ("decisoes", "Liste em tópicos o que ficou decidido nesta reunião até agora. "

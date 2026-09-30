@@ -37,7 +37,7 @@ fora, e a régua 1 confere isso.
 Uso::
 
     tools/conferir_privacidade.py --payload dist/instalador/payload \\
-                                  --motores /mnt/c/Users/andre/MeetingApp/motores
+                                  --motores /mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores
 """
 
 from __future__ import annotations
@@ -491,7 +491,7 @@ def main() -> int:
     ap.add_argument("--payload", type=Path,
                     default=Path("dist/instalador/payload"))
     ap.add_argument("--motores", type=Path,
-                    default=Path("/mnt/c/Users/andre/MeetingApp/motores"))
+                    default=Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"))
     ap.add_argument("--perfil", type=Path, default=Path("/mnt/c/Users/andre"),
                     help="de onde saem os termos a procurar")
     ap.add_argument("--rapido", action="store_true",
