@@ -848,7 +848,7 @@ desses é o item — não há mais o que otimizar deste lado.
 
 ---
 
-### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `aberto` · em teste
+### VIVO-7 · Falante durante a reunião, com o Nemotron-3 — `feature` · `feito`
 
 > **Versão de teste em 30/09/2026**, a pedido do dono do produto, atrás da chave
 > "Nomes ao vivo na legenda (teste)" em Ajustes › Transcrição
@@ -1002,7 +1002,7 @@ por reunião inteira, falta contar.
 
 ## 9. Débito técnico e testes
 
-### DEB-1 · O caminho da ata na ponte não tem teste — `débito` · `aberto`
+### DEB-1 · O caminho da ata na ponte não tem teste — `débito` · `feito`
 
 O núcleo tem testes de sobra e o caminho inteiro foi exercitado em reuniões
 reais pela linha de comando, mas a `Ponte` é interna ao executável e a suíte não
@@ -1012,6 +1012,15 @@ dava para rodá-lo num teste com um motor falso.
 
 **Já dói:** mexer no `GerarAta` hoje é mexer sem rede, e a ata mudou em três das
 últimas quatro versões.
+
+**Feito em 30/09/2026**, e não com um teste do CLI: o caminho saiu da ponte para
+[`Nucleo/Atas/GeracaoDeAta.cs`](../app-net/Nucleo/Atas/GeracaoDeAta.cs), com o
+motor como função, e a ponte e o CLI chamam o mesmo código
+(`Tests/GeracaoDeAtaTests.cs`). **As duas cópias já tinham divergido**: a do app
+punha o título e o vocabulário do projeto no prompt, e a do CLI — a que as
+ferramentas de medição usam — não. E o vocabulário só era achado com
+`vinculo.json`; agora cai no cliente e projeto da transcrição, como o resto do
+contexto.
 
 ---
 
