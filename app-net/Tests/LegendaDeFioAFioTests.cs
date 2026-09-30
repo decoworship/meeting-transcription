@@ -221,8 +221,19 @@ public sealed class LegendaDeFioAFioTests
                 var todo = Faixas.LerJanela(wav, 0, -1);
                 if (todo.Length < segundos * Faixas.TaxaDeAmostragem * 2) continue;
 
+                // A janela de mais energia, de 10 em 10 s: o começo de uma
+                // gravação costuma ser a espera antes de a reunião começar.
                 int jan = segundos * Faixas.TaxaDeAmostragem;
-                return todo[..jan];
+                int passo = 10 * Faixas.TaxaDeAmostragem;
+                int melhor = 0;
+                double maior = -1;
+                for (int ini = 0; ini + jan <= todo.Length; ini += passo)
+                {
+                    double soma = 0;
+                    for (int i = ini; i < ini + jan; i += 16) soma += todo[i] * todo[i];
+                    if (soma > maior) { maior = soma; melhor = ini; }
+                }
+                return todo[melhor..(melhor + jan)];
             }
         }
 

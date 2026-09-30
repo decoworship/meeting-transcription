@@ -3,6 +3,26 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.9.0 — 30/09/2026
+
+**Um segundo jeito de separar os falantes.** Em Ajustes › Transcrição, e em
+cada projeto, o separador de falantes oferece agora o **nemotron-3**, ao lado do
+community-1 de sempre. Nas quatro reuniões medidas ele errou a metade, foi bem
+mais rápido e usou muito menos memória da placa de vídeo; os nomes das vozes que
+o app já conhece saem iguais. Ele separa até 8 pessoas além de você. O padrão
+continua o community-1 — a troca é sua. Por causa dele, o instalador cresceu
+cerca de 380 MB.
+
+**Nomes ao vivo na legenda, em teste.** Com a legenda ligada, uma chave nova em
+Ajustes › Transcrição faz a legenda mostrar quem está falando — o nome, se é
+uma voz que o app conhece, ou "Pessoa 1", "Pessoa 2" — em vez de "Outros". O
+nome aparece depois de alguns segundos de fala; até lá, o texto fica como
+rascunho. Ocupa cerca de 1,5 GB a mais da placa durante a reunião: se a legenda
+começar a atrasar, desligue ali. Nasce desligada.
+
+**Correção.** Sair do Gravador e voltar durante a gravação não apaga mais a
+legenda que já tinha passado.
+
 ## 0.8.1 — 29/09/2026
 
 **A ata sai em Word.** O botão Exportar da aba Ata grava agora um `.docx`, junto

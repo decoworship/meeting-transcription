@@ -1,6 +1,6 @@
 {
-  "versao": "0.8.1",
-  "publicada": "2026-09-29",
-  "notas": "A ata sai em Word: o Exportar da aba Ata grava um .docx junto do .md. Em Ajustes › Sobre, o botão novo Copiar com o registro leva o diagnóstico e as últimas linhas do que o app fez, para relatar um problema.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.8.1"
+  "versao": "0.9.0",
+  "publicada": "2026-09-30",
+  "notas": "Um segundo separador de falantes, o nemotron-3, em Ajustes › Transcrição — mais rápido e com menos memória da placa. E, em teste, os nomes de quem fala na legenda ao vivo.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.9.0"
 }
