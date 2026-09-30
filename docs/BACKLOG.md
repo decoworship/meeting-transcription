@@ -332,7 +332,7 @@ estratégia depende. Precisa virar lista, com o desconhecido caindo no padrão
 **quanto cada um está sendo usado** — sem isso, "o que não está sendo usado" é
 memória de alguém.
 
-### TRA-1 · A prévia ao vivo é jogada fora — `feature` · `aberto`
+### TRA-1 · A prévia ao vivo é jogada fora — `feature` · `espera` · medido em 30/09/2026
 
 **Gatilho: já dói, e foi relatado em uso em 11/09/2026.** O dono do produto
 gravou uma reunião com a prévia ligada, pediu a transcrição ao encerrar, e
@@ -366,6 +366,25 @@ reaproveitar — na dúvida, roda o ASR de novo. Falta a prévia escrever nela.
 **Duas coisas para não esquecer:** o último bloco nunca é processado ao vivo, e
 trocar de motor entre a reunião e a transcrição faz a `Retomada` recusar o
 parcial — corretamente.
+
+**Medido em 30/09/2026, pelo `registro.log`, e o item mudou de figura.** Duas
+coisas:
+
+- **A prévia em blocos não roda para quem usa a legenda.** O `SessaoAoVivo`
+  (mesmo motor da passada final, o único cujo texto dá para reaproveitar) só
+  liga com a legenda desligada — a ponte dá prioridade à legenda e retorna
+  antes. O texto da legenda é o Nemotron ASR, outro modelo, sem pontuação: a
+  `Retomada` o recusaria, e com razão;
+- **reaproveitar os falantes da legenda (`VIVO-7`) não compensa.** Com o
+  nemotron-3 na passada final, a diarização leva **13 a 15 s** (30/09: 10h19 e
+  14h29, reuniões de 20 e 30 min); com o community-1, 1,5 a 3 min. O ASR leva 5
+  a 8 min e é **~90% do tempo**. A legenda com nomes economizaria no máximo os
+  15 s — e é streaming, 0,4 ponto pior que o offline.
+
+**O que sobra dele é só o texto, e só sem legenda:** escrever os blocos da
+prévia na `Retomada` corta o ASR para o rabo de ≤3 min. **Gatilho novo:**
+alguém usar a prévia em vez da legenda — ou a placa comportar as duas ao
+mesmo tempo, o que na 2060 com o Meet ninguém mediu e o `MOD-1` sugere que não.
 
 ### SUP-1 · O app não sabe dizer o que aconteceu — `feature` · `aberto` (4 de 5 na 0.8.1)
 
