@@ -264,6 +264,33 @@ fila cresce para sempre. Um passo a cada 240 ms disputa a placa com os feeds de
   caro atrasou. O número é pessimista, e igual nos três braços;
 - WSL, e não o Python embarcado no Windows; 10 min, e não uma reunião inteira.
 
+## 4c. Em reunião de verdade, com o Meet e a pergunta — 30/09/2026
+
+**Medido pelo dono do produto**, com a chave "Nomes ao vivo na legenda (teste)":
+legenda, Nemotron ao vivo e o Meet juntos ficaram em **3,3 GB**; com uma
+pergunta sendo respondida, **pico de 5,7 GB**, e a legenda não atrasou aos
+24 min de reunião. É o que faltava ao `MOD-1`: o `low_latency` cabe na 2060 com
+tudo ligado.
+
+**O nome na legenda, conferido na `2026-09-30_15-30-05`** (26 min, Vanessa,
+Monlevade e Carla). O nome ao vivo não é gravado, então foi reproduzido: o
+mesmo `FluxoAoVivo` sobre o `system.wav`, a mesma regra de nome por trecho, e os
+nomes que o registro diz que cada vaga recebeu — contra a transcrição final.
+
+```
+trechos dos outros                  439
+com o nome certo                    418   95,2%
+errado, logo depois de trocar         6 de  37   16%
+errado, com a mesma pessoa           15 de 402   3,7%
+```
+
+**O erro mora na troca de pessoa**, como o dono viu nas falas curtas: um trecho
+da legenda tem ~1 s e às vezes atravessa a troca. Deslocar a janela (−800 a
++300 ms) ou olhar só o fim do trecho foi medido e **piora o total** — o que se
+ganha na troca se perde no resto. Separar dentro do trecho pediria o tempo de
+cada palavra, que o streaming não dá (``snapshot()`` devolve zero palavras). A
+regra fica como está.
+
 ## 5. Memória de vozes
 
 O modelo não guarda voz: a saída é probabilidade por quadro, e o slot é por

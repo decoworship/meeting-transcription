@@ -829,8 +829,9 @@ desses é o item — não há mais o que otimizar deste lado.
 > 100% igual ao bloco a bloco); cada vaga manda o vetor de voz aos 6 s e aos
 > 20 s de fala limpa, e o núcleo (`Nucleo/FalantesAoVivo.cs`) põe o nome com o
 > `Vozes.Reconhecer` — ou "Pessoa N". Ele é encerrado antes da separação de
-> falantes do fim. **Falta:** medir com o Meet e a caixa de perguntar juntos, e
-> decidir se sai do teste.
+> falantes do fim. **Medido em 30/09** com o Meet e a pergunta (§4c): cabe, e
+> 95,2% dos trechos dos outros saem com o nome certo; o erro fica na troca de
+> pessoa. **Falta:** decidir se sai do teste.
 
 **Gatilho: o `MOD-1` fechar com folga ao lado da legenda.** Medido em
 25/09/2026 ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md)): o
@@ -898,7 +899,11 @@ portar para o formato do app, e trocar. A qualidade que o §10 deixa de fora é 
 de *ajuste* (limiar, prompt, pós-processamento); trocar o modelo por um que
 comprovadamente erra menos entra aqui, com medição antes.
 
-### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · `aberto` · falta medir com o Meet
+### MOD-1 · O Nemotron-3 ao lado da legenda, na 2060 — `feature` · feito em 30/09/2026
+
+> **Fechado com o Meet:** 3,3 GB com legenda, Nemotron ao vivo e Meet; pico de
+> 5,7 GB com uma pergunta, sem a legenda atrasar
+> ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §4c).
 
 > **Medido em 29/09/2026, sem o Meet** ([NEMOTRON-DIARIZACAO.md](NEMOTRON-DIARIZACAO.md) §4b):
 > o **`low_latency` cabe** — a legenda vai de 3,17× a 2,90×, o Nemotron fica
