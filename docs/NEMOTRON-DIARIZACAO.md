@@ -333,6 +333,11 @@ continua sendo o que é).
 
 ---
 
+**Uma quinta reunião com Gemini entrou em 30/09/2026:** `2026-09-30_09-58-30`,
+*Weekly — Bandeirantes*, 19 min, Diego Lacerda e Hubener Kassio. Já está nas
+listas do `medir_nemotron3.py` e do `medir_mod2.py`; as tabelas acima são das
+quatro de antes, e ainda não foram refeitas com ela.
+
 ## 6. Como reproduzir
 
 As três ferramentas estão em `tools/`, e os grafos em `tools/_nemotron3/`

@@ -57,7 +57,8 @@ ACERVO = Path("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings")
 PYANNOTE = Path("/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
                 "/diarizacao/modelos/community-1")
 REUNIOES = ["2026-08-20_15-59-20", "2026-08-21_11-00-33",
-            "2026-08-25_08-59-22", "2026-08-27_15-28-37"]
+            "2026-08-25_08-59-22", "2026-08-27_15-28-37",
+            "2026-09-30_09-58-30"]
 DONO = "andre yuri"
 
 
