@@ -417,7 +417,22 @@ de ser urgente — **vale por si, quando incomodar**.
 
 ## 6. Distribuição e atualização
 
-### DIST-1 · Separar os motores do instalador — `feature` · `aberto`
+### DIST-1 · Separar os motores do instalador — `feature` · `feito`
+
+> **Feito em 30/09/2026.** O instalador tem **10 MB** e leva o app e o código
+> dos sidecars; os motores — `python/` e `diarizacao/modelos/`, 5.518 arquivos,
+> 3,87 GB — viajam num `.7z` de **1,68 GB** publicado num release próprio,
+> `motores-<impressão>`, que o Inno baixa, confere por SHA256 e extrai **só
+> quando a impressão instalada (`motores/versao-dos-motores.txt`) é outra**. A
+> impressão é o sha256 da lista "caminho tamanho" do que viaja, mais o formato
+> do pacote. Testado de ponta a ponta numa instalação isolada: primeira vez
+> 4 min 35 s (download 1 min 53 s), segunda vez **2 s e nenhum download**,
+> Nemotron carregando no CUDA pelo Python do pacote, desinstalação limpa.
+> **O pacote não pode ser sólido:** com blocos de 64 MB o Inno levaria ~2 h
+> para extrair (medido: 369 arquivos em 8 min 44 s). O `--completo` ainda gera
+> o instalador de antes, para instalar sem internet. Quem tem a 0.9.0 ou
+> anterior baixa os motores uma vez na primeira atualização, porque não tem a
+> marca. Falta o que é do dono: submeter ao `microsoft/winget-pkgs`.
 
 > **Estado em 29/09/2026:** o MOSS saiu (17/09) e as DLLs de CUDA que nenhum
 > motor abre foram cortadas (PR #18, −56 MB). Os números das notas abaixo são

@@ -86,6 +86,8 @@ executa é um cliente da Microsoft, e o app continua só avisando.
   1,59 GB, mesmo quando só o `PulseMeet.exe` de 18 MB mudou. É o mesmo problema
   do degrau 2, com o mesmo remédio: separar a versão do app da versão dos
   motores.
+  **Resolvido pelo DIST-1 em 30/09/2026**: o instalador tem ~20 MB e só baixa
+  os motores quando eles mudam.
 
 **O `winget upgrade` só existe com o pacote numa fonte.** Instalar por
 `--manifest` — que é como se testa, e é tudo o que dá para fazer hoje — não
@@ -98,6 +100,10 @@ da Microsoft baixa o instalador inteiro e roda antivírus nele; 1,59 GB está be
 acima do que costuma passar por lá. Separar os motores é pré-requisito prático
 da submissão, e não só economia de banda — o que faz do degrau 2 o caminho para
 o winget, e não uma alternativa a ele.
+
+**Esse pré-requisito caiu em 30/09/2026 (DIST-1)**: o que a validação baixa
+agora é o instalador de ~20 MB; o pacote de motores é um download que ele faz
+durante a instalação, conferido por SHA256.
 
 ---
 
@@ -121,6 +127,24 @@ reponta").
 
 Até aqui é o que sempre foi. O resto existe desde 19/08/2026, e é o que põe o
 instalador ao alcance de quem não recebe arquivo na mão:
+
+**Desde o DIST-1 (30/09/2026) são dois artefatos**, e a ordem importa. O
+`montar_instalador.sh` imprime, no fim, a impressão digital dos motores e se o
+release `motores-<impressão>` já existe. Se não existir — os motores mudaram
+desde a última versão —, ele sobe **antes** do instalador, porque o instalador
+baixa dele e um 404 só apareceria na máquina de quem instala:
+
+```bash
+M=<a impressão que o script imprimiu>
+gh release create motores-$M --latest=false \
+  --title "Motores $M" --notes "Pacote de motores do PulseMeet." \
+  dist/instalador/PulseMeet-motores-$M.7z
+```
+
+Na maioria das versões ele já existe, e não há nada a subir: o instalador novo
+aponta para o mesmo pacote, e quem atualiza baixa ~20 MB. O
+`--latest=false` é o que impede o release de motores de virar "o último" na
+página do repositório — o link do `versao.json` aponta para o do app.
 
 ```bash
 V=0.4.0
@@ -164,6 +188,10 @@ nele — desde a v0.3.0 há: a página do release.
 ---
 
 ## Os degraus que ficam para depois
+
+> **O DIST-1 (30/09/2026) fez o que importava deste degrau sem o app aprender
+> nada.** O instalador ficou com ~20 MB e baixa os motores só quando a versão
+> deles muda; o que sobra do degrau 2 é o botão — e, pelo winget, nem ele.
 
 **2 — atualizar só o app.** O aviso vira botão: baixa o `PulseMeet.exe`
 (18,5 MB), confere, troca e reabre. É o degrau que mais paga, porque **os
