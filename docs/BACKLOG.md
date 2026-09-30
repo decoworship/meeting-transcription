@@ -497,6 +497,35 @@ línguas e runtime — e nada mais. Ver o `R0` da [FASE7-ROTA.md](FASE7-ROTA.md)
 
 Nenhum muda decisão. Próxima: 30/10/2026.
 
+**Medição de 29/09/2026**, pedida pelo dono do produto, contra os nossos
+números: nas quatro reuniões com Gemini, pela régua do `wer_contra_gemini.py`.
+**Os dois saíram, e a decisão do dono é não seguir com modelo novo**. O que vale
+é ajustar o Nemotron que já temos (`VIVO-8`).
+
+- `oruk/orukeet` (Parakeet TDT v3 com filtros de Gabor, CC BY-SA 4.0, GGUF e
+  ONNX) — **fora.** Exportado para fp32 (`tools/exportar_orukeet_onnx.py`) e
+  medido pela `medir_parakeet.py`, contra o Parakeet v3 fp32 de 11/09. Ele
+  diverge mais do Gemini em 3 das 4 reuniões (29,9 contra 26,9; 29,6 contra 28,1;
+  24,6 contra 24,2) e só ganha na de 14,6 min, por meio ponto. Perde do
+  `large-v3` nas mesmas três, e não tem vocabulário. O ganho do card é no
+  FLEURS, que é fala lida;
+- `ibm-granite/granite-speech-4.1-2b` (Apache 2.0, 2B, vocabulário no pedido) —
+  **fora, e pelo pior motivo: traduz em vez de transcrever.** Em reunião em pt
+  ele alterna entre transcrever, traduzir para o inglês (*"customers have with
+  him, all the links that they send to the teams"*) e inventar *"thank you very
+  much"* em trechos com fala. Nenhuma combinação corrigiu isso: blocos de 30 s,
+  60 s e 3 min, com três pedidos diferentes, um deles em português. A melhor
+  cobriu 11,5% da reunião de 7,7 min, contra 77,2% do app. Em fp16 ele entra em
+  laço, e só roda em bf16, com 5 GB de pico. O F1 de termo em pt que o card
+  anuncia é medido em frases do Common Voice, e não se transfere para reunião
+  (`tools/medir_granite.py`);
+- `granite-speech-4.1-2b-plus`, `VibeVoice-ASR-BitNet`, `desert-ant-labs/align`
+  e o porte Core ML do Nemotron 3.5 (`smdesai`) — **não medidos**, reprovados
+  pelo card. O `-plus` é o Granite sem pontuação. O BitNet é CPU, medido em
+  20 s, sem falante nem vocabulário. O `align` só refina carimbo, e tem licença
+  comercial em escala. O `smdesai` é só Apple, mas deu a pista do `VIVO-8`: o
+  quadro e o contexto de atenção mexem sem quebrar o modelo.
+
 ### DIST-2 · Motores como pacotes por acelerador — `feature` · `espera`
 
 CUDA, Vulkan e CPU como variantes baixáveis, em vez de tudo embutido
