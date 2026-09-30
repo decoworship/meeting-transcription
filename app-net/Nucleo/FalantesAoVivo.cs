@@ -52,6 +52,15 @@ public sealed class FalantesAoVivo : IDisposable
     private readonly Dictionary<int, int> _ordem = [];
     private Task? _laco;
 
+    /// <summary>Até onde, em ms do <c>system.wav</c>, o Nemotron já decidiu.</summary>
+    public long DecididoAteMs { get; private set; }
+
+    /// <summary>
+    /// Disparado a cada bloco decidido. A legenda o usa para soltar o texto
+    /// que esperava o nome — ver <see cref="LegendaAoVivo"/>.
+    /// </summary>
+    public event Action? AoDecidir;
+
     public FalantesAoVivo(string pastaDaGravacao, Motores motores,
                           IReadOnlyDictionary<string, string> ambiente, Vozes? vozes = null)
     {
@@ -116,9 +125,14 @@ public sealed class FalantesAoVivo : IDisposable
         }
     }
 
-    private void AoFalar(IReadOnlyList<MotorSidecar.FalaAoVivo> novas)
+    private void AoFalar(IReadOnlyList<MotorSidecar.FalaAoVivo> novas, long ateMs)
     {
-        lock (_trava) Acrescentar(_falas, _ordem, novas, MemoriaMs);
+        lock (_trava)
+        {
+            Acrescentar(_falas, _ordem, novas, MemoriaMs);
+            DecididoAteMs = Math.Max(DecididoAteMs, ateMs);
+        }
+        AoDecidir?.Invoke();
     }
 
     private void AoVetor(int vaga, float[] vetor, string? modelo)

@@ -419,8 +419,12 @@ class AoVivo:
         import numpy as np
 
         pcm = np.frombuffer(base64.b64decode(b64), dtype="<i2").astype(np.float32) / 32768.0
+        antes = self.fluxo._prox
         ativos, prontos = self.fluxo.alimentar(pcm)
-        if ativos:
+        # **A cada bloco decidido, mesmo em silêncio.** O ``ate_ms`` é o que o
+        # núcleo espera para soltar o texto da legenda com o nome certo; sem ele
+        # numa pausa, o texto ficaria preso até o limite de espera.
+        if self.fluxo._prox != antes:
             _enviar(id=self.id, tipo="progresso", ativos=[list(a) for a in ativos],
                     ate_ms=self.fluxo._prox * 80)
         for vaga, audio in prontos:

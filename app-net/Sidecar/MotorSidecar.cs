@@ -337,7 +337,7 @@ public sealed class MotorSidecar : IDisposable
     /// núcleo quem põe. Ver <c>AoVivo</c> em <c>motores/diarizacao/motor.py</c>.
     /// </remarks>
     public async Task FalantesAoVivoAsync(
-        ChannelReader<float[]> audio, Action<IReadOnlyList<FalaAoVivo>> aoFalar,
+        ChannelReader<float[]> audio, Action<IReadOnlyList<FalaAoVivo>, long> aoFalar,
         Action<int, float[], string?> aoVetor, string modelo, CancellationToken ct)
     {
         int id = _proximoId++;
@@ -376,9 +376,12 @@ public sealed class MotorSidecar : IDisposable
                 switch (m.Tipo)
                 {
                     case "progresso":
-                        if (m.Ativos is { Count: > 0 } ativos)
+                        // `ate_ms` vem a cada bloco decidido, com ou sem fala:
+                        // é o horizonte que a legenda espera para pôr o nome.
+                        if (m.Ativos is { } ativos && m.AteMs is long ate)
                             aoFalar([.. ativos.Where(a => a.Length == 3)
-                                              .Select(a => new FalaAoVivo(a[0], a[1], (int)a[2]))]);
+                                              .Select(a => new FalaAoVivo(a[0], a[1], (int)a[2]))],
+                                    ate);
                         if (m.Vaga is int vaga && m.Vetor is { Length: > 0 } vetor)
                             aoVetor(vaga, vetor, m.ModeloDaVoz);
                         break;
