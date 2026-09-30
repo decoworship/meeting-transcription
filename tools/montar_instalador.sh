@@ -12,7 +12,17 @@
 #   2. publicar.sh --so-build       (as três flags + as réguas do binário)
 #   3. monta o payload pequeno      (.exe, DLL, docs, ícone, WebView2)
 #   4. confere as réguas do instalador
-#   5. chama o ISCC.exe             (os motores são lidos onde já estão)
+#   5. monta o pacote de motores    (.7z, só se a impressão digital for nova)
+#   6. chama o ISCC.exe
+#
+# **Desde o DIST-1 (30/09/2026) são dois artefatos.** O instalador, ~20 MB, com
+# o app e o código dos sidecars; e o pacote de motores, ~1,7 GB, que o
+# instalador baixa do release `motores-<impressão>` só quando a versão
+# instalada é outra. A impressão digital é o sha256 da lista "caminho tamanho"
+# do que viaja: mudou um arquivo do Python embarcado ou um peso, muda a
+# impressão; mudou só o app, o pacote é o mesmo e nem é remontado.
+# Com --completo, sai o instalador de antes, com os motores dentro — para
+# instalar sem internet.
 #
 # **Os motores não são copiados.** São 5,4 GB que produziriam os mesmos bytes;
 # o Inno lê da instalação existente e exclui o que não deve viajar. Ver
@@ -24,6 +34,7 @@
 # Uso:
 #   tools/montar_instalador.sh
 #   tools/montar_instalador.sh --motores /outra/instalacao/motores
+#   tools/montar_instalador.sh --completo     # os motores dentro, sem download
 
 set -euo pipefail
 
@@ -40,12 +51,16 @@ SAIDA="$RAIZ/dist/instalador"
 MOTORES="/mnt/c/Users/andre/AppData/Local/Programs/MeetingApp/motores"
 ISCC="/mnt/c/Users/andre/AppData/Local/Programs/Inno Setup 6/ISCC.exe"
 WEBVIEW2="https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+SETEZIP="/mnt/c/Program Files/7-Zip/7z.exe"
+REPO_URL="https://github.com/decoworship/meeting-transcription"
 
 PULAR_BUILD=0
+COMPLETO=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --motores)     MOTORES="$2"; shift 2 ;;
     --pular-build) PULAR_BUILD=1; shift ;;
+    --completo)    COMPLETO=1; shift ;;
     *) echo "argumento desconhecido: $1" >&2; exit 2 ;;
   esac
 done
@@ -86,6 +101,16 @@ if [[ ! -f "$SAIDA/MicrosoftEdgeWebview2Setup.exe" ]]; then
   curl -sSL --fail -o "$SAIDA/MicrosoftEdgeWebview2Setup.exe" "$WEBVIEW2"
 fi
 cp "$SAIDA/MicrosoftEdgeWebview2Setup.exe" "$PAYLOAD/"
+
+# O código dos sidecars, do REPOSITÓRIO (DIST-1). Viaja sempre dentro do
+# instalador, e não no pacote de motores: muda em quase toda versão, e com ele
+# lá dentro cada mudança num motor.py custaria 1,7 GB de download.
+for m in asr diarizacao modelos legenda; do
+  mkdir -p "$PAYLOAD/codigo/$m"
+  cp "$RAIZ/motores/$m/motor.py" "$PAYLOAD/codigo/$m/"
+done
+rsync -a --exclude __pycache__ --exclude testes \
+  "$RAIZ/motores/diarizacao/pipeline/" "$PAYLOAD/codigo/diarizacao/pipeline/"
 
 echo "==> conferindo as réguas"
 
@@ -223,6 +248,66 @@ echo "==> conferindo privacidade (leva alguns minutos)"
 python3 "$RAIZ/tools/conferir_privacidade.py" --payload "$PAYLOAD" --motores "$MOTORES" \
   || reprovar "a régua de privacidade reprovou — veja acima o que vazou."
 
+# ── o pacote de motores ──────────────────────────────────────────────────────
+# O que viaja são duas árvores: motores/python e motores/diarizacao/modelos. O
+# resto de motores/ é código (vai no payload, acima) ou já não viajava — o
+# llama.cpp (ata/bin) e os GGUF são baixados pelo app. As exclusões são as
+# MESMAS do Excludes do .iss; se uma mudar lá, muda aqui.
+echo "==> calculando a impressão digital dos motores"
+LISTA="$SAIDA/motores-lista.tsv"
+(cd "$MOTORES" && find python diarizacao/modelos -type f \
+    ! -name '*.gguf' ! -name 'curand64_10.dll' ! -name 'cusolverMg64_11.dll' \
+    ! -name '*.pyi' ! -path '*/sklearn/datasets/*' ! -path '*/tests/*' \
+    ! -path '*/test/*' ! -path '*/.cache/*' ! -path '*/__pycache__/*' \
+    -printf '%p\t%s\n' | LC_ALL=C sort) > "$LISTA"
+# O formato do pacote entra na impressão: trocar como ele é montado muda o
+# arquivo publicado, e o mesmo nome com outro conteúdo reprovaria o Hash de
+# quem já tem o instalador anterior.
+FORMATO_DO_PACOTE="7z-mx9-naosolido"
+MOTORES_VERSAO=$( { echo "$FORMATO_DO_PACOTE"; cat "$LISTA"; } | sha256sum | cut -c1-12)
+echo "    $(wc -l < "$LISTA") arquivos · impressão $MOTORES_VERSAO"
+
+iscc_motores="\"/DMotoresVersao=$MOTORES_VERSAO\""
+if (( COMPLETO )); then
+  iscc_motores="$iscc_motores \"/DCompleto=1\""
+else
+  PACOTE="$SAIDA/PulseMeet-motores-$MOTORES_VERSAO.7z"
+  if [[ -f "$PACOTE" ]]; then
+    echo "==> o pacote de motores já existe: $(basename "$PACOTE")"
+  else
+    [[ -f "$SETEZIP" ]] || reprovar "não achei o 7-Zip em $SETEZIP — winget install --id 7zip.7zip"
+    echo "==> montando o pacote de motores (leva uns bons minutos)"
+    # A lista vai ao 7-Zip com barra invertida e CRLF, que é como ele a lê no
+    # Windows.
+    #
+    # **Não sólido, e o número é medido.** O Inno extrai arquivo por arquivo, e
+    # num bloco sólido cada arquivo obriga a descomprimir o bloco desde o
+    # começo: com blocos de 64 MB (30/09/2026), 369 arquivos levaram 8 min 44 s
+    # — os 5.518 levariam duas horas. O download de 1,65 GB, no mesmo teste,
+    # levou 2 min 17 s.
+    lista_win="$SAIDA/motores-lista.txt"
+    cut -f1 "$LISTA" | sed 's|/|\\|g; s/$/\r/' > "$lista_win"
+    tmp="$PACOTE.parcial"
+    rm -f "$tmp"
+    lote7="$SAIDA/empacotar.cmd"
+    {
+      echo "@echo off"
+      echo "cd /d \"$(wslpath -w "$MOTORES")\""
+      echo "\"$(wslpath -w "$SETEZIP")\" a -t7z -mx=9 -mmt=on -ms=off -bso0 -bsp0 \"$(wslpath -w "$tmp")\" @\"$(wslpath -w "$lista_win")\""
+    } > "$lote7"
+    (cd /mnt/c && /mnt/c/Windows/System32/cmd.exe /c "$(wslpath -w "$lote7")") \
+      || reprovar "o 7-Zip falhou ao montar o pacote de motores."
+    mv "$tmp" "$PACOTE"
+  fi
+  PACOTE_TAM=$(stat -c%s "$PACOTE")
+  # O limite de um arquivo num release do GitHub é 2 GiB.
+  (( PACOTE_TAM < 2147483648 )) || reprovar "o pacote de motores tem $((PACOTE_TAM/1000000)) MB — passa do limite de 2 GiB do GitHub."
+  (( PACOTE_TAM > 500000000 )) || reprovar "o pacote de motores tem $((PACOTE_TAM/1000000)) MB — pequeno demais para ter o Python embarcado."
+  PACOTE_SHA=$(sha256sum "$PACOTE" | cut -d' ' -f1)
+  MOTORES_URL="$REPO_URL/releases/download/motores-$MOTORES_VERSAO/$(basename "$PACOTE")"
+  iscc_motores="$iscc_motores \"/DMotoresUrl=$MOTORES_URL\" \"/DMotoresSha=$PACOTE_SHA\" \"/DMotoresTamanho=$PACOTE_TAM\""
+fi
+
 echo "==> compilando o instalador"
 [[ -f "$ISCC" ]] || reprovar "não achei o ISCC.exe em $ISCC — winget install --id JRSoftware.InnoSetup"
 
@@ -241,14 +326,18 @@ saida_win=$(wslpath -w "$SAIDA")
 lote="$SAIDA/compilar.cmd"
 {
   echo "@echo off"
-  echo "\"$(wslpath -w "$ISCC")\" \"/DVersao=$VERSAO\" \"/DPayload=$payload_win\" \"/DMotores=$motores_win\" \"/DSaida=$saida_win\" \"$iss_win\""
+  echo "\"$(wslpath -w "$ISCC")\" \"/DVersao=$VERSAO\" \"/DPayload=$payload_win\" \"/DMotores=$motores_win\" \"/DSaida=$saida_win\" $iscc_motores \"$iss_win\""
 } > "$lote"
 # BOM não, acento não: este .cmd é ASCII puro de propósito — .cmd com acento no
 # PowerShell 5.1 e no cmd.exe exige BOM, e é armadilha conhecida deste projeto.
 
 (cd /mnt/c && /mnt/c/Windows/System32/cmd.exe /c "$(wslpath -w "$lote")") | tail -20
 
-FINAL="$SAIDA/PulseMeet-$VERSAO-instalador.exe"
+if (( COMPLETO )); then
+  FINAL="$SAIDA/PulseMeet-$VERSAO-instalador-completo.exe"
+else
+  FINAL="$SAIDA/PulseMeet-$VERSAO-instalador.exe"
+fi
 [[ -f "$FINAL" ]] || reprovar "o ISCC terminou mas não produziu $FINAL"
 
 # A última régua, e é sobre o artefato inteiro: um instalador pequeno demais não
@@ -265,12 +354,32 @@ FINAL="$SAIDA/PulseMeet-$VERSAO-instalador.exe"
 # os dois. Se um dia o instalador chegar perto de 4 GB por crescimento legítimo,
 # o conserto é o DIST-1 do backlog (separar os motores), não afrouxar a régua.
 tam=$(stat -c%s "$FINAL")
-(( tam > 1000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — pequeno demais para conter os motores."
-(( tam < 4000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — grande demais; um .gguf escapou do Excludes."
+if (( COMPLETO )); then
+  (( tam > 1000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — pequeno demais para conter os motores."
+  (( tam < 4000000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — grande demais; um .gguf escapou do Excludes."
+else
+  # Sem os motores, o instalador é o app: os 18 MB do .exe comprimem para ~10.
+  (( tam > 5000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — pequeno demais para conter o app."
+  (( tam < 150000000 )) || reprovar "o instalador tem $((tam/1000000)) MB — os motores entraram nele."
+fi
 
 echo
 printf 'Pronto: %s\n' "$FINAL"
 printf '        %.2f GB\n' "$(echo "$tam/1000000000" | bc -l)"
 echo
+if (( ! COMPLETO )); then
+  echo "Motores: $(basename "$PACOTE") · impressão $MOTORES_VERSAO"
+  echo "         SHA256 $PACOTE_SHA"
+  if gh release view "motores-$MOTORES_VERSAO" >/dev/null 2>&1; then
+    echo "         o release motores-$MOTORES_VERSAO já existe — nada a subir."
+  else
+    echo "         o release motores-$MOTORES_VERSAO NÃO existe. Suba-o ANTES do"
+    echo "         instalador, senão ele baixa um 404 na máquina de quem instala:"
+    echo "           gh release create motores-$MOTORES_VERSAO --latest=false \\"
+    echo "             --title \"Motores $MOTORES_VERSAO\" --notes \"Pacote de motores do PulseMeet.\" \\"
+    echo "             \"$PACOTE\""
+  fi
+  echo
+fi
 echo "Agora instale numa conta de usuário limpa e rode os critérios A a G"
 echo "de docs/FASE4.md §9 — é a parte que nenhum script faz."

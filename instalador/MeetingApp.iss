@@ -20,6 +20,19 @@
 ;   /DPayload=<pasta>   os arquivos pequenos: .exe, DLL, docs, ícone, bootstrapper
 ;   /DMotores=<pasta>   a árvore de motores\, lida ONDE ELA JÁ ESTÁ
 ;   /DSaida=<pasta>     onde o .exe do instalador é escrito
+;   /DMotoresVersao=<M> a impressão digital do pacote de motores (DIST-1)
+;   /DMotoresUrl, /DMotoresSha, /DMotoresTamanho
+;                       de onde baixar o pacote, e como conferi-lo
+;   /DCompleto          os motores DENTRO do instalador, como até a 0.9.0
+;
+; **Os motores viajam à parte desde o DIST-1 (30/09/2026).** O instalador
+; normal leva o app e o código dos sidecars (~20 MB) e baixa o pacote pesado —
+; o Python embarcado e os pesos de diarização, ~1,7 GB — **só quando a versão
+; que ele pede não é a instalada**. A versão é uma impressão digital do
+; conteúdo, calculada pelo montar_instalador.sh; a maioria das versões novas do
+; app não muda os motores, e aí o update é de 20 MB. É isto que torna o pacote
+; submissível ao winget (docs/ATUALIZACAO.md). O /DCompleto continua existindo
+; para quem precisa instalar sem internet.
 ;
 ; Payload e Motores são separados por um motivo prático: os motores são 5,4 GB, e
 ; copiá-los para uma pasta de estágio a cada build custaria minutos e 5,4 GB de
@@ -38,6 +51,14 @@
 #endif
 #ifndef Saida
   #define Saida "."
+#endif
+#ifndef MotoresVersao
+  #error Falta /DMotoresVersao — rode por tools/montar_instalador.sh
+#endif
+#ifndef Completo
+  #ifndef MotoresUrl
+    #error Falta /DMotoresUrl — rode por tools/montar_instalador.sh
+  #endif
 #endif
 
 ; ─────────────────────────────────────────────────────────────── a marca
@@ -95,7 +116,11 @@ ArchitecturesInstallIn64BitMode=x64compatible
 ; aberto vira um pedido educado para fechar, em vez de um erro de cópia no meio.
 AppMutex=Global\MeetingApp
 OutputDir={#Saida}
+#ifdef Completo
+OutputBaseFilename={#Marca}-{#Versao}-instalador-completo
+#else
 OutputBaseFilename={#Marca}-{#Versao}-instalador
+#endif
 SetupIconFile={#Payload}\logo.ico
 UninstallDisplayIcon={app}\{#Marca}.exe
 ; lzma2/max e solid: o payload é dominado por DLLs de CUDA, que comprimem bem, e
@@ -105,6 +130,8 @@ Compression=lzma2/max
 SolidCompression=yes
 LZMANumBlockThreads=4
 WizardStyle=modern
+; O pacote de motores é .7z, sem senha: o método que só lê isso é o menor.
+ArchiveExtraction=enhanced/nopassword
 ; Sem assinatura de código nesta versão (docs/FASE4.md §6): o SmartScreen vai
 ; avisar, e o INSTALAR.md diz o que fazer.
 
@@ -126,6 +153,13 @@ Name: "iniciarcomwindows"; Description: "Iniciar o {#Marca} junto com o Windows"
 ; atalho para ele.
 Type: files; Name: "{app}\MeetingApp.exe"
 Type: filesandordirs; Name: "{userprograms}\MeetingApp"
+; Motores novos entram numa pasta limpa: extrair por cima deixaria para trás o
+; pacote Python que saiu, e um import que acha o velho é defeito mudo. Só as
+; duas árvores do pacote — motores\ata\modelos e motores\legenda\modelos
+; têm os modelos que a pessoa baixou, e não se tocam. O download acontece na
+; etapa "Preparando para instalar", ANTES disto: se ele falhar, nada foi apagado.
+Type: filesandordirs; Name: "{app}\motores\python"; Check: PrecisaDosMotores
+Type: filesandordirs; Name: "{app}\motores\diarizacao\modelos"; Check: PrecisaDosMotores
 
 [Files]
 Source: "{#Payload}\{#Marca}.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -175,8 +209,24 @@ Source: "{#Payload}\WebView2Loader.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; proteger; tirar 1,7 MB que ninguém importa não custa nada. Conferido em
 ; 23/09/2026: sem a pasta, `sklearn.cluster.KMeans` e o pipeline de diarização
 ; importam e rodam.
+#ifdef Completo
 Source: "{#Motores}\*"; DestDir: "{app}\motores"; \
   Excludes: "*.gguf,ata\bin,curand64_10.dll,cusolverMg64_11.dll,sklearn\datasets,tests,test,*.pyi,.cache,__pycache__"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs
+#else
+; O pacote de motores (DIST-1): as MESMAS exclusões acima, aplicadas pelo
+; montar_instalador.sh ao montar o .7z, que só leva motores\python e
+; motores\diarizacao\modelos. O Hash é conferido antes de extrair; um arquivo
+; trocado no caminho reprova a instalação em vez de instalar outra coisa.
+Source: "{#MotoresUrl}"; DestName: "motores-{#MotoresVersao}.7z"; DestDir: "{app}\motores"; \
+  Hash: "{#MotoresSha}"; ExternalSize: {#MotoresTamanho}; \
+  Flags: external download extractarchive ignoreversion recursesubdirs createallsubdirs; \
+  Check: PrecisaDosMotores
+#endif
+; O código dos sidecars — os motor.py e a pipeline da diarização —, do
+; repositório. Vai sempre, nos dois modos: são poucos KB e mudam em quase toda
+; versão, e é por isso que não moram no pacote pesado.
+Source: "{#Payload}\codigo\*"; DestDir: "{app}\motores"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\INSTALAR.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "{#Payload}\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -223,6 +273,7 @@ Filename: "{app}\{#Marca}.exe"; Description: "Abrir o {#Marca}"; \
 ; vozes moram fora da pasta do app e não são tocadas — ver a mensagem do
 ; CurUninstallStepChanged.
 Type: filesandordirs; Name: "{app}\motores\ata\modelos"
+Type: files; Name: "{app}\motores\versao-dos-motores.txt"
 Type: dirifempty; Name: "{app}\motores"
 Type: dirifempty; Name: "{app}"
 
@@ -247,6 +298,34 @@ begin
     (RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\' + Cliente, 'pv', Versao) and (Versao <> '') and (Versao <> '0.0.0.0')) or
     (RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\' + Cliente, 'pv', Versao) and (Versao <> '') and (Versao <> '0.0.0.0')) or
     (RegQueryStringValue(HKCU, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\' + Cliente, 'pv', Versao) and (Versao <> '') and (Versao <> '0.0.0.0'));
+end;
+
+{ Os motores instalados são os que este instalador pede?
+
+  A marca é um arquivo de uma linha, escrito no fim de toda instalação que
+  trouxe motores. Sem ela — instalação de antes do DIST-1, ou uma que falhou no
+  meio —, a resposta é "precisa", que custa um download e nunca deixa o app sem
+  motor. Calculada uma vez: o Inno chama o Check mais de uma vez por entrada. }
+var
+  PrecisaCalculado, Precisa: Boolean;
+
+function MarcaDosMotores: String;
+begin
+  Result := ExpandConstant('{app}\motores\versao-dos-motores.txt');
+end;
+
+function PrecisaDosMotores: Boolean;
+var
+  Instalada: AnsiString;
+begin
+  if not PrecisaCalculado then
+  begin
+    Precisa := True;
+    if LoadStringFromFile(MarcaDosMotores, Instalada) then
+      Precisa := Trim(String(Instalada)) <> '{#MotoresVersao}';
+    PrecisaCalculado := True;
+  end;
+  Result := Precisa;
 end;
 
 { A instalação manual que já existe, de antes de haver instalador.
@@ -275,6 +354,10 @@ var
   Busca: TFindRec;
 begin
   if CurStep <> ssPostInstall then Exit;
+
+  { Chegar aqui é ter extraído tudo: só agora a marca diz a verdade. }
+  SaveStringToFile(MarcaDosMotores, '{#MotoresVersao}', False);
+
   if not MoverModelos then Exit;
 
   Antiga := PastaAntiga;
