@@ -240,7 +240,7 @@ entre os vetores já sabe apontá-lo ([VOZES.md](VOZES.md) §6).
 
 ## 4. Gravação e agenda
 
-### GRA-1 · O `calendar_event_id` é escrito e nunca lido — `bug` · `aberto`
+### GRA-1 · O `calendar_event_id` é escrito e nunca lido — `bug` · `feito`
 
 Ele existe no `meta.json` desde sempre
 ([Meta.cs:163](../app-net/Gravacao/Meta.cs#L163),
@@ -255,6 +255,15 @@ recupera todas menos uma.
 **Fica como bug de dado, e não de qualidade:** a consequência mais visível dele
 era a ata escolher o lado errado da pendência, e isso saiu deste backlog. O
 item se sustenta sozinho — é dado que o app tem, guardou, e não usa.
+
+**Feito em 30/09/2026** (`Agenda/ReleituraDaAgenda.cs`): meio minuto depois de
+abrir, o app relê no Google cada id sem `attendee_emails` e completa o
+`meta.json`. **Só quando os nomes do evento batem exatamente com os
+`attendees` gravados** — convite mudado depois, ou participante sem e-mail,
+desalinharia as listas paralelas (`GRA-2`), e aí a gravação fica como estava.
+Cada id com resposta definitiva vai para `~/.meeting-recorder/releitura_da_agenda.json`
+e não é perguntado de novo; erro de rede volta na próxima abertura. O resultado
+sai numa linha `agenda` do `registro.log`.
 
 ### GRA-2 · Nome e e-mail casados por posição — `bug` · `espera`
 

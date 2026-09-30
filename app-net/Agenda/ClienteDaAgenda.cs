@@ -253,6 +253,53 @@ public sealed class ClienteDaAgenda : IDisposable
     }
 
     /// <summary>
+    /// Um evento pelo id que o <c>meta.json</c> guardou, ou nulo.
+    /// </summary>
+    /// <remarks>
+    /// Para a <see cref="ReleituraDaAgenda"/>: nulo quer dizer "não deu agora"
+    /// (rede, token) <b>ou</b> "não existe mais" — o <c>status</c> separa os
+    /// dois, e só o segundo é definitivo. Nunca lança.
+    /// </remarks>
+    public async Task<(Evento? Evento, StatusDaAgenda Status)> EventoPorIdAsync(
+        string id, CancellationToken ct = default)
+    {
+        try
+        {
+            if (!EstaConfigurado()) return (null, StatusDaAgenda.NaoConfigurado);
+            if (!EstaAutorizado()) return (null, StatusDaAgenda.NaoAutorizado);
+
+            string? token;
+            try
+            {
+                token = await _cred.AccessTokenAsync(ct);
+            }
+            catch (TokenMortoException)
+            {
+                return (null, StatusDaAgenda.TokenExpirado);
+            }
+            if (token is null) return (null, StatusDaAgenda.NaoAutorizado);
+
+            string url = "https://www.googleapis.com/calendar/v3/calendars/primary/events/"
+                + Uri.EscapeDataString(id);
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var resp = await _http.SendAsync(req, ct);
+
+            // 404 e 410 são o evento apagado da agenda: não adianta tentar de novo.
+            if ((int)resp.StatusCode is 404 or 410) return (null, StatusDaAgenda.SemEvento);
+            if (!resp.IsSuccessStatusCode) return (null, StatusDaAgenda.Erro);
+
+            var item = JsonSerializer.Deserialize(
+                await resp.Content.ReadAsStringAsync(ct), AgendaJson.Default.ItemDeEvento);
+            return item is null ? (null, StatusDaAgenda.Erro) : (Converter(item), StatusDaAgenda.Ok);
+        }
+        catch (Exception)
+        {
+            return (null, StatusDaAgenda.Erro);
+        }
+    }
+
+    /// <summary>
     /// Descobre e guarda o e-mail da conta conectada.
     /// </summary>
     /// <remarks>

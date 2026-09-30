@@ -82,9 +82,11 @@ internal sealed class ContaSalva
 /// serialização por reflexão não sobrevive ao <c>PublishTrimmed</c>.
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = false)]
+[JsonSerializable(typeof(ItemDeEvento))]
 [JsonSerializable(typeof(RespostaDeEventos))]
 [JsonSerializable(typeof(RespostaDeCalendario))]
 [JsonSerializable(typeof(RespostaDeToken))]
 [JsonSerializable(typeof(SegredoDoCliente))]
 [JsonSerializable(typeof(ContaSalva))]
+[JsonSerializable(typeof(List<string>))]
 internal sealed partial class AgendaJson : JsonSerializerContext;
