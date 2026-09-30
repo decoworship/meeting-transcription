@@ -218,7 +218,9 @@ public sealed class LegendaAoVivo : IDisposable
     //: hora dava a fala de uma pessoa ao nome de quem vinha antes — visto em
     //: 30/09/2026, com Diego e Hubener no mesmo balão. O rascunho em cinza segue
     //: na hora; só a linha firme atrasa até o Nemotron decidir aquele trecho,
-    //: ou até <see cref="EsperaMaximaS"/>.
+    //: ou até <see cref="EsperaMaximaS"/>. **Enquanto espera, ele aparece como
+    //: rascunho** (ideia do dono do produto, 30/09/2026): o provisório que vai à
+    //: tela é o firme da fila seguido do tentativo do motor, e nada some.
     private readonly Queue<(string Novo, bool Dono, double De, double Ate, DateTime Chegou)> _fila = new();
     private readonly object _travaDaFila = new();
     private string _tentativo = "";
@@ -384,13 +386,18 @@ public sealed class LegendaAoVivo : IDisposable
                     falante = _ultimoFalante = f.QuemFalou(p.De, p.Ate) ?? _ultimoFalante;
                 }
                 _fila.Dequeue();
-                _aoPedaco(new PedacoDaLegenda(p.Novo, _tentativo, p.Dono, falante));
+                _aoPedaco(new PedacoDaLegenda(p.Novo, Provisorio(), p.Dono, falante));
                 soltou = true;
             }
             if (!soltou && comTentativo)
-                _aoPedaco(new PedacoDaLegenda("", _tentativo, _donoDoTentativo));
+                _aoPedaco(new PedacoDaLegenda("", Provisorio(),
+                                              _fila.TryPeek(out var h) ? h.Dono : _donoDoTentativo));
         }
     }
+
+    /// <summary>O que ainda pode mudar: o firme que espera o nome, e o tentativo.</summary>
+    private string Provisorio() =>
+        (string.Concat(_fila.Select(q => q.Novo)) + " " + _tentativo).Trim();
 
     public void Comecar() => _laco ??= Task.Run(() => LacoAsync(_cancelar.Token));
 
