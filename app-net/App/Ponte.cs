@@ -140,6 +140,11 @@ internal sealed class Resposta
     /// <summary>Os blocos já entregues, para a tela que chegou no meio.</summary>
     [JsonPropertyName("aovivo_ate")] public List<BlocoDaPrevia>? AoVivoAte { get; init; }
 
+    /// <summary>A legenda firme da gravação em curso, para a tela que volta.</summary>
+    [JsonPropertyName("legenda_ate")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<PedacoDaLegendaJson>? LegendaAte { get; init; }
+
     /// <summary>
     /// O que impede a caixa de perguntar, ou nulo quando ela pode existir.
     /// </summary>
@@ -582,6 +587,12 @@ internal sealed class PedacoDaLegendaJson
     [JsonPropertyName("falante")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Falante { get; init; }
+
+    /// <summary>Onde o pedaço termina, em segundos da gravação; 0 no rascunho.</summary>
+    [JsonPropertyName("ate_s")] public double AteS { get; init; }
+
+    /// <summary>Ordem de entrega, para a tela que volta não repetir pedaço.</summary>
+    [JsonPropertyName("seq")] public int Seq { get; init; }
 }
 
 /// <summary>Um bloco de 3 minutos da prévia, como a tela o recebe.</summary>
@@ -684,6 +695,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     /// </remarks>
     private SessaoAoVivo? _aoVivo;
     private LegendaAoVivo? _legenda;
+
+    //: **A legenda firme já entregue**, para a tela que sai do Gravador e volta
+    //: (30/09/2026): os pedaços passam pelo canal de eventos uma vez só, e sem
+    //: isto a volta encontrava o painel vazio. Zera a cada gravação. O número de
+    //: ordem é o que deixa a tela descartar o que chegou duas vezes.
+    private readonly List<PedacoDaLegendaJson> _legendaHistorico = [];
+    private int _legendaSeq;
+
+    private List<PedacoDaLegendaJson> HistoricoDaLegenda()
+    {
+        lock (_legendaHistorico) return [.. _legendaHistorico];
+    }
     private FalantesAoVivo? _falantesAoVivo;
 
     /// <summary>
@@ -1148,6 +1171,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                                 : "nem a legenda nem a prévia em blocos estão ligadas "
                                   + "em Ajustes › Transcrição.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
+                        LegendaAte = HistoricoDaLegenda(),
                         PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
                             cfgAv, CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfgAv.ModeloParaPergunta)),
                     });
@@ -1399,6 +1423,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     private void ComecarAPrevia(string pasta)
     {
         _pastaAoVivo = pasta;
+        lock (_legendaHistorico) _legendaHistorico.Clear();
         try
         {
             _aoVivo?.Dispose();
@@ -1526,15 +1551,25 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         Responder(new Resposta { Id = 0, Tipo = "aovivo", AoVivo = Resumir(b) });
 
     /// <summary>Empurra um pedaço da legenda. Mesmo canal do bloco, outro campo.</summary>
-    private void EmpurrarLegenda(PedacoDaLegenda p) =>
-        Responder(new Resposta
+    private void EmpurrarLegenda(PedacoDaLegenda p)
+    {
+        PedacoDaLegendaJson json;
+        lock (_legendaHistorico)
         {
-            Id = 0, Tipo = "aovivo",
-            Legenda = new PedacoDaLegendaJson
+            json = new PedacoDaLegendaJson
             {
                 Novo = p.Novo, Tentativo = p.Tentativo, Dono = p.Dono, Falante = p.Falante,
-            },
-        });
+                AteS = p.AteS, Seq = ++_legendaSeq,
+            };
+            if (p.Novo.Trim().Length > 0)
+                _legendaHistorico.Add(new PedacoDaLegendaJson
+                {
+                    Novo = p.Novo, Tentativo = "", Dono = p.Dono, Falante = p.Falante,
+                    AteS = p.AteS, Seq = json.Seq,
+                });
+        }
+        Responder(new Resposta { Id = 0, Tipo = "aovivo", Legenda = json });
+    }
 
     /// <summary>Um bloco, como a tela o recebe. O mesmo no evento e na pergunta.</summary>
     private static BlocoDaPrevia Resumir(BlocoAoVivo b) => new()

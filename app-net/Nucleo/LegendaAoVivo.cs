@@ -26,7 +26,8 @@ namespace MeetingApp.Nucleo;
 /// parece. O motor não devolve segmento; quem dá forma é isto.
 /// </para>
 /// </remarks>
-public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono, string? Falante = null);
+public sealed record PedacoDaLegenda(string Novo, string Tentativo, bool Dono, string? Falante = null,
+                                     double AteS = 0);
 
 /// <summary>Uma fala corrida da legenda, como ela fica em disco.</summary>
 public sealed class TurnoDaLegenda
@@ -386,7 +387,7 @@ public sealed class LegendaAoVivo : IDisposable
                     falante = _ultimoFalante = f.QuemFalou(p.De, p.Ate) ?? _ultimoFalante;
                 }
                 _fila.Dequeue();
-                _aoPedaco(new PedacoDaLegenda(p.Novo, Provisorio(), p.Dono, falante));
+                _aoPedaco(new PedacoDaLegenda(p.Novo, Provisorio(), p.Dono, falante, p.Ate));
                 soltou = true;
             }
             if (!soltou && comTentativo)
@@ -607,7 +608,7 @@ public sealed class LegendaAoVivo : IDisposable
         }
 
         if (novo.Length == 0 && p.Tentativo.Length == 0) return;
-        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono, falante));
+        _aoPedaco(new PedacoDaLegenda(novo, p.Tentativo, dono, falante, p.AteMs / 1000.0));
     }
 
     /// <summary>

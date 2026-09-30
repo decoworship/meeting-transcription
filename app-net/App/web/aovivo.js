@@ -117,11 +117,20 @@ export function painelAoVivo(opcoes = {}) {
     voltar.hidden = true;
   });
 
+  //: **A tela que sai do Gravador e volta** redesenha a legenda que já passou
+  //: (30/09/2026): o núcleo guarda os pedaços firmes, e o que chega ao vivo
+  //: antes da resposta espera aqui — entra depois, sem repetir, pelo `seq`.
+  let historicoChegou = false;
+  const aoVoltar = [];
+
   const cancelar = assinar("aovivo", (ev) => {
     // A disciplina de sempre: uma tela que já saiu não desenha mais.
     if (!raiz.isConnected) { cancelar(); return; }
     if (ev.aovivo) acrescentarBloco(ev.aovivo);
-    if (ev.legenda) acrescentarLegenda(ev.legenda);
+    if (ev.legenda) {
+      if (historicoChegou) acrescentarLegenda(ev.legenda);
+      else aoVoltar.push(ev.legenda);
+    }
   });
 
   //: A linha que está crescendo: `{ no, texto, dono, ate_s, palavras }`. A
@@ -135,7 +144,9 @@ export function painelAoVivo(opcoes = {}) {
   let volatil = null;
 
   function acrescentarLegenda(g) {
-    const t = tempo();
+    // O tempo do próprio pedaço quando ele traz — é o que põe a hora certa na
+    // legenda redesenhada ao voltar; o relógio da tela só no rascunho.
+    const t = g.ate_s > 0 ? g.ate_s : tempo();
     // **Quem fala**: `true` é você (a faixa do microfone), um nome é quem os
     // nomes ao vivo reconheceram (Ajustes, em teste), e `false` são "os outros"
     // sem nome. As regras da linha comparam este valor, então trocar de
@@ -209,9 +220,18 @@ export function painelAoVivo(opcoes = {}) {
     if (r.aovivo_impedimento)
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
+    let ultimo = 0;
+    for (const g of r.legenda_ate ?? []) { acrescentarLegenda(g); ultimo = Math.max(ultimo, g.seq ?? 0); }
+    soltarOQueChegou(ultimo);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.
+    soltarOQueChegou(0);
   });
+
+  function soltarOQueChegou(ultimo) {
+    historicoChegou = true;
+    for (const g of aoVoltar.splice(0)) if ((g.seq ?? 0) > ultimo) acrescentarLegenda(g);
+  }
 
   function acrescentarBloco(b) {
     const separador = { separador: true, bloco: b };
