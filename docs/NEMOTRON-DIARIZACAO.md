@@ -103,14 +103,21 @@ casamento, mas é por isso que a §5 existe.
 todos os modos:
 
 ```
-                     2026-08-20   2026-08-21   2026-08-25   2026-08-27
-duração                32 min        8 min       15 min       49 min
-app de hoje             92,6%        95,0%        97,9%        96,6%
-offline                 96,6%        97,8%        98,8%        98,0%
-low_latency     1,04 s  96,5%        97,4%        98,8%        98,0%
-very_low_latency 0,64 s 96,4%        97,4%        98,8%        98,0%
-ultra_low_latency 0,32 s 96,4%       97,4%        98,6%        98,1%
+                     2026-08-20   2026-08-21   2026-08-25   2026-08-27   2026-09-30
+duração                32 min        8 min       15 min       49 min       19 min
+app de hoje             92,6%        95,0%        97,9%        96,6%        96,5%*
+offline                 96,6%        97,8%        98,8%        98,0%        96,7%
+low_latency     1,04 s  96,5%        97,4%        98,8%        98,0%        96,4%
+very_low_latency 0,64 s 96,4%        97,4%        98,8%        98,0%        96,7%
+ultra_low_latency 0,32 s 96,4%       97,4%        98,6%        98,1%        96,7%
 ```
+
+**A quinta coluna entrou em 30/09/2026**, e as três primeiras foram refeitas
+no mesmo dia e deram os mesmos números. \* **O "app de hoje" de 30/09 já é o
+Nemotron**: aquela reunião foi transcrita pelo app com o `nemotron-3` na
+passada final (o `MOD-2`), sobre o `system.wav` e com o dono pelo microfone —
+por isso ela quase empata com o offline daqui, que roda sobre o `mix.wav`. Não
+é o pyannote; a comparação com ele, nessa reunião, está na §3b.
 
 **O erro cai de 41% a 56% no offline** — 7,4 → 3,4 em 20/08, 5,0 → 2,2 em
 21/08, 2,1 → 1,2 em 25/08, 3,4 → 2,0 em 27/08. O ganho é maior nas duas em
@@ -138,9 +145,22 @@ hoje (`motores/diarizacao/pipeline`).
 2026-08-21   8 min      95,6%      98,5%      94,8%     98,0%      12x      142x
 2026-08-25  15 min      98,9%      99,3%      98,8%     99,3%      12x      178x
 2026-08-27  49 min      98,0%      99,0%      97,2%     98,1%      11x      206x
-7.713 palavras          96,5%      98,3%      80,2%     81,5%    564 s     31 s
-VRAM de pico                                                      ~4,4 GB  ~0,55 GB
+2026-09-30  19 min      97,3%      97,4%      50,7%     49,8%      11x      165x
+9.962 palavras          96,7%      98,1%      73,5%     74,4%    737 s     39 s
+VRAM de pico                                                      ~4,6 GB  ~0,56 GB
 ```
+
+**Refeita com a quinta reunião em 30/09/2026.** As quatro de antes reproduzem
+a tabela anterior ao décimo (as 7.713 palavras dão de novo 96,5% × 98,3% e
+80,2% × 81,5%); a coluna de tempo é de outra rodada e oscila ~10%. **A quinta
+empata na separação** — 97,3% × 97,4%, dois falantes além do dono, a reunião
+mais fácil das cinco para os dois — e o Nemotron abre dois rótulos a mais com
+pouca fala, como em 27/08. **O "nome certo" de 30/09 é ~50% nos dois pela mesma
+razão de 20/08:** sem as amostras da própria reunião, nenhum dos dois
+reconhece o Hubener — os dois só dão nome ao Diego —, e o resto das falas dos
+outros é dele. No conjunto das cinco, o erro de separação
+cai de 3,3% para 1,9% — 42%, contra os 51% das quatro —, e o Nemotron roda
+**19× mais rápido**.
 
 **Ganha nas quatro, nas duas notas, e custa uma fração.** O erro de separação
 cai de 3,5% para 1,7% no conjunto — a metade, como na §3, agora com a mesma
@@ -362,8 +382,8 @@ continua sendo o que é).
 
 **Uma quinta reunião com Gemini entrou em 30/09/2026:** `2026-09-30_09-58-30`,
 *Weekly — Bandeirantes*, 19 min, Diego Lacerda e Hubener Kassio. Já está nas
-listas do `medir_nemotron3.py` e do `medir_mod2.py`; as tabelas acima são das
-quatro de antes, e ainda não foram refeitas com ela.
+listas do `medir_nemotron3.py` e do `medir_mod2.py`, e as tabelas da §3 e da
+§3b foram refeitas com ela no mesmo dia.
 
 ## 6. Como reproduzir
 
