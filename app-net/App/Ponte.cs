@@ -2272,57 +2272,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         {
             try
             {
-                var vinculo = DadosDaReuniao.Ler(pasta);
                 var cfg = ConfiguracoesDoApp.Carregar();
-                var (convidados, emails) = ConvidadosDaAgenda.Ler(pasta);
-                // Quem é da casa e quem é do cliente sai do domínio do e-mail, e
-                // não de dedução do modelo: ver Nucleo/Atas/Organizacoes.cs.
-                // Nome de exibição e e-mail juntos: o e-mail diz o lado, o nome
-                // diz como a pessoa é chamada. Ver Organizacoes.Classificar.
-                var pessoas = Organizacoes.Classificar(
-                    convidados, emails, cfg.DominiosDaCasa);
-                // A partir daqui vale o nome canônico, e não o cru do meta.json.
-                // Ele mistura nome próprio com local-part de e-mail na mesma
-                // lista ("Andre Yuri" ao lado de "dimi.randel"), e o modelo copia
-                // o que vê: numa ata gerada de ponta a ponta em 25/08 três
-                // responsáveis saíram como "dimi.randel", "andre.monlevade" e
-                // "thiago.souza". Ver Organizacoes.Classificar.
-                if (pessoas.Count > 0) convidados = [.. pessoas.Select(p => p.Nome)];
-
-                var ctx = new ContextoDaReuniao
-                {
-                    Titulo = Listar().FirstOrDefault(g => g.Caminho == pasta)?.Titulo,
-                    Convidados = convidados,
-                    Pessoas = pessoas,
-                    Cliente = vinculo.Cliente ?? dados.Client,
-                    Projeto = vinculo.Projeto ?? dados.Project,
-                    Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
-                    DuracaoS = dados.Duration ?? 0,
-                    Falantes = [.. dados.Segments.Select(s => s.Speaker)
-                        .Where(s => s is { Length: > 0 }).Distinct()!],
-                    Notas = Notas.Ler(pasta),
-                    Vocabulario = _projetos.Preferencias(
-                        vinculo.Cliente ?? "", vinculo.Projeto ?? "")?.InitialPrompt ?? "",
-                };
-
-                var roteiro = RoteiroDeFatos.De(dados.Segments);
-                string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
-
+                var ctx = GeracaoDeAta.Contexto(pasta, dados, cfg.DominiosDaCasa, _projetos);
                 var motor = new MotorDeAta(
                     CaminhosDoMotorDeAta.AoLadoDoExecutavel(cfg.ModeloDeAta));
 
-                var ata = await motor.GerarAsync(prompt, ctx.DuracaoS, e =>
+                await GeracaoDeAta.GerarAsync(pasta, tipo, dados, ctx, motor.GerarAsync, e =>
                 {
                     _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
                     EmpurrarTranscricoes();
                 }, trabalho.Token);
-
-                VerificadorDeAta.Conferir(ata, dados.Segments,
-                    [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, pessoas);
-
-                File.WriteAllText(Path.Combine(pasta, "ata.md"),
-                                  RedatorDeAta.Escrever(ata, tipo, ctx));
-                File.WriteAllText(Path.Combine(pasta, "ata.json"), ata.ParaJson());
 
                 _transcricoes.Terminar(pasta);
                 Avisar($"Ata pronta: {trabalho.Nome}");

@@ -44,27 +44,10 @@ public static class GeradorDeAta
             return 2;
         }
 
-        var vinculo = DadosDaReuniao.Ler(pasta);
-        // Os mesmos Pessoas que o app monta. Sem eles o cabeçalho desta ata sai
-        // pelo caminho antigo, e é esta ata que as ferramentas de medição leem.
-        var (convidados, emails) = ConvidadosDaAgenda.Ler(pasta);
-        var pessoas = Organizacoes.Classificar(
-            convidados, emails, ConfiguracoesDoApp.Carregar().DominiosDaCasa);
-        // O nome canônico, e não o cru: ver a nota em App/Ponte.cs.
-        if (pessoas.Count > 0) convidados = [.. pessoas.Select(p => p.Nome)];
-
-        var ctx = new ContextoDaReuniao
-        {
-            Convidados = convidados,
-            Pessoas = pessoas,
-            Cliente = vinculo.Cliente ?? dados.Client,
-            Projeto = vinculo.Projeto ?? dados.Project,
-            Data = dados.Date ?? Transcritor.DataDaReuniao(pasta),
-            DuracaoS = dados.Duration ?? 0,
-            Falantes = [.. dados.Segments.Select(s => s.Speaker)
-                .Where(s => s is { Length: > 0 }).Distinct()!],
-            Notas = Notas.Ler(pasta),
-        };
+        // O mesmo contexto que o app monta, com título e vocabulário: é esta ata
+        // que as ferramentas de medição leem. Ver Nucleo/Atas/GeracaoDeAta.cs.
+        var ctx = GeracaoDeAta.Contexto(pasta, dados,
+            ConfiguracoesDoApp.Carregar().DominiosDaCasa, new Projetos());
 
         var roteiro = RoteiroDeFatos.De(dados.Segments);
         string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
@@ -88,27 +71,18 @@ public static class GeradorDeAta
         var motor = new MotorDeAta(caminhos);
         var relogio = Stopwatch.StartNew();
 
-        var ata = await motor.GerarAsync(prompt, ctx.DuracaoS,
+        var ata = await GeracaoDeAta.GerarAsync(pasta, tipo, dados, ctx, motor.GerarAsync,
             p => Console.WriteLine($"  {p.Etapa}: {p.Texto}"), ct);
 
         Console.WriteLine($"gerou em {relogio.Elapsed.TotalSeconds:F0} s: "
                           + $"{ata.Secoes.Count} seções, {ata.Decisoes.Count} decisões, "
                           + $"{ata.Acoes.Count} ações");
-
-        int antes = ata.Observacoes.Count;
-        VerificadorDeAta.Conferir(ata, dados.Segments,
-            [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, pessoas);
-        int mexeu = ata.Observacoes.Count - antes;
-        Console.WriteLine(mexeu > 0
-            ? $"verificador: {mexeu} observação(ões) — ver o fim da ata"
+        Console.WriteLine(ata.Observacoes.Count > 0
+            ? $"verificador: {ata.Observacoes.Count} observação(ões) — ver o fim da ata"
             : "verificador: nada a corrigir");
 
-        string md = RedatorDeAta.Escrever(ata, tipo, ctx);
         string destino = Path.Combine(pasta, "ata.md");
-        await File.WriteAllTextAsync(destino, md, ct);
-        await File.WriteAllTextAsync(Path.Combine(pasta, "ata.json"), ata.ParaJson(), ct);
-
-        Console.WriteLine($"\n{destino}  ({md.Length:N0} chars)");
+        Console.WriteLine($"\n{destino}");
         return 0;
     }
 }
