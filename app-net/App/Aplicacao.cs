@@ -1,3 +1,4 @@
+using MeetingRecorder.Agenda;
 using MeetingApp.App.Bandeja;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
@@ -55,6 +56,41 @@ internal sealed class Aplicacao : IDisposable
         _pastaDasGravacoes = PastaDasGravacoes.Resolver(_gravador.Cfg, pastaDoArgumento);
 
         _bandeja = new Bandeja.Bandeja(_gravador, _ancora, MostrarJanela, Sair);
+
+        ReleraAgendaEmSegundoPlano();
+    }
+
+    /// <summary>
+    /// Os e-mails que as gravações antigas não guardaram (GRA-1).
+    /// </summary>
+    /// <remarks>
+    /// Meio minuto depois de abrir, para não disputar a subida com nada, e fora
+    /// de qualquer caminho que a pessoa espere: se falhar, fica para a próxima
+    /// abertura. Ver <see cref="ReleituraDaAgenda"/>.
+    /// </remarks>
+    private void ReleraAgendaEmSegundoPlano()
+    {
+        if (!ClienteDaAgenda.EstaAutorizado()) return;
+        string pasta = _pastaDasGravacoes;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30));
+                var perguntados = ReleituraDaAgenda.LerPerguntados();
+                using var agenda = new ClienteDaAgenda();
+                var r = await ReleituraDaAgenda.RelerAsync(pasta, id => agenda.EventoPorIdAsync(id), perguntados);
+                ReleituraDaAgenda.GuardarPerguntados(perguntados);
+                if (r.Completadas + r.Divergentes + r.Sumidas + r.Adiadas > 0)
+                    Nucleo.Registro.Escrever("agenda",
+                        $"releitura: {r.Completadas} com e-mails, {r.Divergentes} com convidados "
+                        + $"diferentes, {r.Sumidas} apagadas, {r.Adiadas} para depois");
+            }
+            catch (Exception e)
+            {
+                Nucleo.Registro.Escrever("agenda", $"releitura falhou: {e.Message}");
+            }
+        });
     }
 
     /// <param name="comJanela">
