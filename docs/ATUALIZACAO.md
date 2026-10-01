@@ -158,7 +158,7 @@ gh release create v$V \
 
 cp -r instalador/winget/<versão anterior> instalador/winget/$V
 $EDITOR instalador/winget/$V/*.yaml       # PackageVersion, InstallerUrl,
-                                          # InstallerSha256, DisplayVersion,
+                                          # InstallerSha256,
                                           # ReleaseDate, ReleaseNotesUrl
 $EDITOR versao.json                       # "onde": a URL do release
 
@@ -172,10 +172,13 @@ Três coisas que já custaram tempo, todas na primeira vez:
 - **o SHA256 muda a cada build.** O instalador não é reproduzível; copiar o hash
   da versão anterior faz o winget recusar o download — na máquina da outra
   pessoa, não na sua;
-- **o `DisplayVersion` do manifesto tem que bater com o que o Inno registra.**
-  Se não bater, a instalação dá certo, o app abre, e o `winget upgrade` nunca
-  enxerga o pacote. Rode `winget list MeetingApp` depois de instalar: é o único
-  jeito de descobrir isso antes de publicar.
+- **a versão que o Inno registra tem que bater com o `PackageVersion`.** Se não
+  bater, a instalação dá certo, o app abre, e o `winget upgrade` nunca enxerga o
+  pacote. Rode `winget list PulseMeet` depois de instalar: é o único jeito de
+  descobrir isso antes de publicar. **Sem `DisplayVersion` no manifesto**: igual
+  ao `PackageVersion`, ele é redundante, e o moderador do `winget-pkgs` pede para
+  tirar (PR 444966, 01/10/2026). Ele só volta se um dia as duas versões
+  divergirem — um `0.9.1-rc1`, por exemplo.
 
 **O `versao.json` só vale depois do push**, porque o canal é o repositório. Subir
 o número antes de o instalador existir avisa todo mundo de uma versão que ninguém
