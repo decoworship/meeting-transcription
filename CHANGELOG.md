@@ -3,6 +3,28 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.9.1 — 01/10/2026
+
+**Atualizar ficou leve.** O instalador passou de 1,7 GB para 10 MB: o app vem
+nele, e os motores de transcrição e de separação de falantes vêm à parte,
+baixados pelo próprio instalador **só quando mudam**. Na maioria das versões
+eles não mudam, e atualizar é baixar 10 MB.
+
+**Nesta primeira vez, o instalador baixa os motores uma vez** (1,7 GB, alguns
+minutos), porque a instalação anterior não diz qual versão deles tem. Precisa
+de internet durante a instalação. Nada seu é apagado: gravações, atas, vozes e
+os modelos já baixados ficam onde estão.
+
+**As reuniões antigas ganham os e-mails dos participantes.** Gravações de antes
+de agosto guardaram só os nomes de quem estava no convite. Ao abrir, o app
+relê esses convites na sua agenda Google e completa os e-mails — é por eles que
+a ata separa quem é da sua equipe e quem é do cliente. Acontece uma vez, em
+segundo plano, e só quando o convite ainda tem as mesmas pessoas.
+
+**A ata usa o vocabulário do projeto em mais reuniões.** As grafias corretas
+cadastradas no projeto passam a valer também em reuniões cujo cliente e
+projeto vieram da transcrição, e não só das escolhidas à mão.
+
 ## 0.9.0 — 30/09/2026
 
 **Um segundo jeito de separar os falantes.** Em Ajustes › Transcrição, e em
