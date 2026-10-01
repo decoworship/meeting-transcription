@@ -36,6 +36,13 @@ export function painelAoVivo(opcoes = {}) {
   //: O "o texto aparece…" do estado vazio, que some na primeira fala.
   let vazioNo = null;
   const tempo = opcoes.tempo ?? (() => (performance.now() - montado) / 1000);
+  // **De que gravação é este painel** (01/10/2026): parar e começar outra
+  // reunião sem sair do Gravador mostrava a legenda da anterior na nova. Cada
+  // pedaço diz a pasta de onde veio, e o painel só desenha os da gravação dele
+  // — inclusive os que a anterior solta ao fechar, depois de a nova começar.
+  // Sem `gravacao` (a prova do painel sozinho), aceita tudo.
+  const daGravacao = (g) =>
+    !opcoes.gravacao || !g.gravacao || g.gravacao === opcoes.gravacao();
 
   const raiz = document.createElement("section");
   raiz.className = "bloco aovivo";
@@ -127,7 +134,7 @@ export function painelAoVivo(opcoes = {}) {
     // A disciplina de sempre: uma tela que já saiu não desenha mais.
     if (!raiz.isConnected) { cancelar(); return; }
     if (ev.aovivo) acrescentarBloco(ev.aovivo);
-    if (ev.legenda) {
+    if (ev.legenda && daGravacao(ev.legenda)) {
       if (historicoChegou) acrescentarLegenda(ev.legenda);
       else aoVoltar.push(ev.legenda);
     }
@@ -221,7 +228,7 @@ export function painelAoVivo(opcoes = {}) {
       aviso.replaceChildren(alerta(r.aovivo_impedimento, "atencao"));
     for (const b of r.aovivo_ate ?? []) acrescentarBloco(b);
     let ultimo = 0;
-    for (const g of r.legenda_ate ?? []) { acrescentarLegenda(g); ultimo = Math.max(ultimo, g.seq ?? 0); }
+    for (const g of (r.legenda_ate ?? []).filter(daGravacao)) { acrescentarLegenda(g); ultimo = Math.max(ultimo, g.seq ?? 0); }
     soltarOQueChegou(ultimo);
   }).catch(() => {
     // Sem resposta não se afirma nada: o painel só fica esperando bloco.
