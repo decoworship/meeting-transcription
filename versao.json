@@ -1,6 +1,6 @@
 {
-  "versao": "0.9.0",
-  "publicada": "2026-09-30",
-  "notas": "Um segundo separador de falantes, o nemotron-3, em Ajustes › Transcrição — mais rápido e com menos memória da placa. E, em teste, os nomes de quem fala na legenda ao vivo.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.9.0"
+  "versao": "0.9.1",
+  "publicada": "2026-10-01",
+  "notas": "O instalador ficou com 10 MB: os motores vêm à parte e só são baixados quando mudam — nesta primeira vez, uma vez (1,7 GB, precisa de internet). E as reuniões antigas ganham os e-mails dos participantes, relidos da agenda.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.9.1"
 }
