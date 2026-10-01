@@ -252,7 +252,18 @@ export async function telaDoGravador(ctx) {
 
   // ---- a legenda e as abas
   const grade = el("div", "grav-grade");
-  const previa = painelAoVivo({ tempo: () => estado.duracao_s, aoSaber: aoSaberDaLegenda });
+  // **Um painel por gravação** (01/10/2026). Ele nascia uma vez com a tela, e
+  // parar uma reunião e começar outra sem sair do Gravador deixava a legenda da
+  // anterior na nova — o relógio zerava, o texto não. Quando a gravação em curso
+  // muda, o painel é refeito: o novo pede de novo o modo, o impedimento e o que
+  // já passou, e só aceita os pedaços da pasta dele (ver aovivo.js).
+  const novaPrevia = () => painelAoVivo({
+    tempo: () => estado.duracao_s,
+    gravacao: () => (estado.gravando ? estado.gravacao : null),
+    aoSaber: aoSaberDaLegenda,
+  });
+  let previa = novaPrevia();
+  let previaDe = estado.gravando ? estado.gravacao : null;
 
   const semLegenda = el("div", "bloco grav-sem-legenda");
   semLegenda.hidden = true;
@@ -483,6 +494,16 @@ export async function telaDoGravador(ctx) {
     faixa.dataset.mudo = String(Boolean(g.mudo));
 
     if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
+    if (g.gravando && g.gravacao !== previaDe) {
+      previaDe = g.gravacao;
+      const anterior = previa;
+      previa = novaPrevia();
+      // O hidden é o da anterior até o aoSaber do novo responder, para a coluna
+      // não piscar entre "com legenda" e "sem legenda".
+      previa.raiz.hidden = anterior.raiz.hidden;
+      anterior.encerrar();
+      anterior.raiz.replaceWith(previa.raiz);
+    }
 
 
     desenharAvisos(g);

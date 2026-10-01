@@ -593,6 +593,13 @@ internal sealed class PedacoDaLegendaJson
 
     /// <summary>Ordem de entrega, para a tela que volta não repetir pedaço.</summary>
     [JsonPropertyName("seq")] public int Seq { get; init; }
+
+    /// <summary>
+    /// A pasta da gravação de que o pedaço é — a mesma do <c>gravacao</c> do
+    /// estado. A legenda fecha em segundo plano depois de parar, e os últimos
+    /// pedaços da reunião anterior chegavam à tela da seguinte (01/10/2026).
+    /// </summary>
+    [JsonPropertyName("gravacao")] public string? Gravacao { get; init; }
 }
 
 /// <summary>Um bloco de 3 minutos da prévia, como a tela o recebe.</summary>
@@ -1460,7 +1467,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 }
 
                 _legenda = new LegendaAoVivo(pasta, motores, Motores.Ambiente(),
-                                             EmpurrarLegenda, falantes: _falantesAoVivo);
+                                             p => EmpurrarLegenda(pasta, p),
+                                             falantes: _falantesAoVivo);
                 _legenda.Comecar();
                 return;
             }
@@ -1551,7 +1559,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         Responder(new Resposta { Id = 0, Tipo = "aovivo", AoVivo = Resumir(b) });
 
     /// <summary>Empurra um pedaço da legenda. Mesmo canal do bloco, outro campo.</summary>
-    private void EmpurrarLegenda(PedacoDaLegenda p)
+    private void EmpurrarLegenda(string pasta, PedacoDaLegenda p)
     {
         PedacoDaLegendaJson json;
         lock (_legendaHistorico)
@@ -1559,13 +1567,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             json = new PedacoDaLegendaJson
             {
                 Novo = p.Novo, Tentativo = p.Tentativo, Dono = p.Dono, Falante = p.Falante,
-                AteS = p.AteS, Seq = ++_legendaSeq,
+                AteS = p.AteS, Seq = ++_legendaSeq, Gravacao = pasta,
             };
             if (p.Novo.Trim().Length > 0)
                 _legendaHistorico.Add(new PedacoDaLegendaJson
                 {
                     Novo = p.Novo, Tentativo = "", Dono = p.Dono, Falante = p.Falante,
-                    AteS = p.AteS, Seq = json.Seq,
+                    AteS = p.AteS, Seq = json.Seq, Gravacao = pasta,
                 });
         }
         Responder(new Resposta { Id = 0, Tipo = "aovivo", Legenda = json });
