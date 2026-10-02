@@ -110,6 +110,20 @@ PrivilegesRequired=lowest
 ; todos os usuários" instalaria em {localappdata} do administrador, e o app
 ; abriria para a pessoa errada — ou não abriria. A instalação é por usuário,
 ; ponto, e é o que o DefaultDirName pressupõe.
+;
+; **Sem RedirectionGuard, porque o app herdaria.** Desde o 6.7 o Inno liga essa
+; mitigação no próprio Setup, e a ajuda diz que ela não passa aos filhos. Passa:
+; medido em 02/10/2026, o que o [Run] abre — inclusive o "Abrir o PulseMeet" do
+; fim — sai com ela, e o app a passa aos motores. Aí nenhum motor atravessa link
+; simbólico criado sem elevação, que é do que o cache do HuggingFace é feito com
+; o Modo de Desenvolvedor ligado: a transcrição morria com "Unable to open file
+; 'model.bin'" até alguém reabrir o app pelo menu Iniciar.
+;
+; Não custa proteção: ela existe para que um instalador ELEVADO não seja levado
+; por um link a escrever onde não devia. Este roda sem elevação (acima). Exige o
+; Inno 6.7 ou mais novo; num anterior, a diretiva não existe e a compilação
+; para. Guardado por InstaladorTests.
+RedirectionGuard=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; O mutex que o próprio app cria (App/Program.cs). Com ele, instalar com o app
