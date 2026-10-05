@@ -105,7 +105,7 @@ public sealed class PerguntaDaReuniao(Func<string, CancellationToken, Task<strin
     public static string? OQueImpede(ConfiguracoesDoApp config, CaminhosDoMotorDeAta caminhos)
     {
         if (!config.PerguntarAoVivo)
-            return "perguntar durante a reunião está desligado em Ajustes › Transcrição.";
+            return "perguntar durante a reunião está desligado em Ajustes › Gravador.";
 
         return caminhos.OQueFalta();
     }

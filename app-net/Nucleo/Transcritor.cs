@@ -649,6 +649,10 @@ public sealed class Transcritor(Motores motores)
             // Reconhecer voz é um extra sobre a transcrição, não um requisito.
         }
 
+        // O "You" vira o nome do dono, se ele escreveu um em Ajustes › Geral.
+        // Depois do reconhecimento, que procura vozes por rótulo e pula o "You".
+        VozDoDono.Nomear(segmentos, ConfiguracoesDoApp.Carregar().NomeDoDono);
+
         var resultado = new ResultadoDaTranscricao
         {
             Language = idiomaDetectado,

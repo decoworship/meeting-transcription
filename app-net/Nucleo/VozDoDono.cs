@@ -38,6 +38,19 @@ public static class VozDoDono
     /// <summary>O rótulo do dono, o mesmo que o app sempre gravou.</summary>
     public const string Rotulo = "You";
 
+    /// <summary>
+    /// Troca o <see cref="Rotulo"/> pelo nome que o dono escreveu em Ajustes ›
+    /// Geral — o mesmo renomear que a revisão faz à mão, feito no fim da
+    /// transcrição. Sem nome, o "You" fica: é o estado de sempre.
+    /// </summary>
+    public static void Nomear(IEnumerable<SegmentoFinal> segmentos, string? nome)
+    {
+        if (string.IsNullOrWhiteSpace(nome)) return;
+        string limpo = nome.Trim();
+        foreach (var s in segmentos)
+            if (s.Speaker == Rotulo) s.Speaker = limpo;
+    }
+
     /// <summary>Janela de análise. 20 ms é o passo comum de VAD.</summary>
     public const double JanelaS = 0.020;
 

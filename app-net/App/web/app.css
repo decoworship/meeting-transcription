@@ -1501,6 +1501,127 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * ele já pinta certo nos dois temas. */
 .escolhas { display: flex; flex-wrap: wrap; gap: var(--espaco-3) var(--espaco-5); }
 
+/* ─────────────────────────────── o ajuste em uma linha (plano 4b)
+ *
+ * Título com o ⓘ, uma frase, o custo em etiqueta e o controle à direita. A
+ * explicação medida, que eram dois parágrafos por cartão, mora no balão. */
+.ajustes-secao { gap: 0; padding-block: var(--espaco-3); }
+.ajustes-secao > .bloco__titulo { margin-block: var(--espaco-2); }
+
+.ajuste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3) 0;
+  border-top: 1px solid var(--cor-borda);
+}
+.ajustes-secao > .bloco__titulo + .ajuste { border-top: 0; }
+.ajuste--sub { padding-left: var(--espaco-6); }
+.ajuste__texto { flex: 1 1 18rem; min-width: 0; display: grid; gap: 2px; }
+.ajuste--largo > .ajuste__texto { flex: 0 1 18rem; }
+.ajuste--largo > .aa-entrada { flex: 1 1 16rem; min-width: 0; }
+.ajuste__titulo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2);
+  font-weight: 600; color: var(--cor-texto-forte);
+}
+.ajuste--sub .ajuste__titulo::before { content: "↳"; color: var(--cor-texto-suave); font-weight: 400; }
+.ajuste__linha { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.ajuste__linha--perigo { color: var(--cor-erro); }
+/* A seta é a do design system; a do navegador (o appearance:auto global de
+ * select.aa-entrada) vinha junto, como em Clientes. */
+.ajuste > select.aa-entrada { flex: 0 1 20rem; min-width: 0; }
+.ajustes select.aa-entrada { appearance: none; }
+.bloco__titulo > .dica { margin-left: var(--espaco-2); vertical-align: 0.15em; }
+.ajuste > .acoes { margin: 0; }
+
+.ajustes__trava {
+  margin: 0 0 var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-medio);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-pequeno);
+}
+
+/* O "salvo" grudado no topo do painel: no pé de uma aba longa ninguém o via. */
+.ajustes__estado {
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: 1;
+  justify-self: end;
+  /* Sem altura: aparecer e sumir não empurra o painel. O texto sobe para o
+   * respiro acima do primeiro cartão. */
+  height: 0;
+  margin: 0 0 calc(-1 * var(--espaco-6));
+  transform: translateY(-1.6em);
+  white-space: nowrap;
+}
+
+.ajustes-avancado > summary { cursor: pointer; list-style: revert; }
+.ajustes-avancado > summary:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+.ajustes-avancado[open] > summary { margin-bottom: var(--espaco-2); }
+.ajustes-avancado > summary + .ajuste { border-top: 0; }
+
+/* Um bloco dentro de outro (o motor de ata dentro de Ata) sai mais leve. */
+.bloco .bloco { padding: var(--espaco-4); border-radius: var(--raio-medio); background: transparent; }
+
+/* ─────────────────────────────── o ⓘ */
+.dica { position: relative; display: inline-flex; }
+.dica__botao {
+  width: 1.15rem; height: 1.15rem; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--cor-borda-controle);
+  border-radius: var(--raio-pilula);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: italic 700 0.7rem/1 var(--fonte-display);
+  cursor: help;
+}
+.dica__botao:hover, .dica__botao[aria-expanded="true"] {
+  border-color: var(--cor-acao); color: var(--cor-acao);
+}
+.dica__botao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+.dica__balao {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--espaco-2));
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: min(24rem, 70vw);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-medio);
+  background: var(--cor-texto-forte);
+  color: var(--cor-fundo);
+  box-shadow: var(--sombra-media);
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+.dica__paragrafo { display: block; }
+.dica__paragrafo + .dica__paragrafo { margin-top: var(--espaco-2); opacity: 0.8; }
+.dica:hover > .dica__balao,
+.dica:focus-within > .dica__balao,
+.dica__botao[aria-expanded="true"] + .dica__balao { display: block; }
+.dica[data-calada] > .dica__balao { display: none; }
+
+/* ─────────────────────────────── Geral › Você */
+.voce__previa {
+  display: grid; gap: var(--espaco-1);
+  margin-bottom: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-medio);
+  background: var(--cor-superficie-2);
+  font-size: var(--texto-pequeno);
+}
+.voce__legenda { font-size: var(--texto-rotulo); font-weight: 600; color: var(--cor-texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+.voce__linha { display: flex; gap: var(--espaco-3); }
+.voce__tempo { color: var(--cor-texto-suave); font-variant-numeric: tabular-nums; }
+.voce__quem { font-weight: 700; min-width: 6rem; }
+.voce__quem--dono { color: var(--cor-acao); }
+
 /* ──────────────────────────────────────────────── cartões de modelo */
 
 .modelo {

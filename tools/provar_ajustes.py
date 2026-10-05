@@ -111,7 +111,19 @@ ESTADO = r"""
       case "vozes": return window.__vozes.responder(q);
       case "aprovar-voz": case "esquecer-voz": case "mover-voz":
       case "apagar-voz": case "juntar-vozes": return window.__vozes.responder(q);
-      case "gravador": return { gravador: {} };
+      case "gravador": return { gravador: window.__gravador ?? {} };
+      // As abas de ajustes simples (plano 4b): o app.json, os dispositivos e o
+      // catálogo com os dois modelos de falantes.
+      case "config": return { config: window.__config ??= {} };
+      case "salvar-config": window.__config = { ...q.config }; return {};
+      case "dispositivos": return { dispositivos: {
+        entradas: [{ id: "mic-1", nome: "Headset AN01", padrao: true }, { id: "mic-2", nome: "Webcam" }],
+        saidas: [{ id: "out-1", nome: "Alto-falantes (Realtek)", padrao: true }],
+        mic_id: "mic-2", loopback_id: "" } };
+      case "escolher-dispositivo": return { gravador: window.__gravador ?? {} };
+      case "catalogo": return { catalogo: [
+        { pacote: { id: "large-v3", nome: "Large v3", familia: "asr" }, estado: "instalado", em_uso: true }],
+        diarizadores: ["community-1", "nemotron-3"] };
       case "diagnostico": return { diagnostico: { marca: "PulseMeet", versao: "0.7.1", texto: "" } };
       case "salvar-projeto":
         (clientes[q.cliente] ??= []);
@@ -140,12 +152,14 @@ ESTADO = r"""
 
 
 def abrir(navegador, porta: int, largura: int = 1280, altura: int = 800, tema: str | None = None,
-          secao: str = "Clientes"):
+          secao: str = "Clientes", antes: str | None = None):
     pagina = navegador.new_page(viewport={"width": largura, "height": altura})
     erros: list[str] = []
     pagina.on("pageerror", lambda e: erros.append(str(e)))
     pagina.add_init_script(R.PONTE_FALSA)
     pagina.add_init_script(ESTADO)
+    if antes:
+        pagina.add_init_script(antes)
     if tema:
         pagina.add_init_script(
             "document.addEventListener('DOMContentLoaded', () => "
@@ -154,7 +168,8 @@ def abrir(navegador, porta: int, largura: int = 1280, altura: int = 800, tema: s
     pagina.wait_for_selector(".reuniao-linha", timeout=5000)
     pagina.click("#ir-config")
     pagina.click(f".aba >> text={secao}")
-    pagina.wait_for_selector(".clientes__projeto" if secao == "Clientes" else ".vozes__item", timeout=5000)
+    pagina.wait_for_selector({"Clientes": ".clientes__projeto", "Vozes": ".vozes__item", "Modelos": ".painel > .bloco"}
+                             .get(secao, ".ajuste"), timeout=5000)
     pagina.wait_for_timeout(100)
     return pagina, erros
 
@@ -599,6 +614,159 @@ PROVAS = [prova_mestre, prova_projeto_aberto, prova_busca, prova_gravar, prova_c
           prova_vozes_abaixo, prova_vozes_carimbo, prova_vozes_estreita]
 
 
+# ───────────────────────────────────── as abas simples (plano 4b, 05/10/2026)
+
+def secao(nome: str, antes: str | None = None):
+    def marcar(prova):
+        prova.secao = nome
+        if antes:
+            prova.antes = antes
+        return prova
+    return marcar
+
+
+def ultimo_config(pagina) -> dict:
+    salvos = pedidos(pagina, "salvar-config")
+    return salvos[-1]["config"] if salvos else {}
+
+
+def visivel(pagina, seletor: str) -> bool:
+    return pagina.locator(seletor).first.is_visible()
+
+
+@secao("Gravador")
+def prova_gravador_dispositivos(pagina) -> None:
+    conferir(pagina.input_value("#dispositivo-mic") == "mic-2", "o microfone escolhido vem marcado")
+    conferir(pagina.input_value("#dispositivo-loopback") == "", "o áudio da reunião segue o Windows")
+    conferir(not pagina.is_disabled("#dispositivo-mic"), "parado, dá para trocar")
+    pagina.select_option("#dispositivo-mic", "mic-1")
+    pagina.wait_for_timeout(150)
+    feitos = pedidos(pagina, "escolher-dispositivo")
+    conferir(feitos and feitos[-1]["faixa"] == "mic" and feitos[-1]["dispositivo"] == "mic-1",
+             f"trocar manda escolher-dispositivo ({feitos[-1:]})")
+    conferir(pagina.input_value("#dispositivo-mic") == "mic-1", "e a escolha fica depois do redesenho")
+    conferir(pagina.locator(".ajustes__trava").count() == 0, "sem aviso de trava quando parado")
+
+
+@secao("Gravador", "window.__gravador = { gravando: true }")
+def prova_gravador_travado_gravando(pagina) -> None:
+    conferir(pagina.is_disabled("#dispositivo-mic") and pagina.is_disabled("#dispositivo-loopback"),
+             "gravando, os dois seletores ficam travados")
+    conferir(visivel(pagina, ".ajustes__trava"), "e a trava diz por quê")
+
+
+@secao("Gravador")
+def prova_gravador_durante_a_reuniao(pagina) -> None:
+    corpo = pagina.inner_text(".painel")
+    conferir("Prévia" not in corpo and "prévia" not in corpo, "a prévia em blocos saiu da tela")
+    conferir("Nomes na legenda" not in corpo, "nomes ao vivo só aparecem com a legenda ligada")
+    conferir("Deixar o modelo pronto" not in corpo, "modelo pronto só aparece com perguntar ligado")
+    pagina.click("input[aria-label='Legenda ao vivo']", force=True)
+    pagina.wait_for_selector("text=Nomes na legenda", timeout=3000)
+    c = ultimo_config(pagina)
+    conferir(c.get("legenda_ao_vivo") is True and c.get("transcricao_ao_vivo") is False,
+             f"ligar a legenda desliga a chave antiga da prévia ({c})")
+    conferir(visivel(pagina, ".ajuste--sub >> text=Nomes na legenda"), "e os nomes aparecem recuados")
+    pagina.click("input[aria-label='Perguntar durante a reunião']", force=True)
+    pagina.wait_for_selector("text=Deixar o modelo pronto entre perguntas", timeout=3000)
+    conferir(True, "ligar perguntar mostra o modelo pronto")
+    custos = textos(pagina, ".ajuste__custo")
+    conferir("≈ ⅓ da placa" in custos and "+1,5 GB de placa" in custos, f"o custo em etiqueta ({custos})")
+    agenda = pagina.inner_text(".ajustes-secao:has(#dominios-da-casa)")
+    conferir("Domínios da sua organização" in agenda, "os domínios moram na Agenda")
+
+
+@secao("Gravador")
+def prova_dica(pagina) -> None:
+    linha = pagina.locator(".ajuste", has=pagina.locator("text=Legenda ao vivo")).first
+    botao = linha.locator(".dica__botao")
+    balao = linha.locator(".dica__balao")
+    conferir(not balao.is_visible(), "o balão nasce fechado")
+    conferir(botao.get_attribute("aria-describedby") == balao.get_attribute("id"),
+             "o balão descreve o botão para o leitor de tela")
+    conferir(botao.get_attribute("aria-label") == "Sobre legenda ao vivo", "o ⓘ tem nome")
+    botao.hover()
+    conferir(balao.is_visible(), "abre com o mouse por cima")
+    pagina.mouse.move(0, 0)
+    pagina.wait_for_timeout(50)
+    conferir(not balao.is_visible(), "fecha quando o mouse sai")
+    botao.focus()
+    conferir(balao.is_visible(), "abre com o foco do teclado")
+    pagina.keyboard.press("Escape")
+    conferir(not balao.is_visible(), "Esc fecha")
+    antes = linha.locator("input[type=checkbox]").is_checked()
+    botao.click()
+    pagina.mouse.move(0, 0)
+    conferir(botao.get_attribute("aria-expanded") == "true" and balao.is_visible(),
+             "o clique fixa aberto, mesmo sem o mouse em cima")
+    conferir(linha.locator("input[type=checkbox]").is_checked() == antes, "e não liga a chave")
+    largura = pagina.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
+    conferir(largura, "o balão aberto não cria rolagem lateral")
+
+
+@secao("Transcrição")
+def prova_transcricao_enxuta(pagina) -> None:
+    fora = pagina.locator(".painel > .ajustes-secao:not(.ajustes-avancado) .ajuste").count()
+    conferir(fora == 4, f"quatro ajustes à vista ({fora})")
+    conferir(pagina.locator(".ajustes-avancado").get_attribute("open") is None,
+             "o Avançado nasce fechado")
+    conferir(not visivel(pagina, "text=Transcrever sem placa"), "e esconde transcrever sem placa")
+    corpo = pagina.inner_text(".painel")
+    for saiu in ["Legenda", "Perguntar", "Modelo que separa", "Domínios", "Ver a transcrição"]:
+        conferir(saiu not in corpo, f"'{saiu}' saiu de Transcrição")
+    pagina.click(".ajustes-avancado > summary")
+    conferir(visivel(pagina, "text=Transcrever sem placa"), "abrir o Avançado mostra os dois")
+    conferir(visivel(pagina, ".ajuste__linha--perigo"), "refazer avisa o que se perde")
+
+
+@secao("Transcrição", "window.__config = { usar_hotwords: true }")
+def prova_avancado_ligado_aparece(pagina) -> None:
+    conferir(pagina.locator(".ajustes-avancado").get_attribute("open") is not None,
+             "com um ajuste avançado ligado, o Avançado já abre")
+
+
+@secao("Modelos")
+def prova_modelos_falantes(pagina) -> None:
+    opcoes = textos(pagina, "#diarizacao-padrao option")
+    conferir(opcoes == ["community-1", "nemotron-3"], f"Separar falantes oferece os dois ({opcoes})")
+    conferir("não há o que" not in pagina.inner_text(".painel"), "sem o bloco que dizia não haver escolha")
+    pagina.select_option("#diarizacao-padrao", "nemotron-3")
+    pagina.wait_for_timeout(100)
+    conferir(ultimo_config(pagina).get("diarizacao_padrao") == "nemotron-3", "escolher grava no app.json")
+    ordem = pagina.eval_on_selector_all(".painel > .bloco > .bloco__titulo",
+                                        "els => els.map((e) => e.firstChild.textContent)")
+    conferir(ordem[:3] == ["Transcrição", "Separar falantes", "Ata"], f"a ordem dos blocos ({ordem})")
+
+
+@secao("Geral")
+def prova_geral_nome_do_dono(pagina) -> None:
+    conferir(pagina.inner_text(".voce__quem--dono") == "You", "sem nome, a prévia mostra You")
+    pagina.fill("#nome-do-dono", "André")
+    conferir(pagina.inner_text(".voce__quem--dono") == "André", "a prévia acompanha o que se digita")
+    pagina.press("#nome-do-dono", "Tab")
+    pagina.wait_for_timeout(100)
+    conferir(ultimo_config(pagina).get("nome_do_dono") == "André", "sair do campo grava o nome")
+    sobre = pagina.inner_text(".painel > .bloco:has-text('Sobre')")
+    conferir("Avisar de versão nova" in sobre, "o aviso de versão mora no Sobre")
+    primeiro = pagina.evaluate("() => document.querySelector('.painel').firstElementChild.className")
+    conferir("ajustes__estado" in primeiro, f"o 'salvo' fica no topo do painel ({primeiro})")
+
+
+@secao("Gravador")
+def prova_ajustes_estreita(pagina) -> None:
+    for aba in ["Geral", "Gravador", "Modelos", "Transcrição"]:
+        pagina.click(f".aba >> text={aba}")
+        pagina.wait_for_timeout(100)
+        conferir(pagina.evaluate("() => document.documentElement.scrollWidth <= innerWidth"),
+                 f"{aba} a 1000 px não rola de lado")
+prova_ajustes_estreita.janela = (1000, 700)
+
+PROVAS += [prova_gravador_dispositivos, prova_gravador_travado_gravando,
+           prova_gravador_durante_a_reuniao, prova_dica, prova_transcricao_enxuta,
+           prova_avancado_ligado_aparece, prova_modelos_falantes, prova_geral_nome_do_dono,
+           prova_ajustes_estreita]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fotos", type=Path, help="pasta onde deixar as fotos da seção")
@@ -625,7 +793,8 @@ def main() -> int:
                 largura, altura = getattr(prova, "janela", (1280, 800))
                 try:
                     pagina, erros = abrir(navegador, porta, largura, altura,
-                                          secao=getattr(prova, "secao", "Clientes"))
+                                          secao=getattr(prova, "secao", "Clientes"),
+                                          antes=getattr(prova, "antes", None))
                 except Exception as e:  # noqa: BLE001
                     conferir(False, f"{prova.__name__} não abriu: {str(e).splitlines()[0]}")
                     continue

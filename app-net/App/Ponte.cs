@@ -1175,8 +1175,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                             ? LegendaAoVivo.OQueImpede(motoresAv, cfgAv)
                             : cfgAv.TranscricaoAoVivo
                                 ? SessaoAoVivo.OQueImpede(motoresAv, cfgAv)
-                                : "nem a legenda nem a prévia em blocos estão ligadas "
-                                  + "em Ajustes › Transcrição.",
+                                : "a legenda ao vivo está desligada em Ajustes › Gravador.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
                         LegendaAte = HistoricoDaLegenda(),
                         PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
@@ -2134,8 +2133,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Responder(new Resposta
             {
                 Id = p.Id,
-                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo ou a "
-                     + "prévia em blocos precisam estar ligadas em Ajustes › Transcrição, "
+                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo "
+                     + "precisa estar ligada em Ajustes › Gravador, "
                      + "e leva alguns segundos até a primeira fala firmar.",
             });
             return;

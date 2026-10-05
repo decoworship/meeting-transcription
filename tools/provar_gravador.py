@@ -281,7 +281,7 @@ def prova_antes_heroi(pagina) -> None:
     vai = pagina.eval_on_selector_all(".grav-vai__valor", "els => els.map((e) => e.textContent)")
     conferir(vai == ["Headset AN01 Hands-Free", "Alto-falantes (Realtek Audio)", "andre@beegol.com"],
              f"\"Vai gravar\" diz microfone, áudio da reunião e a conta ({vai})")
-    conferir(pagina.is_visible("text=Trocar em Ajustes › Gravação"), "com o link para Ajustes")
+    conferir(pagina.is_visible("text=Trocar em Ajustes › Gravador"), "com o link para Ajustes")
     conferir(pagina.evaluate(SEM_ROLAGEM_LATERAL), "sem rolagem lateral")
 
 
@@ -359,8 +359,8 @@ def prova_resto_embaixo(pagina) -> None:
         .filter((e) => !e.hidden).map((e) => e.className)""")
     conferir(ordem == ["grav-antes", "grav-resto"], f"o resto vem abaixo do que a prancha mostra ({ordem})")
     titulos = pagina.eval_on_selector_all(".grav-resto .bloco__titulo", "els => els.map((e) => e.textContent)")
-    conferir("Dispositivos" in titulos and "Pasta das gravações" in titulos,
-             f"dispositivos e pasta continuam no Gravador ({titulos})")
+    conferir("Dispositivos" not in titulos and "Pasta das gravações" not in titulos,
+             f"dispositivos e pasta foram para Ajustes ({titulos})")
 
 
 def prova_gravando_faixa_e_grade(pagina) -> None:

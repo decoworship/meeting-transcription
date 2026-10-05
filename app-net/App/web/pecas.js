@@ -486,3 +486,63 @@ export function icone(id) {
   svg.appendChild(uso);
   return svg;
 }
+
+/**
+ * O ⓘ ao lado de um título: a explicação longa fica atrás dele.
+ *
+ * Abre com o mouse por cima e com o foco do teclado (CSS), e o clique fixa
+ * aberto — que é o que serve a quem toca a tela e a quem quer ler com calma.
+ * Esc fecha. O balão é `role="tooltip"` e descreve o botão: quem usa leitor de
+ * tela ouve a explicação ao chegar no ⓘ, sem precisar abrir nada.
+ *
+ * @param assunto o que o ⓘ explica, para o nome do botão ("Sobre a legenda").
+ * @param paragrafos um ou mais parágrafos; o último sai em tom mais suave, que é
+ *   onde mora o número medido.
+ */
+let _dicas = 0;
+export function dica(assunto, ...paragrafos) {
+  const raiz = document.createElement("span");
+  raiz.className = "dica";
+
+  const botao = document.createElement("button");
+  botao.type = "button";
+  botao.className = "dica__botao";
+  botao.textContent = "i";
+  botao.setAttribute("aria-label", `Sobre ${assunto}`);
+  botao.setAttribute("aria-expanded", "false");
+
+  const balao = document.createElement("span");
+  balao.className = "dica__balao";
+  balao.id = `dica-${++_dicas}`;
+  balao.setAttribute("role", "tooltip");
+  for (const texto of paragrafos) {
+    const p = document.createElement("span");
+    p.className = "dica__paragrafo";
+    p.textContent = texto;
+    balao.appendChild(p);
+  }
+  botao.setAttribute("aria-describedby", balao.id);
+
+  const fixar = (aberta) => botao.setAttribute("aria-expanded", String(aberta));
+  botao.addEventListener("click", (e) => {
+    // O ⓘ mora dentro do rótulo do ajuste: sem isto, clicar nele ligaria a chave.
+    e.preventDefault();
+    e.stopPropagation();
+    delete raiz.dataset.calada;
+    fixar(botao.getAttribute("aria-expanded") !== "true");
+  });
+  // Esc cala o balão mesmo aberto pelo foco ou pelo mouse; ele volta a abrir
+  // quando o foco ou o mouse saem e voltam.
+  const soltar = () => { fixar(false); delete raiz.dataset.calada; };
+  botao.addEventListener("blur", soltar);
+  raiz.addEventListener("mouseleave", () => delete raiz.dataset.calada);
+  raiz.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || raiz.dataset.calada) return;
+    e.stopPropagation();
+    fixar(false);
+    raiz.dataset.calada = "true";
+  });
+
+  raiz.append(botao, balao);
+  return raiz;
+}
