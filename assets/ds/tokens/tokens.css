@@ -63,6 +63,16 @@
   --cor-link-sublinhado: var(--primaria-200);
   --cor-veu:             rgba(34,31,26,0.38);
 
+  /* --- Camada (material) — a superfície do que flutua. Separada de
+     --cor-superficie porque é ela que o estilo `vidro` deixa
+     translúcida. Ver estilos.css. --- */
+  --cor-camada:          var(--areia-50);
+  --cor-camada-opaca:    var(--areia-50);
+  --cor-borda-camada:    var(--areia-300);
+  --cor-camada-invertida:       var(--areia-900);
+  --cor-camada-invertida-opaca: var(--areia-900);
+  --camada-filtro:       none;
+
   /* --- Feedback --- */
   --cor-sucesso:    #4A6746;  --cor-sucesso-bg: #E7EDE4;
   --cor-atencao:    #8A5F22;  --cor-atencao-bg: #F5EBD8;
@@ -200,6 +210,14 @@
   --cor-link-sublinhado: #4F739A;
   --cor-veu:             rgba(8,6,4,0.62);
 
+  /* --- Camada (material) --- */
+  --cor-camada:          #2E2A24;
+  --cor-camada-opaca:    #2E2A24;
+  --cor-borda-camada:    #4E483D;
+  --cor-camada-invertida:       #F7F3EA;
+  --cor-camada-invertida-opaca: #F7F3EA;
+  --camada-filtro:       none;
+
   /* Feedback: cor clara + fundo escuro tingido do mesmo matiz. */
   --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
   --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
@@ -273,7 +291,14 @@
     --cor-linha-hover:     #2A2620;
     --cor-link-sublinhado: #4F739A;
     --cor-veu:             rgba(8,6,4,0.62);
-  --cor-veu:             rgba(8,6,4,0.62);
+
+    /* --- Camada (material) --- */
+    --cor-camada:          #2E2A24;
+    --cor-camada-opaca:    #2E2A24;
+    --cor-borda-camada:    #4E483D;
+    --cor-camada-invertida:       #F7F3EA;
+    --cor-camada-invertida-opaca: #F7F3EA;
+    --camada-filtro:       none;
     --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
     --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
     --cor-erro:       #E08172;  --cor-erro-bg:    #3A211C;

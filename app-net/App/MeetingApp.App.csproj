@@ -113,6 +113,8 @@
                       LogicalName="MeetingApp.web.ds.colors_and_type.css" />
     <EmbeddedResource Include="../../assets/ds/componentes.css"
                       LogicalName="MeetingApp.web.ds.componentes.css" />
+    <EmbeddedResource Include="../../assets/ds/estilos.css"
+                      LogicalName="MeetingApp.web.ds.estilos.css" />
     <EmbeddedResource Include="../../assets/ds/fonts/Fraunces/Fraunces-VariableFont.ttf"
                       LogicalName="MeetingApp.web.ds.fonts.Fraunces.Fraunces-VariableFont.ttf" />
     <EmbeddedResource Include="../../assets/ds/fonts/Fraunces/Fraunces-Italic-VariableFont.ttf"

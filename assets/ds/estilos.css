@@ -1,0 +1,230 @@
+/* ============================================================
+   AA Design System — Estilos (camada de material)
+   Dois estilos sobre o MESMO sistema. Só material muda:
+   camada, borda, raio, sombra. Nunca paleta, fonte ou escala.
+
+       data-estilo="aa"      areia chapada, borda, sem sombra
+       data-estilo="vidro"   translúcido no que flutua, opaco no que se lê
+
+   Funciona por subárvore, igual a data-tema, e COMBINA com ele.
+
+   ------------------------------------------------------------
+   TRÊS REGRAS DE ARQUITETURA — leia antes de mexer
+   ------------------------------------------------------------
+   1. Cor de camada é token PRÓPRIO, não --cor-superficie.
+      Os componentes de sobreposição (Modal, Gaveta, MenuSuspenso,
+      Aviso, PilhaAvisos, Dica, BarraSuperior) são inline style lendo
+      token — não têm classe CSS. Se o vidro entrasse por
+      --cor-superficie, TODO Cartao ficaria translúcido junto, e o
+      texto passaria a depender do que corre atrás. Então:
+        --cor-superficie   → sempre opaca, nos dois estilos
+        --cor-camada       → é ela que vira vidro
+      É isso que implementa "vidro flutua, conteúdo é opaco".
+
+   2. Cor de camada é declarada em TODO contexto de tema — claro,
+      escuro explícito e auto — com seletor descendente E de mesmo
+      elemento. Motivo: [data-estilo="x"] e [data-tema="escuro"] têm
+      a mesma especificidade (0,1,0), então quem vence é a ordem de
+      declaração. Como este arquivo é importado DEPOIS dos tokens,
+      sem o par por tema o estilo sobrescreveria o tema e a página
+      voltaria a ficar clara no escuro. Vale igual para
+      [data-tema="auto"] dentro de prefers-color-scheme: dark.
+
+   3. A opacidade da camada é medida, não escolhida a olho.
+      --cor-camada tem alfa alto (0.82 claro / 0.85 escuro) porque a
+      camada translúcida NÃO tem contraste fixo: ela herda o que
+      corre atrás. Os valores abaixo são o mínimo que mantém AA no
+      pior substrato que o sistema consegue pintar — incluindo o véu
+      do modal, que escurece o fundo antes do vidro compor em cima.
+      Medição par por par em preview/contraste.html. Baixar o alfa
+      quebra AA; é o blur que faz o vidro parecer vidro, não o alfa.
+   ============================================================ */
+
+/* ---------------- Geometria — igual nos dois temas ---------------- */
+
+[data-estilo="aa"] {
+  --raio-pequeno: 6px;
+  --raio-medio:  10px;
+  --raio-grande: 16px;
+  --camada-filtro: none;
+}
+
+[data-estilo="vidro"] {
+  --raio-pequeno: 10px;
+  --raio-medio:   14px;
+  --raio-grande:  22px;
+  --vidro-blur: 18px;
+  --vidro-saturacao: 1.4;
+  --camada-filtro: blur(var(--vidro-blur)) saturate(var(--vidro-saturacao));
+}
+
+/* ---------------- aa — claro ---------------- */
+/* Repete o que colors_and_type.css já declara, para o caso de
+   data-estilo="aa" aparecer dentro de uma página em outro estilo. */
+[data-estilo="aa"],
+[data-tema="claro"] [data-estilo="aa"] {
+  --cor-fundo:        var(--areia-100);
+  --cor-superficie:   var(--areia-50);
+  --cor-superficie-2: var(--areia-200);
+  --cor-borda:        var(--areia-300);
+  --cor-borda-forte:  var(--areia-400);
+  --cor-camada:       var(--areia-50);
+  --cor-camada-opaca: var(--areia-50);
+  --cor-borda-camada: var(--areia-300);
+  --cor-camada-invertida:       var(--areia-900);
+  --cor-camada-invertida-opaca: var(--areia-900);
+  --sombra-pequena: 0 1px 2px rgba(34,31,26,0.06);
+  --sombra-media:   0 4px 12px rgba(34,31,26,0.08);
+  --sombra-grande:  0 12px 28px rgba(34,31,26,0.12);
+}
+
+/* ---------------- vidro — claro ---------------- */
+/* O guia dizia "sem glassmorphism, sem blur". Este estilo revê a
+   regra com escopo: translucidez só no que FLUTUA sobre o conteúdo.
+   O que se lê continua opaco — texto longo sobre blur cansa e o
+   contraste passa a depender do que corre atrás. */
+[data-estilo="vidro"],
+[data-tema="claro"] [data-estilo="vidro"] {
+  --cor-fundo:        var(--areia-100);
+  --cor-superficie:   var(--areia-50);   /* OPACA de propósito — ver regra 1 */
+  --cor-superficie-2: var(--areia-200);
+  --cor-borda:        var(--areia-300);
+  --cor-borda-forte:  var(--areia-400);
+
+  --cor-camada:       rgba(250,247,241,0.82);  /* alfa medido — ver regra 3 */
+  --cor-camada-opaca: var(--areia-50);         /* fallback sem backdrop-filter */
+  --cor-borda-camada: rgba(255,255,255,0.65);
+
+  /* Dica é invertida (fundo tinta, texto areia). Vira vidro escuro,
+     não vidro claro: com camada clara o texto claro desapareceria. */
+  --cor-camada-invertida:       rgba(34,31,26,0.88);
+  --cor-camada-invertida-opaca: var(--areia-900);
+
+  /* No vidro a sombra volta a trabalhar: é ela que diz que flutua. */
+  --sombra-pequena: 0 2px 8px rgba(34,31,26,0.10);
+  --sombra-media:   0 8px 24px rgba(34,31,26,0.16);
+  --sombra-grande:  0 20px 50px rgba(34,31,26,0.24);
+}
+
+/* ============================================================
+   TEMA ESCURO — um bloco por estilo (ver regra 2)
+   ============================================================ */
+
+[data-tema="escuro"][data-estilo="aa"],
+[data-tema="escuro"] [data-estilo="aa"] {
+  --cor-fundo:        #1A1714;
+  --cor-superficie:   #221F1A;
+  --cor-superficie-2: #2E2A24;
+  --cor-borda:        #322D26;
+  --cor-borda-forte:  #4E483D;
+  --cor-camada:       #2E2A24;
+  --cor-camada-opaca: #2E2A24;
+  --cor-borda-camada: #4E483D;
+  --cor-camada-invertida:       #F7F3EA;
+  --cor-camada-invertida-opaca: #F7F3EA;
+  --sombra-pequena: 0 1px 2px rgba(0,0,0,0.40);
+  --sombra-media:   0 4px 12px rgba(0,0,0,0.45);
+  --sombra-grande:  0 12px 28px rgba(0,0,0,0.55);
+}
+
+/* No escuro o vidro ESCURECE. Claro translúcido sobre carvão vira
+   névoa e come o contraste do texto em cima. */
+[data-tema="escuro"][data-estilo="vidro"],
+[data-tema="escuro"] [data-estilo="vidro"] {
+  --cor-fundo:        #1A1714;
+  --cor-superficie:   #221F1A;
+  --cor-superficie-2: #2E2A24;
+  --cor-borda:        #322D26;
+  --cor-borda-forte:  #4E483D;
+
+  --cor-camada:       rgba(26,23,20,0.85);   /* alfa medido — ver regra 3 */
+  --cor-camada-opaca: #2E2A24;
+  --cor-borda-camada: rgba(237,231,219,0.14);
+
+  --cor-camada-invertida:       rgba(247,243,234,0.88);
+  --cor-camada-invertida-opaca: #F7F3EA;
+
+  --sombra-pequena: 0 2px 8px rgba(0,0,0,0.45);
+  --sombra-media:   0 8px 24px rgba(0,0,0,0.55);
+  --sombra-grande:  0 20px 50px rgba(0,0,0,0.65);
+}
+
+/* ============================================================
+   TEMA AUTO — o mesmo par, sob prefers-color-scheme (regra 2)
+   Sem este bloco, <html data-tema="auto" data-estilo="vidro"> num
+   sistema no escuro pegaria a camada CLARA: [data-tema="auto"] e
+   [data-estilo="vidro"] empatam em especificidade e este arquivo
+   é importado depois.
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  [data-tema="auto"][data-estilo="aa"],
+  [data-tema="auto"] [data-estilo="aa"] {
+    --cor-fundo:        #1A1714;
+    --cor-superficie:   #221F1A;
+    --cor-superficie-2: #2E2A24;
+    --cor-borda:        #322D26;
+    --cor-borda-forte:  #4E483D;
+    --cor-camada:       #2E2A24;
+    --cor-camada-opaca: #2E2A24;
+    --cor-borda-camada: #4E483D;
+    --cor-camada-invertida:       #F7F3EA;
+    --cor-camada-invertida-opaca: #F7F3EA;
+    --sombra-pequena: 0 1px 2px rgba(0,0,0,0.40);
+    --sombra-media:   0 4px 12px rgba(0,0,0,0.45);
+    --sombra-grande:  0 12px 28px rgba(0,0,0,0.55);
+  }
+
+  [data-tema="auto"][data-estilo="vidro"],
+  [data-tema="auto"] [data-estilo="vidro"] {
+    --cor-fundo:        #1A1714;
+    --cor-superficie:   #221F1A;
+    --cor-superficie-2: #2E2A24;
+    --cor-borda:        #322D26;
+    --cor-borda-forte:  #4E483D;
+
+    --cor-camada:       rgba(26,23,20,0.85);
+    --cor-camada-opaca: #2E2A24;
+    --cor-borda-camada: rgba(237,231,219,0.14);
+
+    --cor-camada-invertida:       rgba(247,243,234,0.88);
+    --cor-camada-invertida-opaca: #F7F3EA;
+
+    --sombra-pequena: 0 2px 8px rgba(0,0,0,0.45);
+    --sombra-media:   0 8px 24px rgba(0,0,0,0.55);
+    --sombra-grande:  0 20px 50px rgba(0,0,0,0.65);
+  }
+}
+
+/* ============================================================
+   Sem suporte a backdrop-filter, vidro cai para OPACO — nunca
+   para ilegível. Cai no próprio token, e não só na classe
+   utilitária, porque os componentes de sobreposição são inline
+   style lendo --cor-camada: sem isto eles ficariam translúcidos
+   sem blur nenhum, que é o pior dos dois mundos.
+   ============================================================ */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  [data-estilo="vidro"],
+  [data-tema="claro"] [data-estilo="vidro"],
+  [data-tema="escuro"][data-estilo="vidro"],
+  [data-tema="escuro"] [data-estilo="vidro"],
+  [data-tema="auto"][data-estilo="vidro"],
+  [data-tema="auto"] [data-estilo="vidro"] {
+    --cor-camada:           var(--cor-camada-opaca);
+    --cor-camada-invertida: var(--cor-camada-invertida-opaca);
+  }
+}
+
+/* ============================================================
+   Utilitário .aa-vidro — para consumidores sem React.
+   Os componentes React leem os tokens direto (--cor-camada,
+   --cor-borda-camada, --camada-filtro) e não precisam de classe.
+   Em data-estilo="aa" o filtro é none, então esta mesma classe
+   entrega uma camada opaca com sombra — o comportamento de hoje.
+   ============================================================ */
+.aa-vidro {
+  background: var(--cor-camada);
+  border: 1px solid var(--cor-borda-camada);
+  box-shadow: var(--sombra-media);
+  backdrop-filter: var(--camada-filtro);
+  -webkit-backdrop-filter: var(--camada-filtro);
+}

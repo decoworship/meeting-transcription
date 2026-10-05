@@ -2557,3 +2557,39 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   max-width: 90rem;
   padding-top: var(--espaco-5);
 }
+
+/* ─────────────────────────────────────── vidro (AA Design System 0.5.0)
+ *
+ * O app usa o estilo `vidro` (index.html, data-estilo), a pedido do dono do
+ * produto em 05/10/2026. A regra é a do próprio sistema: **vidro flutua,
+ * conteúdo é opaco.** Só o que passa por cima do conteúdo lê a camada
+ * (`--cor-camada`, translúcida com blur); cartão, bloco, lista, transcrição e
+ * legenda continuam em `--cor-superficie`, que é opaca nos dois estilos.
+ *
+ * O alfa da camada é o medido pelo sistema (AA no pior substrato, inclusive sob
+ * o véu); não se baixa aqui. Sem backdrop-filter, o token cai para opaco
+ * sozinho (estilos.css). Fica no fim de propósito: vence as regras de cada
+ * componente acima sem mexer nelas. */
+.barra,
+.reuniao-aberta__abas,
+.popover,
+.semana__detalhe .reunioes__painel,
+.tocador,
+.gaveta,
+.modal {
+  background: var(--cor-camada);
+  -webkit-backdrop-filter: var(--camada-filtro);
+  backdrop-filter: var(--camada-filtro);
+}
+.barra, .reuniao-aberta__abas { border-bottom-color: var(--cor-borda-camada); }
+.tocador { border-top-color: var(--cor-borda-camada); }
+.popover, .semana__detalhe .reunioes__painel, .modal { border-color: var(--cor-borda-camada); }
+.gaveta { border-left-color: var(--cor-borda-camada); }
+
+/* A dica é tinta com texto claro: no vidro ela vira a camada invertida, e não
+ * a camada — senão seria texto claro sobre vidro claro. */
+.dica__balao {
+  background: var(--cor-camada-invertida);
+  -webkit-backdrop-filter: var(--camada-filtro);
+  backdrop-filter: var(--camada-filtro);
+}

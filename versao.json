@@ -1,6 +1,6 @@
 {
-  "versao": "0.9.1",
-  "publicada": "2026-10-01",
-  "notas": "O instalador ficou com 10 MB: os motores vêm à parte e só são baixados quando mudam — nesta primeira vez, uma vez (1,7 GB, precisa de internet). E as reuniões antigas ganham os e-mails dos participantes, relidos da agenda.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.9.1"
+  "versao": "0.10.0",
+  "publicada": "2026-10-05",
+  "notas": "Ajustes mais curtos, com a explicação atrás do ⓘ; microfone e áudio da reunião em Ajustes › Gravador; seu nome no lugar de \"You\" nas transcrições; e o visual em vidro.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.10.0"
 }
