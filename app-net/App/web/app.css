@@ -2215,7 +2215,19 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 /* Pendência com caixa: a lista de ações é o que se lê primeiro numa ata, e a
  * caixa a separa do resto sem precisar de cor. */
 .ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
-.ata__pendencia input { margin-right: var(--espaco-2); }
+.ata__pendencia input { margin-right: var(--espaco-2); accent-color: var(--cor-acao); }
+.ata__pendencia input:not(:disabled) { cursor: pointer; }
+.ata__pendencia--feita { color: var(--cor-texto-suave); text-decoration: line-through; }
+
+/* Decidido, Atenção e Em aberto da ata por tema (ATA-5): o rótulo vira
+ * etiqueta, nos tokens de feedback do design system — os dois temas saem daí. */
+.ata__rotulo > strong:first-child {
+  font-size: var(--texto-rotulo); letter-spacing: .05em; text-transform: uppercase;
+  padding: 1px var(--espaco-2); border-radius: var(--raio-pequeno); margin-right: var(--espaco-1);
+}
+.ata__rotulo--decidido > strong:first-child { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+.ata__rotulo--atencao > strong:first-child { background: var(--cor-atencao-bg); color: var(--cor-atencao); }
+.ata__rotulo--aberto > strong:first-child { background: var(--cor-info-bg); color: var(--cor-info); }
 
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }

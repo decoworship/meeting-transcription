@@ -62,6 +62,13 @@ internal sealed class Pedido
     [JsonPropertyName("indice")] public int? Indice { get; init; }
 
     /// <summary>
+    /// A pendência que a tela marcou: o texto dela confere o índice
+    /// (Nucleo/Atas/Pendencias.cs), e <c>feita</c> é o estado novo da caixinha.
+    /// </summary>
+    [JsonPropertyName("texto")] public string? Texto { get; init; }
+    [JsonPropertyName("feita")] public bool? Feita { get; init; }
+
+    /// <summary>
     /// O carimbo da amostra que a tela mostrou: o núcleo só age se o índice
     /// ainda for ela (Vozes.Achar).
     /// </summary>
@@ -845,6 +852,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 case "exportar-ata":
                     Responder(new Resposta { Id = p.Id, Arquivo = ExportarAta(p) });
                     break;
+
+                case "marcar-pendencia":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Pendencias.MarcarNoArquivo(onde, p.Indice ?? -1, p.Texto ?? "", p.Feita == true);
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+                }
 
                 case "customizar-tipo-de-ata":
                     Responder(new Resposta
