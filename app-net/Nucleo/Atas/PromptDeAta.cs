@@ -112,9 +112,46 @@ public static class PromptDeAta
         ("6299 mais 32 dá 194") e leitura de tela não são fatos a acompanhar.
         """;
 
+    /// <summary>
+    /// O que muda para o modelo na ata por tema (ATA-5).
+    /// </summary>
+    /// <remarks>
+    /// Cada frase vem de um defeito da ata de 22/09/2026, a que foi para o
+    /// cliente e voltou com "ficou extensa e repetitiva": o modelo pôs seis
+    /// frentes dentro de uma seção só com subtítulos, e cada tema reapareceu em
+    /// até sete lugares.
+    /// </remarks>
+    public const string BlocoPorTema = """
+        # Cada item mora no seu tema
+
+        Esta ata é organizada **por tema**: quem lê quer ver, dentro de cada
+        assunto, o que foi decidido, quem faz o quê e o que ficou em aberto.
+
+        - **Um tema por seção** em `secoes`. Nunca uma seção com subtítulos `###`
+          dentro: cada frente, assunto ou módulo é uma entrada própria.
+        - Todo item de `decisoes`, `acoes`, `pontos_em_aberto` e `riscos`
+          preenche `secao` com o **título exato** da seção a que pertence. Se não
+          pertence a nenhuma, deixe `secao` vazio.
+        - O `texto` da seção dá o **contexto** em uma ou duas frases e **não
+          repete** a decisão, a ação, o ponto em aberto nem o risco — eles já
+          aparecem dentro do tema.
+        - A ação é **curta**: o que fazer. Sem "para avaliar a aplicação de…"; o
+          tema já diz para quê. Não comece a ação pelo nome do responsável.
+        - `grupo` só quando várias seções são partes de um mesmo assunto maior,
+          com o mesmo texto em todas.
+        - `responsavel` da seção só quando a área ou a pessoa dona do tema **foi
+          dita ou está nas notas**. Nunca deduza.
+        - O `resumo` tem **no máximo três frases**.
+        """;
+
+    /// <summary>A ata agrupa por tema: formato por tema e um tipo com a marca.</summary>
+    public static bool Agrupa(ModeloDeAta tipo, FormatoDaAta formato) =>
+        formato == FormatoDaAta.PorTema && tipo.ItensPorSecao;
+
     public static string Montar(ModeloDeAta tipo, ContextoDaReuniao ctx,
                                 IReadOnlyList<SegmentoFinal> segmentos,
-                                IReadOnlyList<Fato> roteiro)
+                                IReadOnlyList<Fato> roteiro,
+                                FormatoDaAta formato = FormatoDaAta.Classico)
     {
         var sb = new StringBuilder();
 
@@ -122,6 +159,11 @@ public static class PromptDeAta
         sb.AppendLine("\n---\n");
 
         sb.AppendLine(ContratoDoJson);
+        if (Agrupa(tipo, formato))
+        {
+            sb.AppendLine();
+            sb.AppendLine(BlocoPorTema);
+        }
         sb.AppendLine("\n---\n");
 
         sb.AppendLine("# Estrutura desta ata\n");

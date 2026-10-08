@@ -1141,6 +1141,63 @@ function abaModelos(catalogo, config, gravar, diarizadores = []) {
   return painel;
 }
 
+// ─────────────────────────────────────────────────────────── aba Atas
+
+/**
+ * O formato da ata (ATA-5). A aba nasce com uma linha e recebe os modelos de
+ * ata editáveis depois (spec da ata por tema, §8).
+ *
+ * Rádio, como o tema: são dois formatos, e nenhum é "desligado".
+ */
+function abaAtas(config, gravar) {
+  const painel = document.createElement("div");
+  painel.className = "painel";
+
+  const OPCOES = [
+    ["classico", "De hoje"],
+    ["por-tema", "Por tema"],
+  ];
+  // A mesma regra do núcleo (FormatosDaAta.Ler): ausente é por tema, e um
+  // valor desconhecido é o clássico — a tela não pode mostrar um e o app fazer outro.
+  const valor = config.formato_da_ata;
+  const atual = valor == null || valor === "" || valor === "por-tema" ? "por-tema" : "classico";
+
+  const grupo = document.createElement("div");
+  grupo.className = "escolhas";
+  grupo.setAttribute("role", "radiogroup");
+  grupo.setAttribute("aria-label", "Formato da ata");
+  for (const [valor, rotulo] of OPCOES) {
+    const label = document.createElement("label");
+    label.className = "aa-escolha";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "formato-da-ata";
+    radio.value = valor;
+    radio.checked = valor === atual;
+    radio.addEventListener("change", () => gravar({ formato_da_ata: valor }));
+    label.append(radio, document.createTextNode(rotulo));
+    grupo.appendChild(label);
+  }
+
+  painel.appendChild(secaoDeAjustes("Formato",
+    ajuste({
+      titulo: "Formato da ata",
+      linha: "Por tema: cada decisão, ação e ponto em aberto dentro do assunto dele.",
+      dica: [
+        "De hoje: resumo, frentes e, no fim, as listas de decisões, pendências e "
+        + "pontos em aberto. Cada tema aparece um pouco em cada lista.",
+        "Por tema: um bloco por assunto, com o que foi decidido, quem faz o quê e o "
+        + "que ficou em aberto. As observações sobre a transcrição ficam no app e não "
+        + "vão no arquivo exportado.",
+        "Vale para a próxima ata gerada. Ao gerar de novo, a ata anterior fica "
+        + "guardada ao lado, como ata.anterior.md.",
+      ],
+      controle: grupo,
+    }),
+  ));
+  return painel;
+}
+
 // ────────────────────────────────────────────────────── aba Transcrição
 
 /**
@@ -1262,6 +1319,7 @@ const ABAS = [
   ["gravador", "Gravador"],
   ["modelos", "Modelos"],
   ["transcricao", "Transcrição"],
+  ["atas", "Atas"],
   ["clientes", "Clientes"],
   ["vozes", "Vozes"],
 ];
@@ -1354,6 +1412,7 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       gravador: () => abaGravador({ gravador, dispositivos, config }, mexerNoGravador, gravar),
       modelos: () => abaModelos(catalogo, config, gravar, diarizadores ?? []),
       transcricao: () => abaTranscricao(config, gravar),
+      atas: () => abaAtas(config, gravar),
       clientes: () => abaClientes({
         clientes, catalogo, diarizadores: diarizadores ?? [],
         gravacoes: gravacoes ?? [], tipos: tipos ?? [],

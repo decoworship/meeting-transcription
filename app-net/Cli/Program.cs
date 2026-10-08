@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using MeetingApp.Cli;
+using MeetingApp.Nucleo;
+using MeetingApp.Nucleo.Atas;
 using MeetingApp.Sidecar;
 
 // Valida a Fase 2 por linha de comando, antes de existir UI — a ordem de
@@ -37,13 +39,24 @@ if (arg.GetValueOrDefault("revisar") is { Length: > 0 } pastaDaRevisao)
 
 if (arg.GetValueOrDefault("ata") is { Length: > 0 } pastaDaAta)
 {
+    // Sem --formato vale o do app.json, como no app: a linha de comando mede a
+    // ata que o usuário veria. Com ele, só os dois nomes valem — um erro de
+    // digitação mediria o clássico achando que mediu o novo.
+    var formato = ConfiguracoesDoApp.Carregar().Formato;
+    if (arg.GetValueOrDefault("formato") is { } escrito
+        && !FormatosDaAta.TentarLer(escrito, out formato))
+    {
+        Console.Error.WriteLine($"--formato {escrito}: use classico ou por-tema.");
+        return 2;
+    }
+
     using var ataCts = new CancellationTokenSource();
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; ataCts.Cancel(); };
     try
     {
         return await GeradorDeAta.ExecutarAsync(
             pastaDaAta, arg.GetValueOrDefault("tipo") ?? "cliente-update",
-            arg.GetValueOrDefault("modelo"), ataCts.Token);
+            arg.GetValueOrDefault("modelo"), formato, ataCts.Token);
     }
     catch (OperationCanceledException)
     {

@@ -200,6 +200,9 @@ internal sealed class Resposta
     /// <summary>A ata em Markdown, ou nulo quando ainda não existe.</summary>
     [JsonPropertyName("ata")] public string? Ata { get; init; }
 
+    /// <summary>O <c>ata.observacoes.md</c>, quando a ata foi gerada por tema (ATA-5).</summary>
+    [JsonPropertyName("observacoes")] public string? Observacoes { get; init; }
+
     /// <summary>A transcrição mudou depois de a ata ter sido escrita.</summary>
     [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
     [JsonPropertyName("prefs")] public PreferenciasDoProjeto? Prefs { get; init; }
@@ -826,6 +829,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         // corrigiu o texto depois — e a ata ficou desatualizada
                         // sem ninguém avisar.
                         AtaVelha = EstadoDaAta.EstaVelha(onde),
+                        Observacoes = GeracaoDeAta.LerObservacoes(onde),
                     });
                     break;
                 }
@@ -2288,7 +2292,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 {
                     _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
                     EmpurrarTranscricoes();
-                }, trabalho.Token);
+                }, trabalho.Token, cfg.Formato);
 
                 _transcricoes.Terminar(pasta);
                 Avisar($"Ata pronta: {trabalho.Nome}");

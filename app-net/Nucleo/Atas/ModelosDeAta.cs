@@ -11,6 +11,22 @@ namespace MeetingApp.Nucleo.Atas;
 /// <param name="DoUsuario">Veio da pasta do perfil, e não de dentro do executável.</param>
 public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUsuario)
 {
+    /// <summary>A linha que liga a ata por tema num tipo (ATA-5).</summary>
+    /// <remarks>
+    /// É texto do arquivo, e não uma lista no código, porque o tipo é
+    /// personalizável (ATA.md §1): um tipo do usuário liga o agrupamento
+    /// escrevendo a linha. O modelo nunca a vê — <see cref="TextoParaPrompt"/>
+    /// a tira.
+    /// </remarks>
+    public const string Marca = "<!-- ata: itens-por-secao -->";
+
+    /// <summary>Os itens moram dentro das seções, quando o formato é por tema.</summary>
+    public bool ItensPorSecao => Texto.Contains(Marca, StringComparison.Ordinal);
+
+    /// <summary>O texto sem a linha da marca, para tudo o que vai ao modelo.</summary>
+    private string SemMarca =>
+        Texto.Replace(Marca + "\r\n", "").Replace(Marca + "\n", "").Replace(Marca, "");
+
     /// <summary>
     /// As seções que o esqueleto da referência pede, na ordem.
     /// </summary>
@@ -81,15 +97,16 @@ public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUs
     /// </remarks>
     public string TextoParaPrompt()
     {
-        int inicio = Texto.IndexOf("```markdown", StringComparison.Ordinal);
-        if (inicio < 0) return Texto;
-        int fim = Texto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
-        if (fim < 0) return Texto;
+        string texto = SemMarca;
+        int inicio = texto.IndexOf("```markdown", StringComparison.Ordinal);
+        if (inicio < 0) return texto;
+        int fim = texto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
+        if (fim < 0) return texto;
 
         var mantidas = new List<string>();
         bool copiando = true;
 
-        foreach (string linha in Texto[(inicio + 11)..fim].Split('\n'))
+        foreach (string linha in texto[(inicio + 11)..fim].Split('\n'))
         {
             string t = linha.TrimEnd();
 
@@ -106,7 +123,7 @@ public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUs
         }
 
         string corpo = string.Join('\n', mantidas).Trim('\n');
-        return Texto[..(inicio + 11)] + "\n" + corpo + "\n" + Texto[fim..];
+        return texto[..(inicio + 11)] + "\n" + corpo + "\n" + texto[fim..];
     }
 }
 

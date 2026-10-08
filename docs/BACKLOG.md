@@ -222,6 +222,35 @@ engano.
 
 **Gatilho:** aparecer uma reunião que não cabe.
 
+### ATA-5 · A ata por tema — `feature` · feito em 08/10/2026, só no update
+
+A ata de update de 22/09/2026 voltou do cliente com "ficou extensa e
+repetitiva": organizada pelo tipo de informação, ela repetia cada tema em até
+sete lugares. Agora cada decisão, ação, ponto em aberto e risco mora dentro do
+tema, e as observações do verificador ficam fora do arquivo exportado. A chave
+`formato_da_ata` em Ajustes › Atas volta ao formato de antes, byte a byte.
+
+Desenho e critérios: [spec](superpowers/specs/2026-10-08-ata-por-tema-design.md).
+
+**Validado em 08/10/2026; o padrão é "por tema", e só o update agrupa.** Sete reuniões nos
+dois formatos, com o `gemma-4-e4b` (`tools/validar_ata_por_tema.py`): 92% dos
+itens caíram num tema, nenhuma seção com subtítulos, a daily não mudou — mas a
+ata por tema saiu só **19% menor na mediana**, e o critério era 25%. Lendo as
+atas, o veredito é por tipo:
+
+- **update com cliente:** organizado como a cliente pediu; dois defeitos do
+  modelo — `responsavel` do tema com "nosso"/"cliente", e grupo com o mesmo
+  título do tema;
+- **kickoff:** a estrutura ficou, mas cada seção ganhou uma pessoa como dona,
+  deduzida;
+- **sessão de trabalho:** **pior** — perde "Por quê", "Alternativas
+  descartadas" e "Implicações", e repete o mesmo tema por pessoa.
+
+O dono aprovou o critério 3 com os 81% e escolheu **agrupar só o update**: a
+sessão de trabalho e o kickoff perderam a marca e saem como antes, nos dois
+formatos. Voltar a marcá-los pede adaptar o esqueleto deles ao agrupamento —
+o "Por quê" e as "Alternativas descartadas" não têm lugar num item de decisão.
+
 ---
 
 ## 3. Vozes e falantes

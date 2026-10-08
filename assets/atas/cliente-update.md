@@ -1,3 +1,4 @@
+<!-- ata: itens-por-secao -->
 # Ata — Update de projeto com cliente
 
 A mais formal dos tipos. Presuma que o cliente vai ler, e possivelmente encaminhar internamente. A ata funciona como registro compartilhado do combinado — é o instrumento que evita a conversa "mas vocês não tinham dito que...".

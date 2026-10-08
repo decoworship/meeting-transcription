@@ -359,6 +359,12 @@ public sealed class ConfiguracoesDoApp
     [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
         = "cliente-update";
 
+    /// <summary>"por-tema" (padrão) ou "classico" — ver Nucleo/Atas/FormatoDaAta.cs.</summary>
+    [JsonPropertyName("formato_da_ata")] public string FormatoDaAta { get; set; }
+        = Atas.FormatosDaAta.Padrao;
+
+    [JsonIgnore] public Atas.FormatoDaAta Formato => Atas.FormatosDaAta.Ler(FormatoDaAta);
+
     /// <summary>Transcrever mesmo quando a placa não estiver disponível.</summary>
     /// <remarks>
     /// <para>

@@ -2191,6 +2191,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   font-size: var(--texto-corpo);
 }
 
+/* As observações do verificador, à parte da ata por tema (ATA-5). */
+.ata__observacoes { max-width: 68ch; margin-top: var(--espaco-4); }
+.ata__observacoes summary { cursor: pointer; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.ata__observacoes .ata__texto { margin-top: var(--espaco-2); }
+
 /* --texto-medio e --texto-base NÃO EXISTEM no tokens.json, e era isso que
  * estava escrito aqui. Um var() que não resolve invalida a declaração inteira,
  * então os dois títulos herdavam o tamanho do corpo: a ata saía sem hierarquia
@@ -2199,6 +2204,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * inventada sempre falha. */
 .ata__texto h2 { font-size: var(--texto-titulo-m); margin: var(--espaco-4) 0 var(--espaco-2); }
 .ata__texto h3 { font-size: var(--texto-corpo); margin: var(--espaco-3) 0 var(--espaco-1); }
+/* O tema dentro de um grupo da ata por tema (### no Markdown): abaixo do
+ * título do grupo, acima do parágrafo — sem isto o navegador o desenhava no
+ * tamanho dele, e o grupo e o tema saíam iguais. */
+.ata__texto h4 { font-size: var(--texto-corpo); font-weight: 600; color: var(--cor-texto-suave); margin: var(--espaco-3) 0 var(--espaco-1); }
 .ata__texto p { margin: 0 0 var(--espaco-2); line-height: 1.6; }
 .ata__texto ul { margin: 0 0 var(--espaco-3); padding-left: var(--espaco-4); }
 .ata__texto li { margin-bottom: var(--espaco-1); line-height: 1.5; }

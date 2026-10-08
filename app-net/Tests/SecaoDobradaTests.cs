@@ -26,7 +26,7 @@ public sealed class SecaoDobradaTests
 
         var notas = SecaoDobrada.Dobrar(ata);
 
-        Assert.Equal(["Não clusterizar por preço.", "Testar margem."], ata.Decisoes);
+        Assert.Equal(["Não clusterizar por preço.", "Testar margem."], ata.Decisoes.Select(d => d.Texto));
         Assert.Empty(ata.Secoes);
         Assert.Single(notas);
     }
@@ -75,7 +75,7 @@ public sealed class SecaoDobradaTests
 
         var notas = SecaoDobrada.Dobrar(ata);
 
-        Assert.Equal(["a decisão de verdade"], ata.Decisoes);
+        Assert.Equal(["a decisão de verdade"], ata.Decisoes.Select(d => d.Texto));
         Assert.Empty(notas);
         Assert.Single(ata.Secoes);
     }
@@ -117,7 +117,7 @@ public sealed class SecaoDobradaTests
         SecaoDobrada.Dobrar(ata);
 
         Assert.Equal("Falta definir o prazo. E o escopo também.",
-                     Assert.Single(ata.PontosEmAberto));
+                     Assert.Single(ata.PontosEmAberto).Texto);
     }
 
     [Fact]

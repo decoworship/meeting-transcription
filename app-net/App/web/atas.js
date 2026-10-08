@@ -186,6 +186,23 @@ async function carregarAta(g, corpo, botao, aoContar) {
       "A transcrição foi corrigida depois que esta ata foi escrita. Vale refazer.", "aviso"));
   }
   corpo.appendChild(texto);
+
+  // As observações do verificador, quando a ata é por tema (ATA-5): moram fora
+  // do ata.md para não irem ao cliente, e ficam aqui, recolhidas, para quem
+  // gerou conferir números e compromissos.
+  if (r.observacoes) {
+    const obs = document.createElement("details");
+    obs.className = "ata__observacoes";
+    const titulo = document.createElement("summary");
+    titulo.textContent = "Observações sobre a transcrição";
+    const dentro = document.createElement("div");
+    dentro.className = "ata__texto";
+    // O arquivo começa com o próprio título; o <summary> já o diz. "[^\n]", e
+    // não ".": no Windows a linha termina em \r\n, e o "." para no \r.
+    dentro.append(...renderizar(r.observacoes.replace(/^##[^\n]*\n+(?:\r?\n)*/, "")));
+    obs.append(titulo, dentro);
+    corpo.appendChild(obs);
+  }
 }
 
 /**

@@ -21,9 +21,30 @@ namespace MeetingApp.Nucleo.Atas;
 /// </remarks>
 public static class GeracaoDeAta
 {
-    /// <summary>O que o motor faz: prompt e duração entram, a ata sai.</summary>
+    /// <summary>O que o motor faz: prompt, esquema e duração entram, a ata sai.</summary>
+    /// <remarks>
+    /// O esquema virou parâmetro com a ata por tema (ATA-5): ele é parte do
+    /// prompt — as descrições dos campos instruem o modelo —, e muda com o formato.
+    /// </remarks>
     public delegate Task<AtaGerada> Motor(
-        string prompt, double duracaoS, Action<ProgressoDaAta>? progresso, CancellationToken ct);
+        string prompt, string esquema, double duracaoS,
+        Action<ProgressoDaAta>? progresso, CancellationToken ct);
+
+    /// <summary>O recado do verificador, fora do <c>ata.md</c> no formato por tema.</summary>
+    public const string ArquivoDeObservacoes = "ata.observacoes.md";
+
+    /// <summary>
+    /// O <c>ata.md</c> de antes de gerar de novo: comparar formatos é trocar a
+    /// chave e refazer.
+    /// </summary>
+    public const string ArquivoAnterior = "ata.anterior.md";
+
+    public static string? LerObservacoes(string pasta)
+    {
+        string caminho = Path.Combine(pasta, ArquivoDeObservacoes);
+        try { return File.Exists(caminho) ? File.ReadAllText(caminho) : null; }
+        catch (IOException) { return null; }
+    }
 
     /// <summary>Tudo o que o prompt sabe da reunião, lido da pasta.</summary>
     /// <param name="projetos">Para o vocabulário do projeto; nulo, fica sem.</param>
@@ -73,18 +94,31 @@ public static class GeracaoDeAta
     /// <returns>A ata já conferida, para quem quiser relatar números.</returns>
     public static async Task<AtaGerada> GerarAsync(
         string pasta, ModeloDeAta tipo, ResultadoDaTranscricao dados, ContextoDaReuniao ctx,
-        Motor motor, Action<ProgressoDaAta>? progresso, CancellationToken ct)
+        Motor motor, Action<ProgressoDaAta>? progresso, CancellationToken ct,
+        FormatoDaAta formato = FormatoDaAta.Classico)
     {
         var roteiro = RoteiroDeFatos.De(dados.Segments);
-        string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
+        string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro, formato);
+        string esquema = AtaGerada.EsquemaPara(PromptDeAta.Agrupa(tipo, formato));
 
-        var ata = await motor(prompt, ctx.DuracaoS, progresso, ct);
+        var ata = await motor(prompt, esquema, ctx.DuracaoS, progresso, ct);
 
         VerificadorDeAta.Conferir(ata, dados.Segments,
             [.. ctx.Convidados.Concat(ctx.Falantes)], roteiro, ctx.Pessoas);
 
-        await File.WriteAllTextAsync(Path.Combine(pasta, "ata.md"),
-                                     RedatorDeAta.Escrever(ata, tipo, ctx), ct);
+        string md = Path.Combine(pasta, "ata.md");
+        if (File.Exists(md))
+            File.Copy(md, Path.Combine(pasta, ArquivoAnterior), overwrite: true);
+        await File.WriteAllTextAsync(md, RedatorDeAta.Escrever(ata, tipo, ctx, formato), ct);
+
+        // No clássico as observações estão dentro do ata.md; um arquivo à parte
+        // de uma geração anterior por tema contradiria a ata nova.
+        string obs = Path.Combine(pasta, ArquivoDeObservacoes);
+        if (formato == FormatoDaAta.PorTema && RedatorDeAta.Observacoes(ata) is { } texto)
+            await File.WriteAllTextAsync(obs, texto, ct);
+        else if (File.Exists(obs))
+            File.Delete(obs);
+
         await File.WriteAllTextAsync(Path.Combine(pasta, "ata.json"), ata.ParaJson(), ct);
         return ata;
     }

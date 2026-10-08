@@ -1,0 +1,165 @@
+## Regras
+
+Estas regras são a parte que mais importa. Uma ata que erra aqui é pior que nenhuma ata, porque cria falsa memória.
+
+### Separar decidido de discutido
+
+O erro mais frequente em ata automática é promover uma hipótese a decisão. "Acho que poderíamos migrar pro SAM" **não** é uma decisão; é uma ideia levantada. Só entra em **Decisões** o que teve conclusão explícita, ou concordância clara de quem tem autoridade para decidir.
+
+Tudo que foi levantado e não concluiu vai para **Pontos em aberto**, com a pergunta que ficou sem resposta. Essa seção costuma ser a mais valiosa da ata — não a esvazie por parecer incompleta.
+
+### Action items exigem dono
+
+Formato: `- [ ] Ação — **Responsável** — prazo`
+
+Se a transcrição não nomeia responsável, escreva `[responsável a definir]`. Se não há prazo, `[prazo a definir]`. Nunca atribua ao participante que parece mais plausível: um dono inventado faz a tarefa não ser cobrada de ninguém.
+
+Se o dono for de outra organização, marque a organização junto ao nome. Depende-de-terceiros é informação de gestão.
+
+### Fidelidade
+
+Registre o que foi dito, não o que faria sentido ter sido dito. Se a transcrição está truncada, confusa ou com fala inaudível relevante, sinalize no final da ata em **Observações sobre a transcrição** — não preencha a lacuna por inferência.
+
+Se números foram citados (volume, adoção, percentual), transcreva exatamente. Se um número parecer inconsistente com outro citado na mesma reunião, registre ambos e sinalize a divergência em vez de escolher um.
+
+Transcrições automáticas erram nomes próprios, siglas e termos técnicos. Corrija quando o contexto deixa claro (ex.: "Jira" transcrito como "gira", códigos de issue mal segmentados). Quando não estiver claro, mantenha o original e marque com `[sic?]`.
+
+### Idioma
+
+Escreva a ata no idioma predominante da transcrição. Reunião em inglês → ata em inglês, incluindo os títulos das seções. Reunião em português com termos técnicos em inglês → ata em português, preservando os termos como falados. Não traduza nomes de projetos, produtos ou sistemas.
+
+### O que deixar de fora
+
+Small talk, problemas de conexão, agendamento de próxima call que não gerou compromisso, e desentendimentos interpessoais. Discordância *técnica* relevante fica — ela explica a decisão. Atrito pessoal não.
+
+---
+
+# O que você escreve, e o que o app escreve
+
+Você preenche campos de um JSON. O app monta o Markdown a partir deles.
+
+**O app já escreve, e você não deve repetir em lugar nenhum:**
+
+- o título da ata e o cabeçalho com data, duração, cliente e participantes;
+- as seções **Resumo**, **Decisões**, **Pendências**, **Pontos em aberto**,
+  **Riscos e alertas** e **Observações sobre a transcrição** — elas saem
+  dos campos `resumo`, `decisoes`, `acoes`, `pontos_em_aberto`, `riscos` e
+  `observacoes`.
+
+Em `secoes` vai **só o corpo específico deste tipo de ata**. Nunca escreva
+um título começando com `#`, e nunca repita, dentro de uma seção, uma
+decisão, ação ou pendência que já está no campo próprio dela.
+
+# Quem é o dono de cada ação
+
+Antes de fechar o campo `acoes`, percorra a lista de participantes **um por
+um** e pergunte: *o que ficou para esta pessoa?*
+
+Quem fala mais não é dono de tudo. Quem coordena a reunião normalmente
+também sai com tarefas — pedir a alguém que envie algo é tarefa de quem
+pede, quando ele disse que faria algo com o que receber. "Me manda o número
+do chamado que eu falo com o fulano" são **duas** ações, uma de cada lado.
+
+Se ninguém assumiu, use `[responsável a definir]`. Inventar dono é pior que
+admitir que não houve.
+
+# Restrição também é decisão
+
+Vai em `decisoes` não só o que o grupo escolheu fazer, mas o que ele
+combinou **não** fazer, ou fazer só sob condição:
+
+- "não corrija antes de falar comigo";
+- "só seguimos depois que o cliente confirmar";
+- "vamos assumir X como verdade até alguém provar o contrário".
+
+São as que mais custam quando somem da ata, porque alguém age sem elas.
+
+# Números
+
+Registre os números que **dimensionam** algo: volume, valor, percentual,
+prazo, contagem de casos. Ignore aritmética falada em voz alta durante a
+análise — hipótese ("não sei se seria 50, 70 ou 80"), conta em andamento
+("6299 mais 32 dá 194") e leitura de tela não são fatos a acompanhar.
+
+---
+
+# Estrutura desta ata
+
+O tipo desta reunião **já foi definido**: Daily / status curto. Produza as seções da estrutura abaixo, na ordem dela, no campo `secoes` do JSON. Não classifique a reunião de novo.
+
+O modelo em Markdown abaixo serve para dizer **quais seções existem e o que vai em cada uma**. Ele não é o formato da sua resposta: você responde em JSON, e o app monta o Markdown.
+
+# Ata — Daily / status curto
+
+Formato enxuto. O erro aqui é o oposto dos outros tipos: excesso de estrutura. Uma daily de 10 minutos não sustenta oito seções, e uma ata inflada não é lida.
+
+Meta: caber na tela, colável em Slack ou Teams sem edição.
+
+## Estrutura
+
+```markdown
+# Daily — [data]
+
+**Presentes:** [nomes, linha única]
+
+## Rodada
+- **[Nome]:** [o que fez / o que vai fazer] · Impedimento: [se houver]
+
+## Impedimentos
+- [Impedimento] — precisa de **[quem]**
+```
+
+## Notas específicas
+
+**Uma linha por pessoa.** Comprima. Se alguém falou por três minutos, ainda é uma linha — o detalhe pertence a outro tipo de reunião.
+
+**Omita seções vazias.** Sem impedimento, sem seção de impedimento. Sem ação nova, sem seção de ações. Uma daily pode legitimamente produzir só a rodada.
+
+**Não invente estrutura de sprint.** Se a daily virou discussão longa de decisão técnica ou repriorização de escopo, ela deixou de ser daily — use `sprint.md` ou `trabalho.md` e avise o usuário que reclassificou.
+
+**Códigos de issue:** preserve quando citados, mas não force. Daily costuma falar por nome de tarefa, não por código.
+
+**Sem seção de decisões**, salvo se algo realmente foi decidido — nesse caso acrescente uma seção curta. Daily normalmente não decide, e uma seção de decisões vazia ou preenchida com quase-decisões é justamente o vício que essa ata deve evitar.
+
+
+---
+
+# Dados da reunião
+
+- Reunião: Semanal do Portal de Pedidos
+- Cliente: Acme Bebidas
+- Projeto: Portal de Pedidos
+- Data: 22/09/2026 às 10:30
+- Duração: 31min 50s
+- Da nossa equipe: Bruno Teles, Diego Prado
+- Do cliente (Acme Bebidas): Carla Nunes
+Use isto para separar as pendências por lado: `lado` é "nosso" quando o responsável é da nossa equipe e "cliente" quando é do cliente. **Não deduza a organização de ninguém pelo assunto da conversa.**
+- Quem falou: Bruno Teles, Carla Nunes
+
+**Responsável de uma ação só pode ser um destes nomes**: Bruno Teles, Diego Prado, Carla Nunes — ou `[responsável a definir]`. Não invente nomes.
+
+# Notas escritas por quem estava na reunião
+
+**Estas notas têm precedência sobre a transcrição.** Foram escritas por uma pessoa presente; a transcrição é a melhor tentativa de uma máquina. Onde divergirem, siga as notas e registre a divergência em `observacoes`.
+
+Ranking por canal - Comercial
+Regra de ruptura - Trade
+
+# Fatos citados na reunião
+
+Lista levantada automaticamente da transcrição, para conferência. **Use o que for relevante para a ata e ignore o resto** — números de contexto e valores que não pertencem a nenhuma seção não precisam entrar. Não invente nada que não esteja aqui ou na transcrição.
+
+O que está *entre parênteses e em itálico* é a **unidade dita na reunião**. Use exatamente ela. Se um número não tiver unidade marcada, escreva-o sem unidade nenhuma — nunca acrescente R$, %, "mil" ou qualquer medida que não esteja na lista.
+
+- [00:18] **37%** — Perdemos duas semanas de sugestão em julho, 37% de conversão.
+
+# Transcrição
+
+[00:00] Bruno Teles: Vamos começar o dashboard antes da integração com a Diana.
+[00:06] Carla Nunes: O pedido mínimo agora soma o aplicativo e o SFA, e eu levanto o valor novo por canal.
+[00:12] Carla Nunes: As regras de ruptura da Hiper eu busco até sexta.
+[00:18] Bruno Teles: Perdemos duas semanas de sugestão em julho, 37% de conversão.
+
+---
+
+Escreva agora a ata desta reunião, no formato JSON pedido.
