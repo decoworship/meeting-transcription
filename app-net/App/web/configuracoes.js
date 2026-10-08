@@ -13,6 +13,7 @@
 import { pedir } from "/ponte.js";
 import { abaClientes } from "/clientes.js";
 import { abaVozes } from "/vozes.js";
+import { secaoDeModelos } from "/modelos-de-ata.js";
 import { alerta, campo, confirmar, dica, pararAudio } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
@@ -1144,12 +1145,12 @@ function abaModelos(catalogo, config, gravar, diarizadores = []) {
 // ─────────────────────────────────────────────────────────── aba Atas
 
 /**
- * O formato da ata (ATA-5). A aba nasce com uma linha e recebe os modelos de
- * ata editáveis depois (spec da ata por tema, §8).
+ * O formato da ata (ATA-5) e os modelos de cada tipo, para ver e ajustar
+ * (modelos-de-ata.js).
  *
  * Rádio, como o tema: são dois formatos, e nenhum é "desligado".
  */
-function abaAtas(config, gravar) {
+function abaAtas(config, gravar, tipos) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
@@ -1195,6 +1196,7 @@ function abaAtas(config, gravar) {
       controle: grupo,
     }),
   ));
+  painel.appendChild(secaoDeModelos(tipos));
   return painel;
 }
 
@@ -1412,7 +1414,7 @@ export async function telaDeAjustes(ctx, aba = "geral") {
       gravador: () => abaGravador({ gravador, dispositivos, config }, mexerNoGravador, gravar),
       modelos: () => abaModelos(catalogo, config, gravar, diarizadores ?? []),
       transcricao: () => abaTranscricao(config, gravar),
-      atas: () => abaAtas(config, gravar),
+      atas: () => abaAtas(config, gravar, tipos ?? []),
       clientes: () => abaClientes({
         clientes, catalogo, diarizadores: diarizadores ?? [],
         gravacoes: gravacoes ?? [], tipos: tipos ?? [],

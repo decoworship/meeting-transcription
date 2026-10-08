@@ -2614,3 +2614,50 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   -webkit-backdrop-filter: var(--camada-filtro);
   backdrop-filter: var(--camada-filtro);
 }
+
+/* ── Ajustes › Atas › Modelos de ata: mestre-detalhe como Clientes (parte 2 da
+ * ATA-5). O texto do modelo é o que a IA lê, então vai em fonte de código e
+ * com altura de quem vai ler e escrever nele. */
+.modelos-ata { padding: 0; gap: 0; overflow: hidden; }
+.modelos-ata__cabeca { padding: var(--espaco-5); border-bottom: 1px solid var(--cor-borda); }
+.modelos-ata__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.modelos-ata__corpo { display: grid; grid-template-columns: minmax(11rem, 14rem) 1fr; min-height: 30rem; }
+.modelos-ata__mestre { border-right: 1px solid var(--cor-borda); min-width: 0; }
+.modelos-ata__tipo {
+  display: grid; gap: var(--espaco-1); width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0; border-bottom: 1px solid var(--cor-borda);
+  background: transparent; color: var(--cor-texto); font: inherit; text-align: left; cursor: pointer;
+}
+.modelos-ata__tipo:hover { background: var(--cor-superficie-2); }
+.modelos-ata__tipo[aria-current="true"] { background: var(--cor-acao-suave); }
+.modelos-ata__tipo:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.modelos-ata__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.modelos-ata__sub { color: var(--cor-texto-suave); font-size: var(--texto-rotulo); }
+.modelos-ata__detalhe { min-width: 0; padding: var(--espaco-4) var(--espaco-5); display: grid; gap: var(--espaco-3); align-content: start; }
+.modelos-ata__vazio { margin: 0; }
+.modelos-ata__topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--espaco-3); flex-wrap: wrap; }
+.modelos-ata__topo > div:first-child { display: flex; align-items: center; gap: var(--espaco-2); flex-wrap: wrap; }
+.modelos-ata__titulo { margin: 0; font-size: var(--texto-corpo); }
+.modelos-ata__acoes { display: flex; gap: var(--espaco-2); flex-wrap: wrap; }
+.modelos-ata__rotulo { margin: 0; font-size: var(--texto-rotulo); font-weight: 600; color: var(--cor-texto-suave); }
+.modelos-ata__resumo { display: grid; gap: var(--espaco-2); }
+.modelos-ata__secoes { margin: 0; padding-left: var(--espaco-5); display: grid; gap: var(--espaco-1); font-size: var(--texto-pequeno); }
+.modelos-ata__secoes li .aa-etiqueta { margin-left: var(--espaco-2); }
+.modelos-ata__agrupa { display: flex; align-items: center; gap: var(--espaco-2); font-size: var(--texto-pequeno); }
+.modelos-ata__agrupa input { accent-color: var(--cor-acao); }
+textarea.modelos-ata__texto {
+  width: 100%; height: auto; min-height: 26rem; resize: vertical;
+  font-family: var(--fonte-mono); font-size: var(--texto-rotulo); line-height: 1.5;
+}
+.modelos-ata__original summary { cursor: pointer; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.modelos-ata__original pre {
+  max-height: 20rem; overflow: auto; margin: var(--espaco-2) 0 0; padding: var(--espaco-3);
+  background: var(--cor-superficie-2); border-radius: var(--raio-medio);
+  font-family: var(--fonte-mono); font-size: var(--texto-rotulo); white-space: pre-wrap;
+}
+.modelos-ata__pe { display: flex; align-items: center; gap: var(--espaco-3); }
+@media (max-width: 760px) {
+  .modelos-ata__corpo { grid-template-columns: 1fr; }
+  .modelos-ata__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
+}
