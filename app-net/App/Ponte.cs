@@ -207,6 +207,11 @@ internal sealed class Resposta
     /// <summary>A ata em Markdown, ou nulo quando ainda não existe.</summary>
     [JsonPropertyName("ata")] public string? Ata { get; init; }
 
+    [JsonPropertyName("modelo_de_ata")] public ModeloDeAtaAberto? ModeloDeAta { get; init; }
+
+    /// <summary>O id do tipo de ata recém-criado.</summary>
+    [JsonPropertyName("criado")] public string? Criado { get; init; }
+
     /// <summary>O <c>ata.observacoes.md</c>, quando a ata foi gerada por tema (ATA-5).</summary>
     [JsonPropertyName("observacoes")] public string? Observacoes { get; init; }
 
@@ -429,6 +434,33 @@ internal sealed class TipoDeAtaResumo
 
     /// <summary>Veio da pasta do perfil: a tela oferece "voltar ao original".</summary>
     [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
+
+    /// <summary>Vem de dentro do app: personalizado volta ao original, e não se apaga.</summary>
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
+}
+
+/// <summary>Um modelo de ata aberto em Ajustes › Atas, para ver e ajustar.</summary>
+internal sealed class ModeloDeAtaAberto
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+    [JsonPropertyName("secoes")] public required List<SecaoDoModeloResumo> Secoes { get; init; }
+    [JsonPropertyName("agrupa")] public bool Agrupa { get; init; }
+    [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
+
+    /// <summary>A versão do app mudou o modelo depois que o usuário o personalizou.</summary>
+    [JsonPropertyName("original_mudou")] public bool OriginalMudou { get; init; }
+
+    /// <summary>O texto do app, para comparar com a cópia; nulo nos tipos do usuário.</summary>
+    [JsonPropertyName("original")] public string? Original { get; init; }
+}
+
+internal sealed class SecaoDoModeloResumo
+{
+    [JsonPropertyName("titulo")] public required string Titulo { get; init; }
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -813,13 +845,44 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // ─────────────────────────────────────────────── atas
 
                 case "modelos-de-ata":
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
+                    break;
+
+                case "ler-modelo-de-ata":
+                {
+                    var m = ModelosDeAta.Buscar(p.Modelo)
+                        ?? throw new InvalidOperationException($"tipo desconhecido: {p.Modelo}");
                     Responder(new Resposta
                     {
                         Id = p.Id,
-                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        ModeloDeAta = new ModeloDeAtaAberto
                         {
-                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
-                        })],
+                            Id = m.Id, Nome = m.Nome, Texto = m.Texto,
+                            Secoes = [.. ModelosDeAta.Resumo(m).Select(x => new SecaoDoModeloResumo
+                            {
+                                Titulo = x.Titulo, DoApp = x.DoApp,
+                            })],
+                            Agrupa = m.ItensPorSecao,
+                            DoUsuario = m.DoUsuario,
+                            DoApp = ModelosDeAta.EhDoApp(m.Id),
+                            OriginalMudou = ModelosDeAta.OriginalMudou(m.Id),
+                            Original = m.DoUsuario ? ModelosDeAta.Original(m.Id) : null,
+                        },
+                    });
+                    break;
+                }
+
+                case "salvar-modelo-de-ata":
+                    ModelosDeAta.Salvar(p.Modelo ?? "", p.Texto ?? "");
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
+                    break;
+
+                case "novo-modelo-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Criado = ModelosDeAta.Criar(p.Modelo ?? "", p.Nome ?? ""),
+                        Tipos = TiposDeAta(),
                     });
                     break;
 
@@ -870,16 +933,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     });
                     break;
 
+                // Volta ao original os tipos do app, e apaga os criados pelo usuário.
                 case "restaurar-tipo-de-ata":
                     ModelosDeAta.VoltarAoOriginal(p.Modelo ?? "");
-                    Responder(new Resposta
-                    {
-                        Id = p.Id,
-                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
-                        {
-                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
-                        })],
-                    });
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
                     break;
 
                 // ─────────────────────────────────── notas da reunião
@@ -2274,6 +2331,12 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             ? texto
             : "o modelo devolveu uma resposta vazia.";
     }
+
+    private static List<TipoDeAtaResumo> TiposDeAta() =>
+        [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+        {
+            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario, DoApp = ModelosDeAta.EhDoApp(m.Id),
+        })];
 
     private void GerarAta(Pedido p)
     {
