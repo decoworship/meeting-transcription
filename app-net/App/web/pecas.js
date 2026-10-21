@@ -397,6 +397,130 @@ function caixa(titulo, texto) {
   return { dialogo, corpo, acoes };
 }
 
+/**
+ * Uma imagem da reunião em tamanho grande, na mesma caixa do `avisar()`.
+ *
+ * @param opcoes.legenda o que está escrito na linha da imagem, quando há.
+ * @param opcoes.acoes `[{ rotulo, fazer }]` — botões secundários antes do
+ *        "Fechar". Cada um fecha a caixa e então faz o que diz.
+ */
+export function verImagem(src, titulo, opcoes = {}) {
+  const { dialogo, corpo, acoes } = caixa(titulo, opcoes.legenda ?? "");
+  dialogo.classList.add("modal--imagem");
+
+  const img = document.createElement("img");
+  img.className = "modal__imagem";
+  img.src = src;
+  img.alt = opcoes.legenda || titulo;
+  corpo.insertBefore(img, corpo.children[1] ?? null);
+
+  for (const { rotulo, fazer } of opcoes.acoes ?? []) {
+    const b = document.createElement("button");
+    b.className = "aa-btn aa-btn-secundario";
+    b.type = "button";
+    b.textContent = rotulo;
+    b.addEventListener("click", () => { dialogo.close(""); fazer(); });
+    acoes.appendChild(b);
+  }
+  const fechar = document.createElement("button");
+  fechar.className = "aa-btn aa-btn-primario";
+  fechar.type = "button";
+  fechar.textContent = "Fechar";
+  fechar.addEventListener("click", () => dialogo.close(""));
+  acoes.appendChild(fechar);
+  corpo.appendChild(acoes);
+
+  abrirCaixa(dialogo, () => {}, fechar);
+}
+
+/**
+ * Os nomes lidos num print, com uma caixinha cada, para a pessoa confirmar
+ * quem estava na reunião (UI-12).
+ *
+ * @param carregar `async () => ({ nomes_lidos, parece_reuniao })` — a leitura
+ *        leva alguns segundos (sobe o motor de OCR), e a caixa abre antes
+ *        dizendo isso, em vez de o clique parecer não ter feito nada.
+ * @returns os nomes marcados, ou `null` se a pessoa desistiu ou a leitura
+ *          falhou. Nunca rejeita.
+ */
+export function escolherParticipantes(carregar) {
+  return new Promise((resolver) => {
+    const { dialogo, corpo, acoes } = caixa("Quem estava na reunião",
+      "Lendo os nomes do print… leva alguns segundos.");
+    dialogo.classList.add("modal--participantes");
+    const texto = corpo.querySelector(".modal__texto");
+    texto.setAttribute("role", "status");
+
+    const lista = document.createElement("div");
+    lista.className = "participantes";
+    corpo.insertBefore(lista, acoes.parentNode === corpo ? acoes : null);
+
+    const cancelar = document.createElement("button");
+    cancelar.className = "aa-btn aa-btn-secundario";
+    cancelar.type = "button";
+    cancelar.textContent = "Cancelar";
+    cancelar.addEventListener("click", () => dialogo.close(""));
+
+    const guardar = document.createElement("button");
+    guardar.className = "aa-btn aa-btn-primario";
+    guardar.type = "button";
+    guardar.textContent = "Guardar participantes";
+    guardar.disabled = true;
+    guardar.addEventListener("click", () => dialogo.close("sim"));
+
+    acoes.append(cancelar, guardar);
+    corpo.appendChild(acoes);
+
+    const caixinhas = [];
+    const contar = () => {
+      const n = caixinhas.filter((c) => c.entrada.checked).length;
+      guardar.disabled = n === 0;
+      guardar.textContent = n ? `Guardar ${n} ${n === 1 ? "participante" : "participantes"}` : "Guardar participantes";
+    };
+
+    abrirCaixa(dialogo, () => resolver(dialogo.returnValue === "sim"
+      ? caixinhas.filter((c) => c.entrada.checked).map((c) => c.nome) : null), cancelar);
+
+    carregar().then((r) => {
+      const nomes = r.nomes_lidos ?? [];
+      if (!nomes.length) {
+        texto.textContent = "Nenhum nome de pessoa foi achado nesta imagem.";
+        return;
+      }
+      // Num slide ou numa planilha, os "nomes" podem ser linhas de tabela: vêm
+      // desmarcados, e a frase diz por quê.
+      texto.textContent = r.parece_reuniao
+        ? "Desmarque quem não é participante."
+        : "Esta imagem não parece a tela da reunião. Marque só quem estava nela.";
+      for (const n of nomes) {
+        const rotulo = document.createElement("label");
+        rotulo.className = "participantes__item";
+        const entrada = document.createElement("input");
+        entrada.type = "checkbox";
+        entrada.checked = Boolean(r.parece_reuniao || n.guardado);
+        entrada.addEventListener("change", contar);
+        const nome = document.createElement("span");
+        nome.className = "participantes__nome";
+        nome.textContent = n.nome;
+        const detalhe = document.createElement("span");
+        detalhe.className = "participantes__detalhe";
+        detalhe.textContent = [
+          n.original !== n.nome ? `no print: ${n.original}` : null,
+          n.convidado ? "na agenda" : null,
+          n.guardado ? "já guardado" : null,
+        ].filter(Boolean).join(" · ");
+        rotulo.append(entrada, nome, detalhe);
+        lista.appendChild(rotulo);
+        caixinhas.push({ entrada, nome: n.nome });
+      }
+      contar();
+      caixinhas[0]?.entrada.focus();
+    }).catch((e) => {
+      texto.textContent = `Não deu para ler os nomes: ${e.message}`;
+    });
+  });
+}
+
 /** Mostra a caixa, devolve o resultado e some — inclusive do DOM. */
 function abrirCaixa(dialogo, aoFechar, focoInicial) {
   dialogo.addEventListener("close", () => {

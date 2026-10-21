@@ -8,6 +8,9 @@ namespace MeetingApp.Sidecar;
 /// <summary>Erro do lado do motor, ou do canal com ele.</summary>
 public sealed class MotorException(string mensagem) : Exception(mensagem);
 
+/// <summary>Uma linha de texto que o OCR leu, e o retângulo dela na imagem.</summary>
+public sealed record LinhaLida(string Texto, double Confianca, int X0, int Y0, int X1, int Y1);
+
 /// <summary>
 /// Um motor rodando como processo separado, falando o protocolo por linha do
 /// <c>docs/SIDECAR.md</c>.
@@ -281,6 +284,28 @@ public sealed class MotorSidecar : IDisposable
         return new VozExtraida(
             m.Vetor ?? throw new MotorException("o motor não devolveu vetor de voz."),
             m.ModeloDaVoz);
+    }
+
+    /// <summary>
+    /// As linhas de texto de uma imagem, pelo motor de OCR.
+    /// </summary>
+    /// <remarks>
+    /// Só o texto e onde ele está. O que é nome de gente e o que é botão do
+    /// Teams é decisão do núcleo (<c>NomesDoPrint</c>), que tem testes; o motor
+    /// só sabe transformar pixels em texto.
+    /// </remarks>
+    public async Task<IReadOnlyList<LinhaLida>> LerTextoAsync(string caminhoDaImagem,
+                                                             CancellationToken ct = default)
+    {
+        var m = await ExecutarAsync(
+            new Requisicao { Id = _proximoId++, Op = "ler", Imagem = caminhoDaImagem },
+            null, ct);
+
+        return [.. (m.Linhas ?? [])
+            .Where(l => l.Texto is { Length: > 0 })
+            .Select(l => l.Caixa is [var x0, var y0, var x1, var y1]
+                ? new LinhaLida(l.Texto!, l.Confianca, x0, y0, x1, y1)
+                : new LinhaLida(l.Texto!, l.Confianca, 0, 0, 0, 0))];
     }
 
     /// <summary>

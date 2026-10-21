@@ -240,9 +240,13 @@ export async function telaDoGravador(ctx) {
   const acoes = el("div", "grav-faixa__acoes");
   const marcar = botao("aa-btn-primario grav-marcar", "Marcar momento");
   marcar.prepend(icone("i-marca"));
+  // O print da tela vai para capturas/ e entra nas notas com o momento. Com o
+  // app na frente, o print é do monitor dele sem ele — a reunião que está atrás.
+  const capturar = botao("aa-btn-secundario grav-capturar", "Capturar tela");
+  capturar.prepend(icone("i-print"));
   const mutar = botao("aa-btn-secundario", "Mutar");
   const parar = botao("aa-btn-secundario grav-parar", "Parar");
-  acoes.append(marcar, mutar, parar);
+  acoes.append(marcar, capturar, mutar, parar);
   faixa.append(ponto, tempo, info, medidores, acoes);
 
   // O aviso de mudo e as falhas de dispositivo: logo abaixo da faixa, que é
@@ -295,13 +299,26 @@ export async function telaDoGravador(ctx) {
   const perguntas = painelDePerguntas();
   // A dica e o "salvo" das notas numa linha só, embaixo, como na prancha.
   const rodapeNotas = el("div", "grav-abas__dica");
-  rodapeNotas.append(el("span", "", "Marcar momento põe o tempo onde está o cursor."),
-                     notas.raiz.querySelector(".notas__estado"));
+  const dicaNotas = el("span", "", "");
+  // O "Inserir imagem" das notas mora aqui: a fileira de ações delas some
+  // dentro da aba (o Marcar momento está na faixa).
+  const inserirImagem = botao("aa-btn-texto aa-btn--pequeno grav-abas__inserir", "Inserir imagem");
+  inserirImagem.addEventListener("click", () => notas.escolherImagem());
+  rodapeNotas.append(dicaNotas, inserirImagem, notas.raiz.querySelector(".notas__estado"));
+  let atalhoDesenhado;
+  function desenharDicaDasNotas(atalho) {
+    if (atalho === atalhoDesenhado) return;
+    atalhoDesenhado = atalho;
+    dicaNotas.textContent = "Marcar momento põe o tempo onde está o cursor. "
+      + (atalho ? `${atalho} captura a tela de qualquer janela; ` : "")
+      + "Ctrl+V cola uma imagem.";
+  }
+  desenharDicaDasNotas(estado.atalho_de_captura ?? null);
 
   const paineis = {};
   const botoesAba = {};
   for (const [id, rotulo, conteudo] of [
-    ["notas", "Notas", [notas.raiz, rodapeNotas]],
+    ["notas", "Notas", [notas.raiz, notas.imagens, rodapeNotas]],
     ["perguntar", "Perguntar", [perguntas.raiz]],
   ]) {
     const b = el("button", "grav-abas__aba", rotulo);
@@ -474,6 +491,9 @@ export async function telaDoGravador(ctx) {
     ponto.title = g.status;
     tempo.textContent = relogio(g.duracao_s);
     rotularMutar(g.mudo);
+    desenharDicaDasNotas(g.atalho_de_captura ?? null);
+    capturar.title = g.atalho_de_captura
+      ? `Ou ${g.atalho_de_captura}, de qualquer janela` : "";
     faixa.dataset.mudo = String(Boolean(g.mudo));
 
     if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
@@ -867,6 +887,14 @@ export async function telaDoGravador(ctx) {
 
   marcar.addEventListener("click", () => {
     if (notas.marcarMomento({ focar: abaAtiva === "notas" })) previa.marcarMomento();
+  });
+  // A linha chega às notas pelo evento "captura", como a do atalho; aqui só se
+  // segura o botão o bastante para o clique duplo não virar dois prints.
+  capturar.addEventListener("click", async () => {
+    capturar.disabled = true;
+    try { await chamar("capturar-tela"); } finally {
+      setTimeout(() => { capturar.disabled = false; }, 800);
+    }
   });
   // Um mutar por vez: dois cliques rápidos mandariam dois e desfariam o mudo.
   let mutando = false;

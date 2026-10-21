@@ -31,6 +31,10 @@ PLATAFORMA="x86_64-pc-windows-msvc"
 # `transcribe.cpp` ainda está em 0.x — onde a compatibilidade não é promessa.
 TRANSCRIBE_CPP_VERSAO="0.2.3"
 
+# O leitor de nomes (UI-12, motores/ocr). Cravado junto dos hashes dos modelos
+# em tools/empacotar_modelos_de_ocr.sh: os modelos são os da mesma versão.
+RAPIDOCR_VERSAO="3.10.0"
+
 # **1.23.2 e não "a mais nova", e isto não é conservadorismo.** O que o
 # `uv`/`pip` resolvem por padrão hoje é a 1.30, que é um build de **CUDA 13**:
 # ela não carrega contra as nossas DLLs de CUDA 12 (`cublasLt64_13.dll` /
@@ -102,7 +106,13 @@ uv pip install \
   --python-version 3.12 \
   --only-binary=:all: \
   faster-whisper \
-  "pyannote.core" "pyannote.pipeline" einops scipy scikit-learn
+  "pyannote.core" "pyannote.pipeline" einops scipy scikit-learn \
+  "rapidocr==$RAPIDOCR_VERSAO"
+
+# O RapidOCR traz o opencv-python-headless (sem a interface gráfica do OpenCV),
+# o shapely, o pyclipper e o pillow — ~130 MB em 21/10/2026. Ele não declara o
+# onnxruntime: usa o que estiver instalado, e aqui é o -gpu da última etapa. O
+# motor de OCR roda na CPU de propósito (motores/ocr/motor.py).
 
 # **Ele vem ANTES da etapa do CUDA, e isso não é arrumação.** O
 # `uv pip install` num `--target` re-resolve o ambiente inteiro, então qualquer
@@ -205,13 +215,16 @@ echo "==> os sidecars"
 # **A legenda estava na régua e não estava na cópia** desde 18/09/2026, quando
 # o MOSS saiu e levou junto a linha que criava a pasta: o script reprovava a si
 # mesmo no fim. Corrigido em 22/09/2026, na mesma varredura que tirou o torch.
-mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos" "$DESTINO/legenda"
+mkdir -p "$DESTINO/asr" "$DESTINO/diarizacao" "$DESTINO/modelos" "$DESTINO/legenda" "$DESTINO/ocr"
 cp "$RAIZ/motores/asr/motor.py" "$DESTINO/asr/"
 cp "$RAIZ/motores/diarizacao/motor.py" "$DESTINO/diarizacao/"
 # O motor de modelos não traz dependência nova: a huggingface_hub já vem
 # junto do faster-whisper, que a usa para baixar por conta própria.
 cp "$RAIZ/motores/modelos/motor.py" "$DESTINO/modelos/"
 cp "$RAIZ/motores/legenda/motor.py" "$DESTINO/legenda/"
+# Os modelos do OCR (31 MB) vêm do tools/empacotar_modelos_de_ocr.sh, como os
+# de diarização vêm do script deles.
+cp "$RAIZ/motores/ocr/motor.py" "$DESTINO/ocr/"
 
 # A diarização é o único motor com pacote próprio: o `motor.py` importa de
 # `pipeline/` (fbank, sessao, segmentacao, embedding, diarizacao, vendor/), e
@@ -258,6 +271,13 @@ for proibido in torch torchaudio pyannote/audio; do
       provavelmente o pyannote.audio, que é de onde ele sempre veio."
 done
 echo "    torch: fora"
+
+# O leitor de nomes sobe e responde "falta o RapidOCR" na primeira leitura, e
+# não aqui: a régua é o que faz isso aparecer antes do instalador.
+for pacote in rapidocr cv2 shapely pyclipper PIL; do
+  [[ -e "$SITE/$pacote" ]] || reprovar "falta o $pacote — o leitor de nomes (motores/ocr) não sobe sem ele"
+done
+echo "    rapidocr: dentro"
 
 # **O build de CUDA, e não só "tem onnxruntime".** A 1.30, que é o que o
 # resolvedor entrega sem pino, é CUDA 13: ela instala, importa, e o CUDA EP não

@@ -83,7 +83,7 @@ public static class GeracaoDeAta
             DuracaoS = dados.Duration ?? 0,
             Falantes = [.. dados.Segments.Select(s => s.Speaker)
                 .Where(s => s is { Length: > 0 }).Distinct()!],
-            Notas = Notas.Ler(pasta),
+            Notas = Notas.SemImagens(Notas.Ler(pasta)),
             Vocabulario = projetos?.Preferencias(cliente ?? "", projeto ?? "")?.InitialPrompt ?? "",
         };
     }

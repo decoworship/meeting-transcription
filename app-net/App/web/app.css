@@ -788,6 +788,79 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .notas__momento:focus-visible { outline: none; box-shadow: var(--anel-foco); }
 .notas__marca { font-family: var(--fonte-mono); color: var(--cor-acao); }
 
+/* As imagens das notas: o print do atalho e o que se colou. Miniaturas numa
+ * fileira que quebra, cada uma um botão que amplia. A altura é fixa e a
+ * largura segue a imagem, porque print de monitor largo e recorte de slide
+ * têm proporções muito diferentes. */
+.notas__imagens { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
+.notas__imagens[hidden] { display: none; }
+.notas__imagem {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: var(--espaco-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-rotulo);
+  cursor: zoom-in;
+}
+.notas__imagem:hover { border-color: var(--cor-acao); }
+.notas__imagem:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.notas__miniatura {
+  display: block;
+  height: 4.5rem;
+  max-width: 10rem;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--cor-superficie-2);
+}
+/* No momento marcado, a imagem é um selo do tamanho da linha. */
+.notas__momento-imagem {
+  height: 1.25em;
+  max-width: 2.5em;
+  object-fit: cover;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+/* A imagem ampliada: a caixa cresce até quase a janela, e a imagem cabe nela
+ * sem cortar — um print de 4K tem de ser legível, não decorativo. */
+.modal--imagem { width: min(80rem, 94vw); }
+
+/* Quem estava na reunião (UI-12): uma caixinha por nome lido no print. A
+ * lista rola dentro da caixa — uma galeria cheia do Teams passa de vinte. */
+.participantes { display: grid; gap: var(--espaco-1); max-height: 50vh; overflow-y: auto; }
+.participantes:empty { display: none; }
+.participantes__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--espaco-2);
+  align-items: baseline;
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+}
+.participantes__item:hover { background: var(--cor-superficie-2); }
+.participantes__nome { font-weight: 600; }
+.participantes__detalhe {
+  grid-column: 2;
+  font-size: var(--texto-rotulo);
+  color: var(--cor-texto-suave);
+}
+.participantes__detalhe:empty { display: none; }
+.modal__imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie-2);
+}
+
 /* Os termos que as notas sugeriram, como etiquetas clicáveis. */
 .sugestoes {
   display: flex;
@@ -1992,6 +2065,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   margin: var(--espaco-2) 0 0; font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
 }
 .grav-abas .notas__topo { display: none; }
+/* As miniaturas ficam entre o campo e o rodapé, fora da grade do bloco. */
+.grav-abas__painel > .notas__imagens { flex: 0 0 auto; margin-top: var(--espaco-2); max-height: 12rem; overflow-y: auto; }
+.grav-abas__dica { align-items: center; }
+.grav-abas__inserir { flex: 0 0 auto; }
 
 .grav-sem-legenda[hidden] { display: none; }
 
@@ -2400,10 +2477,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .chip-gravando[data-mudo="true"] .chip-gravando__ponto { background: var(--cor-destaque); }
 
 /* A bandeirinha do momento: no botão da faixa e na etiqueta da legenda. */
-.grav-marcar .icone, .fala__momento .icone {
+.grav-marcar .icone, .grav-capturar .icone, .fala__momento .icone {
   width: 16px; height: 16px; flex: none;
 }
-.grav-marcar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
+.grav-marcar, .grav-capturar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
 .fala__momento { align-items: center; gap: var(--espaco-2); }
 .fala__momento .icone { width: 13px; height: 13px; }
 

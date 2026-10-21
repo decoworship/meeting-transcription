@@ -57,6 +57,13 @@ internal sealed class Aplicacao : IDisposable
 
         _bandeja = new Bandeja.Bandeja(_gravador, _ancora, MostrarJanela, Sair);
 
+        // O print da tela: o atalho global e o botão do Gravador dão no mesmo
+        // lugar. O atalho só existe enquanto se grava.
+        _ancora.AoAtalhoDeCaptura = () => CapturarTela(peloAtalho: true);
+        _gravador.AoPedirCaptura += () => CapturarTela(peloAtalho: false);
+        _gravador.AoComecar += _ => LigarAtalhoDeCaptura();
+        _gravador.AoTerminar += DesligarAtalhoDeCaptura;
+
         ReleraAgendaEmSegundoPlano();
     }
 
@@ -166,6 +173,98 @@ internal sealed class Aplicacao : IDisposable
     {
         if (_janela is { Pronta: true, Visivel: true } j)
             j.Enviar(Ponte.EventoDoGravador(_gravador));
+    }
+
+    // ───────────────────────────────────────────────── print da tela
+
+    private void LigarAtalhoDeCaptura()
+    {
+        bool ligou = _ancora.LigarAtalhoDeCaptura();
+        _gravador.AtalhoDeCaptura = ligou ? JanelaDeMensagens.NomeDoAtalho : null;
+        if (!ligou)
+            Nucleo.Registro.Escrever("captura",
+                $"o atalho {JanelaDeMensagens.NomeDoAtalho} é de outro programa; só o botão captura");
+    }
+
+    private void DesligarAtalhoDeCaptura()
+    {
+        _ancora.DesligarAtalhoDeCaptura();
+        _gravador.AtalhoDeCaptura = null;
+    }
+
+    /// <summary>
+    /// Tira o print, guarda em <c>capturas/</c> e põe a linha nas notas.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O print na thread da UI, o PNG fora dela.</b> O <c>BitBlt</c> leva
+    /// milissegundos e tem de ser agora — é o momento que a pessoa quis
+    /// guardar —, e esconder a janela do print só vale na thread dela. Já
+    /// codificar um 4K leva centenas de milissegundos, e o laço que ficasse
+    /// esperando é o mesmo que despacha a bandeja e os medidores.
+    /// </para>
+    /// <para>
+    /// <b>A linha vai para o disco antes de ir para a tela.</b> A janela pode
+    /// estar fechada, ou em outra tela; o <c>notas.md</c> é o que sobrevive.
+    /// Quem tem o campo aberto recebe o evento e põe a mesma linha nele.
+    /// </para>
+    /// </remarks>
+    private void CapturarTela(bool peloAtalho)
+    {
+        if (!_gravador.Estado.Gravando || _gravador.PastaAtual is not { Length: > 0 } pasta) return;
+        double segundos = _gravador.DuracaoAtual;
+
+        CapturaDeTela.Quadro quadro;
+        try
+        {
+            quadro = CapturaDeTela.DoMonitorEmFoco(_janela?.Hwnd ?? IntPtr.Zero);
+        }
+        catch (Exception e)
+        {
+            FalhouACaptura(e.Message, peloAtalho);
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                byte[] png = Png.Codificar(quadro.Largura, quadro.Altura, quadro.Bgra, quadro.Largura * 4);
+                string caminho = Capturas.Guardar(pasta, png, Capturas.NomeNoMomento("tela", segundos));
+                string linha = Capturas.LinhaDaNota(caminho, segundos);
+                Capturas.AnexarANotas(pasta, linha);
+
+                var captura = new CapturaJson { Gravacao = pasta, Caminho = caminho, Linha = linha };
+                _ancora.Executar(() =>
+                {
+                    EnviarAPagina(Ponte.EventoDaCaptura(captura, null));
+                    // Só pelo atalho: quem clicou no botão está olhando o
+                    // campo das notas, e vê a linha chegar.
+                    if (peloAtalho)
+                        _bandeja.AvisarDoApp($"Tela capturada em {Capturas.Relogio(segundos)}. Está nas notas.");
+                });
+            }
+            catch (Exception e)
+            {
+                _ancora.Executar(() => FalhouACaptura(e.Message, peloAtalho));
+            }
+        });
+    }
+
+    private void FalhouACaptura(string motivo, bool peloAtalho)
+    {
+        Nucleo.Registro.Escrever("captura", $"o print falhou: {motivo}");
+        EnviarAPagina(Ponte.EventoDaCaptura(null, $"O print não foi salvo: {motivo}"));
+        if (peloAtalho) _bandeja.AvisarDoApp($"O print não foi salvo: {motivo}");
+    }
+
+    /// <summary>
+    /// Para a página mesmo escondida: o campo das notas continua vivo atrás da
+    /// janela fechada, e é ele que precisa da linha.
+    /// </summary>
+    private void EnviarAPagina(string json)
+    {
+        if (_janela is { Pronta: true } j) j.Enviar(json);
     }
 
     // ─────────────────────────────────────────────────────────── saída

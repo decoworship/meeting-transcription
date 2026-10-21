@@ -32,6 +32,12 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
     /// </remarks>
     public string ScriptLegenda { get; init; } = "";
 
+    /// <summary>
+    /// O motor de OCR, que lê os nomes de um print (UI-12). Opcional pelo
+    /// mesmo motivo da legenda: sem ele o app grava e transcreve igual.
+    /// </summary>
+    public string ScriptOcr { get; init; } = "";
+
     /// <summary>O arranjo esperado do app instalado: <c>motores/</c> ao lado do .exe.</summary>
     public static Motores AoLadoDoExecutavel()
     {
@@ -43,6 +49,7 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             Path.Combine(raiz, "modelos", "motor.py"))
         {
             ScriptLegenda = Path.Combine(raiz, "legenda", "motor.py"),
+            ScriptOcr = Path.Combine(raiz, "ocr", "motor.py"),
         };
     }
 

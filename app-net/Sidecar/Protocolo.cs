@@ -171,8 +171,22 @@ internal sealed class Mensagem
     /// <summary>Falantes ao vivo: a vaga do Nemotron a que o <see cref="Vetor"/> pertence.</summary>
     [JsonPropertyName("vaga")] public int? Vaga { get; init; }
 
+    /// <summary>OCR: as linhas de texto da imagem (motores/ocr/motor.py).</summary>
+    [JsonPropertyName("linhas")] public List<LinhaOcrJson>? Linhas { get; init; }
+    [JsonPropertyName("largura")] public int? Largura { get; init; }
+    [JsonPropertyName("altura")] public int? Altura { get; init; }
+
     // "erro"
     [JsonPropertyName("mensagem")] public string? MensagemDeErro { get; init; }
+}
+
+internal sealed class LinhaOcrJson
+{
+    [JsonPropertyName("texto")] public string? Texto { get; init; }
+    [JsonPropertyName("confianca")] public double Confianca { get; init; }
+
+    /// <summary><c>[x0, y0, x1, y1]</c> em pixels da imagem.</summary>
+    [JsonPropertyName("caixa")] public int[]? Caixa { get; init; }
 }
 
 /// <remarks>
@@ -215,6 +229,11 @@ internal sealed class Requisicao
     /// obrigaria a inventar um caminho falso para satisfazer o tipo.
     /// </remarks>
     [JsonPropertyName("audio")] public string? Audio { get; init; }
+
+    /// <summary>A imagem a ler, na operação <c>ler</c> do motor de OCR.</summary>
+    [JsonPropertyName("imagem")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Imagem { get; init; }
 
     /// <summary>O repositório do HuggingFace, para a operação de baixar.</summary>
     [JsonPropertyName("repositorio")] public string? Repositorio { get; init; }

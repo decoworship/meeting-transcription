@@ -129,6 +129,13 @@ if [[ ! -f "$DESTINO/motores/diarizacao/modelos/community-1/config.yaml" ]]; the
   echo "       vai tentar o HuggingFace — e sem token embutido ela falha." >&2
 fi
 
+# O leitor de nomes (UI-12) só abre os modelos da pasta dele. Sem eles, o app
+# funciona igual e "Ler nomes desta imagem" responde dizendo o que falta.
+if [[ ! -f "$DESTINO/motores/ocr/modelos/PP-OCRv6_rec_small.onnx" ]]; then
+  echo "AVISO: não achei os modelos de OCR em $DESTINO/motores/ocr/modelos" >&2
+  echo "       Rode tools/empacotar_modelos_de_ocr.sh para o leitor de nomes funcionar." >&2
+fi
+
 # O segredo do Google não é obrigatório para o app abrir, mas sem ele o app
 # fundido perde a agenda inteira — que na Fase 1 vinha embutida no gravador.
 # Avisar alto: é o tipo de perda que só aparece na próxima reunião.
@@ -288,8 +295,8 @@ echo "==> sincronizando os sidecars"
 # **A legenda precisa da pasta criada na mão na primeira vez**, porque ela é
 # motor novo e nenhuma instalação a tem ainda. Copiar sempre que a fonte existe
 # resolve, e é o que a condição abaixo faz.
-for m in asr diarizacao modelos legenda; do
-  [[ "$m" == "legenda" \
+for m in asr diarizacao modelos legenda ocr; do
+  [[ ( "$m" == "legenda" || "$m" == "ocr" ) \
      && ! -d "$DESTINO/motores/$m" && ! -d "$MOTORES_FONTE/$m" \
      && ! -d "$RAIZ/motores/$m" ]] \
     && { echo "    (sem motores/$m nesta instalação — pulando)"; continue; }

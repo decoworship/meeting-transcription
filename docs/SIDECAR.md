@@ -97,6 +97,20 @@ roda no `system.wav` sozinho, porque o que o microfone captou já se sabe de
 quem é — dar o mix ao pyannote o faria tentar separar você de você mesmo. O ASR
 recebe o mix, para enxergar a conversa inteira, sobreposições inclusive.
 
+**O motor de OCR** (`motores/ocr/motor.py`, 21/10/2026) lê uma imagem e
+devolve as linhas de texto, a confiança e onde cada uma está:
+
+```json
+{"id": 1, "op": "ler", "imagem": "C:\\...\\capturas\\tela-00-12-34.png"}
+{"id": 1, "tipo": "resultado", "largura": 1280, "altura": 800,
+ "linhas": [{"texto": "Helena Dias", "confianca": 0.98, "caixa": [10, 300, 120, 318]}]}
+```
+
+Só texto: o que é nome de gente e o que é botão do Teams é decisão do núcleo
+(`Nucleo/NomesDoPrint.cs`). Não fica quente — o núcleo o sobe para um print e o
+derruba —, roda sempre na CPU, e abre os modelos só de `motores/ocr/modelos/`,
+nunca da rede (UI-12 do [BACKLOG](BACKLOG.md)).
+
 ### Motor → cliente, durante
 
 ```json
