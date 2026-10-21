@@ -1,6 +1,6 @@
 {
-  "versao": "0.10.0",
-  "publicada": "2026-10-05",
-  "notas": "Ajustes mais curtos, com a explicação atrás do ⓘ; microfone e áudio da reunião em Ajustes › Gravador; seu nome no lugar de \"You\" nas transcrições; e o visual em vidro.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.10.0"
+  "versao": "0.11.0",
+  "publicada": "2026-10-21",
+  "notas": "A ata do update organizada por tema, pendências que se marcam, modelos de ata editáveis em Ajustes › Atas, o Copiar que cola formatado no e-mail, e o print da reunião nas notas com os nomes lidos dele.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.11.0"
 }

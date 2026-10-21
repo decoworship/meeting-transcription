@@ -3,6 +3,48 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.11.0 — 21/10/2026
+
+A 0.10.0 não chegou a sair como release; quem atualiza da 0.9.1 recebe as duas.
+
+**A ata do update com o cliente agora é organizada por tema.** Antes, cada
+assunto aparecia em até sete lugares — nas decisões, nas pendências, nos riscos —,
+e a ata voltou do cliente como "extensa e repetitiva". Agora cada assunto tem a
+sua seção, e o que se decidiu, o que ficou para fazer e o que preocupa sobre ele
+mora ali dentro. Os rótulos **Decidido**, **Atenção** e **Em aberto** saem
+coloridos na tela e no Word. As observações sobre a transcrição (números
+citados que não entraram, por exemplo) aparecem na tela para você conferir, mas
+não vão para o cliente. Quem preferir a ata de antes escolhe o formato clássico
+em Ajustes › Atas.
+
+**As pendências se marcam na própria ata.** A caixinha de cada pendência
+marca, a linha fica riscada e a contagem de abertas cai na hora.
+
+**Os modelos de ata se editam em Ajustes › Atas.** Cada tipo de ata mostra as
+seções que ele escreve e o texto que a IA lê. Dá para ajustar esse texto,
+voltar ao original ou criar um tipo novo a partir de um existente, e o app avisa
+quando o original mudou numa versão nova depois de você personalizar.
+
+**O Copiar da ata cola formatado no e-mail.** No Gmail, no Outlook ou no Word,
+a ata chega com títulos, negrito, caixinhas e etiquetas, em fundo branco. Onde
+só se aceita texto, ela continua chegando como antes.
+
+**Print da reunião.** "Capturar tela" no Gravador, ou Ctrl+Alt+P durante a
+gravação, guarda um print da tela da reunião nas notas, marcado no minuto em
+que foi tirado — e o PulseMeet não aparece no próprio print. Também dá para
+colar, arrastar ou usar "Inserir imagem" nas notas, o que cobre o recorte do
+Win+Shift+S.
+
+**Quem estava, lido do print.** Em uma imagem das notas, "Ler nomes desta
+imagem" lê os nomes da chamada (no Teams, acertou 34 de 34 nos prints de
+teste). Você confirma quais valem, e eles viram as sugestões do campo de nome
+dos falantes na revisão. A leitura roda no computador, sem enviar a imagem a
+lugar nenhum.
+
+**Esta atualização baixa os motores de novo** (1,8 GB, alguns minutos),
+porque a leitura de nomes é um motor novo. Precisa de internet durante a
+instalação. Nada seu é apagado.
+
 ## 0.10.0 — 05/10/2026
 
 **Ajustes mais curtos.** Cada opção virou uma linha: o nome, uma frase do que
