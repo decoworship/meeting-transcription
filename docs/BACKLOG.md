@@ -254,6 +254,32 @@ próximo update volta a ter o download pesado.
 **Fica para depois:** os presentes pelo print na ata (`Presenca` hoje só cruza
 agenda e falas) — pergunta feita ao dono e ainda sem resposta.
 
+### UI-13 · O Claude lê as reuniões — `feature` · feito em 22/10/2026, sai na 0.11.1
+
+Pedido do dono, 22/10/2026: usar a ata ou a transcrição numa tarefa **sem
+copiar à mão**, tudo local, inclusive tarefas sobre várias reuniões (a linha do
+tempo de um cliente foi o exemplo).
+
+**Como ficou:** `PulseMeet.exe --mcp` é um servidor MCP que o Claude Desktop
+abre e com quem conversa por stdio. Seis ferramentas só de leitura (listar
+clientes e reuniões, ler ata e transcrição, buscar, a reunião aberta), a ata e a
+transcrição de cada reunião como recursos no **+** do Claude, e três prompts
+(`timeline`, `follow-up`, `preparar-reuniao`). Ajustes › Geral › **Claude**
+põe a entrada no `claude_desktop_config.json`, mexendo numa chave só. Tudo em
+[INTEGRACAO-CLAUDE.md](INTEGRACAO-CLAUDE.md).
+
+**Medido** com o binário publicado, no Windows, sobre 187 gravações: oito
+pedidos em 3,4 s, contando uma busca no acervo inteiro.
+
+**Instalado e conectado** na máquina do dono em 22/10/2026, e sai na 0.11.1.
+Os `PulseMeet.exe --mcp` que o Claude Desktop deixa abertos **travam o
+`publicar.sh`** como se o app estivesse aberto: a linha de comando diz qual é
+qual, e encerrá-los é seguro — só leem —, mas o Claude precisa ser reaberto.
+
+**Fica para depois**, sem gatilho: escrever de volta (um dossiê do cliente que
+o app mostra), filtrar por pessoa, paginação dos recursos se o acervo crescer, e
+a extensão `.mcpb` no lugar do botão.
+
 ## 2. Ata: formato e saída
 
 **Qualidade da ata não está aqui** — omissão, cobertura e escolha de modelo

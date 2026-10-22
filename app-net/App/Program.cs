@@ -1,5 +1,9 @@
+using System.Text;
 using MeetingApp.App.Bandeja;
 using MeetingApp.App.Nativo;
+using MeetingApp.Nucleo;
+using MeetingApp.Nucleo.Claude;
+using MeetingRecorder.Core;
 
 namespace MeetingApp.App;
 
@@ -42,6 +46,11 @@ internal static class Programa
     /// <c>--web &lt;pasta&gt;</c> serve a interface do disco em vez dos recursos
     /// embutidos, para desenhar sem recompilar. Ver <see cref="Conteudo"/>.
     /// </para>
+    /// <para>
+    /// <c>--mcp</c> não abre app nenhum: vira o servidor MCP que o Claude
+    /// Desktop abre e com quem conversa por stdin/stdout. Ver
+    /// <see cref="ServirAoClaude"/>.
+    /// </para>
     /// </param>
     [STAThread]
     private static int Main(string[] args)
@@ -51,6 +60,11 @@ internal static class Programa
             int i = Array.IndexOf(args, nome);
             return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         }
+
+        // Antes do mutex, e é o ponto: o Claude Desktop abre este processo com
+        // o app de pé, e pela regra de baixo ele pediria a janela à outra
+        // instância e sairia — o Claude veria o servidor morrer ao nascer.
+        if (args.Contains("--mcp")) return ServirAoClaude(Opcao("--gravacoes"));
 
         // Segunda instância não abre um segundo ícone na bandeja nem disputa os
         // dispositivos: pede a janela à que já está de pé e sai. É o que faz
@@ -81,6 +95,42 @@ internal static class Programa
                 + "Se a mensagem falar em WebView2, instale o runtime:\n"
                 + "https://developer.microsoft.com/microsoft-edge/webview2/",
                 "Reuniões", Win32.MB_OK | Win32.MB_ICONERROR);
+            return 1;
+        }
+    }
+
+    /// <summary>
+    /// O acervo para o Claude, pelo MCP, até o Claude fechar a entrada.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Funciona com o app fechado, e não toca em nada do app aberto</b>: sem
+    /// mutex, sem bandeja, sem WebView2, sem gravador. Lê a mesma pasta das
+    /// gravações que o app usa, resolvida pelo mesmo caminho.
+    /// </para>
+    /// <para>
+    /// O executável é <c>WinExe</c>, e mesmo assim tem stdin e stdout: quem o
+    /// abre com os canais redirecionados os entrega, e o Windows não exige
+    /// console para isso. UTF-8 sem BOM, à mão — a codificação padrão do
+    /// console no Windows é a página de código do sistema, e um BOM no começo
+    /// da primeira resposta seria um JSON inválido.
+    /// </para>
+    /// </remarks>
+    private static int ServirAoClaude(string? pastaDoArgumento)
+    {
+        try
+        {
+            string pasta = PastaDasGravacoes.Resolver(Configuracoes.Carregar(), pastaDoArgumento);
+            var servidor = new ServidorMcp(new Acervo(pasta), Diagnostico.VersaoDoApp());
+            var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+            using var entrada = new StreamReader(Console.OpenStandardInput(), utf8);
+            using var saida = new StreamWriter(Console.OpenStandardOutput(), utf8);
+            servidor.RodarAsync(entrada, saida).GetAwaiter().GetResult();
+            return 0;
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"[mcp] {e}");
             return 1;
         }
     }

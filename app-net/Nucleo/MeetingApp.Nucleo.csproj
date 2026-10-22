@@ -6,6 +6,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- O analisador de trimming no build de todo dia, e não só no publish: o
+         binário entregue sai com PublishTrimmed, e o que o trimming quebra
+         compila e passa nos testes. Ligado em 22/10/2026, quando o JsonArray.Add
+         genérico do MCP (Nucleo/Claude) só foi pego pelo publicar.sh. Ele pega a
+         chamada direta; o [ … ] que cai no mesmo Add<T> só o ILLink do publish
+         vê, e lá é aviso, não erro. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>
