@@ -212,7 +212,7 @@ public static class Exportacao
             corpo.Append("<w:p>").Append(recuo);
             if (marcador.Length > 0)
                 corpo.Append("<w:r><w:t xml:space=\"preserve\">").Append(Escapar(marcador)).Append("</w:t></w:r>");
-            corpo.Append(Trechos(linha, negritoBase: false, 22)).Append("</w:p>");
+            corpo.Append(Trechos(linha, negritoBase: false, 22, CorDoRotulo(linha))).Append("</w:p>");
         }
 
         using var zip = new ZipArchive(File.Create(destino), ZipArchiveMode.Create);
@@ -225,7 +225,23 @@ public static class Exportacao
     }
 
     /// <summary>Uma linha em runs, alternando negrito a cada <c>**</c>.</summary>
-    private static string Trechos(string texto, bool negritoBase, int tamanho)
+    /// <summary>
+    /// A cor do rótulo da ata por tema, quando o parágrafo começa com um deles.
+    /// </summary>
+    /// <remarks>
+    /// Os tons claros de sucesso, atenção e informação do AA Design System — os
+    /// mesmos da tela, já conferidos para contraste. Só a cor do texto, sem
+    /// fundo: o .docx vai para o cliente e às vezes para a impressora.
+    /// </remarks>
+    private static string? CorDoRotulo(string linha) =>
+        linha.StartsWith("**Decidido:**", StringComparison.Ordinal) ? "4A6746"
+        : linha.StartsWith("**Atenção:**", StringComparison.Ordinal) ? "8A5F22"
+        : linha.StartsWith("**Em aberto:**", StringComparison.Ordinal) ? "3D6189"
+        : null;
+
+    /// <param name="corDoRotulo">Cor do primeiro trecho em negrito, o rótulo.</param>
+    private static string Trechos(string texto, bool negritoBase, int tamanho,
+                                  string? corDoRotulo = null)
     {
         var sb = new StringBuilder();
         var partes = texto.Split("**");
@@ -239,6 +255,8 @@ public static class Exportacao
             bool negrito = negritoBase || i % 2 == 1;
             sb.Append("<w:r><w:rPr>");
             if (negrito) sb.Append("<w:b/>");
+            if (i == 1 && corDoRotulo is not null)
+                sb.Append("<w:color w:val=\"").Append(corDoRotulo).Append("\"/>");
             sb.Append("<w:sz w:val=\"").Append(tamanho).Append("\"/></w:rPr><w:t xml:space=\"preserve\">")
               .Append(Escapar(partes[i])).Append("</w:t></w:r>");
         }

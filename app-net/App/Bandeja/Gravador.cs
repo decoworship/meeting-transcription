@@ -140,6 +140,27 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     /// <inheritdoc cref="AoComecar"/>
     public event Action? AoTerminar;
 
+    /// <summary>
+    /// Alguém pediu um print da tela: o botão do Gravador, pela ponte.
+    /// </summary>
+    /// <remarks>
+    /// O gravador só repassa. Quem tira o print é a <c>Aplicacao</c>, que tem a
+    /// janela a esconder e a bandeja a avisar — as mesmas que o atalho global
+    /// usa, para o botão e o atalho não divergirem.
+    /// </remarks>
+    public event Action? AoPedirCaptura;
+
+    public void PedirCaptura()
+    {
+        if (Estado.Gravando) Avisar(() => AoPedirCaptura?.Invoke());
+    }
+
+    /// <summary>
+    /// O atalho global de capturar a tela, quando a <c>Aplicacao</c> conseguiu
+    /// registrá-lo nesta gravação. Ver <c>JanelaDeMensagens.LigarAtalhoDeCaptura</c>.
+    /// </summary>
+    public string? AtalhoDeCaptura { get; set; }
+
     private void Avisar(Action? quem)
     {
         try { quem?.Invoke(); }

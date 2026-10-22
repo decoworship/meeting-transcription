@@ -450,6 +450,14 @@ function abrirFalantes() {
   aviso.textContent =
     "Ao nomear alguém, a voz é aprendida e reconhecida nas próximas reuniões.";
 
+  // Os nomes a oferecer: quem um print da reunião mostrou (UI-12), e depois
+  // quem a agenda convidou. Chegam depois da tabela, sem segurá-la.
+  const sugestoes = document.createElement("datalist");
+  sugestoes.id = "falantes-sugestoes";
+  pedir("participantes", { gravacao: estado.gravacao.caminho })
+    .then((r) => preencherSugestoes(sugestoes, r.participantes ?? []))
+    .catch(() => {});
+
   const tabela = document.createElement("table");
   tabela.className = "tabela-falantes";
 
@@ -476,6 +484,7 @@ function abrirFalantes() {
     const entrada = document.createElement("input");
     entrada.className = "aa-entrada";
     entrada.value = nomeDe(cru);
+    entrada.setAttribute("list", sugestoes.id);
     entrada.addEventListener("change", async () => {
       const v = entrada.value.trim();
       if (v && v !== cru) estado.nomes.set(cru, v);
@@ -521,7 +530,7 @@ function abrirFalantes() {
     tr.append(id, nome, n, td, parte);
     tabela.appendChild(tr);
   });
-  s.append(aviso, tabela);
+  s.append(aviso, tabela, sugestoes);
 
   // ---- fundir dois falantes
   const fundir = secao("Fundir");

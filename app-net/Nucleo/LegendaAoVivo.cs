@@ -311,7 +311,7 @@ public sealed class LegendaAoVivo : IDisposable
         // 1x a legenda atrasa sem parar (docs/FASE7-ROTA.md §4).
         if (config.TranscricaoAoVivo)
             return "a legenda ao vivo e a prévia em blocos não cabem juntas na placa "
-                 + "— desligue uma das duas em Ajustes › Transcrição.";
+                 + "— desligue uma das duas em Ajustes › Gravador.";
 
         return motores.OQueFaltaParaLegenda();
     }

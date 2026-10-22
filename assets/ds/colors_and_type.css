@@ -103,6 +103,19 @@
   --cor-link-sublinhado: var(--primaria-200);
   --cor-veu:             rgba(34,31,26,0.38); /* cortina atrás de modal e gaveta */
 
+  /* ---------- Camada (material) ----------
+     A superfície do que FLUTUA sobre o conteúdo: barra, modal, gaveta,
+     menu, aviso, dica. Existe separada de --cor-superficie porque é ela
+     que o estilo `vidro` deixa translúcida; superfície de leitura
+     continua opaca. Sem data-estilo, os dois valores coincidem.
+     Ver estilos.css. */
+  --cor-camada:          var(--areia-50);
+  --cor-camada-opaca:    var(--areia-50);    /* fallback sem backdrop-filter */
+  --cor-borda-camada:    var(--areia-300);
+  --cor-camada-invertida:       var(--areia-900);  /* Dica: fundo tinta, texto areia */
+  --cor-camada-invertida-opaca: var(--areia-900);
+  --camada-filtro:       none;               /* @kind other */
+
   /* ---------- Feedback ---------- */
   /* Valores auditados: cada cor passa AA (4.5:1) tanto como texto sobre seu -bg
      quanto como preenchimento com --cor-texto-invertido em cima. Ver preview/contraste.html. */
@@ -244,6 +257,14 @@
   --cor-link-sublinhado: #4F739A;
   --cor-veu:             rgba(8,6,4,0.62);
 
+  /* ---------- Camada (material) ---------- */
+  --cor-camada:          #2E2A24;
+  --cor-camada-opaca:    #2E2A24;
+  --cor-borda-camada:    #4E483D;
+  --cor-camada-invertida:       #F7F3EA;
+  --cor-camada-invertida-opaca: #F7F3EA;
+  --camada-filtro:       none;               /* @kind other */
+
   /* Feedback: cor clara + fundo escuro tingido do mesmo matiz. */
   --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
   --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
@@ -317,7 +338,14 @@
     --cor-linha-hover:     #2A2620;
     --cor-link-sublinhado: #4F739A;
     --cor-veu:             rgba(8,6,4,0.62);
-  --cor-veu:             rgba(8,6,4,0.62);
+
+    /* ---------- Camada (material) ---------- */
+    --cor-camada:          #2E2A24;
+    --cor-camada-opaca:    #2E2A24;
+    --cor-borda-camada:    #4E483D;
+    --cor-camada-invertida:       #F7F3EA;
+    --cor-camada-invertida-opaca: #F7F3EA;
+    --camada-filtro:       none;               /* @kind other */
     --cor-sucesso:    #8FB088;  --cor-sucesso-bg: #263024;
     --cor-atencao:    #DCA94E;  --cor-atencao-bg: #33280F;
     --cor-erro:       #E08172;  --cor-erro-bg:    #3A211C;

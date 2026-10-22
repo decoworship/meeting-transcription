@@ -44,6 +44,40 @@ test("momentosDasNotas ignora o que não é relógio", () => {
   assert.deepEqual(R.momentosDasNotas(null), []);
 });
 
+test("momentosDasNotas tira a imagem do texto e a devolve à parte", () => {
+  assert.deepEqual(
+    R.momentosDasNotas("[00:12:34] ![captura de tela](capturas/tela-00-12-34.png)\n"
+                       + "[00:13:00] slide do orçamento ![imagem](capturas/imagem-00-13-00.png)"),
+    [
+      { segundos: 754, marca: "00:12:34", texto: "", imagem: "capturas/tela-00-12-34.png" },
+      { segundos: 780, marca: "00:13:00", texto: "slide do orçamento", imagem: "capturas/imagem-00-13-00.png" },
+    ]);
+});
+
+test("imagensDasNotas acha as imagens da reunião, com o momento quando há", () => {
+  assert.deepEqual(
+    R.imagensDasNotas("abertura\n[00:12:34] ![captura de tela](capturas/tela-00-12-34.png)\n"
+                      + "![imagem](capturas/imagem.png) e ![b](capturas/b.jpg)"),
+    [
+      { caminho: "capturas/tela-00-12-34.png", legenda: "captura de tela", segundos: 754, marca: "00:12:34" },
+      { caminho: "capturas/imagem.png", legenda: "imagem", segundos: null, marca: null },
+      { caminho: "capturas/b.jpg", legenda: "b", segundos: null, marca: null },
+    ]);
+});
+
+test("imagensDasNotas ignora imagem de fora da reunião e o que não é imagem", () => {
+  assert.deepEqual(R.imagensDasNotas("![x](https://exemplo.com/a.png)\n[link](capturas/a.png)\n"
+                                     + "![y](capturas/../../fora.png)"), []);
+  assert.deepEqual(R.imagensDasNotas(null), []);
+});
+
+test("urlDaImagem monta o endereço pela pasta da gravação, com barra de Windows ou não", () => {
+  assert.equal(R.urlDaImagem("C:\\Users\\a\\Reuniões\\2026-10-21_10-00-00", "capturas/tela-00-00-05.png"),
+               "https://gravacoes.local/2026-10-21_10-00-00/capturas/tela-00-00-05.png");
+  assert.equal(R.urlDaImagem("/tmp/x/2026 out", "capturas/a b.png"),
+               "https://gravacoes.local/2026%20out/capturas/a%20b.png");
+});
+
 test("estadoDasEtapas marca feitas, a atual e as pendentes", () => {
   assert.deepEqual(R.estadoDasEtapas("diarizacao").map((e) => e.estado),
                    ["feita", "feita", "atual", "pendente"]);

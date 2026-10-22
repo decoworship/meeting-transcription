@@ -173,6 +173,87 @@ Origem: revisão final do plano 4a (`superpowers/plans/2026-09-25-ui-04a-cliente
 
 ---
 
+### UI-11 · Imagens nas notas: print da tela e imagem colada — `feature` · feito em 21/10/2026
+
+Pedido de uso real: guardar o que estava na tela durante a reunião, marcado no
+tempo dela como o "Marcar momento", e poder pôr nas notas um print tirado por
+fora.
+
+**Feito em 21/10/2026**, sem instalar:
+
+- **Capturar tela** — botão na faixa do Gravador e o atalho global
+  **Ctrl+Alt+P**, este só enquanto grava (`JanelaDeMensagens`). O print é do
+  monitor da janela que está na frente; com o próprio PulseMeet na frente, ele
+  some do print por um instante (`WDA_EXCLUDEFROMCAPTURE`), e sai a reunião
+  que está atrás. GDI puro (`App/Nativo/CapturaDeTela.cs`) e PNG escrito à mão
+  (`Nucleo/Png.cs`) — nem WinRT, nem `System.Drawing`.
+- **Colar, arrastar ou "Inserir imagem"** nas notas, na reunião e no Gravador
+  (op `salvar-imagem`). Cobre o recorte do Win+Shift+S.
+- Tudo vai para `capturas/` na pasta da gravação, e para as notas como
+  `[00:12:34] ![captura de tela](capturas/tela-00-12-34.png)`. As notas viram
+  miniaturas que ampliam, e o momento com imagem mostra a miniatura e toca dali.
+- **O núcleo escreve a linha no `notas.md` antes de avisar a tela** (evento
+  `captura`): o print sobrevive com a janela fechada, e o campo aberto põe a
+  mesma linha nele para o próximo salvamento não apagá-la.
+- O prompt da ata, o vocabulário sugerido e o começo das notas na lista
+  recebem o texto **sem** as imagens (`Notas.SemImagens`): o modelo de ata não
+  as vê, e um `[00:12:34]` sozinho seria um momento sem nada dito.
+
+**A conferir na máquina** antes de dar como fechado: o print sair do monitor
+certo com dois monitores e escala de 125%/150%; o app sumir do próprio print
+(com WebView2 dentro); e o Ctrl+Alt+P não colidir com nada no teclado do
+usuário. **Não captura** a reunião do Teams com "impedir captura de tela" —
+sai preta, de propósito.
+
+### UI-12 · Os nomes dos participantes pelo print — `feature` · feito em 21/10/2026, sem instalar
+
+Ideia do dono, 21/10/2026: um print da lista de participantes do Teams/Meet
+guarda quem estava presente e já oferece os nomes para batizar os falantes —
+hoje essas sugestões vêm só dos convidados da agenda (`ConvidadosDaAgenda`), que
+não diz quem entrou (ver `Presenca`).
+
+Depende do UI-11 (o print já existe e já está na pasta) e de **OCR**.
+
+**A rota está decidida (21/10/2026): motor de OCR separado, no sidecar Python**,
+e não o `Windows.Media.Ocr` — pensando em levar o app para macOS e Linux, onde
+o sidecar vai junto e a API WinRT teria de ser refeita. Candidato: **RapidOCR**
+(modelos PP-OCRv5 em ONNX, com reconhecedor latino que cobre o português). O
+`onnxruntime` já está no Python embarcado; o que entra de novo é o
+`opencv-python-headless`, `shapely`, `pyclipper` e `pillow` — medir os MB antes.
+Roda na CPU, para não disputar a GPU com a legenda ao vivo.
+
+**Medido em 21/10/2026** com oito prints reais do dono — quatro do Teams, quatro
+de apresentações. O **PP-OCRv6 small** leu 34 de 34 nomes; o PP-OCRv5 latino,
+33, partindo um nome em dois e grudando o ícone de sinal em outro. ~2 s por
+print na CPU, 31 MB de modelos. O que entra no Python embarcado com o RapidOCR
+(OpenCV headless, shapely, pyclipper, pillow) passa de 100 MB — **medir no
+Windows** quando o `empacotar_motores.sh` rodar.
+
+**Como ficou:**
+
+- Na imagem ampliada das notas, **"Ler nomes desta imagem"**. O núcleo sobe o
+  `motores/ocr/` (não fica quente), e o `Nucleo/NomesDoPrint.cs` separa os
+  nomes: tira a barra do Teams/Meet em inglês e português, o ícone grudado
+  ("Il Fulano"), o sufixo da empresa quando ele se repete ou vem com espaço
+  ("Fulano - Acme"), normaliza nome em maiúsculas e usuário com ponto, e casa
+  com os convidados da agenda.
+- **Nada é gravado sem a pessoa confirmar**, numa caixa com uma caixinha por
+  nome. Nos prints do Teams elas vêm marcadas; num slide (a tabela de
+  vendedores do print 5 dá 16 "nomes") vêm desmarcadas, com a frase dizendo
+  por quê — `PareceReuniao`, que acertou os oito prints.
+- Os confirmados vão para `participantes.json` na pasta da gravação, e viram
+  as **sugestões do campo Nome** na gaveta de falantes da revisão, antes dos
+  convidados da agenda.
+
+**Para funcionar na máquina** falta empacotar: `empacotar_motores.sh` (agora
+instala o `rapidocr`, com régua) e `empacotar_modelos_de_ocr.sh` (os dois ONNX,
+conferidos por SHA256, e a atribuição Apache-2.0). O `montar_instalador.sh` leva
+`ocr/modelos` no pacote de motores — **o que muda a impressão dos motores**, e o
+próximo update volta a ter o download pesado.
+
+**Fica para depois:** os presentes pelo print na ata (`Presenca` hoje só cruza
+agenda e falas) — pergunta feita ao dono e ainda sem resposta.
+
 ## 2. Ata: formato e saída
 
 **Qualidade da ata não está aqui** — omissão, cobertura e escolha de modelo
@@ -221,6 +302,35 @@ precisar** — um caminho de blocos existindo é um caminho de blocos usado por
 engano.
 
 **Gatilho:** aparecer uma reunião que não cabe.
+
+### ATA-5 · A ata por tema — `feature` · feito em 08/10/2026, só no update
+
+A ata de update de 22/09/2026 voltou do cliente com "ficou extensa e
+repetitiva": organizada pelo tipo de informação, ela repetia cada tema em até
+sete lugares. Agora cada decisão, ação, ponto em aberto e risco mora dentro do
+tema, e as observações do verificador ficam fora do arquivo exportado. A chave
+`formato_da_ata` em Ajustes › Atas volta ao formato de antes, byte a byte.
+
+Desenho e critérios: [spec](superpowers/specs/2026-10-08-ata-por-tema-design.md).
+
+**Validado em 08/10/2026; o padrão é "por tema", e só o update agrupa.** Sete reuniões nos
+dois formatos, com o `gemma-4-e4b` (`tools/validar_ata_por_tema.py`): 92% dos
+itens caíram num tema, nenhuma seção com subtítulos, a daily não mudou — mas a
+ata por tema saiu só **19% menor na mediana**, e o critério era 25%. Lendo as
+atas, o veredito é por tipo:
+
+- **update com cliente:** organizado como a cliente pediu; dois defeitos do
+  modelo — `responsavel` do tema com "nosso"/"cliente", e grupo com o mesmo
+  título do tema;
+- **kickoff:** a estrutura ficou, mas cada seção ganhou uma pessoa como dona,
+  deduzida;
+- **sessão de trabalho:** **pior** — perde "Por quê", "Alternativas
+  descartadas" e "Implicações", e repete o mesmo tema por pessoa.
+
+O dono aprovou o critério 3 com os 81% e escolheu **agrupar só o update**: a
+sessão de trabalho e o kickoff perderam a marca e saem como antes, nos dois
+formatos. Voltar a marcá-los pede adaptar o esqueleto deles ao agrupamento —
+o "Por quê" e as "Alternativas descartadas" não têm lugar num item de decisão.
 
 ---
 

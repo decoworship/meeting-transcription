@@ -326,4 +326,113 @@ internal static partial class Win32
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DestroyIcon(IntPtr hIcon);
+
+    // ───────────────────────────────────────────────── atalho global
+
+    internal const uint WM_HOTKEY = 0x0312;
+    internal const uint MOD_ALT = 0x0001;
+    internal const uint MOD_CONTROL = 0x0002;
+
+    /// <summary>Segurar a tecla não dispara uma rajada de prints.</summary>
+    internal const uint MOD_NOREPEAT = 0x4000;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    // ───────────────────────────────────────────────── captura de tela
+
+    internal const uint MONITOR_DEFAULTTOPRIMARY = 0x00000001;
+    internal const uint GA_ROOT = 2;
+    internal const uint SRCCOPY = 0x00CC0020;
+
+    /// <summary>Inclui as janelas em camadas — menus, dicas, sobreposições.</summary>
+    internal const uint CAPTUREBLT = 0x40000000;
+
+    internal const uint WDA_NONE = 0x00000000;
+
+    /// <summary>
+    /// A janela some das capturas, e não vira um retângulo preto. Windows 10
+    /// 2004 em diante; antes disso a chamada falha e a janela aparece.
+    /// </summary>
+    internal const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MONITORINFO
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct BITMAPINFOHEADER
+    {
+        public uint biSize;
+        public int biWidth;
+        public int biHeight;
+        public ushort biPlanes;
+        public ushort biBitCount;
+        public uint biCompression;
+        public uint biSizeImage;
+        public int biXPelsPerMeter;
+        public int biYPelsPerMeter;
+        public uint biClrUsed;
+        public uint biClrImportant;
+    }
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+
+    /// <summary>Espera a próxima composição do DWM.</summary>
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmFlush();
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetDC(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    internal static partial int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial IntPtr CreateCompatibleDC(IntPtr hdc);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DeleteDC(IntPtr hdc);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial IntPtr CreateDIBSection(IntPtr hdc, ref BITMAPINFOHEADER pbmi,
+        uint usage, out IntPtr ppvBits, IntPtr hSection, uint offset);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial IntPtr SelectObject(IntPtr hdc, IntPtr h);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DeleteObject(IntPtr ho);
+
+    [LibraryImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool BitBlt(IntPtr hdc, int x, int y, int cx, int cy,
+        IntPtr hdcSrc, int x1, int y1, uint rop);
 }

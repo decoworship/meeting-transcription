@@ -174,6 +174,7 @@ Type: filesandordirs; Name: "{userprograms}\MeetingApp"
 ; etapa "Preparando para instalar", ANTES disto: se ele falhar, nada foi apagado.
 Type: filesandordirs; Name: "{app}\motores\python"; Check: PrecisaDosMotores
 Type: filesandordirs; Name: "{app}\motores\diarizacao\modelos"; Check: PrecisaDosMotores
+Type: filesandordirs; Name: "{app}\motores\ocr\modelos"; Check: PrecisaDosMotores
 
 [Files]
 Source: "{#Payload}\{#Marca}.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -229,8 +230,8 @@ Source: "{#Motores}\*"; DestDir: "{app}\motores"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 #else
 ; O pacote de motores (DIST-1): as MESMAS exclusões acima, aplicadas pelo
-; montar_instalador.sh ao montar o .7z, que só leva motores\python e
-; motores\diarizacao\modelos. O Hash é conferido antes de extrair; um arquivo
+; montar_instalador.sh ao montar o .7z, que só leva motores\python,
+; motores\diarizacao\modelos e motores\ocr\modelos. O Hash é conferido antes de extrair; um arquivo
 ; trocado no caminho reprova a instalação em vez de instalar outra coisa.
 Source: "{#MotoresUrl}"; DestName: "motores-{#MotoresVersao}.7z"; DestDir: "{app}\motores"; \
   Hash: "{#MotoresSha}"; ExternalSize: {#MotoresTamanho}; \

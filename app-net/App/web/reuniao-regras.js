@@ -29,6 +29,11 @@ export const juntarTermos = (lista) => lista.join(", ");
 
 const MARCA = /\[(\d{1,2}):(\d{2}):(\d{2})\]/;
 
+// Uma imagem da reunião em markdown: só as de capturas/, e sem subir de pasta.
+// O mesmo critério de Notas.SemImagens no núcleo.
+const IMAGEM = /[ \t]?!\[([^\]\n]*)\]\((capturas\/[^)\s/\\]+)\)/g;
+const imagemValida = (caminho) => !caminho.includes("..");
+
 /**
  * Os momentos marcados nas notas (`UI-4`).
  *
@@ -44,13 +49,53 @@ export function momentosDasNotas(texto) {
     if (!m) continue;
     const [h, min, s] = [m[1], m[2], m[3]].map(Number);
     if (min > 59 || s > 59) continue;
-    momentos.push({
+    const resto = linha.slice(0, m.index) + linha.slice(m.index + m[0].length);
+    // A imagem não é texto do momento: ela vira miniatura ao lado dele.
+    const imagem = [...resto.matchAll(IMAGEM)].find((i) => imagemValida(i[2]))?.[2];
+    const momento = {
       segundos: h * 3600 + min * 60 + s,
       marca: m[0].slice(1, -1),
-      texto: (linha.slice(0, m.index) + linha.slice(m.index + m[0].length)).trim(),
-    });
+      texto: (imagem ? resto.replace(IMAGEM, "") : resto).trim(),
+    };
+    if (imagem) momento.imagem = imagem;
+    momentos.push(momento);
   }
   return momentos;
+}
+
+/**
+ * As imagens que as notas citam, na ordem em que aparecem.
+ *
+ * O print do atalho e a imagem colada viram `![legenda](capturas/arquivo)`
+ * nas notas. O momento é o da linha, quando ela tem um — é o que deixa a
+ * miniatura tocar a reunião dali.
+ */
+export function imagensDasNotas(texto) {
+  const imagens = [];
+  for (const linha of String(texto ?? "").split("\n")) {
+    const m = linha.match(MARCA);
+    const segundos = m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : null;
+    for (const i of linha.matchAll(IMAGEM)) {
+      if (!imagemValida(i[2])) continue;
+      imagens.push({
+        caminho: i[2],
+        legenda: i[1],
+        segundos: m ? segundos : null,
+        marca: m ? m[0].slice(1, -1) : null,
+      });
+    }
+  }
+  return imagens;
+}
+
+/**
+ * O endereço da imagem para o `<img>`: a pasta das gravações é servida em
+ * `gravacoes.local` (JanelaDoApp), como o áudio do tocador.
+ */
+export function urlDaImagem(pastaDaGravacao, caminho) {
+  const nome = String(pastaDaGravacao).split(/[\\/]/).filter(Boolean).pop() ?? "";
+  const partes = String(caminho).split("/").map(encodeURIComponent).join("/");
+  return `https://gravacoes.local/${encodeURIComponent(nome)}/${partes}`;
 }
 
 /** As etapas do pipeline, na ordem em que o núcleo as percorre. */

@@ -20,9 +20,9 @@
 // `data-gravando` da raiz — trocar de estado não reconstrói nada.
 //
 // **O que o app tinha e a prancha não mostra desce, e nada sai** (decisão do
-// dono, 25/09): a lista de convidados por nome, dispositivos e pasta ficam
-// abaixo do que a prancha mostra. Dispositivos e pasta vão para Ajustes num
-// plano próprio.
+// dono, 25/09): a lista de convidados por nome fica abaixo do que a prancha
+// mostra. Dispositivos e pasta foram para Ajustes no plano 4b (05/10/2026), e
+// o "Vai gravar" mostra o que está escolhido e leva até lá.
 //
 // Desenha uma vez e depois só atualiza os nós que mudam. O `aplicar()` roda
 // cinco vezes por segundo enquanto grava: redesenhar ali derrubaria o foco de
@@ -184,7 +184,7 @@ export async function telaDoGravador(ctx) {
   const vaiMic = itemVai("mic", "Seu microfone");
   const vaiAudio = itemVai("audio", "Áudio da reunião");
   const vaiAgenda = itemVai("agenda", "Agenda");
-  const trocar = el("a", "grav-vai__trocar", "Trocar em Ajustes › Gravação");
+  const trocar = el("a", "grav-vai__trocar", "Trocar em Ajustes › Gravador");
   trocar.href = "#config=gravador";
   trocar.addEventListener("click", (e) => { e.preventDefault(); ctx.abrirAjustes?.("gravador"); });
   vai.appendChild(trocar);
@@ -240,9 +240,13 @@ export async function telaDoGravador(ctx) {
   const acoes = el("div", "grav-faixa__acoes");
   const marcar = botao("aa-btn-primario grav-marcar", "Marcar momento");
   marcar.prepend(icone("i-marca"));
+  // O print da tela vai para capturas/ e entra nas notas com o momento. Com o
+  // app na frente, o print é do monitor dele sem ele — a reunião que está atrás.
+  const capturar = botao("aa-btn-secundario grav-capturar", "Capturar tela");
+  capturar.prepend(icone("i-print"));
   const mutar = botao("aa-btn-secundario", "Mutar");
   const parar = botao("aa-btn-secundario grav-parar", "Parar");
-  acoes.append(marcar, mutar, parar);
+  acoes.append(marcar, capturar, mutar, parar);
   faixa.append(ponto, tempo, info, medidores, acoes);
 
   // O aviso de mudo e as falhas de dispositivo: logo abaixo da faixa, que é
@@ -268,8 +272,8 @@ export async function telaDoGravador(ctx) {
   const semLegenda = el("div", "bloco grav-sem-legenda");
   semLegenda.hidden = true;
   const semLegendaMotivo = el("p", "bloco__texto");
-  const semLegendaIr = botao("aa-btn-secundario aa-btn--pequeno", "Abrir Ajustes › Transcrição");
-  semLegendaIr.addEventListener("click", () => ctx.abrirAjustes?.("transcricao"));
+  const semLegendaIr = botao("aa-btn-secundario aa-btn--pequeno", "Abrir Ajustes › Gravador");
+  semLegendaIr.addEventListener("click", () => ctx.abrirAjustes?.("gravador"));
   semLegenda.append(
     el("h2", "bloco__titulo", "Sem legenda nesta gravação"),
     el("p", "bloco__texto",
@@ -295,13 +299,26 @@ export async function telaDoGravador(ctx) {
   const perguntas = painelDePerguntas();
   // A dica e o "salvo" das notas numa linha só, embaixo, como na prancha.
   const rodapeNotas = el("div", "grav-abas__dica");
-  rodapeNotas.append(el("span", "", "Marcar momento põe o tempo onde está o cursor."),
-                     notas.raiz.querySelector(".notas__estado"));
+  const dicaNotas = el("span", "", "");
+  // O "Inserir imagem" das notas mora aqui: a fileira de ações delas some
+  // dentro da aba (o Marcar momento está na faixa).
+  const inserirImagem = botao("aa-btn-texto aa-btn--pequeno grav-abas__inserir", "Inserir imagem");
+  inserirImagem.addEventListener("click", () => notas.escolherImagem());
+  rodapeNotas.append(dicaNotas, inserirImagem, notas.raiz.querySelector(".notas__estado"));
+  let atalhoDesenhado;
+  function desenharDicaDasNotas(atalho) {
+    if (atalho === atalhoDesenhado) return;
+    atalhoDesenhado = atalho;
+    dicaNotas.textContent = "Marcar momento põe o tempo onde está o cursor. "
+      + (atalho ? `${atalho} captura a tela de qualquer janela; ` : "")
+      + "Ctrl+V cola uma imagem.";
+  }
+  desenharDicaDasNotas(estado.atalho_de_captura ?? null);
 
   const paineis = {};
   const botoesAba = {};
   for (const [id, rotulo, conteudo] of [
-    ["notas", "Notas", [notas.raiz, rodapeNotas]],
+    ["notas", "Notas", [notas.raiz, notas.imagens, rodapeNotas]],
     ["perguntar", "Perguntar", [perguntas.raiz]],
   ]) {
     const b = el("button", "grav-abas__aba", rotulo);
@@ -358,24 +375,7 @@ export async function telaDoGravador(ctx) {
   const participantes = el("p", "bloco__texto");
   reuniao.append(tituloReuniao, participantes);
 
-  // ---- dispositivos
-  const blocoDisp = el("div", "bloco");
-  const notaDisp = el("p", "bloco__texto",
-    // A trava não é limitação de implementação e sim o que preserva o valor das
-    // duas faixas separadas: reabrir o stream no meio exigiria realinhá-las.
-    "Não dá para trocar de dispositivo durante uma gravação: as duas faixas "
-    + "começam alinhadas por terem começado juntas.");
-  const escolhaMic = seletor("Microfone", "mic", dispositivos.entradas, dispositivos.mic_id);
-  const escolhaLoop = seletor("Áudio do sistema", "loopback", dispositivos.saidas, dispositivos.loopback_id);
-  blocoDisp.append(el("h2", "bloco__titulo", "Dispositivos"), escolhaMic.raiz, escolhaLoop.raiz, notaDisp);
-
-  // ---- pasta
-  const blocoPasta = el("div", "bloco");
-  const caminho = el("p", "bloco__texto caminho");
-  blocoPasta.append(el("h2", "bloco__titulo", "Pasta das gravações"), caminho,
-    el("p", "bloco__texto", "Trocar em Ajustes › Geral. É a mesma pasta que a lista de reuniões lê."));
-
-  resto.append(reuniao, blocoDisp, blocoPasta);
+  resto.append(reuniao);
 
   raiz.append(antes, gravando, resto);
   tela.replaceChildren(raiz);
@@ -491,6 +491,9 @@ export async function telaDoGravador(ctx) {
     ponto.title = g.status;
     tempo.textContent = relogio(g.duracao_s);
     rotularMutar(g.mudo);
+    desenharDicaDasNotas(g.atalho_de_captura ?? null);
+    capturar.title = g.atalho_de_captura
+      ? `Ou ${g.atalho_de_captura}, de qualquer janela` : "";
     faixa.dataset.mudo = String(Boolean(g.mudo));
 
     if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
@@ -542,9 +545,6 @@ export async function telaDoGravador(ctx) {
     vaiAgenda.textContent = !g.usar_agenda ? "não usada"
       : g.conta ?? (g.agenda_configurada ? "não conectada" : "sem credencial");
 
-    escolhaMic.campo.disabled = g.gravando;
-    escolhaLoop.campo.disabled = g.gravando;
-    caminho.textContent = g.pasta;
 
     // O apontarPara ignora repetição, então chamar isto cinco vezes por segundo
     // não custa nada.
@@ -888,6 +888,14 @@ export async function telaDoGravador(ctx) {
   marcar.addEventListener("click", () => {
     if (notas.marcarMomento({ focar: abaAtiva === "notas" })) previa.marcarMomento();
   });
+  // A linha chega às notas pelo evento "captura", como a do atalho; aqui só se
+  // segura o botão o bastante para o clique duplo não virar dois prints.
+  capturar.addEventListener("click", async () => {
+    capturar.disabled = true;
+    try { await chamar("capturar-tela"); } finally {
+      setTimeout(() => { capturar.disabled = false; }, 800);
+    }
+  });
   // Um mutar por vez: dois cliques rápidos mandariam dois e desfariam o mudo.
   let mutando = false;
   async function alternarMudo() {
@@ -908,19 +916,13 @@ export async function telaDoGravador(ctx) {
     parar.disabled = false;
   });
 
-  for (const [faixaNome, escolha] of [["mic", escolhaMic], ["loopback", escolhaLoop]])
-    escolha.campo.addEventListener("change", async () => {
-      await chamar("escolher-dispositivo", { faixa: faixaNome, dispositivo: escolha.campo.value });
-      desenharVai();
-    });
-
   function desenharVai() {
     const nomeDe = (lista, id) => {
       const d = id ? lista.find((x) => x.id === id) : lista.find((x) => x.padrao);
       return d?.nome ?? "Padrão do Windows";
     };
-    vaiMic.textContent = nomeDe(dispositivos.entradas, escolhaMic.campo.value);
-    vaiAudio.textContent = nomeDe(dispositivos.saidas, escolhaLoop.campo.value);
+    vaiMic.textContent = nomeDe(dispositivos.entradas, dispositivos.mic_id);
+    vaiAudio.textContent = nomeDe(dispositivos.saidas, dispositivos.loopback_id);
   }
 
   atualizar.addEventListener("click", carregarProximas);
@@ -973,35 +975,4 @@ function dataDoNome(nome) {
 function horaDoNome(nome) {
   const m = /_(\d{2})-(\d{2})/.exec(nome ?? "");
   return m ? `${m[1]}:${m[2]}` : "";
-}
-
-/** Um select de dispositivo, com "Padrão do Windows" primeiro. */
-function seletor(rotulo, faixa, lista, escolhido) {
-  const label = document.createElement("label");
-  label.className = "campo";
-
-  const span = document.createElement("span");
-  span.textContent = rotulo;
-
-  const campo = document.createElement("select");
-  campo.className = "aa-entrada";
-  campo.id = `dispositivo-${faixa}`;
-
-  // Primeiro e padrão porque seguir o dispositivo do sistema é o que a maioria
-  // quer: fixar um headset específico quebra no dia em que ele é desconectado.
-  const padrao = document.createElement("option");
-  padrao.value = "";
-  padrao.textContent = "Padrão do Windows";
-  campo.appendChild(padrao);
-
-  for (const d of lista) {
-    const o = document.createElement("option");
-    o.value = d.id;
-    o.textContent = d.padrao ? `${d.nome}  (padrão)` : d.nome;
-    campo.appendChild(o);
-  }
-  campo.value = escolhido ?? "";
-
-  label.append(span, campo);
-  return { raiz: label, campo };
 }

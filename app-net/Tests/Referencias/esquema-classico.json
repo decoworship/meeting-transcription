@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "properties": {
+    "resumo": {
+      "type": "string",
+      "description": "3 a 5 linhas: o que avançou, o que travou, o que precisa de decisão."
+    },
+    "secoes": {
+      "type": "array",
+      "description": "O corpo da ata, nas seções que a estrutura pedir, na ordem dela.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "titulo": { "type": "string" },
+          "situacao": {
+            "type": "string",
+            "description": "Só quando a seção tiver estado. Vazio se não tiver."
+          },
+          "texto": { "type": "string" }
+        },
+        "required": ["titulo", "texto"],
+        "additionalProperties": false
+      }
+    },
+    "decisoes": {
+      "type": "array",
+      "description": "Só o que teve conclusão explícita. Hipótese não é decisão.",
+      "items": { "type": "string" }
+    },
+    "acoes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "acao": { "type": "string" },
+          "responsavel": {
+            "type": "string",
+            "description": "Nome de quem faz. Se ninguém foi nomeado, escreva exatamente: [responsável a definir]"
+          },
+          "prazo": {
+            "type": "string",
+            "description": "Se não houve prazo, escreva exatamente: [prazo a definir]"
+          },
+          "lado": {
+            "type": "string",
+            "enum": ["nosso", "cliente"],
+            "description": "De quem depende a ação."
+          }
+        },
+        "required": ["acao", "responsavel", "prazo", "lado"],
+        "additionalProperties": false
+      }
+    },
+    "pontos_em_aberto": {
+      "type": "array",
+      "description": "O que foi levantado e não concluiu, com a pergunta que ficou.",
+      "items": { "type": "string" }
+    },
+    "riscos": {
+      "type": "array",
+      "description": "Só quando alguém sinalizou preocupação. Vazio se ninguém sinalizou.",
+      "items": { "type": "string" }
+    },
+    "observacoes": {
+      "type": "array",
+      "description": "Trechos inaudíveis, números divergentes, nomes com grafia incerta.",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["resumo", "secoes", "decisoes", "acoes", "pontos_em_aberto", "riscos", "observacoes"],
+  "additionalProperties": false
+}

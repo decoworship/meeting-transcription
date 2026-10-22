@@ -259,14 +259,19 @@ escrevendo Markdown (§1): o arquivo do tipo diz *quais seções produzir*, e o
 esquema garante a forma do que é verificável.
 
 ```
-resumo            texto
-secoes[]          { titulo, situacao?, texto }   ← a parte específica do tipo
-decisoes[]        texto
-acoes[]           { acao, responsavel, prazo, lado }  ← "nosso" ou "cliente"
-pontos_em_aberto[] texto
-riscos[]          texto
-observacoes[]     texto                          ← o que o verificador escreveu
+resumo             texto
+secoes[]           { titulo, situacao?, texto, grupo?, responsavel? }
+decisoes[]         { texto, secao? }                   ← "secao" desde a ATA-5
+acoes[]            { acao, responsavel, prazo, lado, secao? }  ← lado: "nosso" ou "cliente"
+pontos_em_aberto[] { texto, secao? }
+riscos[]           { texto, secao? }
+observacoes[]      texto                               ← o que o verificador escreveu
 ```
+
+Desde a ATA-5 (08/10/2026), `secao` diz em qual seção do corpo o item mora, e o
+redator o escreve lá dentro nos tipos com a marca `<!-- ata: itens-por-secao -->`
+quando o formato é "por tema". As listas antigas, em `string[]`, ainda abrem. Ver
+a [spec](superpowers/specs/2026-10-08-ata-por-tema-design.md).
 
 O esqueleto de cada referência vira a **lista de seções esperadas** — usada para
 pedir ao modelo e para conferir o que voltou, não para gerar um esquema por

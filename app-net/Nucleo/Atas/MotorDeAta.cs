@@ -241,7 +241,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
     }
 
     public async Task<AtaGerada> GerarAsync(
-        string prompt, double duracaoS,
+        string prompt, string esquema, double duracaoS,
         Action<ProgressoDaAta>? progresso = null, CancellationToken ct = default)
     {
         if (caminhos.OQueFalta() is { } falta) throw new InvalidOperationException(falta);
@@ -264,7 +264,7 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
             await EsperarSubirAsync(processo, porta, ct);
 
             progresso?.Invoke(new ProgressoDaAta("lendo", 0.2, "lendo a reunião"));
-            string json = await PedirAsync(porta, prompt, ct);
+            string json = await PedirAsync(porta, prompt, esquema, ct);
 
             progresso?.Invoke(new ProgressoDaAta("montagem", 0.95, "montando a ata"));
             return AtaGerada.DeJson(json)
@@ -489,9 +489,9 @@ public sealed class MotorDeAta(CaminhosDoMotorDeAta caminhos)
         throw new TimeoutException("o motor de ata não respondeu em 2 minutos");
     }
 
-    private static Task<string> PedirAsync(int porta, string prompt, CancellationToken ct) =>
-        PedirAsync(porta, PromptDeAta.Sistema, prompt, "ata", AtaGerada.Esquema,
-                   TokensDeSaida, ct);
+    private static Task<string> PedirAsync(int porta, string prompt, string esquema,
+                                           CancellationToken ct) =>
+        PedirAsync(porta, PromptDeAta.Sistema, prompt, "ata", esquema, TokensDeSaida, ct);
 
     private static async Task<string> PedirAsync(
         int porta, string sistema, string prompt, string nomeDoEsquema, string esquema,

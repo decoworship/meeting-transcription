@@ -63,6 +63,15 @@ for linha in sys.stdin:
         ])
         continue
 
+    if req.get("op") == "ler":
+        # O motor de OCR (motores/ocr/motor.py): linhas, confiança e caixa.
+        enviar(id=id_req, tipo="resultado", largura=1280, altura=800, linhas=[
+            {"texto": "Chat", "confianca": 1.0, "caixa": [648, 66, 679, 84]},
+            {"texto": "Helena Dias", "confianca": 0.98, "caixa": [10, 300, 120, 318]},
+            {"texto": req.get("imagem"), "confianca": 0.5, "caixa": [0, 0, 1, 1]},
+        ])
+        continue
+
     if req.get("op") == "transcrever":
         enviar(id=id_req, tipo="progresso", pct=0.5, texto="transcrevendo")
         enviar(id=id_req, tipo="resultado", idioma="pt", duracao=7.0, segmentos=[

@@ -32,6 +32,12 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
     /// </remarks>
     public string ScriptLegenda { get; init; } = "";
 
+    /// <summary>
+    /// O motor de OCR, que lê os nomes de um print (UI-12). Opcional pelo
+    /// mesmo motivo da legenda: sem ele o app grava e transcreve igual.
+    /// </summary>
+    public string ScriptOcr { get; init; } = "";
+
     /// <summary>O arranjo esperado do app instalado: <c>motores/</c> ao lado do .exe.</summary>
     public static Motores AoLadoDoExecutavel()
     {
@@ -43,6 +49,7 @@ public sealed record Motores(string Python, string ScriptAsr, string ScriptDiari
             Path.Combine(raiz, "modelos", "motor.py"))
         {
             ScriptLegenda = Path.Combine(raiz, "legenda", "motor.py"),
+            ScriptOcr = Path.Combine(raiz, "ocr", "motor.py"),
         };
     }
 
@@ -648,6 +655,10 @@ public sealed class Transcritor(Motores motores)
         {
             // Reconhecer voz é um extra sobre a transcrição, não um requisito.
         }
+
+        // O "You" vira o nome do dono, se ele escreveu um em Ajustes › Geral.
+        // Depois do reconhecimento, que procura vozes por rótulo e pula o "You".
+        VozDoDono.Nomear(segmentos, ConfiguracoesDoApp.Carregar().NomeDoDono);
 
         var resultado = new ResultadoDaTranscricao
         {

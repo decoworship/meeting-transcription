@@ -11,6 +11,22 @@ namespace MeetingApp.Nucleo.Atas;
 /// <param name="DoUsuario">Veio da pasta do perfil, e não de dentro do executável.</param>
 public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUsuario)
 {
+    /// <summary>A linha que liga a ata por tema num tipo (ATA-5).</summary>
+    /// <remarks>
+    /// É texto do arquivo, e não uma lista no código, porque o tipo é
+    /// personalizável (ATA.md §1): um tipo do usuário liga o agrupamento
+    /// escrevendo a linha. O modelo nunca a vê — <see cref="TextoParaPrompt"/>
+    /// a tira.
+    /// </remarks>
+    public const string Marca = "<!-- ata: itens-por-secao -->";
+
+    /// <summary>Os itens moram dentro das seções, quando o formato é por tema.</summary>
+    public bool ItensPorSecao => Texto.Contains(Marca, StringComparison.Ordinal);
+
+    /// <summary>O texto sem a linha da marca, para tudo o que vai ao modelo.</summary>
+    private string SemMarca =>
+        Texto.Replace(Marca + "\r\n", "").Replace(Marca + "\n", "").Replace(Marca, "");
+
     /// <summary>
     /// As seções que o esqueleto da referência pede, na ordem.
     /// </summary>
@@ -81,15 +97,16 @@ public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUs
     /// </remarks>
     public string TextoParaPrompt()
     {
-        int inicio = Texto.IndexOf("```markdown", StringComparison.Ordinal);
-        if (inicio < 0) return Texto;
-        int fim = Texto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
-        if (fim < 0) return Texto;
+        string texto = SemMarca;
+        int inicio = texto.IndexOf("```markdown", StringComparison.Ordinal);
+        if (inicio < 0) return texto;
+        int fim = texto.IndexOf("```", inicio + 11, StringComparison.Ordinal);
+        if (fim < 0) return texto;
 
         var mantidas = new List<string>();
         bool copiando = true;
 
-        foreach (string linha in Texto[(inicio + 11)..fim].Split('\n'))
+        foreach (string linha in texto[(inicio + 11)..fim].Split('\n'))
         {
             string t = linha.TrimEnd();
 
@@ -106,7 +123,7 @@ public sealed record ModeloDeAta(string Id, string Nome, string Texto, bool DoUs
         }
 
         string corpo = string.Join('\n', mantidas).Trim('\n');
-        return Texto[..(inicio + 11)] + "\n" + corpo + "\n" + Texto[fim..];
+        return texto[..(inicio + 11)] + "\n" + corpo + "\n" + texto[fim..];
     }
 }
 
@@ -148,7 +165,8 @@ public static class ModelosDeAta
         ".meeting-transcription", "atas");
 
     /// <summary>Todos os tipos, com os do usuário na frente dos embutidos.</summary>
-    public static IReadOnlyList<ModeloDeAta> Todos()
+    /// <param name="pasta">A pasta dos modelos do usuário; nula, a do perfil.</param>
+    public static IReadOnlyList<ModeloDeAta> Todos(string? pasta = null)
     {
         var achados = new Dictionary<string, ModeloDeAta>(StringComparer.OrdinalIgnoreCase);
 
@@ -156,13 +174,13 @@ public static class ModelosDeAta
             if (LerEmbutido(id) is { } texto)
                 achados[id] = new ModeloDeAta(id, NomeDe(id), texto, DoUsuario: false);
 
-        foreach (var arquivo in ArquivosDoUsuario())
+        foreach (var arquivo in ArquivosDoUsuario(pasta ?? PastaDoUsuario))
         {
             string id = Path.GetFileNameWithoutExtension(arquivo);
             try
             {
-                achados[id] = new ModeloDeAta(
-                    id, NomeDe(id), File.ReadAllText(arquivo), DoUsuario: true);
+                string texto = File.ReadAllText(arquivo);
+                achados[id] = new ModeloDeAta(id, NomeDe(id, texto), texto, DoUsuario: true);
             }
             catch (IOException)
             {
@@ -180,8 +198,8 @@ public static class ModelosDeAta
         ];
     }
 
-    public static ModeloDeAta? Buscar(string? id) =>
-        id is { Length: > 0 } ? Todos().FirstOrDefault(
+    public static ModeloDeAta? Buscar(string? id, string? pasta = null) =>
+        id is { Length: > 0 } ? Todos(pasta).FirstOrDefault(
             m => string.Equals(m.Id, id, StringComparison.OrdinalIgnoreCase)) : null;
 
     /// <summary>
@@ -236,12 +254,12 @@ public static class ModelosDeAta
             "## Passo 2: Regras comuns a todos os tipos", "## Regras");
     }
 
-    private static IEnumerable<string> ArquivosDoUsuario()
+    private static IEnumerable<string> ArquivosDoUsuario(string pasta)
     {
         try
         {
-            return Directory.Exists(PastaDoUsuario)
-                ? Directory.EnumerateFiles(PastaDoUsuario, "*.md").Order()
+            return Directory.Exists(pasta)
+                ? Directory.EnumerateFiles(pasta, "*.md").Order()
                 : [];
         }
         catch (IOException)
@@ -250,8 +268,31 @@ public static class ModelosDeAta
         }
     }
 
-    private static string NomeDe(string id) =>
-        NomesBonitos.TryGetValue(id, out string? nome) ? nome : id.Replace('-', ' ');
+    /// <remarks>
+    /// Os do app têm nome fixo. O tipo criado pelo usuário tira o nome do título
+    /// do arquivo ("# Ata — Comitê de Dados"), que é onde a tela o escreve — o
+    /// nome do arquivo perdeu os acentos e as maiúsculas.
+    /// </remarks>
+    private static string NomeDe(string id, string? texto = null)
+    {
+        if (NomesBonitos.TryGetValue(id, out string? nome)) return nome;
+        if (texto is not null && Titulo(texto) is { Length: > 0 } titulo) return titulo;
+        return id.Replace('-', ' ');
+    }
+
+    /// <summary>O "# Ata — X" do topo do arquivo, antes do bloco do esqueleto.</summary>
+    private static string? Titulo(string texto)
+    {
+        int bloco = texto.IndexOf("```markdown", StringComparison.Ordinal);
+        foreach (string cru in (bloco < 0 ? texto : texto[..bloco]).Split('\n'))
+        {
+            string linha = cru.Trim();
+            if (!linha.StartsWith("# Ata", StringComparison.Ordinal)) continue;
+            string resto = linha[5..].TrimStart(' ', '—', '-', ':').Trim();
+            return resto.Length > 0 ? resto : null;
+        }
+        return null;
+    }
 
     /// <remarks>
     /// Os recursos entram pelo .csproj com o mesmo cuidado dos ícones da
@@ -277,10 +318,168 @@ public static class ModelosDeAta
         return destino;
     }
 
-    /// <summary>Apaga a versão do usuário, voltando ao embutido.</summary>
-    public static void VoltarAoOriginal(string id)
+    /// <summary>
+    /// Apaga a versão do usuário: volta ao do app, ou apaga o tipo que ele criou.
+    /// </summary>
+    public static void VoltarAoOriginal(string id, string? pasta = null)
     {
-        string arquivo = Path.Combine(PastaDoUsuario, $"{id}.md");
+        pasta ??= PastaDoUsuario;
+        string arquivo = Path.Combine(pasta, $"{id}.md");
         if (File.Exists(arquivo)) File.Delete(arquivo);
+        var marcas = LerMarcas(pasta);
+        if (marcas.Remove(id)) GravarMarcas(pasta, marcas);
+    }
+
+    // ───────────────────────────── editar em Ajustes › Atas (parte 2 da ATA-5)
+
+    /// <summary>O tipo vem de dentro do app (e não só da pasta do usuário).</summary>
+    public static bool EhDoApp(string id) =>
+        Embutidos.Contains(id, StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>O texto do tipo como o app o traz, sem a cópia do usuário.</summary>
+    public static string? Original(string id) => EhDoApp(id) ? LerEmbutido(id) : null;
+
+    /// <summary>Uma seção do esqueleto, e quem a escreve.</summary>
+    /// <param name="DoApp">
+    /// O app a escreve a partir de um campo (Resumo, Decisões, Pendências…); a
+    /// IA não a vê como seção. Ver <see cref="ModeloDeAta.TextoParaPrompt"/>.
+    /// </param>
+    public sealed record SecaoDoModelo(string Titulo, bool DoApp);
+
+    /// <summary>As seções que a ata do tipo terá, na ordem, e quem escreve cada uma.</summary>
+    public static IReadOnlyList<SecaoDoModelo> Resumo(ModeloDeAta modelo) =>
+        [.. modelo.Secoes.Select(t => new SecaoDoModelo(t, RedatorDeAta.NomeCanonico(t) is not null))];
+
+    /// <summary>
+    /// O que falta no texto para ele servir de modelo, ou nulo se não falta nada.
+    /// </summary>
+    /// <remarks>
+    /// Sem o bloco do esqueleto a IA não sabe que seções escrever, e a ata sai
+    /// só com o que o app escreve sozinho — em silêncio. Melhor recusar ao
+    /// salvar, quando quem escreveu ainda está olhando.
+    /// </remarks>
+    public static string? OQueFalta(string texto)
+    {
+        const string falta = "o modelo precisa do bloco ```markdown com o esqueleto da ata, "
+                             + "fechado com ```, e pelo menos uma seção \"## \" dentro dele";
+        int inicio = texto.IndexOf("```markdown", StringComparison.Ordinal);
+        if (inicio < 0 || texto.IndexOf("```", inicio + 11, StringComparison.Ordinal) < 0)
+            return falta;
+        return new ModeloDeAta("x", "x", texto, DoUsuario: true).Secoes.Count == 0 ? falta : null;
+    }
+
+    /// <summary>Grava o modelo na pasta do usuário — personalizando, se for do app.</summary>
+    /// <exception cref="InvalidOperationException">O texto não tem a estrutura.</exception>
+    public static void Salvar(string id, string texto, string? pasta = null)
+    {
+        if (OQueFalta(texto) is { } falta) throw new InvalidOperationException(falta);
+        pasta ??= PastaDoUsuario;
+        Directory.CreateDirectory(pasta);
+        string arquivo = Path.Combine(pasta, $"{id}.md");
+
+        // A marca do original é a da hora de personalizar, e não a de cada
+        // salvar: a cópia continua sendo daquela versão do app.
+        if (EhDoApp(id) && !File.Exists(arquivo) && Original(id) is { } original)
+        {
+            var marcas = LerMarcas(pasta);
+            marcas[id] = Marca(original);
+            GravarMarcas(pasta, marcas);
+        }
+
+        string tmp = arquivo + ".tmp";
+        File.WriteAllText(tmp, texto);
+        File.Move(tmp, arquivo, overwrite: true);
+    }
+
+    /// <summary>Um tipo novo, copiado de outro, com o nome no título e no arquivo.</summary>
+    /// <returns>O id do tipo novo — o nome do arquivo.</returns>
+    public static string Criar(string baseId, string nome, string? pasta = null)
+    {
+        pasta ??= PastaDoUsuario;
+        string limpo = nome.Trim();
+        string id = Identificador(limpo);
+        if (id.Length == 0)
+            throw new InvalidOperationException("dê ao tipo um nome com letras ou números");
+        if (Buscar(id, pasta) is not null)
+            throw new InvalidOperationException($"já existe um tipo chamado \"{limpo}\"");
+        var base_ = Buscar(baseId, pasta)
+            ?? throw new InvalidOperationException($"tipo desconhecido: {baseId}");
+
+        Salvar(id, ComTitulo(base_.Texto, limpo), pasta);
+        return id;
+    }
+
+    /// <summary>
+    /// A cópia personalizada é de um original que o app já trocou.
+    /// </summary>
+    /// <remarks>
+    /// Sem isto, uma versão nova do app muda o modelo — como a ata por tema
+    /// mudou o update com cliente em 08/10/2026 — e quem personalizou fica na
+    /// versão velha sem saber. Sem marca guardada (personalizado antes desta
+    /// versão) não se afirma nada.
+    /// </remarks>
+    public static bool OriginalMudou(string id, string? pasta = null)
+    {
+        pasta ??= PastaDoUsuario;
+        if (!EhDoApp(id) || !File.Exists(Path.Combine(pasta, $"{id}.md"))) return false;
+        if (Original(id) is not { } original) return false;
+        return LerMarcas(pasta).TryGetValue(id, out string? marca) && marca != Marca(original);
+    }
+
+    /// <summary>"Comitê de Dados" → "comite-de-dados".</summary>
+    private static string Identificador(string nome)
+    {
+        string sem = new string(nome.ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
+                        != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        var partes = System.Text.RegularExpressions.Regex.Split(sem, "[^a-z0-9]+")
+            .Where(x => x.Length > 0);
+        return string.Join('-', partes);
+    }
+
+    /// <summary>Troca o "# Ata — …" do topo, antes do bloco do esqueleto.</summary>
+    private static string ComTitulo(string texto, string nome)
+    {
+        int bloco = texto.IndexOf("```markdown", StringComparison.Ordinal);
+        var linhas = texto.Split('\n');
+        int fimDoTopo = bloco < 0 ? linhas.Length : texto[..bloco].Split('\n').Length;
+        for (int i = 0; i < fimDoTopo && i < linhas.Length; i++)
+        {
+            if (!linhas[i].TrimStart().StartsWith("# Ata", StringComparison.Ordinal)) continue;
+            linhas[i] = $"# Ata — {nome}" + (linhas[i].EndsWith('\r') ? "\r" : "");
+            return string.Join('\n', linhas);
+        }
+        return $"# Ata — {nome}\n\n" + texto;
+    }
+
+    private static string Marca(string texto) => Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(texto.Replace("\r\n", "\n")))).ToLowerInvariant();
+
+    /// <remarks>
+    /// Texto, uma linha por tipo ("id\tmarca"), e não JSON: não precisa de
+    /// contexto de serialização sob o PublishTrimmed, e não aparece como tipo
+    /// porque a lista só lê *.md.
+    /// </remarks>
+    private static Dictionary<string, string> LerMarcas(string pasta)
+    {
+        var marcas = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string arquivo = Path.Combine(pasta, ".originais");
+        try
+        {
+            if (!File.Exists(arquivo)) return marcas;
+            foreach (string linha in File.ReadAllLines(arquivo))
+                if (linha.Split('\t') is [var id, var marca] && id.Length > 0)
+                    marcas[id] = marca.Trim();
+        }
+        catch (IOException) { }
+        return marcas;
+    }
+
+    private static void GravarMarcas(string pasta, Dictionary<string, string> marcas)
+    {
+        Directory.CreateDirectory(pasta);
+        File.WriteAllLines(Path.Combine(pasta, ".originais"),
+                           marcas.OrderBy(m => m.Key).Select(m => $"{m.Key}\t{m.Value}"));
     }
 }

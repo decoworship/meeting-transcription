@@ -46,6 +46,18 @@ public sealed class MotorSidecarTests
     }
 
     [Fact]
+    public async Task OcrDevolveAsLinhasComConfiancaECaixa()
+    {
+        using var m = await Subir();
+
+        var linhas = await m.LerTextoAsync(@"C:\reunioes\capturas\tela.png");
+
+        Assert.Equal(new LinhaLida("Helena Dias", 0.98, 10, 300, 120, 318), linhas[1]);
+        // A imagem pedida chega ao motor como foi mandada.
+        Assert.Equal(@"C:\reunioes\capturas\tela.png", linhas[2].Texto);
+    }
+
+    [Fact]
     public async Task MotorDeDiarizacaoChegaNaRequisicaoQuandoPedido()
     {
         // O porte para ONNX Runtime (docs/DIARIZACAO-ONNX.md) só é alcançável

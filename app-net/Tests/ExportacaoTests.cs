@@ -265,6 +265,25 @@ public sealed class ExportacaoTests : IDisposable
     }
 
     [Fact]
+    public void OsRotulosDaAtaPorTemaSaemColoridos()
+    {
+        // Decidido, Atenção e Em aberto (ATA-5): cor no texto e sem fundo, nos
+        // tons claros do AA Design System — imprime também em preto e branco.
+        string xml = DocumentoDaAta(
+            "**Decidido:** subir na sexta\n\n**Atenção:** o prazo\n\n**Em aberto:** o custo\n\n"
+            + "**Data:** 20/08 · **Decidido:** no meio não conta\n");
+
+        string Rotulo(string cor, string texto) =>
+            $"<w:b/><w:color w:val=\"{cor}\"/><w:sz w:val=\"22\"/></w:rPr><w:t xml:space=\"preserve\">{texto}</w:t>";
+        Assert.Contains(Rotulo("4A6746", "Decidido:"), xml);
+        Assert.Contains(Rotulo("8A5F22", "Atenção:"), xml);
+        Assert.Contains(Rotulo("3D6189", "Em aberto:"), xml);
+        // Só o rótulo no começo do parágrafo; o resto do negrito fica como era.
+        Assert.Equal(1, xml.Split("w:val=\"4A6746\"").Length - 1);
+        Assert.Contains("<w:b/><w:sz w:val=\"22\"/></w:rPr><w:t xml:space=\"preserve\">Data:</w:t>", xml);
+    }
+
+    [Fact]
     public void AAtaViraWordComTitulosNegritoEListas()
     {
         string xml = DocumentoDaAta(

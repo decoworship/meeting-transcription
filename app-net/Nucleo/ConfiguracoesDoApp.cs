@@ -343,11 +343,27 @@ public sealed class ConfiguracoesDoApp
     /// as pendências por lado sem o modelo deduzir organização pelo assunto da
     /// conversa — dedução que já pôs alguém da equipe como sendo do cliente.
     /// </remarks>
+    /// <summary>
+    /// O nome do dono da máquina, que substitui o "You" no fim da transcrição.
+    /// </summary>
+    /// <remarks>
+    /// Vazio é o comportamento de sempre. Os sinais ao vivo e o aprendizado de
+    /// vozes continuam lendo o "You" — a troca acontece só no
+    /// <c>transcricao.json</c>, como quando a pessoa renomeia na revisão.
+    /// </remarks>
+    [JsonPropertyName("nome_do_dono")] public string NomeDoDono { get; set; } = "";
+
     [JsonPropertyName("dominios_da_casa")] public List<string> DominiosDaCasa { get; set; } = [];
 
     /// <summary>O tipo de ata sugerido quando o projeto não tem preferência.</summary>
     [JsonPropertyName("tipo_de_ata_padrao")] public string TipoDeAtaPadrao { get; set; }
         = "cliente-update";
+
+    /// <summary>"por-tema" (padrão) ou "classico" — ver Nucleo/Atas/FormatoDaAta.cs.</summary>
+    [JsonPropertyName("formato_da_ata")] public string FormatoDaAta { get; set; }
+        = Atas.FormatosDaAta.Padrao;
+
+    [JsonIgnore] public Atas.FormatoDaAta Formato => Atas.FormatosDaAta.Ler(FormatoDaAta);
 
     /// <summary>Transcrever mesmo quando a placa não estiver disponível.</summary>
     /// <remarks>

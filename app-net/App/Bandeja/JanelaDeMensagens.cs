@@ -73,6 +73,47 @@ internal sealed class JanelaDeMensagens : IDisposable
     /// <summary>Uma segunda instância pediu a janela, ou a bandeja pediu.</summary>
     public Action? AoPedirJanela { get; set; }
 
+    /// <summary>O atalho de capturar a tela foi apertado, em qualquer janela.</summary>
+    public Action? AoAtalhoDeCaptura { get; set; }
+
+    private const int IdDoAtalhoDeCaptura = 1;
+    private bool _atalhoRegistrado;
+
+    /// <summary>
+    /// Liga o atalho global de capturar a tela. Falso se outro programa já o tem.
+    /// </summary>
+    /// <remarks>
+    /// Só enquanto se grava, e por isso liga e desliga com a gravação: um
+    /// atalho global rouba a combinação de todos os outros programas, e fora da
+    /// reunião ele não teria momento nenhum para marcar.
+    /// </remarks>
+    public bool LigarAtalhoDeCaptura()
+    {
+        if (_atalhoRegistrado) return true;
+        _atalhoRegistrado = Win32.RegisterHotKey(Hwnd, IdDoAtalhoDeCaptura,
+            Win32.MOD_CONTROL | Win32.MOD_ALT | Win32.MOD_NOREPEAT, TeclaDoAtalho);
+        return _atalhoRegistrado;
+    }
+
+    public void DesligarAtalhoDeCaptura()
+    {
+        if (!_atalhoRegistrado) return;
+        Win32.UnregisterHotKey(Hwnd, IdDoAtalhoDeCaptura);
+        _atalhoRegistrado = false;
+    }
+
+    /// <summary>
+    /// Ctrl+Alt+P, de "print".
+    /// </summary>
+    /// <remarks>
+    /// Ctrl+Alt é o AltGr, e no ABNT2 o AltGr+P não escreve nada — ao contrário
+    /// do AltGr+Q (/), W (?) e E (°), que um atalho global roubaria de quem
+    /// digita. O PrintScreen sozinho é do Recorte do Windows 11, e o
+    /// Win+Shift+S também.
+    /// </remarks>
+    public const uint TeclaDoAtalho = 'P';
+    public const string NomeDoAtalho = "Ctrl+Alt+P";
+
     public JanelaDeMensagens()
     {
         _wndProc = Processar;
@@ -160,6 +201,10 @@ internal sealed class JanelaDeMensagens : IDisposable
                     unchecked((short)((wParam.ToInt64() >> 16) & 0xFFFF)));
                 return IntPtr.Zero;
 
+            case Win32.WM_HOTKEY:
+                if (wParam == IdDoAtalhoDeCaptura) AoAtalhoDeCaptura?.Invoke();
+                return IntPtr.Zero;
+
             case Win32.WM_DESTROY:
                 Win32.PostQuitMessage(0);
                 return IntPtr.Zero;
@@ -169,6 +214,7 @@ internal sealed class JanelaDeMensagens : IDisposable
 
     public void Dispose()
     {
+        DesligarAtalhoDeCaptura();
         Win32.KillTimer(Hwnd, IdDoTimer);
         Win32.KillTimer(Hwnd, IdDoTimerRapido);
         Win32.DestroyWindow(Hwnd);

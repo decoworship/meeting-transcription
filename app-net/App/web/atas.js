@@ -11,6 +11,7 @@ import { pedir } from "/ponte.js";
 import { alerta, campo } from "/pecas.js";
 import { assinarTranscricoes, emCurso, ultimoResultado, cancelar } from "/transcricoes.js";
 import { tituloDe } from "/app.js";
+import { blocosDaAta, htmlParaEmail } from "/ata-regras.js";
 
 // A transcrição e a separação de falantes dividem o registro com a ata. A aba
 // Ata só acompanha o que é dela: tomar a separação de falantes por uma ata
@@ -30,15 +31,27 @@ const ETAPAS = {
  * @param depois onde pôr o caminho do arquivo exportado, ou o erro: logo
  *   depois deste elemento.
  */
-function botoesDaAta(markdown, gravacao, depois) {
+function botoesDaAta(lerMarkdown, gravacao, depois) {
   const copiar = document.createElement("button");
   copiar.className = "aa-btn aa-btn-texto";
   copiar.type = "button";
   copiar.textContent = "Copiar";
   copiar.addEventListener("click", async () => {
-    // A ata existe para ser colada num e-mail. Markdown puro, e não o texto
-    // renderizado: é o que o Teams, o Slack e o e-mail entendem.
-    await navigator.clipboard.writeText(markdown);
+    // A ata existe para ser colada num e-mail. Vão duas versões, e quem cola
+    // escolhe: o Gmail, o Outlook e o Word pegam o HTML, com fundo branco e
+    // estilo em cada elemento; o que só aceita texto pega o Markdown.
+    // O texto de agora, e não o de quando a ata abriu: as caixinhas marcadas
+    // depois vão junto.
+    const markdown = lerMarkdown();
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/html": new Blob([htmlParaEmail(markdown)], { type: "text/html" }),
+        "text/plain": new Blob([markdown], { type: "text/plain" }),
+      })]);
+    } catch {
+      // Sem ClipboardItem, ou recusado: ao menos o Markdown, como sempre foi.
+      await navigator.clipboard.writeText(markdown);
+    }
     copiar.textContent = "Copiado";
     setTimeout(() => { copiar.textContent = "Copiar"; }, 1500);
   });
@@ -168,17 +181,42 @@ async function carregarAta(g, corpo, botao, aoContar) {
   cabeca.className = "ata__cabeca";
   const estado = document.createElement("p");
   estado.className = "ata__estado";
-  const linhas = r.ata.split("\n").filter((l) => l.trim().length > 0).length;
-  const pendencias = (r.ata.match(/^- \[ \]/gm) ?? []).length;
-  aoContar?.(pendencias);
-  estado.textContent = pendencias > 0
-    ? `${pendencias} pendência${pendencias > 1 ? "s" : ""} · ${linhas} linhas`
-    : `${linhas} linhas`;
-  cabeca.append(estado, ...botoesDaAta(r.ata, g, cabeca));
+  let atual = r.ata;
+  // Recontado a cada caixinha: a pendência marcada deixa de estar aberta, aqui
+  // e no selo da aba — a mesma régua do EstadoDaAta, que só conta "- [ ]".
+  const contar = () => {
+    const linhas = atual.split("\n").filter((l) => l.trim().length > 0).length;
+    const pendencias = (atual.match(/^- \[ \]/gm) ?? []).length;
+    aoContar?.(pendencias);
+    estado.textContent = pendencias > 0
+      ? `${pendencias} pendência${pendencias > 1 ? "s" : ""} · ${linhas} linhas`
+      : `${linhas} linhas`;
+  };
+  contar();
+  cabeca.append(estado, ...botoesDaAta(() => atual, g, cabeca));
+
+  // A marca vai para o ata.md (Nucleo/Atas/Pendencias.cs); depois relê o
+  // arquivo, para o Copiar e a contagem verem o que está em disco.
+  let aviso = null;
+  const aoMarcar = async (indice, textoDaPendencia, feita) => {
+    aviso?.remove();
+    try {
+      await pedir("marcar-pendencia",
+        { gravacao: g.caminho, indice, texto: textoDaPendencia, feita });
+      const relida = await pedir("ata", { gravacao: g.caminho });
+      if (relida.ata) atual = relida.ata;
+      contar();
+      return true;
+    } catch (e) {
+      aviso = alerta(e.message, "erro");
+      cabeca.after(aviso);
+      return false;
+    }
+  };
 
   const texto = document.createElement("div");
   texto.className = "ata__texto";
-  texto.append(...renderizar(r.ata));
+  texto.append(...renderizar(r.ata, { aoMarcar }));
 
   corpo.replaceChildren(cabeca);
   if (r.ata_velha) {
@@ -186,82 +224,99 @@ async function carregarAta(g, corpo, botao, aoContar) {
       "A transcrição foi corrigida depois que esta ata foi escrita. Vale refazer.", "aviso"));
   }
   corpo.appendChild(texto);
+
+  // As observações do verificador, quando a ata é por tema (ATA-5): moram fora
+  // do ata.md para não irem ao cliente, e ficam aqui, recolhidas, para quem
+  // gerou conferir números e compromissos.
+  if (r.observacoes) {
+    const obs = document.createElement("details");
+    obs.className = "ata__observacoes";
+    const titulo = document.createElement("summary");
+    titulo.textContent = "Observações sobre a transcrição";
+    const dentro = document.createElement("div");
+    dentro.className = "ata__texto";
+    // O arquivo começa com o próprio título; o <summary> já o diz. "[^\n]", e
+    // não ".": no Windows a linha termina em \r\n, e o "." para no \r.
+    dentro.append(...renderizar(r.observacoes.replace(/^##[^\n]*\n+(?:\r?\n)*/, "")));
+    obs.append(titulo, dentro);
+    corpo.appendChild(obs);
+  }
 }
 
 /**
- * Markdown suficiente para uma ata, sem biblioteca.
+ * A ata desenhada na tela, a partir dos blocos de ata-regras.js.
  *
- * São seis construções — título, item de lista, checkbox, negrito, parágrafo e
- * regra — e uma biblioteca custaria mais que isso em bytes e em CSP. Monta nós,
- * nunca innerHTML: o texto vem de um modelo de linguagem, e o dia em que uma
- * transcrição contiver algo parecido com uma tag não pode ser o dia em que o app
- * a executa.
+ * Monta nós, nunca innerHTML: o texto vem de um modelo de linguagem, e o dia em
+ * que uma transcrição contiver algo parecido com uma tag não pode ser o dia em
+ * que o app a executa.
  */
-function renderizar(markdown) {
+function renderizar(markdown, { aoMarcar } = {}) {
   const nos = [];
-  let lista = null;
+  // O número da caixinha, na ordem em que aparece: é o que o núcleo usa para
+  // achar a linha (e confere pelo texto, caso a ata tenha mudado).
+  let caixinhas = -1;
 
-  const fecharLista = () => { lista = null; };
-
-  for (const linha of markdown.split("\n")) {
-    const t = linha.trim();
-
-    if (t.length === 0) { fecharLista(); continue; }
-
-    const titulo = t.match(/^(#{1,4})\s+(.*)$/);
-    if (titulo) {
-      fecharLista();
-      const h = document.createElement(`h${Math.min(6, titulo[1].length + 1)}`);
-      h.append(...comNegrito(titulo[2]));
+  for (const bloco of blocosDaAta(markdown)) {
+    if (bloco.tipo === "titulo") {
+      const h = document.createElement(`h${bloco.nivel}`);
+      h.append(...comNegrito(bloco.trechos));
       nos.push(h);
       continue;
     }
 
-    const item = t.match(/^[-*]\s+(?:\[( |x)\]\s+)?(.*)$/);
-    if (item) {
-      if (!lista) {
-        lista = document.createElement("ul");
-        nos.push(lista);
+    if (bloco.tipo === "lista") {
+      const lista = document.createElement("ul");
+      for (const item of bloco.itens) {
+        const li = document.createElement("li");
+        if (item.caixa !== null) {
+          li.className = "ata__pendencia";
+          const caixa = document.createElement("input");
+          caixa.type = "checkbox";
+          caixa.checked = item.caixa;
+          li.classList.toggle("ata__pendencia--feita", caixa.checked);
+          // Sem quem grave, só leitura: um check que some ao recarregar é pior
+          // que check nenhum.
+          caixa.disabled = !aoMarcar;
+          if (aoMarcar) {
+            const indice = ++caixinhas;
+            const textoDaPendencia = item.texto;
+            caixa.setAttribute("aria-label", "Pendência feita");
+            caixa.addEventListener("change", async () => {
+              const feita = caixa.checked;
+              li.classList.toggle("ata__pendencia--feita", feita);
+              caixa.disabled = true;
+              const gravou = await aoMarcar(indice, textoDaPendencia, feita);
+              if (!gravou) {
+                caixa.checked = !feita;
+                li.classList.toggle("ata__pendencia--feita", !feita);
+              }
+              caixa.disabled = false;
+            });
+          }
+          li.appendChild(caixa);
+        }
+        li.append(...comNegrito(item.trechos));
+        lista.appendChild(li);
       }
-      const li = document.createElement("li");
-      if (item[1] !== undefined) {
-        li.className = "ata__pendencia";
-        const caixa = document.createElement("input");
-        caixa.type = "checkbox";
-        caixa.checked = item[1] === "x";
-        // Só leitura: marcar aqui não voltaria para o arquivo, e um check que
-        // some ao recarregar é pior que check nenhum.
-        caixa.disabled = true;
-        li.appendChild(caixa);
-      }
-      li.append(...comNegrito(item[2]));
-      lista.appendChild(li);
+      nos.push(lista);
       continue;
     }
 
-    fecharLista();
     const p = document.createElement("p");
-    p.append(...comNegrito(t));
+    if (bloco.rotulo) p.classList.add("ata__rotulo", `ata__rotulo--${bloco.rotulo}`);
+    p.append(...comNegrito(bloco.trechos));
     nos.push(p);
   }
   return nos;
 }
 
-function comNegrito(texto) {
-  const nos = [];
-  let resto = texto;
-  const negrito = /\*\*(.+?)\*\*/;
-
-  let m;
-  while ((m = negrito.exec(resto)) !== null) {
-    if (m.index > 0) nos.push(document.createTextNode(resto.slice(0, m.index)));
-    const forte = document.createElement("strong");
-    forte.textContent = m[1];
-    nos.push(forte);
-    resto = resto.slice(m.index + m[0].length);
-  }
-  if (resto.length > 0) nos.push(document.createTextNode(resto));
-  return nos;
+function comNegrito(trechos) {
+  return trechos.map(({ texto, forte }) => {
+    if (!forte) return document.createTextNode(texto);
+    const s = document.createElement("strong");
+    s.textContent = texto;
+    return s;
+  });
 }
 
 /**

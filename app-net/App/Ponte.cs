@@ -62,6 +62,13 @@ internal sealed class Pedido
     [JsonPropertyName("indice")] public int? Indice { get; init; }
 
     /// <summary>
+    /// A pendência que a tela marcou: o texto dela confere o índice
+    /// (Nucleo/Atas/Pendencias.cs), e <c>feita</c> é o estado novo da caixinha.
+    /// </summary>
+    [JsonPropertyName("texto")] public string? Texto { get; init; }
+    [JsonPropertyName("feita")] public bool? Feita { get; init; }
+
+    /// <summary>
     /// O carimbo da amostra que a tela mostrou: o núcleo só age se o índice
     /// ainda for ela (Vozes.Achar).
     /// </summary>
@@ -95,6 +102,15 @@ internal sealed class Pedido
     /// <c>true</c> no botão de resumo, que tem forma; ausente na caixa livre.
     /// </summary>
     [JsonPropertyName("resumo")] public bool? Resumo { get; init; }
+
+    /// <summary>
+    /// O momento da reunião em que a imagem foi colada nas notas, quando há
+    /// gravação correndo. Ausente na reunião já gravada.
+    /// </summary>
+    [JsonPropertyName("segundos")] public double? Segundos { get; init; }
+
+    /// <summary>Os participantes que a pessoa confirmou, em <c>salvar-participantes</c>.</summary>
+    [JsonPropertyName("nomes")] public List<string>? Nomes { get; init; }
 }
 
 internal sealed class Resposta
@@ -115,6 +131,21 @@ internal sealed class Resposta
 
     /// <summary>Um bloco da prévia ao vivo. Só no evento <c>id: 0</c>.</summary>
     [JsonPropertyName("aovivo")] public BlocoDaPrevia? AoVivo { get; init; }
+
+    /// <summary>
+    /// A imagem que entrou nas notas: no evento <c>captura</c> (o print do
+    /// atalho ou do botão) e na resposta de <c>salvar-imagem</c>.
+    /// </summary>
+    [JsonPropertyName("captura")] public CapturaJson? Captura { get; init; }
+
+    /// <summary>Os nomes que o OCR achou num print, em <c>ler-nomes</c>.</summary>
+    [JsonPropertyName("nomes_lidos")] public List<NomeLidoJson>? NomesLidos { get; init; }
+
+    /// <summary>O print tem cara de tela de reunião: as caixinhas já vêm marcadas.</summary>
+    [JsonPropertyName("parece_reuniao")] public bool? PareceReuniao { get; init; }
+
+    /// <summary>Quem estava, e as sugestões de nome de falante.</summary>
+    [JsonPropertyName("participantes")] public List<string>? Participantes { get; init; }
 
     /// <summary>Um pedaço da legenda ao vivo. Só no evento <c>id: 0</c>.</summary>
     [JsonPropertyName("legenda")] public PedacoDaLegendaJson? Legenda { get; init; }
@@ -199,6 +230,14 @@ internal sealed class Resposta
 
     /// <summary>A ata em Markdown, ou nulo quando ainda não existe.</summary>
     [JsonPropertyName("ata")] public string? Ata { get; init; }
+
+    [JsonPropertyName("modelo_de_ata")] public ModeloDeAtaAberto? ModeloDeAta { get; init; }
+
+    /// <summary>O id do tipo de ata recém-criado.</summary>
+    [JsonPropertyName("criado")] public string? Criado { get; init; }
+
+    /// <summary>O <c>ata.observacoes.md</c>, quando a ata foi gerada por tema (ATA-5).</summary>
+    [JsonPropertyName("observacoes")] public string? Observacoes { get; init; }
 
     /// <summary>A transcrição mudou depois de a ata ter sido escrita.</summary>
     [JsonPropertyName("ata_velha")] public bool AtaVelha { get; init; }
@@ -296,6 +335,28 @@ internal sealed class ProximasReunioes
 /// dois casos de propósito: a tela desenha do estado que recebeu, sem precisar
 /// saber se pediu ou se foi avisada.
 /// </remarks>
+/// <summary>Um nome que o OCR leu, como a tela o oferece.</summary>
+internal sealed class NomeLidoJson
+{
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("original")] public required string Original { get; init; }
+    [JsonPropertyName("convidado")] public string? Convidado { get; init; }
+
+    /// <summary>Já está em <c>participantes.json</c>, de um print anterior.</summary>
+    [JsonPropertyName("guardado")] public bool Guardado { get; init; }
+}
+
+/// <summary>Uma imagem guardada em <c>capturas/</c> e a linha dela nas notas.</summary>
+internal sealed class CapturaJson
+{
+    [JsonPropertyName("gravacao")] public required string Gravacao { get; init; }
+
+    /// <summary>Relativo à pasta da gravação, com barra normal: "capturas/tela-00-12-34.png".</summary>
+    [JsonPropertyName("caminho")] public required string Caminho { get; init; }
+
+    [JsonPropertyName("linha")] public required string Linha { get; init; }
+}
+
 internal sealed class EstadoDoGravador
 {
     [JsonPropertyName("gravando")] public bool Gravando { get; init; }
@@ -349,6 +410,13 @@ internal sealed class EstadoDoGravador
     [JsonPropertyName("agenda_configurada")] public bool AgendaConfigurada { get; init; }
 
     [JsonPropertyName("faixas")] public List<FaixaAoVivo> Faixas { get; init; } = [];
+
+    /// <summary>
+    /// O atalho global de capturar a tela, quando está ligado. Nulo parado, ou
+    /// quando outro programa já tinha a combinação — aí só o botão funciona, e
+    /// a tela não promete um atalho que não existe.
+    /// </summary>
+    [JsonPropertyName("atalho_de_captura")] public string? AtalhoDeCaptura { get; init; }
 }
 
 /// <summary>Uma faixa enquanto grava — é daqui que sai o medidor de nível.</summary>
@@ -419,6 +487,33 @@ internal sealed class TipoDeAtaResumo
 
     /// <summary>Veio da pasta do perfil: a tela oferece "voltar ao original".</summary>
     [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
+
+    /// <summary>Vem de dentro do app: personalizado volta ao original, e não se apaga.</summary>
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
+}
+
+/// <summary>Um modelo de ata aberto em Ajustes › Atas, para ver e ajustar.</summary>
+internal sealed class ModeloDeAtaAberto
+{
+    [JsonPropertyName("id")] public required string Id { get; init; }
+    [JsonPropertyName("nome")] public required string Nome { get; init; }
+    [JsonPropertyName("texto")] public required string Texto { get; init; }
+    [JsonPropertyName("secoes")] public required List<SecaoDoModeloResumo> Secoes { get; init; }
+    [JsonPropertyName("agrupa")] public bool Agrupa { get; init; }
+    [JsonPropertyName("do_usuario")] public bool DoUsuario { get; init; }
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
+
+    /// <summary>A versão do app mudou o modelo depois que o usuário o personalizou.</summary>
+    [JsonPropertyName("original_mudou")] public bool OriginalMudou { get; init; }
+
+    /// <summary>O texto do app, para comparar com a cópia; nulo nos tipos do usuário.</summary>
+    [JsonPropertyName("original")] public string? Original { get; init; }
+}
+
+internal sealed class SecaoDoModeloResumo
+{
+    [JsonPropertyName("titulo")] public required string Titulo { get; init; }
+    [JsonPropertyName("do_app")] public bool DoApp { get; init; }
 }
 
 internal sealed class DispositivosDisponiveis
@@ -803,13 +898,44 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 // ─────────────────────────────────────────────── atas
 
                 case "modelos-de-ata":
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
+                    break;
+
+                case "ler-modelo-de-ata":
+                {
+                    var m = ModelosDeAta.Buscar(p.Modelo)
+                        ?? throw new InvalidOperationException($"tipo desconhecido: {p.Modelo}");
                     Responder(new Resposta
                     {
                         Id = p.Id,
-                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+                        ModeloDeAta = new ModeloDeAtaAberto
                         {
-                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
-                        })],
+                            Id = m.Id, Nome = m.Nome, Texto = m.Texto,
+                            Secoes = [.. ModelosDeAta.Resumo(m).Select(x => new SecaoDoModeloResumo
+                            {
+                                Titulo = x.Titulo, DoApp = x.DoApp,
+                            })],
+                            Agrupa = m.ItensPorSecao,
+                            DoUsuario = m.DoUsuario,
+                            DoApp = ModelosDeAta.EhDoApp(m.Id),
+                            OriginalMudou = ModelosDeAta.OriginalMudou(m.Id),
+                            Original = m.DoUsuario ? ModelosDeAta.Original(m.Id) : null,
+                        },
+                    });
+                    break;
+                }
+
+                case "salvar-modelo-de-ata":
+                    ModelosDeAta.Salvar(p.Modelo ?? "", p.Texto ?? "");
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
+                    break;
+
+                case "novo-modelo-de-ata":
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Criado = ModelosDeAta.Criar(p.Modelo ?? "", p.Nome ?? ""),
+                        Tipos = TiposDeAta(),
                     });
                     break;
 
@@ -826,6 +952,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                         // corrigiu o texto depois — e a ata ficou desatualizada
                         // sem ninguém avisar.
                         AtaVelha = EstadoDaAta.EstaVelha(onde),
+                        Observacoes = GeracaoDeAta.LerObservacoes(onde),
                     });
                     break;
                 }
@@ -842,6 +969,15 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Arquivo = ExportarAta(p) });
                     break;
 
+                case "marcar-pendencia":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Pendencias.MarcarNoArquivo(onde, p.Indice ?? -1, p.Texto ?? "", p.Feita == true);
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+                }
+
                 case "customizar-tipo-de-ata":
                     Responder(new Resposta
                     {
@@ -850,16 +986,10 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     });
                     break;
 
+                // Volta ao original os tipos do app, e apaga os criados pelo usuário.
                 case "restaurar-tipo-de-ata":
                     ModelosDeAta.VoltarAoOriginal(p.Modelo ?? "");
-                    Responder(new Resposta
-                    {
-                        Id = p.Id,
-                        Tipos = [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
-                        {
-                            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario,
-                        })],
-                    });
+                    Responder(new Resposta { Id = p.Id, Tipos = TiposDeAta() });
                     break;
 
                 // ─────────────────────────────────── notas da reunião
@@ -886,6 +1016,72 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     {
                         Id = p.Id,
                         Termos = Notas.TermosSugeridos(p.Conteudo ?? ""),
+                    });
+                    break;
+                }
+
+                case "capturar-tela":
+                    // Quem tira o print é a Aplicacao, que tem a janela e a
+                    // bandeja; a linha chega à página pelo evento "captura".
+                    gravador.PedirCaptura();
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+
+                case "salvar-imagem":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    if (p.Conteudo is not { Length: > 0 } base64)
+                        throw new InvalidOperationException("sem imagem");
+                    // Sem criar a pasta: as notas criam a delas de propósito,
+                    // mas uma imagem para uma gravação apagada é um diretório
+                    // novo com um arquivo solto que ninguém vai achar.
+                    if (!Directory.Exists(onde))
+                        throw new InvalidOperationException("a gravação não existe mais");
+
+                    byte[] bytes;
+                    try { bytes = Convert.FromBase64String(base64); }
+                    catch (FormatException) { throw new InvalidOperationException("imagem ilegível"); }
+
+                    string nome = p.Segundos is { } s
+                        ? Capturas.NomeNoMomento("imagem", s) : "imagem";
+                    string caminho = Capturas.Guardar(onde, bytes, nome);
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Captura = new CapturaJson
+                        {
+                            Gravacao = onde,
+                            Caminho = caminho,
+                            Linha = Capturas.LinhaDaNota(caminho, p.Segundos, "imagem"),
+                        },
+                    });
+                    break;
+                }
+
+                // ─────────────────────────────── quem estava (UI-12)
+
+                case "ler-nomes":
+                    await LerNomesAsync(p);
+                    break;
+
+                case "salvar-participantes":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde || !Directory.Exists(onde))
+                        throw new InvalidOperationException("a gravação não existe mais");
+                    Participantes.Juntar(onde, p.Nomes ?? []);
+                    Responder(new Resposta { Id = p.Id, Participantes = Participantes.Ler(onde) });
+                    break;
+                }
+
+                case "participantes":
+                {
+                    if (p.Gravacao is not { Length: > 0 } onde)
+                        throw new InvalidOperationException("sem gravação");
+                    Responder(new Resposta
+                    {
+                        Id = p.Id,
+                        Participantes = Participantes.Sugestoes(onde, ConvidadosEmCurso(onde)),
                     });
                     break;
                 }
@@ -1175,8 +1371,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                             ? LegendaAoVivo.OQueImpede(motoresAv, cfgAv)
                             : cfgAv.TranscricaoAoVivo
                                 ? SessaoAoVivo.OQueImpede(motoresAv, cfgAv)
-                                : "nem a legenda nem a prévia em blocos estão ligadas "
-                                  + "em Ajustes › Transcrição.",
+                                : "a legenda ao vivo está desligada em Ajustes › Gravador.",
                         AoVivoAte = [.. (_aoVivo?.Entregues ?? []).Select(Resumir)],
                         LegendaAte = HistoricoDaLegenda(),
                         PerguntarImpedimento = PerguntaDaReuniao.OQueImpede(
@@ -1255,6 +1450,65 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         }
     }
 
+    // ───────────────────────────────────────────────── quem estava (UI-12)
+
+    /// <summary>
+    /// Os convidados da gravação em curso, que ainda não têm <c>meta.json</c>;
+    /// nulo para as outras, que o têm.
+    /// </summary>
+    private List<string>? ConvidadosEmCurso(string pasta) =>
+        gravador.Estado.Gravando && gravador.PastaAtual is { } atual
+        && string.Equals(Path.GetFullPath(atual), Path.GetFullPath(pasta), StringComparison.OrdinalIgnoreCase)
+            ? gravador.Evento?.NomesDosParticipantes() ?? []
+            : null;
+
+    /// <summary>
+    /// Lê os nomes de uma imagem das notas. Dois minutos de prazo: subir o
+    /// Python e ler um print leva uns 5 s, e um motor que não respondeu em dois
+    /// minutos não vai responder.
+    /// </summary>
+    private async Task LerNomesAsync(Pedido p)
+    {
+        if (p.Gravacao is not { Length: > 0 } onde)
+            throw new InvalidOperationException("sem gravação");
+        // Só imagens da reunião: o caminho vem da página, e a página não manda
+        // o motor ler arquivo fora de capturas/.
+        if (p.Texto is not { Length: > 0 } relativo
+            || !relativo.StartsWith(Capturas.Pasta + "/", StringComparison.Ordinal)
+            || relativo.Contains("..") || relativo.Contains('\\')
+            || relativo.IndexOf('/', Capturas.Pasta.Length + 1) >= 0)
+            throw new InvalidOperationException("essa imagem não é das notas desta reunião");
+
+        string imagem = Path.Combine(onde, Capturas.Pasta, relativo[(Capturas.Pasta.Length + 1)..]);
+        if (!File.Exists(imagem)) throw new InvalidOperationException("a imagem não está mais na pasta");
+
+        var convidados = ConvidadosEmCurso(onde) ?? ConvidadosDaAgenda.Ler(onde).Nomes;
+        using var prazo = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        NomesDoPrint.Leitura leitura;
+        try
+        {
+            leitura = await LeitorDeNomes.LerAsync(Motores.AoLadoDoExecutavel(), imagem, convidados, prazo.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            throw new InvalidOperationException("o leitor de nomes não respondeu em dois minutos");
+        }
+
+        var guardados = Participantes.Ler(onde);
+        Responder(new Resposta
+        {
+            Id = p.Id,
+            PareceReuniao = leitura.PareceReuniao,
+            NomesLidos = [.. leitura.Nomes.Select(n => new NomeLidoJson
+            {
+                Nome = n.Convidado ?? n.Nome,
+                Original = n.Original,
+                Convidado = n.Convidado,
+                Guardado = guardados.Contains(n.Convidado ?? n.Nome, StringComparer.OrdinalIgnoreCase),
+            })],
+        });
+    }
+
     // ───────────────────────────────────────────────────────── gravador
 
     /// <summary>
@@ -1309,8 +1563,23 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Conta = MeetingRecorder.Agenda.ClienteDaAgenda.EstaAutorizado()
                 ? MeetingRecorder.Agenda.ClienteDaAgenda.EmailDaConta() : null,
             Faixas = faixas,
+            AtalhoDeCaptura = g.Estado.Gravando ? g.AtalhoDeCaptura : null,
         };
     }
+
+    /// <summary>
+    /// O print que entrou nas notas, empurrado à página — ou o motivo de não ter
+    /// entrado.
+    /// </summary>
+    /// <remarks>
+    /// Evento, e não resposta: o atalho é apertado com outra janela na frente, e
+    /// ninguém na página pediu nada. O botão da tela usa o mesmo caminho, para
+    /// haver um jeito só de a linha chegar ao campo das notas.
+    /// </remarks>
+    public static string EventoDaCaptura(CapturaJson? captura, string? erro) =>
+        JsonSerializer.Serialize(
+            new Resposta { Id = 0, Tipo = "captura", Captura = captura, Erro = erro },
+            PonteJson.Default.Resposta);
 
     /// <summary>
     /// Pergunta as próximas reuniões ao Google e as traduz para a tela.
@@ -2134,8 +2403,8 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Responder(new Resposta
             {
                 Id = p.Id,
-                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo ou a "
-                     + "prévia em blocos precisam estar ligadas em Ajustes › Transcrição, "
+                Erro = "ainda não há nada transcrito desta reunião. A legenda ao vivo "
+                     + "precisa estar ligada em Ajustes › Gravador, "
                      + "e leva alguns segundos até a primeira fala firmar.",
             });
             return;
@@ -2256,6 +2525,12 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             : "o modelo devolveu uma resposta vazia.";
     }
 
+    private static List<TipoDeAtaResumo> TiposDeAta() =>
+        [.. ModelosDeAta.Todos().Select(m => new TipoDeAtaResumo
+        {
+            Id = m.Id, Nome = m.Nome, DoUsuario = m.DoUsuario, DoApp = ModelosDeAta.EhDoApp(m.Id),
+        })];
+
     private void GerarAta(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } pasta)
@@ -2289,7 +2564,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 {
                     _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
                     EmpurrarTranscricoes();
-                }, trabalho.Token);
+                }, trabalho.Token, cfg.Formato);
 
                 _transcricoes.Terminar(pasta);
                 Avisar($"Ata pronta: {trabalho.Nome}");

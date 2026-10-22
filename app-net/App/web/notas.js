@@ -7,9 +7,34 @@
 //
 // Salva sozinho. Nota de reunião perdida por falta de um clique em "salvar" é a
 // falha mais boba que este bloco pode ter.
+//
+// **Imagens nas notas.** O print do atalho (Ctrl+Alt+P) e do botão "Capturar
+// tela", e a imagem que a pessoa cola, arrasta ou anexa, viram arquivo em
+// `capturas/` e uma linha `![legenda](capturas/arquivo)` no texto — com o
+// momento da reunião na frente quando há gravação correndo. O campo continua
+// sendo texto; as imagens aparecem como miniaturas logo abaixo dele.
 
-import { pedir } from "/ponte.js";
-import { momentosDasNotas } from "/reuniao-regras.js";
+import { pedir, assinar } from "/ponte.js";
+import { momentosDasNotas, imagensDasNotas, urlDaImagem } from "/reuniao-regras.js";
+import { verImagem, escolherParticipantes } from "/pecas.js";
+
+/** O mesmo teto do núcleo (Capturas.TamanhoMaximo), para recusar antes de mandar. */
+const TAMANHO_MAXIMO = 30 * 1024 * 1024;
+
+/** Duas pastas são a mesma gravação? O caminho pode vir com outra barra ou caixa. */
+const mesmaPasta = (a, b) => Boolean(a && b)
+  && String(a).replace(/[\\/]+$/, "").replace(/\//g, "\\").toLowerCase()
+     === String(b).replace(/[\\/]+$/, "").replace(/\//g, "\\").toLowerCase();
+
+/** O conteúdo de um arquivo em base64, que é como a ponte carrega bytes. */
+function base64De(arquivo) {
+  return new Promise((resolver, rejeitar) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolver(String(leitor.result).split(",")[1] ?? "");
+    leitor.onerror = () => rejeitar(leitor.error ?? new Error("não foi possível ler a imagem"));
+    leitor.readAsDataURL(arquivo);
+  });
+}
 
 const ATRASO_MS = 800;
 
@@ -71,7 +96,33 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
     acoes.appendChild(marcar);
   }
 
-  raiz.append(topo, campo, acoes);
+  // Anexar uma imagem que já está num arquivo. Colar (Ctrl+V) e arrastar para
+  // o campo fazem o mesmo, e cobrem o print tirado com Win+Shift+S.
+  const seletor = document.createElement("input");
+  seletor.type = "file";
+  seletor.accept = "image/png,image/jpeg,image/gif,image/webp";
+  seletor.hidden = true;
+  seletor.addEventListener("change", () => {
+    const arquivo = seletor.files?.[0];
+    seletor.value = "";
+    if (arquivo) inserirImagem(arquivo);
+  });
+  const anexar = document.createElement("button");
+  anexar.className = "aa-btn aa-btn-secundario";
+  anexar.type = "button";
+  anexar.textContent = "Inserir imagem";
+  anexar.title = "Também dá para colar (Ctrl+V) ou arrastar uma imagem para o campo";
+  anexar.addEventListener("click", () => escolherImagem());
+  acoes.append(anexar, seletor);
+
+  // As imagens que o texto cita, em miniatura. Fora do campo pelo mesmo motivo
+  // dos momentos: uma <textarea> não mostra imagem.
+  const imagens = document.createElement("div");
+  imagens.className = "notas__imagens";
+  imagens.setAttribute("aria-label", "Imagens das notas");
+  imagens.hidden = true;
+
+  raiz.append(topo, campo, acoes, imagens);
 
   /**
    * Põe o tempo de agora onde está o cursor.
@@ -91,6 +142,169 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
     return true;
   }
 
+  /** Abre o seletor de arquivo. O Gravador chama do rodapé dele. */
+  function escolherImagem() {
+    if (!alvo || campo.disabled) return;
+    seletor.click();
+  }
+
+  /**
+   * Guarda a imagem na pasta da gravação e põe a linha dela onde está o
+   * cursor, numa linha própria.
+   */
+  async function inserirImagem(arquivo) {
+    if (!alvo || campo.disabled) return;
+    if (arquivo.size > TAMANHO_MAXIMO) {
+      estado.textContent = "imagem grande demais (o limite é 30 MB)";
+      return;
+    }
+    // O cursor de agora, não o de depois do disco: quem colou continua
+    // digitando enquanto a imagem é guardada.
+    const pos = campo.selectionStart ?? campo.value.length;
+    const textoAntes = campo.value;
+    estado.textContent = "guardando a imagem…";
+    try {
+      const conteudo = await base64De(arquivo);
+      const r = await pedir("salvar-imagem", {
+        gravacao: alvo, conteudo,
+        ...(opcoes.tempo ? { segundos: opcoes.tempo() } : {}),
+      });
+      // Se o texto mudou enquanto se esperava, a imagem vai para o fim: o
+      // cursor guardado já não aponta para o mesmo lugar.
+      inserirLinha(r.captura.linha, campo.value === textoAntes ? pos : campo.value.length);
+    } catch (e) {
+      estado.textContent = `a imagem não entrou: ${e.message}`;
+    }
+  }
+
+  function inserirLinha(linha, pos) {
+    const antes = campo.value.slice(0, pos);
+    const depois = campo.value.slice(pos);
+    const abre = antes && !antes.endsWith("\n") ? "\n" : "";
+    const fecha = depois && !depois.startsWith("\n") ? "\n" : "";
+    campo.value = antes + abre + linha + fecha + depois;
+    const fim = (antes + abre + linha).length;
+    campo.selectionStart = campo.selectionEnd = fim;
+    aoEditar();
+    agendar();
+  }
+
+  campo.addEventListener("paste", (e) => {
+    const item = [...(e.clipboardData?.items ?? [])]
+      .find((i) => i.kind === "file" && i.type.startsWith("image/"));
+    const arquivo = item?.getAsFile();
+    if (!arquivo) return;          // texto colado segue o caminho normal
+    e.preventDefault();
+    inserirImagem(arquivo);
+  });
+  // Sem o preventDefault no dragover, o WebView2 trata o arquivo solto como
+  // navegação e troca a página do app pela imagem.
+  campo.addEventListener("dragover", (e) => {
+    if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === "file")) e.preventDefault();
+  });
+  campo.addEventListener("drop", (e) => {
+    const arquivo = [...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith("image/"));
+    if (!arquivo) return;
+    e.preventDefault();
+    inserirImagem(arquivo);
+  });
+
+  /**
+   * Os nomes de um print viram os participantes da reunião (UI-12): o motor de
+   * OCR lê, a pessoa confirma, e eles passam a ser as sugestões de nome dos
+   * falantes na revisão.
+   */
+  async function lerNomes(imagem) {
+    const gravacao = alvo;
+    const nomes = await escolherParticipantes(
+      () => pedir("ler-nomes", { gravacao, texto: imagem.caminho }));
+    if (!nomes?.length) return;
+    try {
+      const r = await pedir("salvar-participantes", { gravacao, nomes });
+      const n = r.participantes?.length ?? nomes.length;
+      estado.textContent = `${n} ${n === 1 ? "participante guardado" : "participantes guardados"}`;
+    } catch (e) {
+      estado.textContent = `os participantes não foram guardados: ${e.message}`;
+    }
+  }
+
+  /** A imagem grande, com "ouvir daqui" quando ela tem momento e a tela toca. */
+  function ampliar(imagem) {
+    const acoesDaImagem = [{ rotulo: "Ler nomes desta imagem", fazer: () => lerNomes(imagem) }];
+    if (imagem.segundos != null && opcoes.aoTocar)
+      acoesDaImagem.push({ rotulo: `Ouvir a partir de ${imagem.marca}`, fazer: () => opcoes.aoTocar(imagem.segundos) });
+    const linha = campo.value.split("\n").find((l) => l.includes(`(${imagem.caminho})`)) ?? "";
+    const legenda = linha.replace(/!\[[^\]]*\]\([^)]*\)/g, "").replace(/\[\d{1,2}:\d{2}:\d{2}\]/, "").trim();
+    verImagem(urlDaImagem(alvo, imagem.caminho),
+              imagem.marca ? `Imagem em ${imagem.marca}` : "Imagem das notas",
+              { legenda, acoes: acoesDaImagem });
+  }
+
+  function miniatura(imagem, classe) {
+    const img = document.createElement("img");
+    img.className = classe;
+    img.src = urlDaImagem(alvo, imagem.caminho);
+    img.alt = imagem.legenda || "imagem";
+    img.loading = "lazy";
+    img.decoding = "async";
+    return img;
+  }
+
+  // Refeitas só quando a lista muda, e não a cada tecla: refazer um <img> é
+  // recarregá-lo, e a faixa piscaria enquanto se digita.
+  let imagensDesenhadas = "";
+  function desenharImagens() {
+    const lista = alvo ? imagensDasNotas(campo.value) : [];
+    const chave = `${alvo}|${lista.map((i) => i.caminho).join("|")}`;
+    if (chave === imagensDesenhadas) return;
+    imagensDesenhadas = chave;
+    imagens.replaceChildren(...lista.map((imagem) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "notas__imagem";
+      b.title = imagem.marca ? `Ver a imagem de ${imagem.marca}` : "Ver a imagem";
+      b.appendChild(miniatura(imagem, "notas__miniatura"));
+      if (imagem.marca) {
+        const marca = document.createElement("span");
+        marca.className = "notas__marca";
+        marca.textContent = imagem.marca;
+        b.appendChild(marca);
+      }
+      b.addEventListener("click", () => ampliar(imagem));
+      return b;
+    }));
+    imagens.hidden = lista.length === 0;
+  }
+
+  /** O que muda com o texto, fora o salvar. */
+  function aoEditar() {
+    desenharMomentos();
+    desenharImagens();
+  }
+  campo.addEventListener("input", desenharImagens);
+
+  // O print do atalho e do botão chega por evento: o núcleo já pôs a linha no
+  // notas.md, e o campo aberto precisa tê-la também — senão o próximo
+  // salvamento da tela, que grava o campo inteiro, a apagaria do disco.
+  let jaConectou = false;
+  const cancelarCaptura = assinar("captura", (r) => {
+    if (raiz.isConnected) jaConectou = true;
+    else if (jaConectou) { cancelarCaptura(); return; }
+
+    if (r.erro) {
+      if (opcoes.tempo) estado.textContent = r.erro;
+      return;
+    }
+    const c = r.captura;
+    if (!c || !mesmaPasta(c.gravacao, alvo) || !carregado) return;
+    if (!campo.value.includes(c.linha)) {
+      const texto = campo.value;
+      campo.value = texto + (texto && !texto.endsWith("\n") ? "\n" : "") + c.linha;
+      aoEditar();
+      salvar();
+    }
+  });
+
   // Os momentos marcados, como botões que tocam dali (UI-4). Uma lista ao lado
   // do campo, e não dentro dele — uma <textarea> não tem botão —, refeita a
   // cada tecla sem tocar no campo: quem escreve não perde o cursor (F-2).
@@ -104,7 +318,9 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
       const marca = document.createElement("span");
       marca.className = "notas__marca";
       marca.textContent = m.marca;
-      b.append(marca, document.createTextNode(m.texto ? ` ${m.texto}` : ""));
+      b.append(marca);
+      if (m.imagem) b.append(" ", miniatura({ caminho: m.imagem, legenda: m.texto }, "notas__momento-imagem"));
+      b.append(document.createTextNode(m.texto ? ` ${m.texto}` : m.imagem ? " imagem" : ""));
       b.title = `Ouvir a partir de ${m.marca}`;
       b.addEventListener("click", () => opcoes.aoTocar(m.segundos));
       return b;
@@ -170,7 +386,7 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
       // começar, a resposta pode chegar depois da primeira tecla.
       if (campo.value === "" || campo.value === ultimoSalvo) campo.value = r.notas ?? "";
       ultimoSalvo = campo.value;
-      desenharMomentos();
+      aoEditar();
       carregado = true;
       estado.textContent = campo.value ? "salvo" : "";
       opcoes.aoMudar?.(r.termos ?? []);
@@ -198,11 +414,15 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
       }
     },
     marcarMomento,
+    escolherImagem,
+    /** A faixa de miniaturas, para o Gravador pô-la fora da grade do campo. */
+    imagens,
     /** Grava agora, sem esperar o atraso. Para quem está saindo da tela. */
     salvarAgora: salvar,
     definirHabilitado(ligado, aviso = "") {
       campo.disabled = !ligado;
       if (marcar) marcar.disabled = !ligado;
+      anexar.disabled = !ligado;
       if (!ligado && aviso) estado.textContent = aviso;
     },
   };
@@ -220,6 +440,7 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
     campo.value = "";
     ultimoSalvo = "";
     carregado = false;
+    aoEditar();
     if (caminho) await carregar(caminho);
   }
 }

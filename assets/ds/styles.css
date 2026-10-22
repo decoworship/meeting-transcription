@@ -1,8 +1,10 @@
 /* ============================================================
    AA Design System — ponto de entrada único
-   Linke SÓ este arquivo. Ele traz tokens, tipografia e as
-   classes de componente em CSS puro (para consumidores sem React).
+   Linke SÓ este arquivo. Ele traz tokens, tipografia, as classes
+   de componente em CSS puro (para consumidores sem React) e a
+   camada de material (data-estilo).
    ============================================================ */
 
 @import url('colors_and_type.css');
 @import url('componentes.css');
+@import url('estilos.css');   /* camada de material — sempre DEPOIS dos tokens */

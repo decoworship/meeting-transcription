@@ -788,6 +788,79 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .notas__momento:focus-visible { outline: none; box-shadow: var(--anel-foco); }
 .notas__marca { font-family: var(--fonte-mono); color: var(--cor-acao); }
 
+/* As imagens das notas: o print do atalho e o que se colou. Miniaturas numa
+ * fileira que quebra, cada uma um botão que amplia. A altura é fixa e a
+ * largura segue a imagem, porque print de monitor largo e recorte de slide
+ * têm proporções muito diferentes. */
+.notas__imagens { display: flex; flex-wrap: wrap; gap: var(--espaco-2); }
+.notas__imagens[hidden] { display: none; }
+.notas__imagem {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  padding: var(--espaco-1);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font: inherit;
+  font-size: var(--texto-rotulo);
+  cursor: zoom-in;
+}
+.notas__imagem:hover { border-color: var(--cor-acao); }
+.notas__imagem:focus-visible { outline: none; box-shadow: var(--anel-foco); }
+.notas__miniatura {
+  display: block;
+  height: 4.5rem;
+  max-width: 10rem;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--cor-superficie-2);
+}
+/* No momento marcado, a imagem é um selo do tamanho da linha. */
+.notas__momento-imagem {
+  height: 1.25em;
+  max-width: 2.5em;
+  object-fit: cover;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+
+/* A imagem ampliada: a caixa cresce até quase a janela, e a imagem cabe nela
+ * sem cortar — um print de 4K tem de ser legível, não decorativo. */
+.modal--imagem { width: min(80rem, 94vw); }
+
+/* Quem estava na reunião (UI-12): uma caixinha por nome lido no print. A
+ * lista rola dentro da caixa — uma galeria cheia do Teams passa de vinte. */
+.participantes { display: grid; gap: var(--espaco-1); max-height: 50vh; overflow-y: auto; }
+.participantes:empty { display: none; }
+.participantes__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--espaco-2);
+  align-items: baseline;
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pequeno);
+  cursor: pointer;
+}
+.participantes__item:hover { background: var(--cor-superficie-2); }
+.participantes__nome { font-weight: 600; }
+.participantes__detalhe {
+  grid-column: 2;
+  font-size: var(--texto-rotulo);
+  color: var(--cor-texto-suave);
+}
+.participantes__detalhe:empty { display: none; }
+.modal__imagem {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: var(--raio-pequeno);
+  background: var(--cor-superficie-2);
+}
+
 /* Os termos que as notas sugeriram, como etiquetas clicáveis. */
 .sugestoes {
   display: flex;
@@ -1501,6 +1574,127 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * ele já pinta certo nos dois temas. */
 .escolhas { display: flex; flex-wrap: wrap; gap: var(--espaco-3) var(--espaco-5); }
 
+/* ─────────────────────────────── o ajuste em uma linha (plano 4b)
+ *
+ * Título com o ⓘ, uma frase, o custo em etiqueta e o controle à direita. A
+ * explicação medida, que eram dois parágrafos por cartão, mora no balão. */
+.ajustes-secao { gap: 0; padding-block: var(--espaco-3); }
+.ajustes-secao > .bloco__titulo { margin-block: var(--espaco-2); }
+
+.ajuste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3) 0;
+  border-top: 1px solid var(--cor-borda);
+}
+.ajustes-secao > .bloco__titulo + .ajuste { border-top: 0; }
+.ajuste--sub { padding-left: var(--espaco-6); }
+.ajuste__texto { flex: 1 1 18rem; min-width: 0; display: grid; gap: 2px; }
+.ajuste--largo > .ajuste__texto { flex: 0 1 18rem; }
+.ajuste--largo > .aa-entrada { flex: 1 1 16rem; min-width: 0; }
+.ajuste__titulo {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--espaco-2);
+  font-weight: 600; color: var(--cor-texto-forte);
+}
+.ajuste--sub .ajuste__titulo::before { content: "↳"; color: var(--cor-texto-suave); font-weight: 400; }
+.ajuste__linha { color: var(--cor-texto-suave); font-size: var(--texto-pequeno); }
+.ajuste__linha--perigo { color: var(--cor-erro); }
+/* A seta é a do design system; a do navegador (o appearance:auto global de
+ * select.aa-entrada) vinha junto, como em Clientes. */
+.ajuste > select.aa-entrada { flex: 0 1 20rem; min-width: 0; }
+.ajustes select.aa-entrada { appearance: none; }
+.bloco__titulo > .dica { margin-left: var(--espaco-2); vertical-align: 0.15em; }
+.ajuste > .acoes { margin: 0; }
+
+.ajustes__trava {
+  margin: 0 0 var(--espaco-2);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-medio);
+  background: var(--cor-atencao-bg);
+  color: var(--cor-atencao);
+  font-size: var(--texto-pequeno);
+}
+
+/* O "salvo" grudado no topo do painel: no pé de uma aba longa ninguém o via. */
+.ajustes__estado {
+  position: sticky;
+  top: var(--altura-da-barra);
+  z-index: 1;
+  justify-self: end;
+  /* Sem altura: aparecer e sumir não empurra o painel. O texto sobe para o
+   * respiro acima do primeiro cartão. */
+  height: 0;
+  margin: 0 0 calc(-1 * var(--espaco-6));
+  transform: translateY(-1.6em);
+  white-space: nowrap;
+}
+
+.ajustes-avancado > summary { cursor: pointer; list-style: revert; }
+.ajustes-avancado > summary:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+.ajustes-avancado[open] > summary { margin-bottom: var(--espaco-2); }
+.ajustes-avancado > summary + .ajuste { border-top: 0; }
+
+/* Um bloco dentro de outro (o motor de ata dentro de Ata) sai mais leve. */
+.bloco .bloco { padding: var(--espaco-4); border-radius: var(--raio-medio); background: transparent; }
+
+/* ─────────────────────────────── o ⓘ */
+.dica { position: relative; display: inline-flex; }
+.dica__botao {
+  width: 1.15rem; height: 1.15rem; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--cor-borda-controle);
+  border-radius: var(--raio-pilula);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font: italic 700 0.7rem/1 var(--fonte-display);
+  cursor: help;
+}
+.dica__botao:hover, .dica__botao[aria-expanded="true"] {
+  border-color: var(--cor-acao); color: var(--cor-acao);
+}
+.dica__botao:focus-visible { outline: var(--anel-foco); outline-offset: 2px; }
+.dica__balao {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--espaco-2));
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: min(24rem, 70vw);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-medio);
+  background: var(--cor-texto-forte);
+  color: var(--cor-fundo);
+  box-shadow: var(--sombra-media);
+  font-size: var(--texto-pequeno);
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+.dica__paragrafo { display: block; }
+.dica__paragrafo + .dica__paragrafo { margin-top: var(--espaco-2); opacity: 0.8; }
+.dica:hover > .dica__balao,
+.dica:focus-within > .dica__balao,
+.dica__botao[aria-expanded="true"] + .dica__balao { display: block; }
+.dica[data-calada] > .dica__balao { display: none; }
+
+/* ─────────────────────────────── Geral › Você */
+.voce__previa {
+  display: grid; gap: var(--espaco-1);
+  margin-bottom: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-medio);
+  background: var(--cor-superficie-2);
+  font-size: var(--texto-pequeno);
+}
+.voce__legenda { font-size: var(--texto-rotulo); font-weight: 600; color: var(--cor-texto-suave); text-transform: uppercase; letter-spacing: 0.04em; }
+.voce__linha { display: flex; gap: var(--espaco-3); }
+.voce__tempo { color: var(--cor-texto-suave); font-variant-numeric: tabular-nums; }
+.voce__quem { font-weight: 700; min-width: 6rem; }
+.voce__quem--dono { color: var(--cor-acao); }
+
 /* ──────────────────────────────────────────────── cartões de modelo */
 
 .modelo {
@@ -1871,6 +2065,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   margin: var(--espaco-2) 0 0; font-size: var(--texto-rotulo); color: var(--cor-texto-suave);
 }
 .grav-abas .notas__topo { display: none; }
+/* As miniaturas ficam entre o campo e o rodapé, fora da grade do bloco. */
+.grav-abas__painel > .notas__imagens { flex: 0 0 auto; margin-top: var(--espaco-2); max-height: 12rem; overflow-y: auto; }
+.grav-abas__dica { align-items: center; }
+.grav-abas__inserir { flex: 0 0 auto; }
 
 .grav-sem-legenda[hidden] { display: none; }
 
@@ -2070,6 +2268,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   font-size: var(--texto-corpo);
 }
 
+/* As observações do verificador, à parte da ata por tema (ATA-5). */
+.ata__observacoes { max-width: 68ch; margin-top: var(--espaco-4); }
+.ata__observacoes summary { cursor: pointer; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.ata__observacoes .ata__texto { margin-top: var(--espaco-2); }
+
 /* --texto-medio e --texto-base NÃO EXISTEM no tokens.json, e era isso que
  * estava escrito aqui. Um var() que não resolve invalida a declaração inteira,
  * então os dois títulos herdavam o tamanho do corpo: a ata saía sem hierarquia
@@ -2078,6 +2281,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
  * inventada sempre falha. */
 .ata__texto h2 { font-size: var(--texto-titulo-m); margin: var(--espaco-4) 0 var(--espaco-2); }
 .ata__texto h3 { font-size: var(--texto-corpo); margin: var(--espaco-3) 0 var(--espaco-1); }
+/* O tema dentro de um grupo da ata por tema (### no Markdown): abaixo do
+ * título do grupo, acima do parágrafo — sem isto o navegador o desenhava no
+ * tamanho dele, e o grupo e o tema saíam iguais. */
+.ata__texto h4 { font-size: var(--texto-corpo); font-weight: 600; color: var(--cor-texto-suave); margin: var(--espaco-3) 0 var(--espaco-1); }
 .ata__texto p { margin: 0 0 var(--espaco-2); line-height: 1.6; }
 .ata__texto ul { margin: 0 0 var(--espaco-3); padding-left: var(--espaco-4); }
 .ata__texto li { margin-bottom: var(--espaco-1); line-height: 1.5; }
@@ -2085,7 +2292,19 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 /* Pendência com caixa: a lista de ações é o que se lê primeiro numa ata, e a
  * caixa a separa do resto sem precisar de cor. */
 .ata__pendencia { list-style: none; margin-left: calc(var(--espaco-4) * -1); }
-.ata__pendencia input { margin-right: var(--espaco-2); }
+.ata__pendencia input { margin-right: var(--espaco-2); accent-color: var(--cor-acao); }
+.ata__pendencia input:not(:disabled) { cursor: pointer; }
+.ata__pendencia--feita { color: var(--cor-texto-suave); text-decoration: line-through; }
+
+/* Decidido, Atenção e Em aberto da ata por tema (ATA-5): o rótulo vira
+ * etiqueta, nos tokens de feedback do design system — os dois temas saem daí. */
+.ata__rotulo > strong:first-child {
+  font-size: var(--texto-rotulo); letter-spacing: .05em; text-transform: uppercase;
+  padding: 1px var(--espaco-2); border-radius: var(--raio-pequeno); margin-right: var(--espaco-1);
+}
+.ata__rotulo--decidido > strong:first-child { background: var(--cor-sucesso-bg); color: var(--cor-sucesso); }
+.ata__rotulo--atencao > strong:first-child { background: var(--cor-atencao-bg); color: var(--cor-atencao); }
+.ata__rotulo--aberto > strong:first-child { background: var(--cor-info-bg); color: var(--cor-info); }
 
 @media (max-width: 900px) {
   .ata__topo { grid-template-columns: 1fr; align-items: stretch; }
@@ -2258,10 +2477,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .chip-gravando[data-mudo="true"] .chip-gravando__ponto { background: var(--cor-destaque); }
 
 /* A bandeirinha do momento: no botão da faixa e na etiqueta da legenda. */
-.grav-marcar .icone, .fala__momento .icone {
+.grav-marcar .icone, .grav-capturar .icone, .fala__momento .icone {
   width: 16px; height: 16px; flex: none;
 }
-.grav-marcar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
+.grav-marcar, .grav-capturar { display: inline-flex; align-items: center; gap: var(--espaco-2); }
 .fala__momento { align-items: center; gap: var(--espaco-2); }
 .fala__momento .icone { width: 13px; height: 13px; }
 
@@ -2435,4 +2654,87 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   width: 100%;
   max-width: 90rem;
   padding-top: var(--espaco-5);
+}
+
+/* ─────────────────────────────────────── vidro (AA Design System 0.5.0)
+ *
+ * O app usa o estilo `vidro` (index.html, data-estilo), a pedido do dono do
+ * produto em 05/10/2026. A regra é a do próprio sistema: **vidro flutua,
+ * conteúdo é opaco.** Só o que passa por cima do conteúdo lê a camada
+ * (`--cor-camada`, translúcida com blur); cartão, bloco, lista, transcrição e
+ * legenda continuam em `--cor-superficie`, que é opaca nos dois estilos.
+ *
+ * O alfa da camada é o medido pelo sistema (AA no pior substrato, inclusive sob
+ * o véu); não se baixa aqui. Sem backdrop-filter, o token cai para opaco
+ * sozinho (estilos.css). Fica no fim de propósito: vence as regras de cada
+ * componente acima sem mexer nelas. */
+.barra,
+.reuniao-aberta__abas,
+.popover,
+.semana__detalhe .reunioes__painel,
+.tocador,
+.gaveta,
+.modal {
+  background: var(--cor-camada);
+  -webkit-backdrop-filter: var(--camada-filtro);
+  backdrop-filter: var(--camada-filtro);
+}
+.barra, .reuniao-aberta__abas { border-bottom-color: var(--cor-borda-camada); }
+.tocador { border-top-color: var(--cor-borda-camada); }
+.popover, .semana__detalhe .reunioes__painel, .modal { border-color: var(--cor-borda-camada); }
+.gaveta { border-left-color: var(--cor-borda-camada); }
+
+/* A dica é tinta com texto claro: no vidro ela vira a camada invertida, e não
+ * a camada — senão seria texto claro sobre vidro claro. */
+.dica__balao {
+  background: var(--cor-camada-invertida);
+  -webkit-backdrop-filter: var(--camada-filtro);
+  backdrop-filter: var(--camada-filtro);
+}
+
+/* ── Ajustes › Atas › Modelos de ata: mestre-detalhe como Clientes (parte 2 da
+ * ATA-5). O texto do modelo é o que a IA lê, então vai em fonte de código e
+ * com altura de quem vai ler e escrever nele. */
+.modelos-ata { padding: 0; gap: 0; overflow: hidden; }
+.modelos-ata__cabeca { padding: var(--espaco-5); border-bottom: 1px solid var(--cor-borda); }
+.modelos-ata__cabeca .bloco__texto { margin-top: var(--espaco-1); }
+.modelos-ata__corpo { display: grid; grid-template-columns: minmax(11rem, 14rem) 1fr; min-height: 30rem; }
+.modelos-ata__mestre { border-right: 1px solid var(--cor-borda); min-width: 0; }
+.modelos-ata__tipo {
+  display: grid; gap: var(--espaco-1); width: 100%;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 0; border-bottom: 1px solid var(--cor-borda);
+  background: transparent; color: var(--cor-texto); font: inherit; text-align: left; cursor: pointer;
+}
+.modelos-ata__tipo:hover { background: var(--cor-superficie-2); }
+.modelos-ata__tipo[aria-current="true"] { background: var(--cor-acao-suave); }
+.modelos-ata__tipo:focus-visible { outline: none; box-shadow: inset var(--anel-foco); }
+.modelos-ata__nome { font-weight: 600; font-size: var(--texto-pequeno); overflow-wrap: anywhere; }
+.modelos-ata__sub { color: var(--cor-texto-suave); font-size: var(--texto-rotulo); }
+.modelos-ata__detalhe { min-width: 0; padding: var(--espaco-4) var(--espaco-5); display: grid; gap: var(--espaco-3); align-content: start; }
+.modelos-ata__vazio { margin: 0; }
+.modelos-ata__topo { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--espaco-3); flex-wrap: wrap; }
+.modelos-ata__topo > div:first-child { display: flex; align-items: center; gap: var(--espaco-2); flex-wrap: wrap; }
+.modelos-ata__titulo { margin: 0; font-size: var(--texto-corpo); }
+.modelos-ata__acoes { display: flex; gap: var(--espaco-2); flex-wrap: wrap; }
+.modelos-ata__rotulo { margin: 0; font-size: var(--texto-rotulo); font-weight: 600; color: var(--cor-texto-suave); }
+.modelos-ata__resumo { display: grid; gap: var(--espaco-2); }
+.modelos-ata__secoes { margin: 0; padding-left: var(--espaco-5); display: grid; gap: var(--espaco-1); font-size: var(--texto-pequeno); }
+.modelos-ata__secoes li .aa-etiqueta { margin-left: var(--espaco-2); }
+.modelos-ata__agrupa { display: flex; align-items: center; gap: var(--espaco-2); font-size: var(--texto-pequeno); }
+.modelos-ata__agrupa input { accent-color: var(--cor-acao); }
+textarea.modelos-ata__texto {
+  width: 100%; height: auto; min-height: 26rem; resize: vertical;
+  font-family: var(--fonte-mono); font-size: var(--texto-rotulo); line-height: 1.5;
+}
+.modelos-ata__original summary { cursor: pointer; font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
+.modelos-ata__original pre {
+  max-height: 20rem; overflow: auto; margin: var(--espaco-2) 0 0; padding: var(--espaco-3);
+  background: var(--cor-superficie-2); border-radius: var(--raio-medio);
+  font-family: var(--fonte-mono); font-size: var(--texto-rotulo); white-space: pre-wrap;
+}
+.modelos-ata__pe { display: flex; align-items: center; gap: var(--espaco-3); }
+@media (max-width: 760px) {
+  .modelos-ata__corpo { grid-template-columns: 1fr; }
+  .modelos-ata__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
 }

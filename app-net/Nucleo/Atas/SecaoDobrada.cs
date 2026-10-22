@@ -89,9 +89,9 @@ public static class SecaoDobrada
     {
         switch (canonica)
         {
-            case "Decisões": ata.Decisoes = itens; break;
-            case "Pontos em aberto": ata.PontosEmAberto = itens; break;
-            case "Riscos e alertas": ata.Riscos = itens; break;
+            case "Decisões": ata.Decisoes = [.. itens.Select(i => new ItemDaAta(i))]; break;
+            case "Pontos em aberto": ata.PontosEmAberto = [.. itens.Select(i => new ItemDaAta(i))]; break;
+            case "Riscos e alertas": ata.Riscos = [.. itens.Select(i => new ItemDaAta(i))]; break;
             case "Pendências": ata.Acoes = [.. itens.Select(Acao)]; break;
         }
     }

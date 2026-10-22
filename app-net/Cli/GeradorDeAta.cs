@@ -19,7 +19,7 @@ namespace MeetingApp.Cli;
 public static class GeradorDeAta
 {
     public static async Task<int> ExecutarAsync(string pasta, string tipoId, string? modelo,
-                                                CancellationToken ct)
+                                                FormatoDaAta formato, CancellationToken ct)
     {
         string arquivo = Path.Combine(pasta, "transcricao.json");
         if (!File.Exists(arquivo))
@@ -50,12 +50,13 @@ public static class GeradorDeAta
             ConfiguracoesDoApp.Carregar().DominiosDaCasa, new Projetos());
 
         var roteiro = RoteiroDeFatos.De(dados.Segments);
-        string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro);
+        string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro, formato);
 
         var caminhos = CaminhosDoMotorDeAta.AoLadoDoExecutavel(modelo);
         Console.WriteLine($"reunião  {Path.GetFileName(pasta)} · {ctx.DuracaoS / 60:F0} min · "
                           + $"{dados.Segments.Count} trechos");
         Console.WriteLine($"tipo     {tipo.Nome}{(tipo.DoUsuario ? " (do usuário)" : "")}");
+        Console.WriteLine($"formato  {(formato == FormatoDaAta.PorTema ? "por tema" : "clássico")}");
         Console.WriteLine($"prompt   {prompt.Length:N0} chars · roteiro com {roteiro.Count} fatos");
 
         // O dimensionamento agora depende do modelo e da placa, e não só do
@@ -72,7 +73,7 @@ public static class GeradorDeAta
         var relogio = Stopwatch.StartNew();
 
         var ata = await GeracaoDeAta.GerarAsync(pasta, tipo, dados, ctx, motor.GerarAsync,
-            p => Console.WriteLine($"  {p.Etapa}: {p.Texto}"), ct);
+            p => Console.WriteLine($"  {p.Etapa}: {p.Texto}"), ct, formato);
 
         Console.WriteLine($"gerou em {relogio.Elapsed.TotalSeconds:F0} s: "
                           + $"{ata.Secoes.Count} seções, {ata.Decisoes.Count} decisões, "

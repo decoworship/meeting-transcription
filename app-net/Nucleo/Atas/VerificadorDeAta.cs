@@ -213,10 +213,10 @@ public static class VerificadorDeAta
             foreach (string p in Palavras(s.Text))
                 faladas.Add(p);
 
-        var sobreviventes = new List<string>();
-        foreach (string decisao in ata.Decisoes)
+        var sobreviventes = new List<ItemDaAta>();
+        foreach (var decisao in ata.Decisoes)
         {
-            var palavras = Palavras(decisao).ToList();
+            var palavras = Palavras(decisao.Texto).ToList();
             if (palavras.Count == 0) continue;
 
             int eco = palavras.Count(p => Ecoa(p, faladas));
@@ -224,9 +224,10 @@ public static class VerificadorDeAta
 
             if (proporcao < 0.5)
             {
-                notas.Add($"\"{Encurtar(decisao)}\" foi registrada como decisão, mas quase "
+                notas.Add($"\"{Encurtar(decisao.Texto)}\" foi registrada como decisão, mas quase "
                           + "nada dela aparece na transcrição. Movida para pontos em aberto "
                           + "— confira antes de tratar como combinada.");
+                // A seção vai junto: rebaixar não é tirar do tema (ATA-5).
                 ata.PontosEmAberto.Add(decisao);
             }
             else
@@ -264,11 +265,11 @@ public static class VerificadorDeAta
             foreach (string p in Palavras(s.Text))
                 faladas.Add(p);
 
-        var sobreviventes = new List<string>();
+        var sobreviventes = new List<ItemDaAta>();
         int caidos = 0;
-        foreach (string risco in ata.Riscos)
+        foreach (var risco in ata.Riscos)
         {
-            var palavras = Palavras(risco).ToList();
+            var palavras = Palavras(risco.Texto).ToList();
             if (palavras.Count == 0) continue;
 
             if ((double)palavras.Count(p => Ecoa(p, faladas)) / palavras.Count >= 0.5)
@@ -300,10 +301,10 @@ public static class VerificadorDeAta
 
         string tudo = string.Join("\n", new[] { ata.Resumo }
             .Concat(ata.Secoes.Select(s => $"{s.Titulo} {s.Texto}"))
-            .Concat(ata.Decisoes)
+            .Concat(ata.Decisoes.Select(d => d.Texto))
             .Concat(ata.Acoes.Select(a => a.Acao))
-            .Concat(ata.PontosEmAberto)
-            .Concat(ata.Riscos));
+            .Concat(ata.PontosEmAberto.Select(p => p.Texto))
+            .Concat(ata.Riscos.Select(r => r.Texto)));
 
         var faltando = RoteiroDeFatos.NaoIncorporados(roteiro, tudo);
         if (faltando.Count == 0) return;

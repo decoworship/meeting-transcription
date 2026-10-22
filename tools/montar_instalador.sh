@@ -105,7 +105,7 @@ cp "$SAIDA/MicrosoftEdgeWebview2Setup.exe" "$PAYLOAD/"
 # O código dos sidecars, do REPOSITÓRIO (DIST-1). Viaja sempre dentro do
 # instalador, e não no pacote de motores: muda em quase toda versão, e com ele
 # lá dentro cada mudança num motor.py custaria 1,7 GB de download.
-for m in asr diarizacao modelos legenda; do
+for m in asr diarizacao modelos legenda ocr; do
   mkdir -p "$PAYLOAD/codigo/$m"
   cp "$RAIZ/motores/$m/motor.py" "$PAYLOAD/codigo/$m/"
 done
@@ -238,6 +238,14 @@ for f in community-1/segmentation/model.onnx \
       tools/exportar_diarizacao_onnx.py, no venv do WSL)."
 done
 
+# O leitor de nomes (UI-12): os dois modelos do OCR, e a atribuição da
+# Apache-2.0 que viaja com eles. Moram no pacote de motores, e não no código:
+# são 31 MB que só mudam quando o RapidOCR muda.
+for f in PP-OCRv6_det_small.onnx PP-OCRv6_rec_small.onnx ATRIBUICAO.md; do
+  [[ -f "$MOTORES/ocr/modelos/$f" ]] \
+    || reprovar "falta ocr/modelos/$f — rode tools/empacotar_modelos_de_ocr.sh."
+done
+
 echo "    (gguf, ata\\bin, curand, cusolverMg, tests e .pyi ficam de fora por Excludes)"
 
 # ── privacidade ──────────────────────────────────────────────────────────────
@@ -249,13 +257,14 @@ python3 "$RAIZ/tools/conferir_privacidade.py" --payload "$PAYLOAD" --motores "$M
   || reprovar "a régua de privacidade reprovou — veja acima o que vazou."
 
 # ── o pacote de motores ──────────────────────────────────────────────────────
-# O que viaja são duas árvores: motores/python e motores/diarizacao/modelos. O
+# O que viaja são três árvores: motores/python, motores/diarizacao/modelos e,
+# desde o leitor de nomes (21/10/2026), motores/ocr/modelos. O
 # resto de motores/ é código (vai no payload, acima) ou já não viajava — o
 # llama.cpp (ata/bin) e os GGUF são baixados pelo app. As exclusões são as
 # MESMAS do Excludes do .iss; se uma mudar lá, muda aqui.
 echo "==> calculando a impressão digital dos motores"
 LISTA="$SAIDA/motores-lista.tsv"
-(cd "$MOTORES" && find python diarizacao/modelos -type f \
+(cd "$MOTORES" && find python diarizacao/modelos ocr/modelos -type f \
     ! -name '*.gguf' ! -name 'curand64_10.dll' ! -name 'cusolverMg64_11.dll' \
     ! -name '*.pyi' ! -path '*/sklearn/datasets/*' ! -path '*/tests/*' \
     ! -path '*/test/*' ! -path '*/.cache/*' ! -path '*/__pycache__/*' \

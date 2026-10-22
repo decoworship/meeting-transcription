@@ -116,6 +116,20 @@ def conteudo(texto: str) -> set[str]:
     return {p for p in palavras if p not in VAZIAS}
 
 
+def texto_do_item(i) -> str:
+    """O texto de um item do ata.json, em qualquer das duas formas.
+
+    Até a ATA-5 as listas eram `string[]`; desde então cada item é
+    `{texto, secao}`, e a ação continua `{acao, ...}`. Ler só a forma velha
+    deixava a auditoria cega para toda ata nova — sem erro, só zero achados.
+    """
+    if isinstance(i, str):
+        return i
+    if isinstance(i, dict):
+        return i.get("texto") or i.get("acao") or ""
+    return ""
+
+
 def parecidos(a: str, b: str) -> float:
     """Jaccard das palavras de conteúdo, com desempate por sequência."""
     ca, cb = conteudo(a), conteudo(b)
@@ -204,8 +218,8 @@ def auditar_secoes(ata: dict, g: Gravacao) -> None:
 def auditar_bullets(ata: dict, g: Gravacao) -> None:
     """Item de lista que já vem com '- ' dentro do valor vira '- -' no .md."""
     for campo in LISTAS:
-        for item in ata.get(campo) or []:
-            if isinstance(item, str) and item.lstrip().startswith(("-", "*", "•")):
+        for item in (texto_do_item(i) for i in ata.get(campo) or []):
+            if item.lstrip().startswith(("-", "*", "•")):
                 g.marcar(
                     "bullet_no_valor", "ruido",
                     f"`{campo}` com marcador dentro do valor: {curto(item)}",
@@ -221,8 +235,7 @@ def auditar_repeticao(ata: dict, g: Gravacao) -> None:
     eram duas frases alternadas três vezes.
     """
     blocos = [
-        (campo, [(i.get("acao") if isinstance(i, dict) else i) or "" for i in
-                 (ata.get(campo) or [])])
+        (campo, [texto_do_item(i) for i in (ata.get(campo) or [])])
         for campo in LISTAS + ["acoes"]
     ]
     blocos += [
@@ -262,7 +275,7 @@ def auditar_eco(ata: dict, g: Gravacao) -> None:
     # de fazer X é a ata funcionando, não eco. Medido — com `decisoes` dentro,
     # 13 das 17 ocorrências eram esse par legítimo, e o achado virava ruído.
     for campo in ("riscos", "pontos_em_aberto"):
-        itens = [i for i in (ata.get(campo) or []) if isinstance(i, str)]
+        itens = [t for t in (texto_do_item(i) for i in ata.get(campo) or []) if t]
         ecos = sum(1 for i in itens if any(parecidos(i, p) >= 0.55 for p in pendencias))
         if ecos and itens:
             g.marcar(

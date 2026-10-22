@@ -1,4 +1,4 @@
-// A tela de ajustes: cinco abas numa coluna à esquerda.
+// A tela de ajustes: seis abas numa coluna à esquerda.
 //
 // Era uma gaveta com quatro seções empilhadas. Virou tela por uma razão
 // concreta: a gestão de vozes precisa de uma lista de pessoas, as amostras de
@@ -13,7 +13,8 @@
 import { pedir } from "/ponte.js";
 import { abaClientes } from "/clientes.js";
 import { abaVozes } from "/vozes.js";
-import { alerta, campo, confirmar, pararAudio } from "/pecas.js";
+import { secaoDeModelos } from "/modelos-de-ata.js";
+import { alerta, campo, confirmar, dica, pararAudio } from "/pecas.js";
 
 /** "3,1 GB", "148 MB" — tamanho para uma pessoa decidir, não para conferir. */
 function tamanho(bytes) {
@@ -75,12 +76,91 @@ function obra(oQueFalta, oQueDaParaFazer) {
   return el;
 }
 
-function chave(ligada, aoMudar) {
+/**
+ * O interruptor do design system (`.aa-interruptor`), e não a caixinha crua.
+ *
+ * @param rotulo o nome que o leitor de tela diz — o título do ajuste.
+ */
+function chave(ligada, aoMudar, rotulo) {
+  const raiz = document.createElement("label");
+  raiz.className = "aa-interruptor";
   const caixa = document.createElement("input");
   caixa.type = "checkbox";
   caixa.checked = ligada === true;
+  if (rotulo) caixa.setAttribute("aria-label", rotulo);
   caixa.addEventListener("change", (e) => aoMudar(e.target.checked));
-  return caixa;
+  raiz.appendChild(caixa);
+  return raiz;
+}
+
+/**
+ * Um ajuste numa linha: título com o ⓘ, uma frase, o custo e o controle.
+ *
+ * É o desenho do plano 4b (spec §3.4, e o mockup de 05/10/2026): a decisão é o
+ * que aparece; a explicação medida, que antes ocupava dois parágrafos por
+ * cartão, fica atrás do ⓘ.
+ *
+ * @param o.titulo o nome do ajuste.
+ * @param o.linha uma frase do que ele faz.
+ * @param o.dica parágrafos do ⓘ; vazio, sem ⓘ.
+ * @param o.custo etiqueta à direita ("≈ ⅓ da placa"), opcional.
+ * @param o.etiqueta etiqueta neutra junto do título ("teste"), opcional.
+ * @param o.controle o nó da direita — interruptor, seletor, campo.
+ * @param o.sub recuado, porque só vale com o ajuste de cima ligado.
+ * @param o.perigo a frase sai no tom de erro: ela avisa o que se perde.
+ * @param o.largo o controle ocupa o resto da linha (campos de texto).
+ */
+function ajuste({ titulo, linha, dica: textos = [], custo, etiqueta, controle,
+                  sub = false, perigo = false, largo = false }) {
+  const raiz = document.createElement("div");
+  raiz.className = "ajuste";
+  if (sub) raiz.classList.add("ajuste--sub");
+  if (largo) raiz.classList.add("ajuste--largo");
+
+  const texto = document.createElement("div");
+  texto.className = "ajuste__texto";
+  const t = document.createElement("span");
+  t.className = "ajuste__titulo";
+  t.textContent = titulo;
+  if (etiqueta) {
+    const e = document.createElement("span");
+    e.className = "aa-etiqueta";
+    e.textContent = etiqueta;
+    t.appendChild(e);
+  }
+  if (textos.length) t.appendChild(dica(titulo.toLowerCase(), ...textos));
+  texto.appendChild(t);
+  if (linha) {
+    const l = document.createElement("span");
+    l.className = "ajuste__linha";
+    if (perigo) l.classList.add("ajuste__linha--perigo");
+    l.textContent = linha;
+    texto.appendChild(l);
+  }
+  raiz.appendChild(texto);
+
+  if (custo) {
+    const c = document.createElement("span");
+    c.className = "aa-etiqueta aa-etiqueta--atencao ajuste__custo";
+    c.textContent = custo;
+    raiz.appendChild(c);
+  }
+  if (controle) raiz.appendChild(controle);
+  return raiz;
+}
+
+/** Uma seção de ajustes: o cartão com título e as linhas dentro. */
+function secaoDeAjustes(titulo, ...itens) {
+  const b = document.createElement("section");
+  b.className = "bloco ajustes-secao";
+  if (titulo) {
+    const h = document.createElement("h2");
+    h.className = "bloco__titulo";
+    h.textContent = titulo;
+    b.appendChild(h);
+  }
+  b.append(...itens.filter(Boolean));
+  return b;
 }
 
 /**
@@ -187,12 +267,71 @@ function blocoDeTema(config, gravar) {
 
 // ─────────────────────────────────────────────────────────── aba Geral
 
+/**
+ * O nome do dono, no lugar do "You" (05/10/2026, a pedido do dono do produto).
+ *
+ * Não muda nada ao vivo nem no reconhecimento de vozes: o núcleo troca o
+ * rótulo só no fim da transcrição, como quando a pessoa renomeia o falante na
+ * revisão (VozDoDono.Nomear). A prévia abaixo do campo mostra o efeito, porque
+ * "seu nome nas transcrições" sozinho não diz onde ele aparece.
+ */
+function secaoVoce(config, gravar) {
+  const entrada = document.createElement("input");
+  entrada.className = "aa-entrada";
+  entrada.id = "nome-do-dono";
+  entrada.placeholder = "Você";
+  entrada.value = config.nome_do_dono ?? "";
+  entrada.setAttribute("aria-label", "Seu nome nas transcrições");
+
+  const previa = document.createElement("div");
+  previa.className = "voce__previa";
+  const legenda = document.createElement("span");
+  legenda.className = "voce__legenda";
+  legenda.textContent = "Assim fica a transcrição";
+  const linha = (tempo, quem, fala, dono) => {
+    const l = document.createElement("div");
+    l.className = "voce__linha";
+    const t = document.createElement("span");
+    t.className = "voce__tempo";
+    t.textContent = tempo;
+    const q = document.createElement("span");
+    q.className = dono ? "voce__quem voce__quem--dono" : "voce__quem";
+    q.textContent = quem;
+    const f = document.createElement("span");
+    f.textContent = fala;
+    l.append(t, q, f);
+    return { l, q };
+  };
+  const sua = linha("00:12", "", "Bom dia, pessoal, vamos começar pelo cronograma.", true);
+  const outra = linha("00:19", "Speaker 1", "Fechei a parte da integração ontem.", false);
+  previa.append(legenda, sua.l, outra.l);
+
+  const mostrar = () => { sua.q.textContent = entrada.value.trim() || "You"; };
+  mostrar();
+  entrada.addEventListener("input", mostrar);
+  entrada.addEventListener("change", () => gravar({ nome_do_dono: entrada.value.trim() }));
+
+  return secaoDeAjustes("Você",
+    ajuste({
+      titulo: "Seu nome nas transcrições",
+      linha: "Quem fala pelo seu microfone sai com este nome.",
+      dica: [
+        "Hoje a sua fala sai como \"You\" e você renomeia na revisão. Com um nome "
+        + "aqui, ela já sai nomeada no fim da transcrição — como se você tivesse "
+        + "renomeado à mão, e dá para renomear de novo numa reunião.",
+        "Vale para as próximas transcrições. Vazio, continua \"You\". A legenda ao "
+        + "vivo continua mostrando \"Você\".",
+      ],
+      controle: entrada, largo: true,
+    }),
+    previa);
+}
+
 function abaGeral(config, gravador, gravar, estadoDoTexto) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
-  const pastas = bloco("Pastas",
-    "Onde o app grava e procura as gravações, e para onde ele copia o que você exporta.");
+  const pastas = bloco("Pastas");
 
   // Uma pasta só, desde a Fase 2.5.
   //
@@ -215,39 +354,29 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
       }
     });
 
-  const campoExport = campoDePasta("Pasta de exportação",
+  const campoExport = campoDePasta("Cópia das transcrições",
     config.pasta_de_exportacao ?? "", "vazio = só ao lado da gravação",
     (v) => gravar({ pasta_de_exportacao: v }));
 
   // Pasta própria para as atas: a transcrição é material de trabalho, a ata é o
   // que se manda para fora. Destinos diferentes, finalidades diferentes.
-  const campoAtas = campoDePasta("Pasta das atas",
+  const campoAtas = campoDePasta("Cópia das atas",
     config.pasta_de_atas ?? "", "vazio = só ao lado da gravação",
     (v) => gravar({ pasta_de_atas: v }));
 
-  const dica = document.createElement("p");
-  dica.className = "campo__dica";
-  dica.textContent = "As duas exportações sempre gravam ao lado da gravação. "
-    + "As pastas acima são a cópia que se leva para fora — e são separadas "
-    + "porque a transcrição é material de trabalho e a ata é o que se manda "
-    + "para o cliente ou para o time.";
+  const titulo = pastas.querySelector(".bloco__titulo");
+  titulo.appendChild(dica("as pastas",
+    "As exportações sempre gravam ao lado da gravação. As duas cópias são o que "
+    + "se leva para fora — e são separadas porque a transcrição é material de "
+    + "trabalho, e a ata é o que se manda para o cliente ou para o time."));
 
-  pastas.append(campoPasta, campoExport, campoAtas, dica);
+  pastas.append(campoPasta, campoExport, campoAtas);
 
-  // A única conexão que o app abre por conta própria, e por isso ela é
-  // desligável e fica à vista — junto do bloco que mostra a versão, que é onde
-  // a pergunta "estou atualizado?" nasce.
-  const aviso = bloco("Avisar de versão nova",
-    "Confere, ao abrir os Ajustes, se saiu uma versão mais nova. Vai um pedido "
-    + "de um arquivo público, sem identificação nenhuma — nada da sua reunião "
-    + "sai daqui.");
-  aviso.classList.add("bloco--chave");
-  aviso.appendChild(chave(config.avisar_de_atualizacao !== false,
-    async (v) => { await gravar({ avisar_de_atualizacao: v }); recarregar(); }));
-
-  painel.append(pastas, blocoDeTema(config, gravar), blocoSobre(), aviso);
+  painel.append(secaoVoce(config, gravar), pastas, blocoDeTema(config, gravar),
+                blocoSobre(config, gravar));
   return painel;
 }
+
 
 /**
  * Versão e diagnóstico.
@@ -261,7 +390,7 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
  * O bloco vem do núcleo pronto (Nucleo/Diagnostico.cs) e não é remontado aqui:
  * o texto que a pessoa cola e o texto que ela vê na tela têm que ser o mesmo.
  */
-function blocoSobre() {
+function blocoSobre(config, gravar) {
   const b = bloco("Sobre",
     "A versão instalada, e o bloco que ajuda a resolver um problema à distância.");
 
@@ -318,7 +447,18 @@ function blocoSobre() {
   acoes.className = "acoes";
   acoes.append(botao, comRegistro);
 
-  b.append(linha, acoes, blocoDeAtualizacao());
+  // A única conexão que o app abre por conta própria, e por isso ela é
+  // desligável e fica à vista — no bloco que mostra a versão, que é onde a
+  // pergunta "estou atualizado?" nasce.
+  const aviso = ajuste({
+    titulo: "Avisar de versão nova",
+    linha: "Confere um arquivo público ao abrir os Ajustes; nada da reunião sai daqui.",
+    controle: chave(config.avisar_de_atualizacao !== false,
+      async (v) => { await gravar({ avisar_de_atualizacao: v }); recarregar(); },
+      "Avisar de versão nova"),
+  });
+
+  b.append(linha, acoes, blocoDeAtualizacao(), aviso);
   return b;
 }
 
@@ -394,73 +534,245 @@ function blocoDeAtualizacao() {
 // ───────────────────────────────────────────────────────── aba Gravador
 
 /**
- * O que é do gravador e não cabe na tela dele.
+ * Um seletor de dispositivo, com "Padrão do Windows" primeiro.
  *
- * A tela do Gravador é o que se olha durante uma reunião: estado, nível,
- * dispositivo. O que se configura uma vez e não se olha mais — notificações,
- * conta do Google — mora aqui, que é onde já se procura configuração.
+ * Primeiro e padrão porque seguir o dispositivo do sistema é o que a maioria
+ * quer: fixar um headset específico quebra no dia em que ele é desconectado.
  */
-function abaGravador(gravador, aoMexer) {
+function seletorDeDispositivo(faixa, lista, escolhido, rotulo) {
+  const campo = document.createElement("select");
+  campo.className = "aa-entrada";
+  campo.id = `dispositivo-${faixa}`;
+  campo.setAttribute("aria-label", rotulo);
+  const padrao = document.createElement("option");
+  padrao.value = "";
+  padrao.textContent = "Padrão do Windows";
+  campo.appendChild(padrao);
+  for (const d of lista ?? []) {
+    const o = document.createElement("option");
+    o.value = d.id;
+    o.textContent = d.padrao ? `${d.nome}  (padrão)` : d.nome;
+    campo.appendChild(o);
+  }
+  campo.value = escolhido ?? "";
+  return campo;
+}
+
+/**
+ * O que é do gravador e se configura uma vez: dispositivos, o que roda durante
+ * a reunião, notificações e agenda.
+ *
+ * **Dispositivos moram aqui desde o plano 4b** (spec §3.2): a tela do Gravador
+ * é o que se olha durante uma reunião, e eles "se mexem uma vez por mês". O
+ * "Vai gravar" de lá mostra o que está escolhido e traz para cá.
+ *
+ * **O que roda durante a reunião também** (05/10/2026): a legenda, os nomes
+ * ao vivo e a pergunta aparecem no Gravador, e era em Transcrição — que é a
+ * passada do fim — que se procurava por eles.
+ */
+function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
-  const avisos = bloco("Notificações",
-    "Os balões da bandeja: reunião reconhecida, lembrete de microfone mudo.");
-  avisos.classList.add("bloco--chave");
-  avisos.appendChild(chave(gravador.notificacoes,
-    (v) => aoMexer("notificacoes", { ligado: v })));
-
-  // Dito com todas as letras porque é a diferença entre um aviso que incomoda e
-  // um aviso que salva a reunião — e desligar o primeiro não pode desligar o
-  // segundo.
-  const nota = document.createElement("p");
-  nota.className = "bloco__texto";
-  nota.textContent =
-    "Desligar não silencia dispositivo caindo nem disco enchendo: isso você "
-    + "precisa saber de qualquer jeito.";
-  avisos.appendChild(nota);
-
-  const agenda = bloco("Google Calendar",
-    "Identifica a reunião que está sendo gravada e usa os convidados como "
-    + "vocabulário na transcrição.");
-
-  if (!gravador.agenda_configurada) {
-    agenda.appendChild(obra(
-      "Falta o google_client_secret.json",
-      "Ponha o arquivo em %USERPROFILE%\\.meeting-recorder e reabra o app. "
-      + "Só aparece em binário montado sem a credencial embutida."));
-    painel.append(avisos, agenda);
-    return painel;
+  // ---- dispositivos
+  //
+  // A trava não é limitação de implementação e sim o que preserva o valor das
+  // duas faixas separadas: reabrir o stream no meio exigiria realinhá-las.
+  if (dispositivos) {
+    const mic = seletorDeDispositivo("mic", dispositivos.entradas, dispositivos.mic_id,
+                                     "Microfone");
+    const sis = seletorDeDispositivo("loopback", dispositivos.saidas,
+                                     dispositivos.loopback_id, "Áudio da reunião");
+    for (const [faixa, campo] of [["mic", mic], ["loopback", sis]]) {
+      campo.disabled = gravador.gravando === true;
+      campo.addEventListener("change", () => {
+        // A tela se redesenha com o estado do gravador que volta; o dispositivo
+        // escolhido tem que estar na lista local para não voltar ao anterior.
+        dispositivos[faixa === "mic" ? "mic_id" : "loopback_id"] = campo.value;
+        aoMexer("escolher-dispositivo", { faixa, dispositivo: campo.value });
+      });
+    }
+    const secao = secaoDeAjustes("Dispositivos",
+      ajuste({ titulo: "Microfone", linha: "A sua voz.", controle: mic }),
+      ajuste({
+        titulo: "Áudio da reunião", linha: "O que sai pelo seu fone ou alto-falante.",
+        dica: ["É o áudio que o Windows manda para este dispositivo de saída — as vozes "
+               + "da chamada. Ele é gravado numa faixa separada da sua, e é isso que "
+               + "permite saber com certeza quando quem falou foi você."],
+        controle: sis,
+      }));
+    if (gravador.gravando) {
+      const trava = document.createElement("p");
+      trava.className = "ajustes__trava";
+      trava.textContent = "Gravando agora: os dois ficam travados até a gravação parar — "
+        + "as faixas começam alinhadas por começarem juntas.";
+      secao.appendChild(trava);
+    }
+    painel.appendChild(secao);
   }
 
-  const usar = document.createElement("div");
-  usar.className = "bloco bloco--chave";
-  const usarTitulo = document.createElement("h2");
-  usarTitulo.className = "bloco__titulo";
-  usarTitulo.textContent = "Usar esta agenda";
-  usar.append(usarTitulo, chave(gravador.usar_agenda,
-    (v) => aoMexer("usar-agenda", { ligado: v })));
+  // ---- durante a reunião
+  //
+  // Tudo nasce desligado enquanto o SUP-2 estiver aberto: ao vivo, um
+  // desligamento da máquina custa a reunião, e não uma transcrição que a
+  // retomada devolve.
+  //
+  // **A prévia em blocos saiu da tela** (05/10/2026, decisão do dono do
+  // produto): ela era o "ao vivo" do tempo do MOSS, e a legenda faz o mesmo
+  // melhor. Ligar a legenda continua desligando a chave antiga no app.json,
+  // porque as duas não cabem juntas na placa (LegendaAoVivo.OQueImpede).
+  const legenda = config.legenda_ao_vivo === true;
+  const perguntar = config.perguntar_ao_vivo === true;
+  painel.appendChild(secaoDeAjustes("Durante a reunião",
+    ajuste({
+      titulo: "Legenda ao vivo",
+      linha: "O texto da reunião aparece no Gravador enquanto ela acontece.",
+      dica: [
+        "A fala aparece quase no instante — a sua de um lado, a dos outros do "
+        + "outro. É rascunho, sem pontuação: a transcrição do fim continua sendo a "
+        + "que vale.",
+        "Ocupa cerca de um terço da placa a reunião inteira. Precisa do modelo da "
+        + "legenda baixado em Ajustes › Modelos; sem ele, a chave não tem efeito.",
+      ],
+      custo: "≈ ⅓ da placa",
+      controle: chave(legenda, async (v) => {
+        await gravar(v ? { legenda_ao_vivo: true, transcricao_ao_vivo: false }
+                       : { legenda_ao_vivo: false });
+        recarregar();
+      }, "Legenda ao vivo"),
+    }),
+    // Só com a legenda: é um segundo sidecar (o Nemotron-3) ao lado dela. O
+    // custo medido sem o Meet está em docs/NEMOTRON-DIARIZACAO.md §4b.
+    legenda && ajuste({
+      titulo: "Nomes na legenda", etiqueta: "teste", sub: true,
+      linha: "O nome de quem fala em vez de \"Outros\", para vozes que o app já conhece.",
+      dica: [
+        "Quem o app não conhece aparece como \"Pessoa 1\", \"Pessoa 2\". O nome "
+        + "costuma aparecer depois de alguns segundos de fala da pessoa.",
+        "Usa o nemotron-3 e vale a partir da próxima gravação. Se a legenda começar "
+        + "a atrasar, desligue aqui.",
+      ],
+      custo: "+1,5 GB de placa",
+      controle: chave(config.falantes_ao_vivo === true, async (v) => {
+        await gravar({ falantes_ao_vivo: v });
+        recarregar();
+      }, "Nomes na legenda"),
+    }),
+    // Esta convive com a legenda: o motor de ata sobe por pergunta e morre
+    // depois dela. A chave existe para poder desligar quando a máquina estiver
+    // sendo usada para outra coisa (dono do produto, 16/09/2026).
+    ajuste({
+      titulo: "Perguntar durante a reunião",
+      linha: "Uma caixa no Gravador que responde sobre o que já foi dito.",
+      dica: [
+        "O modelo lê o que já foi transcrito e responde ali mesmo — o que ficou "
+        + "pendente, sobre o que estão falando agora.",
+        "Cada pergunta leva cerca de vinte segundos, e enquanto ele responde a "
+        + "legenda engasga. Lê no máximo a última hora de reunião. Usa o modelo "
+        + "escolhido em Ajustes › Modelos.",
+      ],
+      custo: "~20 s por pergunta",
+      controle: chave(perguntar, async (v) => {
+        await gravar({ perguntar_ao_vivo: v });
+        recarregar();
+      }, "Perguntar durante a reunião"),
+    }),
+    // A única chave que deixa uma carga residente na placa: o terceiro contexto
+    // CUDA, a carga que derrubou a legenda de 2,46x para 0,45x em 11/09.
+    perguntar && ajuste({
+      titulo: "Deixar o modelo pronto entre perguntas", sub: true,
+      linha: "As perguntas seguintes respondem quase na hora.",
+      dica: [
+        "A primeira continua levando os mesmos vinte segundos; depois dela o modelo "
+        + "fica de pé esperando a próxima.",
+        "Em troca, ele segura cerca de 3 GB da placa — é isso que pode fazer a "
+        + "legenda atrasar. Desliga sozinho depois de dez minutos sem pergunta e "
+        + "quando a gravação para.",
+      ],
+      custo: "segura ~3 GB",
+      controle: chave(config.modelo_quente === true, async (v) => {
+        await gravar({ modelo_quente: v });
+        recarregar();
+      }, "Deixar o modelo pronto entre perguntas"),
+    })));
 
-  const conta = document.createElement("p");
-  conta.className = "bloco__texto";
-  conta.textContent = gravador.conta
-    ? `Conectado: ${gravador.conta}` : "Nenhuma conta conectada.";
+  // ---- notificações
+  //
+  // Dito no ⓘ porque é a diferença entre um aviso que incomoda e um aviso que
+  // salva a reunião — e desligar o primeiro não pode desligar o segundo.
+  painel.appendChild(secaoDeAjustes("Notificações",
+    ajuste({
+      titulo: "Balões da bandeja",
+      linha: "Reunião reconhecida, lembrete de microfone mudo.",
+      dica: ["Desligar não silencia dispositivo caindo nem disco enchendo: isso "
+             + "você precisa saber de qualquer jeito."],
+      controle: chave(gravador.notificacoes,
+        (v) => aoMexer("notificacoes", { ligado: v }), "Balões da bandeja"),
+    })));
+
+  painel.appendChild(secaoDaAgenda(gravador, aoMexer, config, gravar));
+  return painel;
+}
+
+/** A agenda: a conta, a chave de usar, e os domínios que dizem quem é da casa. */
+function secaoDaAgenda(gravador, aoMexer, config, gravar) {
+  // ---- os domínios da casa
+  //
+  // Só os nossos, e não os dos clientes: quem não é da casa é cliente, e essa
+  // regra não precisa de manutenção quando aparece um cliente novo. Moram aqui
+  // porque é dos e-mails da agenda que eles leem o lado de cada pessoa.
+  const dominios = document.createElement("input");
+  dominios.className = "aa-entrada";
+  dominios.id = "dominios-da-casa";
+  dominios.placeholder = "beegol.com, minhaempresa.com.br";
+  dominios.value = (config.dominios_da_casa ?? []).join(", ");
+  dominios.setAttribute("aria-label", "Domínios da sua organização");
+  dominios.addEventListener("change", () => gravar({
+    dominios_da_casa: dominios.value.split(",")
+      .map((d) => d.trim().replace(/^@/, "").toLowerCase())
+      .filter(Boolean),
+  }));
+  const linhaDominios = ajuste({
+    titulo: "Domínios da sua organização",
+    linha: "Separados por vírgula. Quem tem outro domínio é cliente.",
+    dica: [
+      "Os e-mails da agenda dizem de que lado da mesa cada pessoa está. Sem isto, "
+      + "a ata deduz pelo assunto — e numa reunião que fala de um cliente o tempo "
+      + "todo, alguém da equipe vira gente do cliente.",
+      "Quem não tiver e-mail na agenda fica sem lado, e a ata não inventa um.",
+    ],
+    controle: dominios, largo: true,
+  });
+
+  if (!gravador.agenda_configurada) {
+    return secaoDeAjustes("Agenda",
+      obra("Falta o google_client_secret.json",
+        "Ponha o arquivo em %USERPROFILE%\\.meeting-recorder e reabra o app. "
+        + "Só aparece em binário montado sem a credencial embutida."),
+      linhaDominios);
+  }
 
   const acoes = document.createElement("div");
   acoes.className = "acoes";
-
   const conectar = document.createElement("button");
   conectar.className = "aa-btn aa-btn-secundario";
   conectar.type = "button";
   conectar.textContent = gravador.conta ? "Trocar de conta…" : "Conectar conta…";
+  const conta = ajuste({
+    titulo: "Google Calendar",
+    linha: gravador.conta ? `Conectado: ${gravador.conta}` : "Nenhuma conta conectada.",
+    dica: ["Identifica a reunião que está sendo gravada e usa os convidados como "
+           + "vocabulário na transcrição."],
+    controle: acoes,
+  });
   conectar.addEventListener("click", () => {
     // O navegador abre e a autorização termina fora do app; o resultado chega
     // por balão da bandeja. Recarregar aqui mostraria o estado de antes.
-    conta.textContent = "Abrindo o navegador… conclua a autorização por lá.";
+    conta.querySelector(".ajuste__linha").textContent =
+      "Abrindo o navegador… conclua a autorização por lá.";
     aoMexer("conectar-agenda");
   });
   acoes.appendChild(conectar);
-
   if (gravador.conta) {
     const desconectar = document.createElement("button");
     desconectar.className = "aa-btn aa-btn-texto";
@@ -470,12 +782,19 @@ function abaGravador(gravador, aoMexer) {
     acoes.appendChild(desconectar);
   }
 
-  agenda.append(conta, acoes);
-  painel.append(avisos, usar, agenda);
-  return painel;
+  return secaoDeAjustes("Agenda",
+    conta,
+    ajuste({
+      titulo: "Usar esta agenda",
+      linha: "Dá nome às gravações pela reunião que está acontecendo.",
+      controle: chave(gravador.usar_agenda,
+        (v) => aoMexer("usar-agenda", { ligado: v }), "Usar esta agenda"),
+    }),
+    linhaDominios);
 }
 
-// ───────────────────────────────────────────────────────── aba Modelos
+
+// ──────────────────────────────────────────────── cartões de modelo
 
 function cartaoDeModelo(item) {
   const { pacote, estado, bytes_em_disco, em_uso } = item;
@@ -672,7 +991,64 @@ function blocoDoMotorDeAta() {
   return b;
 }
 
-function abaModelos(catalogo, config, gravar) {
+// ───────────────────────────────────────────────────────── aba Modelos
+
+/** O título de um bloco de modelo, com o ⓘ ao lado quando há o que dizer. */
+function blocoDeModelo(titulo, texto, ...explicacao) {
+  const b = bloco(titulo, texto);
+  if (explicacao.length)
+    b.querySelector(".bloco__titulo").appendChild(dica(titulo.toLowerCase(), ...explicacao));
+  return b;
+}
+
+/**
+ * Qual modelo separa os falantes — o padrão do app.
+ *
+ * Mora em Modelos desde o plano 4b (05/10/2026). Antes ficava em Transcrição, e
+ * Modelos tinha um bloco que dizia "não há o que escolher" — verdade até o
+ * nemotron-3 entrar ao lado do community-1 (MOD-2, 29/09/2026), e mentira
+ * desde então.
+ *
+ * A lista vem do disco (Motores.ModelosDeDiarizacao), não de constante: é o
+ * que faz um modelo novo aparecer sozinho no dia em que for empacotado, e o
+ * que impede a tela de oferecer o que o motor não sabe carregar.
+ */
+function blocoDeFalantes(config, gravar, diarizadores) {
+  const b = blocoDeModelo("Separar falantes",
+    "Vem dentro do app — nada a baixar. Um projeto pode escolher outro em Clientes.",
+    "O community-1 separou bem por meses. O nemotron-3 separou melhor nas quatro "
+    + "reuniões medidas (metade dos erros), é bem mais rápido e usa menos memória "
+    + "da placa; os nomes das vozes conhecidas saem iguais. Ele separa até 8 "
+    + "pessoas além de você.");
+
+  if (diarizadores.length === 0) {
+    // Dizer a verdade em vez de um seletor vazio: nesta instalação a
+    // diarização vai tentar o HuggingFace e falhar.
+    b.appendChild(alerta("Nenhum modelo de diarização encontrado nesta instalação. "
+      + "Separar falantes não vai funcionar até reinstalar o app.", "atencao"));
+    return b;
+  }
+
+  const campoSep = campo("Usar por padrão", "select", { opcoes: diarizadores });
+  const sel = campoSep.querySelector("select");
+  sel.id = "diarizacao-padrao";
+  diarizadores.forEach((nome, n) => { sel.options[n].value = nome; });
+  sel.value = config.diarizacao_padrao ?? diarizadores[0];
+  // Um padrão apontando para pasta que não existe mais não pode sumir em
+  // silêncio: ele decide como toda reunião é transcrita.
+  if (sel.selectedIndex === -1) {
+    const solto = document.createElement("option");
+    solto.value = config.diarizacao_padrao;
+    solto.textContent = `${config.diarizacao_padrao} (não instalado)`;
+    sel.appendChild(solto);
+    sel.value = config.diarizacao_padrao;
+  }
+  sel.addEventListener("change", (e) => gravar({ diarizacao_padrao: e.target.value }));
+  b.appendChild(campoSep);
+  return b;
+}
+
+function abaModelos(catalogo, config, gravar, diarizadores = []) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
@@ -682,10 +1058,6 @@ function abaModelos(catalogo, config, gravar) {
   // decisão 4). Sem NVIDIA o app funciona — o faster-whisper e o llama.cpp caem
   // para CPU sozinhos —, mas uma reunião de uma hora passa a levar horas. Dizer
   // isso aqui é a diferença entre um app lento e um app que parece travado.
-  //
-  // Entra por cima, e não some depois: quem instalou numa máquina sem placa
-  // precisa dessa informação toda vez que escolher um modelo, não só na
-  // primeira.
   const avisoDePlaca = document.createElement("div");
   painel.appendChild(avisoDePlaca);
   diagnostico().then((d) => {
@@ -706,25 +1078,8 @@ function abaModelos(catalogo, config, gravar) {
   //
   // O segundo não repete os cartões de download: são os mesmos arquivos, e uma
   // segunda lista de botões "baixar" faria parecer que são outros.
-  for (const [familia, titulo, texto, chaveConfig, padrao, semCartoes] of [
-    ["asr", "Transcrição", "Qual modelo transforma áudio em texto.",
-     "modelo_padrao", "large-v3"],
-    // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
-    // quem abre o .gguf é o llama.cpp, por caminho.
-    ["ata", "Ata", "Qual modelo escreve as atas a partir da transcrição.",
-     "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf"],
-    ["ata", "Pergunta durante a reunião",
-     "Qual modelo responde no Gravador enquanto a reunião acontece. Pode ser "
-     + "diferente do da ata: aqui o que conta é responder rápido e caber na "
-     + "placa junto com a legenda.",
-     "modelo_da_pergunta",
-     // Vazio significa "o mesmo da ata", e é o que o núcleo entende — então o
-     // seletor mostra o da ata até alguém escolher outro.
-     config.modelo_de_ata ?? "qwen3-4b-instruct-q4km.gguf", true],
-  ]) {
-    const b = bloco(titulo, texto);
+  const seletorDaFamilia = (b, familia, chaveConfig, padrao) => {
     const itens = catalogo.filter((i) => i.pacote.familia === familia);
-
     const escolha = campo("Usar por padrão", "select",
       { opcoes: itens.map((i) => i.pacote.nome) });
     const sel = escolha.querySelector("select");
@@ -739,395 +1094,221 @@ function abaModelos(catalogo, config, gravar) {
       recarregar();
     });
     b.appendChild(escolha);
+    return itens;
+  };
 
-    if (!semCartoes) for (const i of itens) b.appendChild(cartaoDeModelo(i));
-    painel.appendChild(b);
-  }
+  // O texto mudou na Fase 4, e o motivo é que o comportamento mudou: antes o
+  // faster-whisper baixava 3 GB sozinho na primeira transcrição, sem barra.
+  const asr = blocoDeModelo("Transcrição", "Transforma áudio em texto.",
+    "A transcrição e a ata precisam do modelo baixado antes: o app não começa um "
+    + "download de gigabytes no meio de um clique. É aqui que se baixa, com barra "
+    + "e tamanho à vista.");
+  for (const i of seletorDaFamilia(asr, "asr", "modelo_padrao", "large-v3"))
+    asr.appendChild(cartaoDeModelo(i));
+  painel.appendChild(asr);
 
-  // O modelo da legenda ao vivo. Mesma forma e mesma razão do bloco acima: sem
-  // cartão o modelo não teria como ser baixado, e o motor subiria sem ele.
+  painel.appendChild(blocoDeFalantes(config, gravar, diarizadores));
+
+  // A família da Fase 3. O valor guardado é o nome do arquivo, e não o id:
+  // quem abre o .gguf é o llama.cpp, por caminho. O motor de ata entra dentro
+  // do bloco, porque sem ele nenhum destes modelos roda.
+  const ata = blocoDeModelo("Ata", "Escreve as atas a partir da transcrição.");
+  const itensDeAta = seletorDaFamilia(ata, "ata", "modelo_de_ata", "qwen3-4b-instruct-q4km.gguf");
+  ata.appendChild(blocoDoMotorDeAta());
+  for (const i of itensDeAta) ata.appendChild(cartaoDeModelo(i));
+  painel.appendChild(ata);
+
+  const pergunta = blocoDeModelo("Pergunta durante a reunião",
+    "Pode ser menor que o da ata: divide a placa com a legenda.",
+    "Aqui o que conta é responder rápido e caber na placa junto com a legenda. "
+    + "Usa os mesmos arquivos da ata — baixe acima.");
+  // Vazio significa "o mesmo da ata", e é o que o núcleo entende — então o
+  // seletor mostra o da ata até alguém escolher outro.
+  seletorDaFamilia(pergunta, "ata", "modelo_da_pergunta",
+                   config.modelo_de_ata ?? "qwen3-4b-instruct-q4km.gguf");
+  painel.appendChild(pergunta);
+
+  // O modelo da legenda ao vivo: sem cartão o modelo não teria como ser
+  // baixado, e o motor subiria sem ele.
   const daLegenda = catalogo.filter((i) => i.pacote.familia === "legenda");
   if (daLegenda.length > 0) {
-    const b = bloco("Legenda ao vivo (opcional)",
-      "O modelo que faz o texto aparecer quase no instante da fala. "
-      + "Baixe-o antes de ligar a legenda em Ajustes › Transcrição; enquanto "
-      + "não for baixado, a chave não tem efeito.");
+    const b = blocoDeModelo("Legenda ao vivo", "Liga em Ajustes › Gravador.",
+      "O modelo que faz o texto aparecer quase no instante da fala. Enquanto não "
+      + "for baixado, a chave da legenda não tem efeito.");
     for (const i of daLegenda) b.appendChild(cartaoDeModelo(i));
     painel.appendChild(b);
   }
 
-  painel.appendChild(blocoDoMotorDeAta());
+  return painel;
+}
 
-  // Diarização: um bloco que informa, e não oferece.
-  //
-  // Ela tinha cartão e seletor até a Fase 4, e os dois mentiam de formas
-  // diferentes. O cartão media o cache do HuggingFace, que o motor deixou de
-  // ler quando os pesos passaram a viajar dentro do instalador — numa
-  // instalação nova ele diria "ausente" sobre uma diarização que funciona. E o
-  // seletor nunca chegou ao pipeline: era colhido, salvo e ignorado
-  // (docs/FASE6.md §4.6).
-  //
-  // O que sobrou é o que a pessoa de fato quer saber olhando aqui: qual modelo
-  // separa os falantes, e por que ele não aparece para baixar.
-  const diar = bloco("Diarização", "Qual modelo separa quem falou.");
-  const dizerDiar = document.createElement("p");
-  dizerDiar.className = "campo__dica";
-  dizerDiar.textContent = "Pyannote Community 1, e ele já vem dentro do app — "
-    + "são 57 MB instalados junto, não há o que baixar nem o que escolher. "
-    + "Separar falantes funciona sem internet desde a primeira reunião.";
-  diar.appendChild(dizerDiar);
-  painel.appendChild(diar);
+// ─────────────────────────────────────────────────────────── aba Atas
 
-  const nota = document.createElement("p");
-  nota.className = "campo__dica";
-  // O texto mudou na Fase 4, e o motivo é que o comportamento mudou.
-  //
-  // Antes o faster-whisper baixava 3 GB sozinho na primeira transcrição — sem
-  // barra, sem anunciar o tamanho, no meio de um clique. Agora o app confere
-  // antes e manda para cá, onde existe barra de progresso e o tamanho está
-  // escrito. E a diarização não baixa mais nada: os pesos dela vêm dentro do
-  // instalador.
-  nota.textContent = "A transcrição e a ata precisam do modelo baixado antes: "
-    + "o app não começa um download de gigabytes no meio de um clique. É aqui "
-    + "que se baixa, com barra e tamanho à vista. A diarização não aparece para "
-    + "baixar porque ela já vem dentro do app.";
-  painel.appendChild(nota);
+/**
+ * O formato da ata (ATA-5) e os modelos de cada tipo, para ver e ajustar
+ * (modelos-de-ata.js).
+ *
+ * Rádio, como o tema: são dois formatos, e nenhum é "desligado".
+ */
+function abaAtas(config, gravar, tipos) {
+  const painel = document.createElement("div");
+  painel.className = "painel";
 
+  const OPCOES = [
+    ["classico", "De hoje"],
+    ["por-tema", "Por tema"],
+  ];
+  // A mesma regra do núcleo (FormatosDaAta.Ler): ausente é por tema, e um
+  // valor desconhecido é o clássico — a tela não pode mostrar um e o app fazer outro.
+  const valor = config.formato_da_ata;
+  const atual = valor == null || valor === "" || valor === "por-tema" ? "por-tema" : "classico";
+
+  const grupo = document.createElement("div");
+  grupo.className = "escolhas";
+  grupo.setAttribute("role", "radiogroup");
+  grupo.setAttribute("aria-label", "Formato da ata");
+  for (const [valor, rotulo] of OPCOES) {
+    const label = document.createElement("label");
+    label.className = "aa-escolha";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "formato-da-ata";
+    radio.value = valor;
+    radio.checked = valor === atual;
+    radio.addEventListener("change", () => gravar({ formato_da_ata: valor }));
+    label.append(radio, document.createTextNode(rotulo));
+    grupo.appendChild(label);
+  }
+
+  painel.appendChild(secaoDeAjustes("Formato",
+    ajuste({
+      titulo: "Formato da ata",
+      linha: "Por tema: cada decisão, ação e ponto em aberto dentro do assunto dele.",
+      dica: [
+        "De hoje: resumo, frentes e, no fim, as listas de decisões, pendências e "
+        + "pontos em aberto. Cada tema aparece um pouco em cada lista.",
+        "Por tema: um bloco por assunto, com o que foi decidido, quem faz o quê e o "
+        + "que ficou em aberto. As observações sobre a transcrição ficam no app e não "
+        + "vão no arquivo exportado.",
+        "Vale para a próxima ata gerada. Ao gerar de novo, a ata anterior fica "
+        + "guardada ao lado, como ata.anterior.md.",
+      ],
+      controle: grupo,
+    }),
+  ));
+  painel.appendChild(secaoDeModelos(tipos));
   return painel;
 }
 
 // ────────────────────────────────────────────────────── aba Transcrição
 
-function abaTranscricao(config, gravar, diarizadores = []) {
+/**
+ * O que acontece na passada do fim, depois de a reunião acabar.
+ *
+ * Eram treze cartões com dois parágrafos cada (spec §2, item 6); o que roda ao
+ * vivo foi para Gravador, o modelo de falantes para Modelos, os domínios para a
+ * Agenda, e a explicação medida para trás do ⓘ.
+ */
+function abaTranscricao(config, gravar) {
   const painel = document.createElement("div");
   painel.className = "painel";
 
-  // A placa, e o que fazer quando ela não aparece.
+  const fonetica = config.correcao_fonetica !== false;
+  painel.appendChild(secaoDeAjustes("Correção do texto",
+    ajuste({
+      titulo: "Correção fonética",
+      linha: "O vocabulário do projeto corrige a grafia: \"Jimmy\" volta a ser \"Dimi\".",
+      dica: ["Na transcrição, cada trecho corrigido ganha uma marca ✎, e o filtro no "
+             + "topo mostra só os corrigidos. Clicar na marca desfaz a troca — a "
+             + "correção é um palpite, e palpite que ninguém confere é um defeito "
+             + "esperando."],
+      controle: chave(fonetica, (v) => gravar({ correcao_fonetica: v }), "Correção fonética"),
+    }),
+    // A revisão pela regra não tem chave: ela roda junto com a correção
+    // fonética. O que se liga aqui é o SEGUNDO propositor — e a etiqueta diz o
+    // preço, porque 640 MB é decisão de quem paga.
+    ajuste({
+      titulo: "Revisar nomes e siglas com o modelo", sub: true,
+      linha: "Acha o que a regra não alcança — \"Cláudio\" que era \"Claude\".",
+      dica: [
+        "O modelo lê a transcrição e sugere trocas; elas passam pela mesma "
+        + "conferência da regra, e cada uma fica marcada com ✎ para você desfazer.",
+        "Numa medição com dez erros reais, a regra pegou 3 e o modelo 8. Precisa do "
+        + "modelo de ata baixado.",
+      ],
+      custo: "+640 MB · ~30 s por reunião",
+      controle: chave(config.revisao_com_modelo === true,
+        (v) => gravar({ revisao_com_modelo: v }), "Revisar nomes e siglas com o modelo"),
+    }),
+    ajuste({
+      titulo: "Descartar fala inventada sobre silêncio",
+      linha: "Palavras sobre trechos sem sinal nenhum saem antes da transcrição existir.",
+      dica: [
+        "Cerca de 5% das palavras que o modelo transcreve caem sobre trechos sem "
+        + "sinal nenhum — zeros exatos, não fala baixa. Sobre ausência de som, "
+        + "qualquer palavra é invenção.",
+        "O critério é severo de propósito (99% de amostras zeradas, e dois terços "
+        + "do trecho): fala removida por engano é conteúdo que não volta.",
+      ],
+      controle: chave(config.filtrar_silencio, (v) => gravar({ filtrar_silencio: v }),
+                      "Descartar fala inventada sobre silêncio"),
+    })));
+
+  painel.appendChild(secaoDeAjustes("Refazer",
+    ajuste({
+      titulo: "Mostrar \"Transcrever de novo\"",
+      linha: "Refazer descarta os nomes de falante e as correções daquela reunião.",
+      perigo: true,
+      dica: ["O botão aparece numa reunião já transcrita e reprocessa o áudio "
+             + "inteiro. Fica escondido por padrão porque uma reunião de duas horas "
+             + "custa meia hora de placa, e refazer apaga o que foi revisado."],
+      controle: chave(config.permitir_retranscrever,
+        (v) => gravar({ permitir_retranscrever: v }), "Mostrar Transcrever de novo"),
+    })));
+
+  // ---- o que quase ninguém muda
   //
-  // Relatado em 18/08/2026: numa máquina com RTX 4050 a transcrição caiu para
-  // CPU e o large-v3 consumiu RAM por horas até derrubar o Windows. Desde
-  // então o pipeline recusa a CPU por padrão — e esta é a chave que torna a
-  // exceção uma escolha, para quem de fato não tem placa.
-  const semPlaca = bloco("Transcrever sem placa",
-    "Por padrão o app recusa transcrever quando não encontra a placa de vídeo. "
-    + "Ligue só se esta máquina não tem placa NVIDIA: a transcrição passa a "
-    + "levar horas em vez de minutos e consome muita memória.");
-  semPlaca.classList.add("bloco--chave");
-  semPlaca.appendChild(chave(config.permitir_cpu === true,
-    (v) => gravar({ permitir_cpu: v })));
-  painel.appendChild(semPlaca);
-
-  const refazer = bloco("Transcrever de novo");
-  refazer.classList.add("bloco--chave");
-  const texto = document.createElement("p");
-  texto.className = "bloco__texto";
-  // O porquê fica na tela, não só no código: quem liga isto precisa saber o
-  // que arrisca.
-  texto.textContent = "Mostra o botão de refazer numa reunião já transcrita. "
-    + "Refazer descarta os nomes de falante e as correções de texto daquela "
-    + "reunião, e reprocessa o áudio inteiro.";
-  refazer.append(texto, chave(config.permitir_retranscrever,
-    (v) => gravar({ permitir_retranscrever: v })));
-  painel.appendChild(refazer);
-
-  const fonetica = bloco("Correção fonética",
-    "Os termos do vocabulário do projeto corrigem o texto: 'Dimi' que o modelo "
-    + "escreveu 'Jimmy' volta a ser 'Dimi'.");
-  fonetica.classList.add("bloco--chave");
-  fonetica.appendChild(chave(config.correcao_fonetica !== false,
-    (v) => gravar({ correcao_fonetica: v })));
-
-  const comoVer = document.createElement("p");
-  comoVer.className = "campo__dica";
-  comoVer.textContent = "Na transcrição, cada trecho corrigido ganha uma marca "
-    + "✎, e o filtro no topo mostra só os corrigidos. Clicar na marca desfaz a "
-    + "troca daquele trecho — a correção é um palpite, e palpite que ninguém "
-    + "confere é um defeito esperando.";
-  fonetica.appendChild(comoVer);
-  painel.appendChild(fonetica);
-
-  // A revisão pela regra não tem chave: ela roda junto com a correção fonética,
-  // não baixa nada e não usa a placa. O que se liga aqui é o SEGUNDO
-  // propositor — e a chave diz o preço, porque 640 MB é decisão de quem paga.
-  const revisao = bloco("Revisar nomes e siglas com o modelo",
-    "Os nomes do projeto e da agenda já são corrigidos por regra. Ligando isto, "
-    + "o modelo lê a transcrição e acha também o que a regra não alcança — "
-    + "'Cláudio' que era 'Claude', 'sexta' que era 'cesta'. Numa medição com "
-    + "dez erros reais, a regra pegou 3 e o modelo 8.");
-  revisao.classList.add("bloco--chave");
-  revisao.appendChild(chave(config.revisao_com_modelo === true,
-    (v) => gravar({ revisao_com_modelo: v })));
-
-  const preco = document.createElement("p");
-  preco.className = "campo__dica";
-  preco.textContent = "Precisa do modelo de ata baixado (640 MB) e acrescenta "
-    + "cerca de meio minuto por reunião. O modelo só sugere: as trocas passam "
-    + "pela mesma conferência da regra, e cada uma fica marcada com ✎ para você "
-    + "desfazer.";
-  revisao.appendChild(preco);
-  painel.appendChild(revisao);
-
-  // ---- os domínios da casa
-  //
-  // Só os nossos, e não os dos clientes: quem não é da casa é cliente, e essa
-  // regra não precisa de manutenção quando aparece um cliente novo.
-  const casa = bloco("Domínios da nossa organização",
-    "Os e-mails da agenda dizem de que lado da mesa cada pessoa está. Sem isto, "
-    + "a ata deduz pelo assunto da conversa — e numa reunião que fala de um "
-    + "cliente o tempo todo, alguém da equipe vira gente do cliente.");
-
-  const entrada = document.createElement("input");
-  entrada.className = "aa-entrada";
-  entrada.id = "dominios-da-casa";
-  entrada.placeholder = "beegol.com, minhaempresa.com.br";
-  entrada.value = (config.dominios_da_casa ?? []).join(", ");
-  entrada.addEventListener("change", () => gravar({
-    dominios_da_casa: entrada.value.split(",")
-      .map((d) => d.trim().replace(/^@/, "").toLowerCase())
-      .filter(Boolean),
-  }));
-
-  const dica = document.createElement("p");
-  dica.className = "campo__dica";
-  dica.textContent = "Separados por vírgula. Quem tiver e-mail de outro domínio "
-    + "entra como cliente; quem não tiver e-mail na agenda fica sem lado, e a "
-    + "ata não inventa um.";
-  casa.append(entrada, dica);
-  painel.appendChild(casa);
-
-  const silencio = bloco("Descartar fala inventada sobre silêncio");
-  silencio.classList.add("bloco--chave");
-  const porQue = document.createElement("p");
-  porQue.className = "bloco__texto";
-  // O número está na tela porque é ele que justifica a chave existir.
-  porQue.textContent = "Cerca de 5% das palavras que o modelo transcreve caem "
-    + "sobre trechos em que não há sinal nenhum — zeros exatos, não fala baixa. "
-    + "Sobre ausência de som, qualquer palavra é invenção. Ligado, esses trechos "
-    + "são descartados antes de a transcrição existir.";
-  const cuidado = document.createElement("p");
-  cuidado.className = "campo__dica";
-  cuidado.textContent = "O critério é severo de propósito (99% de amostras "
-    + "zeradas, e dois terços do trecho): fala removida por engano é conteúdo "
-    + "que não volta, enquanto invenção some no meio da ata sem ninguém notar.";
-  silencio.append(porQue, chave(config.filtrar_silencio,
-    (v) => gravar({ filtrar_silencio: v })), cuidado);
-  painel.appendChild(silencio);
-
-  // ---- o hotwords
-  //
-  // Desligado desde 19/08/2026. A chave existe mais para poder medir do que
-  // para escolher — a comparação com e sem, no mesmo áudio, é o que a régua de
-  // fontes paralelas pede (FASE6 §5).
-  const hot = bloco("Dar o vocabulário ao modelo enquanto ele transcreve");
-  hot.classList.add("bloco--chave");
-  const oQueCusta = document.createElement("p");
-  oQueCusta.className = "bloco__texto";
-  oQueCusta.textContent = "Desligado, o vocabulário continua sendo usado para "
-    + "corrigir a grafia depois — que é o que recupera \"Dimi\" de \"Jimmy\". "
-    + "Ligado, ele também é sussurrado ao modelo durante a transcrição, e isso "
-    + "faz o modelo juntar a fala em blocos longos: na mesma reunião, 207 "
-    + "trechos em vez de 787, e quatro vezes mais tempo para transcrever.";
-  const porQueImporta = document.createElement("p");
-  porQueImporta.className = "campo__dica";
-  porQueImporta.textContent = "Quem falou é decidido por trecho. Num trecho de "
-    + "40 segundos com três pessoas dentro, duas somem — e é por isso que a "
-    + "chave está desligada: as duas medições dizem que os nomes se recuperam "
-    + "igual pelos dois caminhos.";
-  hot.append(oQueCusta, chave(config.usar_hotwords === true,
-    (v) => gravar({ usar_hotwords: v })), porQueImporta);
-  painel.appendChild(hot);
-
-  // ---- a prévia durante a própria reunião
-  //
-  // Nasce desligada, e continua desligada por padrão: enquanto o SUP-2 estiver
-  // aberto — a máquina do segundo usuário desliga sozinha sob carga de GPU —
-  // ligar isto lá custaria a reunião, e não uma transcrição que a retomada
-  // devolve. Quem liga aceita a troca na própria máquina.
-  const previa = bloco("Ver a transcrição durante a reunião");
-  previa.classList.add("bloco--chave");
-  const oQueE = document.createElement("p");
-  oQueE.className = "bloco__texto";
-  oQueE.textContent = "Enquanto você grava, o que já foi dito aparece no "
-    + "Gravador em forma de conversa — a sua fala de um lado, a dos outros do "
-    + "outro. Não é legenda: uma frase dita no minuto 10 aparece entre o 12 e o "
-    + "13, porque o bloco de 3 minutos precisa fechar antes de ser transcrito.";
-  const oQueCustaAoVivo = document.createElement("p");
-  oQueCustaAoVivo.className = "campo__dica";
-  oQueCustaAoVivo.textContent = "Ocupa cerca de um décimo da placa durante a "
-    + "reunião, e usa o motor escolhido acima — os dois servem. Aparece o texto "
-    + "e o que é seu, separado pelo lado da tela; quem é cada um dos outros só "
-    + "na transcrição do fim, que roda normalmente quando a reunião acaba.";
-  // **Ligar uma desliga a outra, de verdade.** O texto abaixo prometia isso e o
-  // código não fazia: as duas ficavam ligadas no app.json, o núcleo recusava a
-  // legenda (ela não cabe junto na placa) e o bloco ganhava — sem nada na tela
-  // dizendo por quê. Uma promessa de interface que o código não cumpre é pior
-  // que não prometer.
-  previa.append(oQueE, chave(config.transcricao_ao_vivo === true, async (v) => {
-    await gravar(v ? { transcricao_ao_vivo: true, legenda_ao_vivo: false }
-                   : { transcricao_ao_vivo: false });
-    recarregar();
-  }), oQueCustaAoVivo);
-  painel.appendChild(previa);
-
-  // ---- a legenda ao vivo
-  //
-  // Nasce desligada, como tudo o que roda durante a gravação enquanto o SUP-2
-  // estiver aberto. E **não convive com a prévia em blocos**: medido em
-  // 11/09/2026, as duas juntas derrubam a legenda de 2,46x para 0,45x na 2060 —
-  // abaixo do tempo real, com a fila crescendo sem parar. O núcleo recusa, e
-  // este texto é para a pessoa não descobrir isso pelo sintoma.
-  const legenda = bloco("Legenda ao vivo");
-  legenda.classList.add("bloco--chave");
-  const oQueELegenda = document.createElement("p");
-  oQueELegenda.className = "bloco__texto";
-  oQueELegenda.textContent = "O texto aparece quase no instante da fala, e não "
-    + "a cada 3 minutos. Ele mostra o que foi dito e separa a sua fala da dos "
-    + "outros pelo lado da tela — quem é cada um continua vindo na transcrição "
-    + "do fim.";
-  const oQueCustaLegenda = document.createElement("p");
-  oQueCustaLegenda.className = "campo__dica";
-  oQueCustaLegenda.textContent = "Ocupa cerca de um terço da placa durante a "
-    + "reunião, e não funciona junto com a prévia em blocos acima — as duas não "
-    + "cabem. Ligando esta, a de cima fica desligada.";
-  legenda.append(oQueELegenda, chave(config.legenda_ao_vivo === true, async (v) => {
-    await gravar(v ? { legenda_ao_vivo: true, transcricao_ao_vivo: false }
-                   : { legenda_ao_vivo: false });
-    recarregar();
-  }), oQueCustaLegenda);
-  painel.appendChild(legenda);
-
-  // ---- os nomes ao vivo, em teste (30/09/2026)
-  //
-  // Só aparece com a legenda ligada, porque só vale com ela: é um segundo
-  // sidecar (o Nemotron-3) ao lado da legenda. O custo medido sem o Meet está
-  // em docs/NEMOTRON-DIARIZACAO.md §4b; com o Meet, é o que o teste descobre.
-  if (config.legenda_ao_vivo === true) {
-    const nomes = bloco("Nomes ao vivo na legenda (teste)");
-    nomes.classList.add("bloco--chave");
-    const oQueENomes = document.createElement("p");
-    oQueENomes.className = "bloco__texto";
-    oQueENomes.textContent = "Em vez de \"Outros\", a legenda mostra o nome de "
-      + "quem está falando — das vozes que o app já conhece — ou \"Pessoa 1\", "
-      + "\"Pessoa 2\" para quem ele não conhece. O nome costuma aparecer depois "
-      + "de alguns segundos de fala da pessoa.";
-    const oQueCustaNomes = document.createElement("p");
-    oQueCustaNomes.className = "campo__dica";
-    oQueCustaNomes.textContent = "Usa o nemotron-3 e ocupa cerca de 1,5 GB a mais "
-      + "da placa durante a reunião. Vale a partir da próxima gravação; se a "
-      + "legenda começar a atrasar, desligue aqui.";
-    nomes.append(oQueENomes, chave(config.falantes_ao_vivo === true, async (v) => {
-      await gravar({ falantes_ao_vivo: v });
-      recarregar();
-    }), oQueCustaNomes);
-    painel.appendChild(nomes);
-  }
-
-  // ---- perguntar durante a reunião
-  //
-  // **Esta convive com as duas de cima**, e é a única que convive: o motor de
-  // ata sobe por pergunta e morre depois dela, então não disputa a placa o tempo
-  // todo. O que ela custa é um engasgo na legenda enquanto responde.
-  //
-  // A chave existe por um motivo que o dono do produto deu com todas as letras:
-  // poder desligar quando a máquina estiver sendo usada para outra coisa.
-  const perguntar = bloco("Perguntar durante a reunião");
-  perguntar.classList.add("bloco--chave");
-  const oQueEPerguntar = document.createElement("p");
-  oQueEPerguntar.className = "bloco__texto";
-  oQueEPerguntar.textContent = "Uma caixa no Gravador onde você escreve o que "
-    + "quiser sobre a reunião em curso — o que já foi falado, o que ficou "
-    + "pendente, sobre o que estão falando agora. O modelo lê o que já foi "
-    + "transcrito e responde ali mesmo.";
-  const oQueCustaPerguntar = document.createElement("p");
-  oQueCustaPerguntar.className = "campo__dica";
-  oQueCustaPerguntar.textContent = "Cada pergunta leva cerca de vinte segundos, "
-    + "e enquanto o modelo responde a legenda engasga — ele ocupa a placa e "
-    + "devolve logo depois. O modelo lê no máximo a última hora de reunião: "
-    + "acima disso o começo sai, e a resposta diz que saiu. Usa o modelo de ata "
-    + "escolhido em Ajustes › Modelos.";
-  perguntar.append(oQueEPerguntar, chave(config.perguntar_ao_vivo === true, async (v) => {
-    await gravar({ perguntar_ao_vivo: v });
-    recarregar();
-  }), oQueCustaPerguntar);
-  painel.appendChild(perguntar);
-
-  // ---- deixar o modelo quente
-  //
-  // **É a única chave desta tela que liga uma carga residente na placa.** Ligada,
-  // o motor vira o terceiro contexto CUDA — a carga que derrubou a legenda de
-  // 2,46x para 0,45x em 11/09. O texto diz isso, porque o sintoma (a legenda
-  // parando de firmar) não aponta para cá.
-  const quente = bloco("Deixar o modelo pronto entre perguntas");
-  quente.classList.add("bloco--chave");
-  const oQueEQuente = document.createElement("p");
-  oQueEQuente.className = "bloco__texto";
-  oQueEQuente.textContent = "Depois da primeira pergunta, o modelo fica de pé "
-    + "esperando a próxima. A primeira continua levando os mesmos vinte "
-    + "segundos; as seguintes respondem quase na hora.";
-  const oQueCustaQuente = document.createElement("p");
-  oQueCustaQuente.className = "campo__dica";
-  oQueCustaQuente.textContent = "Em troca, ele segura cerca de 3 GB da placa "
-    + "enquanto espera — e é isso que pode fazer a legenda ao vivo atrasar. Ele "
-    + "se desliga sozinho depois de dez minutos sem pergunta, e quando a "
-    + "gravação para. Desligando esta chave, a placa volta na hora.";
-  quente.append(oQueEQuente, chave(config.modelo_quente === true, async (v) => {
-    await gravar({ modelo_quente: v });
-    recarregar();
-  }), oQueCustaQuente);
-  painel.appendChild(quente);
-
-  // ---- qual modelo separa os falantes
-  //
-  // Aqui e não só em Ajustes › Clientes. O de lá é a exceção por projeto; este
-  // é o padrão do app, e é onde as pessoas foram procurar — a escolha existia
-  // apenas dentro da linha de um projeto, que precisa ser expandida para
-  // aparecer, e por isso parecia não existir.
-  //
-  // A lista vem do disco (Motores.ModelosDeDiarizacao), não de constante: é o
-  // que faz um modelo novo aparecer sozinho no dia em que for empacotado, e o
-  // que impede a tela de oferecer o que o motor não sabe carregar.
-  const sep = bloco("Modelo que separa os falantes",
-    "Vale para todas as reuniões, menos as de um projeto que tenha escolhido "
-    + "outro em Clientes.");
-
-  if (diarizadores.length === 0) {
-    const semNada = document.createElement("p");
-    semNada.className = "campo__dica";
-    // Dizer a verdade em vez de um seletor vazio: nesta instalação a
-    // diarização vai tentar o HuggingFace e falhar.
-    semNada.textContent = "Nenhum modelo de diarização encontrado nesta "
-      + "instalação. Separar falantes não vai funcionar até reinstalar o app.";
-    sep.appendChild(semNada);
-  } else {
-    const campoSep = campo("Modelo", "select", { opcoes: diarizadores });
-    const sel = campoSep.querySelector("select");
-    diarizadores.forEach((nome, n) => { sel.options[n].value = nome; });
-    sel.value = config.diarizacao_padrao ?? diarizadores[0];
-    // Um padrão apontando para pasta que não existe mais não pode sumir em
-    // silêncio: ele decide como toda reunião é transcrita.
-    if (sel.selectedIndex === -1) {
-      const solto = document.createElement("option");
-      solto.value = config.diarizacao_padrao;
-      solto.textContent = `${config.diarizacao_padrao} (não instalado)`;
-      sel.appendChild(solto);
-      sel.value = config.diarizacao_padrao;
-    }
-    sel.addEventListener("change", (e) => gravar({ diarizacao_padrao: e.target.value }));
-
-    const qual = document.createElement("p");
-    qual.className = "campo__dica";
-    // O nemotron-3 entrou em 29/09/2026 (MOD-2): ao lado, e não no lugar.
-    // docs/NEMOTRON-DIARIZACAO.md §3b.
-    qual.textContent = "O community-1 é o padrão. O nemotron-3 separou melhor "
-      + "nas quatro reuniões medidas (metade dos erros), é bem mais rápido e usa "
-      + "menos memória da placa; os nomes das vozes conhecidas saem iguais. Ele "
-      + "separa até 8 pessoas além de você.";
-    sep.append(campoSep, qual);
-  }
-  painel.appendChild(sep);
+  // Fechado por padrão. "Transcrever sem placa" é a exceção para quem não tem
+  // NVIDIA (relato de 18/08/2026: a queda para CPU derrubou o Windows); o
+  // hotwords está desligado desde 19/08/2026 e existe mais para medir do que
+  // para escolher (FASE6 §5). Abre sozinho se algum dos dois estiver ligado —
+  // um ajuste fora do padrão não pode ficar escondido.
+  const avancado = document.createElement("details");
+  avancado.className = "bloco ajustes-secao ajustes-avancado";
+  avancado.open = config.permitir_cpu === true || config.usar_hotwords === true;
+  const resumo = document.createElement("summary");
+  resumo.className = "bloco__titulo";
+  resumo.textContent = "Avançado";
+  avancado.append(resumo,
+    ajuste({
+      titulo: "Transcrever sem placa",
+      linha: "Só para máquina sem NVIDIA: leva horas e consome muita memória.",
+      dica: ["Por padrão o app recusa transcrever quando não encontra a placa de "
+             + "vídeo, porque cair para a CPU sem aviso já fez uma transcrição comer "
+             + "a memória por horas até derrubar o Windows."],
+      controle: chave(config.permitir_cpu === true, (v) => gravar({ permitir_cpu: v }),
+                      "Transcrever sem placa"),
+    }),
+    ajuste({
+      titulo: "Vocabulário durante a transcrição", etiqueta: "para medir",
+      linha: "Junta a fala em blocos longos; os nomes se recuperam igual sem ele.",
+      dica: [
+        "Desligado, o vocabulário continua corrigindo a grafia depois. Ligado, ele "
+        + "também é sussurrado ao modelo enquanto transcreve — e o modelo junta a "
+        + "fala: na mesma reunião, 207 trechos em vez de 787.",
+        "Quem falou é decidido por trecho: num trecho de 40 segundos com três "
+        + "pessoas, duas somem. As duas medições dizem que os nomes se recuperam "
+        + "igual pelos dois caminhos.",
+      ],
+      custo: "4× mais lento",
+      controle: chave(config.usar_hotwords === true, (v) => gravar({ usar_hotwords: v }),
+                      "Vocabulário durante a transcrição"),
+    }));
+  painel.appendChild(avancado);
 
   return painel;
 }
+
 
 // ──────────────────────────────────────────────────────── aba Clientes
 //
@@ -1140,6 +1321,7 @@ const ABAS = [
   ["gravador", "Gravador"],
   ["modelos", "Modelos"],
   ["transcricao", "Transcrição"],
+  ["atas", "Atas"],
   ["clientes", "Clientes"],
   ["vozes", "Vozes"],
 ];
@@ -1157,18 +1339,21 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "true");
   tela.replaceChildren();
 
-  let config, clientes, catalogo, diarizadores, vozes, parecidos, gravador, gravacoes, tipos;
+  let config, clientes, catalogo, diarizadores, vozes, parecidos, gravador, gravacoes, tipos,
+      dispositivos;
   try {
     // Tudo de uma vez: são cinco leituras baratas e locais, e pedir sob demanda
     // a cada troca de aba faria a aba piscar por nada.
     // As gravações e os tipos de ata só servem a Clientes (as contagens e o
     // tipo padrão do projeto); sem eles, a seção perde isso e o resto vale.
     [{ config }, { clientes }, { catalogo, diarizadores }, { vozes, parecidos },
-     { gravador }, { gravacoes }, { tipos }] = await Promise.all([
+     { gravador }, { gravacoes }, { tipos }, { dispositivos }] = await Promise.all([
       pedir("config"), pedir("clientes"), pedir("catalogo"), pedir("vozes"),
       pedir("gravador"),
       pedir("gravacoes").catch(() => ({ gravacoes: [] })),
       pedir("modelos-de-ata").catch(() => ({ tipos: [] })),
+      // Sem a lista de dispositivos a aba Gravador perde só os seletores.
+      pedir("dispositivos").catch(() => ({ dispositivos: null })),
     ]);
   } catch (e) {
     tela.setAttribute("aria-busy", "false");
@@ -1179,8 +1364,12 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   tela.setAttribute("aria-busy", "false");
   recarregar = () => telaDeAjustes(ctx, atual);
 
+  // No topo e grudado nele: no pé de uma aba longa, quem mexia no primeiro
+  // ajuste não via o "salvo" (plano 4b). `role="status"` anuncia sem roubar o
+  // foco de quem digita.
   const estado = document.createElement("p");
-  estado.className = "campo__dica";
+  estado.className = "campo__dica ajustes__estado";
+  estado.setAttribute("role", "status");
 
   /** Grava a cada mudança: um botão "salvar" só criaria como esquecer. */
   async function gravar(mudanca) {
@@ -1222,16 +1411,17 @@ export async function telaDeAjustes(ctx, aba = "geral") {
   function desenharPainel() {
     const conteudo = {
       geral: () => abaGeral(config, gravador, gravar, (t) => { estado.textContent = t; }),
-      gravador: () => abaGravador(gravador, mexerNoGravador),
-      modelos: () => abaModelos(catalogo, config, gravar),
-      transcricao: () => abaTranscricao(config, gravar, diarizadores ?? []),
+      gravador: () => abaGravador({ gravador, dispositivos, config }, mexerNoGravador, gravar),
+      modelos: () => abaModelos(catalogo, config, gravar, diarizadores ?? []),
+      transcricao: () => abaTranscricao(config, gravar),
+      atas: () => abaAtas(config, gravar, tipos ?? []),
       clientes: () => abaClientes({
         clientes, catalogo, diarizadores: diarizadores ?? [],
         gravacoes: gravacoes ?? [], tipos: tipos ?? [],
       }, () => recarregar(), estado),
       vozes: () => abaVozes({ vozes, parecidos: parecidos ?? [] }, estado),
     }[atual]();
-    conteudo.appendChild(estado);
+    conteudo.prepend(estado);
     painel.replaceChildren(conteudo);
   }
 

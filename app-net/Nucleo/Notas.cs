@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace MeetingApp.Nucleo;
 
 /// <summary>
@@ -66,7 +68,7 @@ public static class Notas
     /// </remarks>
     public static string? Inicio(string pastaDaGravacao, int limite = 200)
     {
-        string junto = string.Join(" · ", Ler(pastaDaGravacao)
+        string junto = string.Join(" · ", SemImagens(Ler(pastaDaGravacao))
             .Replace("\r", "")
             .Split('\n')
             .Select(l => l.Trim())
@@ -129,6 +131,7 @@ public static class Notas
     {
         var achados = new List<string>();
         if (texto is not { Length: > 0 }) return achados;
+        texto = SemImagens(texto);
 
         foreach (var linha in texto.Split('\n'))
         {
@@ -153,5 +156,37 @@ public static class Notas
             }
         }
         return achados;
+    }
+
+    // A imagem da reunião em markdown, com o espaço que a separava do texto
+    // antes dela. Só as de capturas/: uma imagem de fora que alguém colou como
+    // link é texto dessa pessoa.
+    private static readonly Regex ImagemDaReuniao =
+        new(@"[ \t]?!\[[^\]\n]*\]\(" + Capturas.Pasta + @"/[^)\s]+\)", RegexOptions.Compiled);
+
+    private static readonly Regex SoMarcaDeTempo =
+        new(@"^[\s\-*#]*(\[\d{1,2}:\d{2}:\d{2}\][\s\-*]*)*$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// O texto das notas sem as imagens da reunião.
+    /// </summary>
+    /// <remarks>
+    /// Para onde só cabe texto: o prompt da ata, o vocabulário sugerido e o
+    /// começo das notas na lista. A linha que só tinha a imagem e o momento
+    /// some inteira — um <c>[00:12:34]</c> sozinho no prompt é um momento sem
+    /// nada dito, e o modelo de ata não vê a imagem.
+    /// </remarks>
+    public static string SemImagens(string texto)
+    {
+        if (!texto.Contains("](" + Capturas.Pasta + "/")) return texto;
+
+        var linhas = new List<string>();
+        foreach (string linha in texto.Split('\n'))
+        {
+            string limpa = ImagemDaReuniao.Replace(linha, "");
+            if (limpa.Length != linha.Length && SoMarcaDeTempo.IsMatch(limpa)) continue;
+            linhas.Add(limpa.Length != linha.Length ? limpa.TrimEnd() : linha);
+        }
+        return string.Join('\n', linhas);
     }
 }
