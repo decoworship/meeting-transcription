@@ -1514,6 +1514,20 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   align-items: start;
 }
 
+/* Uma largura só para todas as seções. Sem o width, a .aa-pagina (margin auto
+ * num item de grade) encolhia até o conteúdo de cada uma, e a coluna de abas
+ * andava 180 px de lado ao trocar de aba — Geral, a mais estreita, e Clientes,
+ * a mais larga, nas pontas. O teto é o da janela a 100% (1280 px): ali todas
+ * ocupam a largura toda, e acima dela o conjunto centraliza sem que um
+ * interruptor fique a um palmo do título dele. O topo é o das telas de
+ * trabalho (Reuniões, Gravador), que Clientes e Vozes já usavam sozinhas. */
+.aa-pagina:has(> .ajustes) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 76rem;
+  padding-top: var(--espaco-5);
+}
+
 /* As abas acompanham a rolagem do painel: com Clientes ou Vozes longos, ter de
  * voltar ao topo só para trocar de aba é o incômodo que sticky existe para
  * resolver. O topo é a altura da barra — encostar em zero as esconde atrás
@@ -1547,7 +1561,11 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .aba:focus-visible { outline: var(--anel-foco); outline-offset: -2px; }
 .aba[aria-selected="true"] { background: var(--cor-acao-suave); color: var(--cor-acao); }
 
-.painel { display: grid; gap: var(--espaco-6); align-content: start; }
+/* Coluna flexível, e não grade: o "salvo" (.ajustes__estado) tem altura zero e
+ * margem negativa do tamanho do vão, para não ocupar lugar. Na grade a linha
+ * não encolhe abaixo de zero, o vão sobrava, e o primeiro cartão de toda seção
+ * começava 32 px abaixo da primeira aba. */
+.painel { display: flex; flex-direction: column; gap: var(--espaco-6); min-width: 0; }
 
 /* Um bloco por assunto, com o título dentro do cartão. É a forma da referência
  * do Meetily, e ela funciona porque cada bloco fica legível sozinho — dá para
@@ -1622,7 +1640,7 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   position: sticky;
   top: var(--altura-da-barra);
   z-index: 1;
-  justify-self: end;
+  align-self: flex-end;
   /* Sem altura: aparecer e sumir não empurra o painel. O texto sobe para o
    * respiro acima do primeiro cartão. */
   height: 0;
@@ -2429,16 +2447,6 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   .clientes__lista { max-height: 14rem; overflow: auto; }
 }
 
-/* Mestre-detalhe precisa da largura da janela, como a lista de Reuniões: o
- * mesmo remendo da .aa-pagina (ver .aa-pagina:has(> .reunioes)), só quando
- * a seção aberta é Clientes. */
-.aa-pagina:has(.clientes) {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 90rem;
-  padding-top: var(--espaco-5);
-}
-
 /* Uma seta só nos seletores de Clientes: o DS já desenha a dele, e o
  * appearance:auto global (select.aa-entrada) punha a do navegador junto. */
 .clientes select.aa-entrada { appearance: none; }
@@ -2648,12 +2656,6 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   .vozes__corpo { grid-template-columns: 1fr; }
   .vozes__mestre { border-right: 0; border-bottom: 1px solid var(--cor-borda); }
   .vozes__pessoas { max-height: 16rem; overflow: auto; }
-}
-.aa-pagina:has(.vozes) {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 90rem;
-  padding-top: var(--espaco-5);
 }
 
 /* ─────────────────────────────────────── vidro (AA Design System 0.5.0)

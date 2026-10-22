@@ -1058,10 +1058,14 @@ function abaModelos(catalogo, config, gravar, diarizadores = []) {
   // decisão 4). Sem NVIDIA o app funciona — o faster-whisper e o llama.cpp caem
   // para CPU sozinhos —, mas uma reunião de uma hora passa a levar horas. Dizer
   // isso aqui é a diferença entre um app lento e um app que parece travado.
+  // Escondido até ter o que dizer: vazio, ele ainda levava um vão do painel, e
+  // os cartões de Modelos começavam 32 px abaixo dos das outras seções.
   const avisoDePlaca = document.createElement("div");
+  avisoDePlaca.hidden = true;
   painel.appendChild(avisoDePlaca);
   diagnostico().then((d) => {
     if (d.placa) return;
+    avisoDePlaca.hidden = false;
     avisoDePlaca.appendChild(alerta(
       "Não encontrei placa NVIDIA nesta máquina. O app funciona, mas transcreve "
       + "pela CPU — uma reunião de uma hora pode levar algumas horas. Modelos "
