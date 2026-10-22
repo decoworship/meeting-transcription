@@ -3,6 +3,23 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.11.1 — 22/10/2026
+
+**O Claude Desktop lê as suas reuniões.** Em Ajustes › Geral › Claude,
+"Conectar ao Claude" liga o PulseMeet ao Claude Desktop; depois é sair do Claude
+pela bandeja e abrir de novo. As atas e transcrições aparecem no **+** do Claude
+para anexar sem copiar, e ele também busca sozinho quando a pergunta atravessa
+várias reuniões — "a linha do tempo deste cliente desde agosto", por exemplo.
+O PulseMeet só deixa ler: nada do acervo muda por esse caminho. O que o Claude
+lê vai para a conversa, como qualquer texto que você colasse nela.
+
+**Ajustes mais arrumados.** As seções agora começam todas no mesmo lugar — antes
+a coluna da esquerda andava de lado a cada troca —, e os botões de ligar e
+desligar foram redesenhados: desligado é só o contorno, ligado é cheio.
+
+**O logo do PulseMeet na barra da janela** e no Alt+Tab, no lugar do ícone
+genérico do Windows.
+
 ## 0.11.0 — 21/10/2026
 
 A 0.10.0 não chegou a sair como release; quem atualiza da 0.9.1 recebe as duas.
