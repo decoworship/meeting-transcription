@@ -313,10 +313,24 @@ internal static partial class Win32
 
     // ───────────────────────────────────────────────── ícones
 
+    internal const int SM_CXICON = 11;
     internal const int SM_CXSMICON = 49;
 
     [LibraryImport("user32.dll")]
     internal static partial int GetSystemMetrics(int nIndex);
+
+    internal const uint IMAGE_ICON = 1;
+    internal const uint LR_SHARED = 0x8000;
+
+    /// <summary>
+    /// O grupo de ícones que o <c>ApplicationIcon</c> do .csproj grava no .exe.
+    /// O compilador o grava sempre com este id, o mesmo do IDI_APPLICATION.
+    /// </summary>
+    internal static readonly IntPtr IDI_DO_APP = 32512;
+
+    [LibraryImport("user32.dll", EntryPoint = "LoadImageW")]
+    internal static partial IntPtr LoadImage(IntPtr hInst, IntPtr name, uint type,
+                                             int cx, int cy, uint fuLoad);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     internal static partial IntPtr CreateIconFromResourceEx(

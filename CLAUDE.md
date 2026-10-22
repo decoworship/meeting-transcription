@@ -136,6 +136,14 @@ código — mas **o winget faz esse degrau sem que o app aprenda nada**: desde
 o `winget upgrade` ainda não funciona: falta separar os motores do instalador,
 que é o que torna 1,59 GB submissível e um update de 18 MB possível.
 
+**O Claude lê as reuniões desde 22/10/2026** (`UI-13`): `PulseMeet.exe --mcp`
+é um servidor MCP que o Claude Desktop abre, e que só lê o acervo
+([docs/INTEGRACAO-CLAUDE.md](docs/INTEGRACAO-CLAUDE.md)). Ele desvia **antes do
+mutex** — senão morreria ao nascer com o app aberto —, e o stdout dele é o
+protocolo. Escrito à mão com `JsonNode`, sem o SDK, por causa do trimming: e
+mesmo assim **`JsonArray.Add` e `[a, b]` caem no `Add<T>` genérico** que o
+trimming recusa; use `(JsonNode)` e `new JsonArray(a, b)`.
+
 **O corpus paralelo deixou de ser tarefa pendente em 27/08/2026**, junto com a
 qualidade. Ele existe — três reuniões com Notion e Gemini/Meet — e é de onde
 saiu quase tudo o que se sabe sobre a transcrição e a diarização
@@ -148,7 +156,7 @@ mais trabalho que alguém deva.
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 849 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 905 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB

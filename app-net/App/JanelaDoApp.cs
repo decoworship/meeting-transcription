@@ -66,12 +66,23 @@ internal sealed class JanelaDoApp : IDisposable
         _telaInicial = telaInicial;
         _wndProc = Processar;
 
+        // O ícone vem do próprio .exe, nos dois tamanhos. Sem ele a classe
+        // nasce sem ícone, e a barra de título e o Alt+Tab mostravam o genérico
+        // do Windows enquanto o Explorer e a barra de tarefas mostravam o logo.
+        // LR_SHARED: o sistema guarda os dois, e ninguém precisa destruí-los.
+        var modulo = Win32.GetModuleHandle(null);
         var classe = new Win32.WNDCLASSEX
         {
             cbSize = (uint)Marshal.SizeOf<Win32.WNDCLASSEX>(),
             lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
-            hInstance = Win32.GetModuleHandle(null),
+            hInstance = modulo,
             hCursor = Win32.LoadCursorW(IntPtr.Zero, Win32.IDC_ARROW),
+            hIcon = Win32.LoadImage(modulo, Win32.IDI_DO_APP, Win32.IMAGE_ICON,
+                Win32.GetSystemMetrics(Win32.SM_CXICON), Win32.GetSystemMetrics(Win32.SM_CXICON),
+                Win32.LR_SHARED),
+            hIconSm = Win32.LoadImage(modulo, Win32.IDI_DO_APP, Win32.IMAGE_ICON,
+                Win32.GetSystemMetrics(Win32.SM_CXSMICON), Win32.GetSystemMetrics(Win32.SM_CXSMICON),
+                Win32.LR_SHARED),
             lpszClassName = NomeDaClasse,
         };
         if (Win32.RegisterClassExW(ref classe) == 0)

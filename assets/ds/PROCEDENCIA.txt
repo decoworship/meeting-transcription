@@ -1,3 +1,11 @@
 commit: c223c277a
 origem: https://github.com/decoworship/aa-design-system
 copiado em: 2026-10-05 (0.5.0 — camada de material, data-estilo aa e vidro)
+
+alterado aqui, ainda não devolvido à origem:
+- 2026-10-22, componentes.css, .aa-interruptor: o botão se posicionava pelo
+  label e herdava a margem do checkbox do navegador, e saía para fora do
+  trilho; no escuro era um disco escuro sobre o trilho. Agora se mede pelo
+  input, desligado é contorno com botão pequeno no tom suave, e ligado é
+  trilho de ação com botão no --cor-texto-invertido. Levar ao
+  aa-design-system antes da próxima cópia, ou ela desfaz isto.

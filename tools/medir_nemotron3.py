@@ -55,7 +55,7 @@ ACERVO = Path("/mnt/c/Users/andre/OneDrive/Documents/MeetingRecordings")
 #: as quatro gravações do acervo com export do Gemini/Meet (AUDITORIA-ATAS.md §9)
 COM_GEMINI_TODAS = ["2026-08-20_15-59-20", "2026-08-21_11-00-33",
                     "2026-08-25_08-59-22", "2026-08-27_15-28-37",
-                    "2026-09-30_09-58-30"]
+                    "2026-09-30_09-58-30", "2026-10-21_12-01-47"]
 #: as duas que têm pessoas em comum, que é o que a régua de vozes precisa
 COM_GEMINI = {"0820": "2026-08-20_15-59-20", "0821": "2026-08-21_11-00-33"}
 MODELO = AQUI / "_nemotron3"

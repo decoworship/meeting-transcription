@@ -373,8 +373,100 @@ function abaGeral(config, gravador, gravar, estadoDoTexto) {
   pastas.append(campoPasta, campoExport, campoAtas);
 
   painel.append(secaoVoce(config, gravar), pastas, blocoDeTema(config, gravar),
-                blocoSobre(config, gravar));
+                secaoDoClaude(), blocoSobre(config, gravar));
   return painel;
+}
+
+/**
+ * A conexão com o Claude Desktop: uma entrada no arquivo de configuração dele,
+ * que passa a abrir este executável com --mcp e a ler as reuniões por ali.
+ *
+ * O botão é o caminho inteiro, de propósito: o arquivo mora num lugar diferente
+ * em cada instalação do Claude, guarda as preferências dele junto, e editá-lo à
+ * mão é o tipo de instrução que ninguém segue. Ver docs/INTEGRACAO-CLAUDE.md.
+ */
+function secaoDoClaude() {
+  const linha = document.createElement("span");
+  const botao = document.createElement("button");
+  botao.type = "button";
+  botao.className = "aa-btn aa-btn-secundario";
+  botao.hidden = true;
+  const recado = document.createElement("p");
+  recado.className = "campo__dica";
+  recado.hidden = true;
+
+  let conectado = false;
+
+  function desenhar(c, depoisDeMexer = false) {
+    conectado = c.conectado && c.neste_executavel;
+    botao.hidden = !c.encontrado;
+    botao.disabled = false;
+    recado.hidden = true;
+
+    if (c.erro) {
+      linha.textContent = `Não deu para ler a configuração do Claude: ${c.erro}`;
+      botao.hidden = true;
+    } else if (!c.encontrado) {
+      linha.textContent = "O Claude Desktop não está instalado nesta conta do Windows.";
+    } else if (conectado) {
+      linha.textContent = "Conectado: as reuniões aparecem no + do Claude Desktop, "
+        + "e o Claude pode buscá-las sozinho.";
+      botao.textContent = "Desconectar";
+      botao.className = "aa-btn aa-btn-texto";
+    } else if (c.conectado) {
+      linha.textContent = "A conexão aponta para outro PulseMeet.exe, que pode ter mudado de lugar.";
+      botao.textContent = "Reconectar";
+      botao.className = "aa-btn aa-btn-secundario";
+    } else {
+      linha.textContent = "Deixa o Claude ler as atas, as transcrições e as notas, sem copiar.";
+      botao.textContent = "Conectar ao Claude";
+      botao.className = "aa-btn aa-btn-secundario";
+    }
+
+    // O Claude só lê a configuração ao abrir, e fechar a janela dele não o
+    // encerra — ele fica na bandeja, como este app.
+    if (depoisDeMexer && c.encontrado && !c.erro) {
+      recado.hidden = false;
+      recado.textContent = "Saia do Claude Desktop pela bandeja e abra de novo: "
+        + "ele só lê a conexão quando abre.";
+    }
+  }
+
+  botao.addEventListener("click", async () => {
+    botao.disabled = true;
+    try {
+      const r = await pedir(conectado ? "desconectar-claude" : "conectar-claude");
+      desenhar(r.claude, true);
+    } catch (e) {
+      botao.disabled = false;
+      recado.hidden = false;
+      recado.textContent = `não deu: ${e.message}`;
+    }
+  });
+
+  linha.textContent = "conferindo…";
+  pedir("claude").then((r) => desenhar(r.claude)).catch((e) => {
+    linha.textContent = `não deu para conferir: ${e.message}`;
+  });
+
+  const item = ajuste({
+    titulo: "Claude Desktop",
+    dica: [
+      "O Claude Desktop abre o PulseMeet num processo à parte, que só lê as reuniões "
+      + "deste computador. Funciona com o app fechado, e nada muda nas gravações.",
+      "Com a reunião anexada pelo +, ou pedindo direto (\"faça a linha do tempo do cliente "
+      + "X\"), o Claude lê a ata, a transcrição e as notas. O que ele lê vai para a "
+      + "conversa — e, como toda conversa com o Claude, para a Anthropic. O resto do "
+      + "acervo não sai daqui.",
+      "\"Esta reunião\" é a última que você abriu aqui.",
+    ],
+    controle: botao,
+  });
+  // A frase muda com o estado, então ela entra no lugar da linha fixa do ajuste.
+  linha.className = "ajuste__linha";
+  item.querySelector(".ajuste__texto").appendChild(linha);
+
+  return secaoDeAjustes("Claude", item, recado);
 }
 
 
@@ -1058,10 +1150,14 @@ function abaModelos(catalogo, config, gravar, diarizadores = []) {
   // decisão 4). Sem NVIDIA o app funciona — o faster-whisper e o llama.cpp caem
   // para CPU sozinhos —, mas uma reunião de uma hora passa a levar horas. Dizer
   // isso aqui é a diferença entre um app lento e um app que parece travado.
+  // Escondido até ter o que dizer: vazio, ele ainda levava um vão do painel, e
+  // os cartões de Modelos começavam 32 px abaixo dos das outras seções.
   const avisoDePlaca = document.createElement("div");
+  avisoDePlaca.hidden = true;
   painel.appendChild(avisoDePlaca);
   diagnostico().then((d) => {
     if (d.placa) return;
+    avisoDePlaca.hidden = false;
     avisoDePlaca.appendChild(alerta(
       "Não encontrei placa NVIDIA nesta máquina. O app funciona, mas transcreve "
       + "pela CPU — uma reunião de uma hora pode levar algumas horas. Modelos "

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using MeetingApp.App.Nativo;
 using MeetingApp.Nucleo;
 using MeetingApp.Nucleo.Atas;
+using MeetingApp.Nucleo.Claude;
 using MeetingApp.Sidecar;
 
 namespace MeetingApp.App;
@@ -286,6 +287,19 @@ internal sealed class Resposta
 
     /// <summary>As próximas reuniões da agenda, para escolher qual gravar.</summary>
     [JsonPropertyName("proximas")] public ProximasReunioes? Proximas { get; init; }
+
+    /// <summary>O PulseMeet está na configuração do Claude Desktop?</summary>
+    [JsonPropertyName("claude")] public EstadoDoClaude? Claude { get; init; }
+}
+
+/// <summary><see cref="EstadoDaConexao"/> com os nomes da ponte.</summary>
+internal sealed class EstadoDoClaude
+{
+    [JsonPropertyName("encontrado")] public bool Encontrado { get; init; }
+    [JsonPropertyName("conectado")] public bool Conectado { get; init; }
+    [JsonPropertyName("neste_executavel")] public bool NesteExecutavel { get; init; }
+    [JsonPropertyName("arquivo")] public string? Arquivo { get; init; }
+    [JsonPropertyName("erro")] public string? Erro { get; init; }
 }
 
 /// <summary>Uma reunião da agenda, como a tela precisa vê-la.</summary>
@@ -747,6 +761,7 @@ internal sealed class TrechoDaPrevia
 [JsonSerializable(typeof(EstadoDoMotorDeAta))]
 [JsonSerializable(typeof(EstadoDaAtualizacao))]
 [JsonSerializable(typeof(ProximasReunioes))]
+[JsonSerializable(typeof(EstadoDoClaude))]
 internal sealed partial class PonteJsonBase : JsonSerializerContext;
 
 internal static class PonteJson
@@ -1181,6 +1196,26 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     });
                     break;
 
+                // A conexão com o Claude Desktop: uma entrada no arquivo dele, que
+                // o abre como PulseMeet.exe --mcp. Ver docs/INTEGRACAO-CLAUDE.md.
+                case "claude":
+                    Responder(new Resposta { Id = p.Id, Claude = EstadoDoClaude() });
+                    break;
+
+                case "conectar-claude":
+                case "desconectar-claude":
+                {
+                    string arquivo = ConexaoComClaude.ArquivoDeConfiguracao()
+                        ?? throw new InvalidOperationException(
+                            "O Claude Desktop não está instalado nesta conta do Windows.");
+                    if (p.Op == "conectar-claude")
+                        ConexaoComClaude.Conectar(arquivo, Executavel());
+                    else
+                        ConexaoComClaude.Desconectar(arquivo);
+                    Responder(new Resposta { Id = p.Id, Claude = EstadoDoClaude() });
+                    break;
+                }
+
                 case "motor-de-ata":
                     Responder(new Resposta
                     {
@@ -1281,9 +1316,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id });
                     break;
 
+                // Os três lugares que abrem uma reunião pedem isto, e só eles: é
+                // a hora de anotar qual é "esta reunião" para o Claude
+                // (Nucleo/Claude/ReuniaoAberta.cs).
                 case "transcricao":
-                    Responder(new Resposta { Id = p.Id, Transcricao = LerTranscricao(p.Gravacao) });
+                {
+                    string? texto = LerTranscricao(p.Gravacao);
+                    if (texto is not null) ReuniaoAberta.Marcar(p.Gravacao!);
+                    Responder(new Resposta { Id = p.Id, Transcricao = texto });
                     break;
+                }
 
                 // O que a legenda ao vivo deixou para ler. **Não é transcrição**
                 // e não entra no lugar dela: serve para conferir, antes de
@@ -2991,6 +3033,20 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         string caminho = Path.Combine(pasta, "transcricao.json");
         return File.Exists(caminho) ? File.ReadAllText(caminho) : null;
     }
+
+    private static EstadoDoClaude EstadoDoClaude()
+    {
+        var e = ConexaoComClaude.Estado(ConexaoComClaude.ArquivoDeConfiguracao(), Executavel());
+        return new EstadoDoClaude
+        {
+            Encontrado = e.ClaudeEncontrado, Conectado = e.Conectado,
+            NesteExecutavel = e.NesteExecutavel, Arquivo = e.Arquivo, Erro = e.Erro,
+        };
+    }
+
+    /// <summary>Este executável — o que o Claude Desktop vai abrir com <c>--mcp</c>.</summary>
+    private static string Executavel() =>
+        Environment.ProcessPath ?? throw new InvalidOperationException("não sei onde o PulseMeet.exe está");
 
     private void Responder(Resposta r) =>
         responder(JsonSerializer.Serialize(r, PonteJson.Default.Resposta));
