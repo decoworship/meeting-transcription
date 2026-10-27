@@ -3,6 +3,36 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.12.0 — 27/10/2026
+
+**O mute anda junto com a reunião.** Mutar no Google Meet ou no Teams aberto no
+navegador muta a gravação do PulseMeet, e mutar no PulseMeet muta a reunião. Vale
+no Chrome e no Edge, por uma extensão que vem com o app. Liga-se em Ajustes ›
+Gravador › Chamadas, que mostra os três passos para carregar a extensão. Vem
+desligado. Quando o PulseMeet atualizar, clique em ↻ na extensão, em
+chrome://extensions, e recarregue a aba da reunião. O Teams desktop entra pelo
+mesmo lugar, quando a organização deixa a API dele ligada.
+
+**Um modelo de transcrição novo, o Parakeet Ultra.** Em Ajustes › Modelos ›
+Transcrição, ao lado do Large v3. Nas reuniões em que comparamos com a
+transcrição do Google Meet, ele perdeu menos fala que o Large v3 em todas, e
+separou os falantes tão bem quanto. Transcreve quase duas vezes mais rápido e
+ocupa metade da placa. Ele não recebe o vocabulário do projeto na entrada: os
+termos continuam sendo corrigidos depois, como já acontece hoje. O padrão
+continua o Large v3; o Parakeet Ultra é para quem quiser experimentar. São
+1,3 GB para baixar.
+
+**A tela de transcrever mostra os modelos que existem**, com o nome de Ajustes,
+e começa no modelo escolhido lá. Antes ela tinha uma lista própria, e
+transcrevia com o Large v3 mesmo que Ajustes dissesse outro.
+
+**A legenda ao vivo ficou cerca de 18% mais rápida**, com o mesmo texto.
+
+**Remover um modelo de ata em Ajustes › Modelos removia todos eles**, inclusive o
+que estava em uso. Agora sai só o escolhido.
+
+Esta atualização baixa de novo o pacote de motores (~1,7 GB), uma vez.
+
 ## 0.11.1 — 22/10/2026
 
 **O Claude Desktop lê as suas reuniões.** Em Ajustes › Geral › Claude,
