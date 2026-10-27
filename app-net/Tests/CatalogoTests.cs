@@ -246,6 +246,89 @@ public sealed class CatalogoTests
     }
 
     [Fact]
+    public void OParakeetUltraEUmGgufAoLadoDoMotorDeAsr()
+    {
+        // O repositório tem seis quantizações; baixá-lo como pasta de cache
+        // traria ~7 GB para usar 1,26. E quem abre o arquivo é o motor.py, por
+        // caminho, em motores/asr/modelos.
+        var ultra = Catalogo.Pacotes.Single(p => p.Id == "parakeet-ultra");
+
+        Assert.Equal("asr", ultra.Familia);
+        Assert.True(Catalogo.EhArquivoAvulso(ultra));
+        Assert.Equal(Catalogo.PastaDosModelosDoAsr(), Catalogo.PastaDoPacote(ultra));
+        Assert.EndsWith(Path.Combine("motores", "asr", "modelos", "parakeet-ultra-F16.gguf"),
+                        Catalogo.ArquivoDoPacote(ultra));
+        // os do faster-whisper continuam no cache
+        Assert.False(Catalogo.EhArquivoAvulso(Catalogo.Pacotes.Single(p => p.Id == "large-v3")));
+    }
+
+    [Fact]
+    public void NenhumModeloDeAsrTemNomeLocal()
+    {
+        // A tela grava `nome_local ?? id` no modelo_padrao (configuracoes.js,
+        // seletorDaFamilia). Um nome_local num pacote de ASR faria a
+        // configuração guardar o nome do arquivo, e o motor receberia em
+        // --modelo algo que ele não conhece.
+        Assert.All(Catalogo.Pacotes.Where(p => p.Familia == "asr"),
+                   p => Assert.Null(p.NomeLocal));
+    }
+
+    [Fact]
+    public void OMotorDeAsrConheceOMesmoArquivoQueOCatalogo()
+    {
+        // Quem baixa é o C#, quem abre é o motor.py: o par id → arquivo está
+        // escrito nos dois, e discordar é um download que funciona e um motor
+        // que diz "baixe o modelo" sobre um modelo baixado.
+        string? motor = Achar(Path.Combine("motores", "asr", "motor.py"));
+        if (motor is null) return;   // fora do repositório não há o que comparar
+
+        string texto = File.ReadAllText(motor);
+        foreach (var p in Catalogo.Pacotes.Where(p => p is { Familia: "asr", Arquivo: not null }))
+            Assert.Contains($"\"{p.Id}\": \"{p.Arquivo}\"", texto);
+    }
+
+    [Fact]
+    public void GgufDeAsrAusenteOuPelaMetadeImpedeATranscricao()
+    {
+        var ultra = Catalogo.Pacotes.Single(p => p.Id == "parakeet-ultra");
+        string arquivo = Catalogo.ArquivoDoPacote(ultra);
+        Assert.False(File.Exists(arquivo));   // a pasta de testes não tem o modelo
+
+        string? ausente = Catalogo.OQueImpede("parakeet-ultra");
+        Assert.NotNull(ausente);
+        Assert.Contains("Modelos", ausente);
+
+        // Um vizinho na pasta não pode passar por ele: é o arquivo que se mede.
+        Directory.CreateDirectory(Path.GetDirectoryName(arquivo)!);
+        string vizinho = Path.Combine(Path.GetDirectoryName(arquivo)!, "outro.gguf");
+        try
+        {
+            File.WriteAllBytes(vizinho, new byte[1024]);
+            Assert.NotNull(Catalogo.OQueImpede("parakeet-ultra"));
+
+            File.WriteAllBytes(arquivo, new byte[1024]);
+            Assert.Contains("pela metade", Catalogo.OQueImpede("parakeet-ultra"));
+        }
+        finally
+        {
+            File.Delete(vizinho);
+            File.Delete(arquivo);
+        }
+    }
+
+    private static string? Achar(string relativo)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            string tentativa = Path.Combine(dir.FullName, relativo);
+            if (File.Exists(tentativa)) return tentativa;
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    [Fact]
     public void OModeloDeAtaNaoMoraNoCacheDoHuggingFace()
     {
         // Quem abre o .gguf é o llama.cpp, por caminho, e não a biblioteca do

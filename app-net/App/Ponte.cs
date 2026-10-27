@@ -2977,6 +2977,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
         var pacote = Catalogo.Pacotes.FirstOrDefault(x => x.Id == id)
             ?? throw new InvalidOperationException($"não conheço o pacote {id}");
 
+        // **No arquivo avulso apaga-se o arquivo, e não a pasta.** A pasta é
+        // compartilhada — `motores/ata/modelos` guarda todos os GGUF de ata, e
+        // `motores/asr/modelos` os de ASR do transcribe.cpp —, e apagá-la para
+        // remover um modelo levaria os vizinhos junto, inclusive o que está em
+        // uso. Foi assim até 27/10/2026.
+        if (Catalogo.EhArquivoAvulso(pacote))
+        {
+            string arquivo = Catalogo.ArquivoDoPacote(pacote);
+            if (File.Exists(arquivo)) File.Delete(arquivo);
+            return;
+        }
+
         string pasta = Catalogo.PastaDoPacote(pacote);
         if (Directory.Exists(pasta)) Directory.Delete(pasta, recursive: true);
     }

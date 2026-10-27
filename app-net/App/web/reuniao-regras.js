@@ -125,6 +125,33 @@ export function relogioDoTocador(segundos) {
 }
 
 /** A linha que diz o que as opções do motor, dobradas, estão escolhendo. */
+/**
+ * As opções do seletor de modelo do preparo, tiradas do catálogo.
+ *
+ * **A lista era fixa** — `["large-v3", "medium", "small", "base", "tiny"]` — e
+ * divergiu do catálogo sem ninguém ver: faltava o Turbo, sobrava um "tiny" que
+ * o catálogo não oferece, e o Parakeet Ultra (27/10/2026) não apareceu. Agora é
+ * a mesma fonte de Ajustes › Modelos, com o nome bonito e o id como valor.
+ *
+ * `padrao` marca o que Ajustes escolheu (`em_uso`): é com ele que a tela começa,
+ * e não com o primeiro da lista — que mandava o Large v3 ao núcleo mesmo com
+ * outro modelo escolhido em Ajustes. Um valor salvo no projeto que o catálogo
+ * não conhece entra como está, para a escolha não se perder em silêncio.
+ */
+export function opcoesDeModelo(catalogo, atual) {
+  const opcoes = (catalogo ?? [])
+    .filter((i) => i?.pacote?.familia === "asr")
+    .map((i) => ({
+      valor: i.pacote.id,
+      rotulo: i.estado === "instalado" ? i.pacote.nome : `${i.pacote.nome} (não baixado)`,
+      padrao: Boolean(i.em_uso),
+    }));
+  if (atual && !opcoes.some((o) => o.valor === atual)) {
+    opcoes.push({ valor: atual, rotulo: atual, padrao: false });
+  }
+  return opcoes;
+}
+
 export function resumoDoMotor({ modelo, idioma, diarizar }) {
   return [
     modelo,

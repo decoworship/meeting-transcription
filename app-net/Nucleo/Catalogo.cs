@@ -57,8 +57,10 @@ public sealed class PacoteDeModelo
     /// </summary>
     /// <remarks>
     /// Os GGUF de ata moram em repositórios com uma dezena de quantizações, e
-    /// baixar tudo traria 20 GB para usar 2,5. Preenchido só na família "ata";
-    /// nulo nos outros, que continuam vindo por <c>snapshot_download</c>.
+    /// baixar tudo traria 20 GB para usar 2,5. Preenchido nas famílias de
+    /// GGUF — ata, legenda — e nos modelos de ASR que rodam no
+    /// <c>transcribe.cpp</c>; nulo nos do faster-whisper, que continuam vindo
+    /// por <c>snapshot_download</c>.
     /// </remarks>
     [JsonPropertyName("arquivo")] public string? Arquivo { get; init; }
 
@@ -138,6 +140,30 @@ public static class Catalogo
             TamanhoEsperadoBytes = 1_620_000_000,
             TamanhoMedido = false,
             Nota = "Ainda não medido em português aqui — a comparação está por fazer.",
+        },
+        // **O primeiro ASR fora do faster-whisper** (27/10/2026). Roda no
+        // `transcribe.cpp`, o mesmo runtime da legenda, e por isso é um GGUF
+        // avulso ao lado do motor, e não uma pasta de cache: o repositório tem
+        // seis quantizações, ~7 GB, para usar 1,26. O id é o que o
+        // `motores/asr/motor.py` reconhece no `GGUF` dele — o par está escrito
+        // nos dois lugares, e um teste confere que concordam.
+        //
+        // **Sem `NomeLocal`, de propósito**: a tela grava `nome_local ?? id` no
+        // `modelo_padrao`, e com ele a configuração guardaria o nome do arquivo
+        // em vez do id que o motor entende.
+        new PacoteDeModelo
+        {
+            Id = "parakeet-ultra",
+            Nome = "Parakeet Ultra",
+            Familia = "asr",
+            Descricao = "Mais rápido que o Large v3, com metade da placa, e perde menos fala. "
+                      + "Não recebe vocabulário: os termos entram só na correção depois.",
+            Repositorio = "handy-computer/parakeet-ultra-gguf",
+            Arquivo = "parakeet-ultra-F16.gguf",
+            TamanhoEsperadoBytes = 1_256_724_448,
+            TamanhoMedido = true,
+            Nota = "Em 6 reuniões com transcrição do Gemini: 26,1% de divergência contra "
+                 + "27,9% do Large v3, em ~8× o tempo real e ~2 GB de placa na RTX 2060.",
         },
         new PacoteDeModelo
         {
@@ -342,6 +368,7 @@ public static class Catalogo
         "ata" => PastaDosModelosDeAta(),
         "moss" => PastaDosModelosDoMoss(),
         "legenda" => PastaDosModelosDaLegenda(),
+        "asr" when pacote.Arquivo is not null => PastaDosModelosDoAsr(),
         _ => Path.Combine(PastaDoCache(), "models--" + pacote.Repositorio.Replace("/", "--")),
     };
 
@@ -371,8 +398,23 @@ public static class Catalogo
     /// <c>CatalogoTests</c>.
     /// </para>
     /// </remarks>
+    /// <remarks>
+    /// Na família <c>asr</c> a resposta é do pacote, e não da família: os do
+    /// faster-whisper são pasta de cache, e os do <c>transcribe.cpp</c>, que
+    /// têm <see cref="PacoteDeModelo.Arquivo"/>, são GGUF avulso.
+    /// </remarks>
     public static bool EhArquivoAvulso(PacoteDeModelo pacote) =>
-        pacote.Familia is "ata" or "moss" or "legenda";
+        pacote.Familia is "ata" or "moss" or "legenda"
+        || pacote is { Familia: "asr", Arquivo: not null };
+
+    /// <summary>Ao lado do sidecar de ASR, que é quem abre o arquivo.</summary>
+    /// <remarks>
+    /// O <c>motores/asr/motor.py</c> procura o GGUF em <c>modelos/</c> ao lado
+    /// dele (<c>PASTA_DOS_MODELOS</c>). O <c>publicar.sh</c> só copia o
+    /// <c>motor.py</c>, então o modelo baixado sobrevive às publicações.
+    /// </remarks>
+    public static string PastaDosModelosDoAsr() =>
+        Path.Combine(AppContext.BaseDirectory, "motores", "asr", "modelos");
 
     /// <summary>Ao lado do sidecar da legenda, que é quem abre o arquivo.</summary>
     /// <remarks>
@@ -410,12 +452,7 @@ public static class Catalogo
         var lista = new List<PacoteComEstado>();
         foreach (var pacote in Pacotes)
         {
-            // Na família "ata" o pacote é um arquivo, e não uma pasta de cache:
-            // medir a pasta contaria os outros modelos de ata junto.
-            long bytes = EhArquivoAvulso(pacote)
-                ? (File.Exists(ArquivoDoPacote(pacote))
-                    ? new FileInfo(ArquivoDoPacote(pacote)).Length : 0)
-                : TamanhoEmDisco(PastaDoPacote(pacote));
+            long bytes = BytesDoPacote(pacote);
 
             // A margem de 5% existe porque o tamanho publicado não é o tamanho
             // em disco: o cache guarda blobs mais links, e o sistema de arquivos
@@ -464,7 +501,7 @@ public static class Catalogo
         var pacote = Pacotes.FirstOrDefault(p => p.Id == id);
         if (pacote is null) return null;
 
-        long bytes = TamanhoEmDisco(PastaDoPacote(pacote));
+        long bytes = BytesDoPacote(pacote);
         if (bytes == 0)
             return $"o modelo {pacote.Nome} ainda não foi baixado. "
                  + "Abra Ajustes → Modelos e baixe-o antes de transcrever.";
@@ -502,6 +539,19 @@ public static class Catalogo
         {
             return -1;
         }
+    }
+
+    /// <summary>Quanto do pacote está no disco agora.</summary>
+    /// <remarks>
+    /// No arquivo avulso mede-se o arquivo, e não a pasta: ela guarda os
+    /// vizinhos — os outros modelos de ata, por exemplo —, e somá-los diria
+    /// "instalado" sobre um pacote que nunca foi baixado.
+    /// </remarks>
+    private static long BytesDoPacote(PacoteDeModelo pacote)
+    {
+        if (!EhArquivoAvulso(pacote)) return TamanhoEmDisco(PastaDoPacote(pacote));
+        string arquivo = ArquivoDoPacote(pacote);
+        return File.Exists(arquivo) ? new FileInfo(arquivo).Length : 0;
     }
 
     private static long TamanhoEmDisco(string pasta)
