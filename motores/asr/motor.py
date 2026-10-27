@@ -5,6 +5,11 @@ os mesmos do ``src/transcription/faster_whisper_transcriber.py``, que continua
 sendo a referência: mudar qualquer um deles aqui muda o resultado sem que a
 comparação com o app antigo perceba.
 
+**Desde 27/10/2026 há um segundo runtime atrás do mesmo protocolo**: os modelos
+do :data:`GGUF` rodam no ``transcribe.cpp``, o mesmo da legenda ao vivo. O
+contrato de fio não muda — trechos com ``inicio``, ``fim``, ``texto`` e
+``palavras`` —, e por isso o C# não sabe qual dos dois respondeu.
+
 Uso (é assim que o cliente C# o inicia)::
 
     python motor.py [--modelo large-v3]
@@ -77,7 +82,128 @@ def _achar_cuda() -> None:
 
 _achar_cuda()
 
-VERSAO = "2"
+VERSAO = "3"
+
+#: Os modelos que rodam no ``transcribe.cpp``, e não no faster-whisper: o id que
+#: o app manda em ``--modelo`` → o arquivo em :data:`PASTA_DOS_MODELOS`.
+#:
+#: **O mesmo par está no** ``Nucleo/Catalogo.cs`` (o ``Arquivo`` do pacote),
+#: escrito nos dois lugares de propósito, como o GGUF da legenda: quem baixa é o
+#: C#, quem abre é este arquivo. O GGUF não viaja no instalador (o ``.iss``
+#: exclui ``*.gguf``); entra por Ajustes › Modelos.
+#:
+#: O ``parakeet-ultra`` entrou em 27/10/2026, depois de ganhar do ``large-v3``
+#: nas seis reuniões com Gemini: 26,1% contra 27,9% de divergência, 7,4× contra
+#: 4,6× o tempo real, 2,2 GB contra 4,7 GB de VRAM
+#: (``tools/medir_asr_final.py``). **F16, e não Q8**, porque foi o F16 que se
+#: mediu — e em setembro a quantização mais pesada do Parakeet perdia conteúdo.
+GGUF = {"parakeet-ultra": "parakeet-ultra-F16.gguf"}
+
+PASTA_DOS_MODELOS = pathlib.Path(os.path.abspath(__file__)).parent / "modelos"
+
+TAXA = 16000
+
+#: O áudio vai ao ``transcribe.cpp`` em blocos, cortados no silêncio, por duas
+#: razões. A primeira é o **progresso**: uma chamada só não diz onde está, e a
+#: tela ficaria parada a reunião inteira. A segunda é a **memória**: o Parakeet
+#: v3, numa passada única de 48 min, morreu com ``CUDA error: invalid
+#: configuration argument`` (26/10/2026). O ultra passou nos 48 min, mas uma
+#: reunião de duas horas nunca foi medida, e bloco limitado é o que torna o
+#: custo independente da duração.
+BLOCO_S = 300
+
+#: Onde procurar o silêncio, para cada lado da fronteira de cada bloco. Cortar
+#: no meio de uma palavra a perderia nos dois blocos; 10 s é mais que a maior
+#: fala corrida sem pausa de 100 ms que se espera de uma reunião.
+JANELA_DE_CORTE_S = 10
+
+#: O corte dos trechos pela palavra, a mesma regra da medição. O ``segment`` do
+#: Parakeet devolve os trechos da cabeça de VAD dele, de até 30 s — 15 trechos
+#: em 7,7 min, contra 124 do ``large-v3`` —, e trecho longo mistura falantes.
+PAUSA_S = 0.5           # silêncio entre palavras que fecha o trecho
+PAUSA_NO_PONTO_S = 0.2  # basta isto quando a palavra fecha frase
+TETO_S = 25.0           # o max_speech_duration_s do VAD do faster-whisper
+
+
+def _threads() -> int:
+    """Os núcleos físicos, como na legenda (``motores/legenda/motor.py``).
+
+    O padrão da biblioteca (0) sobre-inscreve threads nos núcleos lógicos: no
+    ``parakeet-ultra`` isso custou 6,5× contra 7,9× o tempo real, com o texto
+    idêntico palavra por palavra (27/10/2026).
+    """
+    return max(2, min(8, (os.cpu_count() or 4) // 2))
+
+
+def cortes(onda, taxa: int = TAXA) -> list:
+    """Os blocos de :data:`BLOCO_S`, cada fronteira no quadro mais quieto.
+
+    Devolve pares ``(início, fim)`` em amostras. Procura, em quadros de 100 ms,
+    o de menor energia dentro de :data:`JANELA_DE_CORTE_S` em torno de cada
+    fronteira, e corta no meio dele. Áudio curto é um bloco só.
+    """
+    import numpy as np
+
+    n = len(onda)
+    passo, janela, quadro = BLOCO_S * taxa, JANELA_DE_CORTE_S * taxa, taxa // 10
+    limites = [0]
+    alvo = passo
+    while alvo + janela < n:
+        ini, fim = max(limites[-1] + quadro, alvo - janela), alvo + janela
+        k = (fim - ini) // quadro
+        energia = (np.asarray(onda[ini: ini + k * quadro], dtype=np.float32)
+                   .reshape(k, quadro) ** 2).mean(axis=1)
+        corte = ini + int(energia.argmin()) * quadro + quadro // 2
+        limites.append(corte)
+        alvo = corte + passo
+    limites.append(n)
+    return list(zip(limites[:-1], limites[1:]))
+
+
+def trechos_por_palavra(palavras, deslocamento: float) -> list:
+    """Palavras com tempo → os trechos do protocolo, cortando no silêncio.
+
+    As palavras saem **com o espaço na frente**, como as do faster-whisper:
+    o C# remonta o texto de um trecho dividido por ``string.Concat`` delas
+    (``Nucleo/Transcricao.cs``), e sem o espaço o texto sairia colado.
+    """
+    palavras = [w for w in palavras if w.text.strip()]
+    trechos, atual = [], []
+    for i, w in enumerate(palavras):
+        atual.append(w)
+        prox = palavras[i + 1] if i + 1 < len(palavras) else None
+        pausa = (prox.t0_ms - w.t1_ms) / 1000 if prox else float("inf")
+        fecha = w.text.rstrip().endswith((".", "?", "!"))
+        longo = (w.t1_ms - atual[0].t0_ms) / 1000 > TETO_S
+        if pausa >= PAUSA_S or (fecha and pausa >= PAUSA_NO_PONTO_S) or longo:
+            ditas = [{"inicio": deslocamento + x.t0_ms / 1000,
+                      "fim": deslocamento + x.t1_ms / 1000,
+                      "texto": " " + x.text.strip()} for x in atual]
+            trechos.append({"inicio": ditas[0]["inicio"], "fim": ditas[-1]["fim"],
+                            "texto": "".join(d["texto"] for d in ditas),
+                            "palavras": ditas})
+            atual = []
+    return trechos
+
+
+def ler_wav(caminho: str):
+    """O ``mix.wav`` que o núcleo escreve, em float32 mono a 16 kHz.
+
+    O faster-whisper reamostra sozinho; o ``transcribe.cpp`` não. O núcleo
+    sempre escreve 16 kHz (``Faixas.EscreverMix``), e outra taxa aqui é defeito
+    de quem chamou — melhor dizer que transcrever outro áudio.
+    """
+    import wave
+
+    import numpy as np
+
+    with wave.open(caminho, "rb") as w:
+        if w.getframerate() != TAXA or w.getsampwidth() != 2:
+            raise RuntimeError(
+                f"o áudio precisa ser WAV de 16 bits a {TAXA} Hz, e veio "
+                f"{w.getsampwidth() * 8} bits a {w.getframerate()} Hz")
+        a = np.frombuffer(w.readframes(w.getnframes()), "<i2").astype(np.float32) / 32768
+        return a.reshape(-1, w.getnchannels()).mean(axis=1)
 
 
 def _enviar(**campos) -> None:
@@ -90,11 +216,15 @@ def _log(texto: str) -> None:
 
 
 class Modelo:
-    """O faster-whisper, carregado sob demanda e mantido quente."""
+    """O modelo, carregado sob demanda e mantido quente.
+
+    O faster-whisper, ou o ``transcribe.cpp`` quando o id está em :data:`GGUF`.
+    """
 
     def __init__(self, tamanho: str) -> None:
         self._tamanho = tamanho
         self._modelo = None
+        self._gguf = GGUF.get(tamanho)
         self.dispositivo = "?"
         self.motivo: str | None = None
 
@@ -240,6 +370,10 @@ class Modelo:
             return
 
         _enviar(id=id_req, tipo="progresso", pct=0.0, texto="carregando o modelo")
+        if self._gguf:
+            self._carregar_gguf()
+            return
+
         from faster_whisper import WhisperModel
 
         placa = self.diagnostico()
@@ -257,9 +391,64 @@ class Modelo:
         )
         _log(f"modelo {self._tamanho} carregado em {self.dispositivo}")
 
+    def _carregar_gguf(self) -> None:
+        """O ``transcribe.cpp`` na CUDA, e na CPU se ela não subir.
+
+        Mesmo arranjo da legenda: a falha de CUDA não é fatal aqui, porque quem
+        decide se a CPU é aceitável é o núcleo, pelo ``dispositivo`` e pelo
+        ``motivo`` que voltam na resposta.
+        """
+        import transcribe_cpp as t
+
+        caminho = PASTA_DOS_MODELOS / self._gguf
+        if not caminho.is_file():
+            raise RuntimeError(
+                f"o modelo {self._tamanho} não está em {caminho}. "
+                "Abra Ajustes → Modelos e baixe-o antes de transcrever.")
+        try:
+            self._modelo = t.Model(str(caminho), backend="cuda")
+            self.dispositivo = "cuda"
+        except Exception as e:
+            self.motivo = f"o backend de CUDA do transcribe.cpp não subiu: {e!r}"
+            _log(f"SEM CUDA: {self.motivo}")
+            self._modelo = t.Model(str(caminho), backend="cpu")
+            self.dispositivo = "cpu"
+        _log(f"modelo {self._tamanho} ({self._gguf}) carregado em {self.dispositivo}, "
+             f"transcribe.cpp {getattr(t, '__version__', '?')}")
+
+    def _transcrever_gguf(self, caminho: str, id_req: int,
+                          vocabulario: str | None, idioma: str | None) -> dict:
+        import transcribe_cpp as t
+
+        # O Parakeet não tem entrada de vocabulário nem de idioma: ele detecta
+        # o idioma sozinho, e a dica não muda uma palavra (medido em 26/10/2026).
+        # O vocabulário não se perde — ele segue para a correção fonética, que
+        # roda depois de qualquer motor.
+        if vocabulario:
+            _log(f"{self._tamanho} não aceita vocabulário; ele vai só para a correção")
+
+        onda = ler_wav(caminho)
+        duracao = len(onda) / TAXA
+        segmentos, idioma_visto = [], None
+        for ini, fim in cortes(onda):
+            if fim - ini < TAXA // 2:   # o transcribe.cpp recusa entrada curta demais
+                continue
+            r = t.transcribe(self._modelo, onda[ini:fim], timestamps="word",
+                             n_threads=_threads())
+            segmentos += trechos_por_palavra(r.words, ini / TAXA)
+            idioma_visto = idioma_visto or (r.language or None)
+            _enviar(id=id_req, tipo="progresso", pct=min(fim / len(onda), 0.99),
+                    texto="transcrevendo")
+
+        return {"segmentos": segmentos, "idioma": idioma or idioma_visto,
+                "duracao": duracao, "dispositivo": self.dispositivo,
+                "motivo": self.motivo}
+
     def transcrever(self, caminho: str, id_req: int,
                     vocabulario: str | None, idioma: str | None) -> dict:
         self.carregar(id_req)
+        if self._gguf:
+            return self._transcrever_gguf(caminho, id_req, vocabulario, idioma)
 
         # Os mesmos parâmetros do transcritor do app atual. Cada um tem um
         # motivo registrado lá; repetir os motivos aqui só os faria divergir.

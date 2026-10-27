@@ -30,6 +30,10 @@ Duas notas por diarizador, por palavra alinhada com o Gemini:
 Uso::
 
     uv run $(cat uvw) --with scipy python tools/medir_mod2.py [--json saida.json]
+
+    # o falante com os trechos de outro ASR, sobre a diarização de produção
+    ... tools/medir_mod2.py --diarizadores pyannote \\
+        --transcricoes /mnt/c/Users/andre/pulsemeet-medicoes/asr-final/{large-v3,motor-parakeet-ultra}
 """
 from __future__ import annotations
 
@@ -150,17 +154,65 @@ def nomear(wes, onda, mascara, rotulos, pessoas) -> dict[str, str | None]:
 
 # ------------------------------------------------------------------ a régua
 
-def rotular(segs, mascara, rotulos) -> list[str]:
-    rot = []
+#: O ``Montagem.MinimoDoPedaco`` do C#: pedaço mais curto que isto volta ao vizinho.
+MINIMO_DO_PEDACO = 0.5
+
+
+def dono(mascara, rotulos, ini: float, fim: float) -> str | None:
+    """O rótulo de maior sobreposição no intervalo, ou ``None`` se não há nenhum."""
+    soma = mascara[int(ini * 100):max(int(fim * 100), int(ini * 100) + 1)].sum(0)
+    return rotulos[int(soma.argmax())] if soma.size and soma.max() > 0 else None
+
+
+def pecas(segs, mascara, rotulos) -> list[tuple[str, str]]:
+    """``(rótulo, texto)`` do jeito que o app monta, e não um rótulo por trecho.
+
+    O pipeline corta o trecho pela palavra onde o falante troca
+    (``Montagem.RepartirPorFalante``, ``Nucleo/Transcricao.cs``), e esta é a
+    mesma regra: cada palavra com o rótulo de maior sobreposição, a palavra sem
+    diarização herda a anterior, pedaço de menos de 0,5 s volta ao vizinho, e
+    vizinhos do mesmo falante se juntam. **Sem isto a régua castiga quem devolve
+    trechos maiores** — foi o que mostrou a primeira rodada com o
+    ``parakeet-ultra``, em 27/10/2026. Trecho sem palavras fica com um rótulo só.
+    """
+    saida = []
     for s in segs:
-        soma = mascara[int(s["start"] * 100):max(int(s["end"] * 100), int(s["start"] * 100) + 1)].sum(0)
-        rot.append(rotulos[int(soma.argmax())] if soma.size and soma.max() > 0 else "?")
-    return rot
+        ws = s.get("words") or []
+        do_trecho = dono(mascara, rotulos, s["start"], s["end"]) or "?"
+        if len(ws) <= 1:
+            saida.append((do_trecho, s["text"]))
+            continue
+        donos = [dono(mascara, rotulos, w["start"], w["end"]) for w in ws]
+        primeiro = next((d for d in donos if d), None)
+        for i in range(len(donos)):
+            if donos[i] is None:
+                donos[i] = donos[i - 1] if i > 0 else primeiro
+
+        corridas, ini = [], 0
+        for i in range(1, len(donos) + 1):
+            if i < len(donos) and donos[i] == donos[ini]:
+                continue
+            if corridas and ws[i - 1]["end"] - ws[ini]["start"] < MINIMO_DO_PEDACO:
+                corridas[-1] = (corridas[-1][0], i - 1)
+            else:
+                corridas.append((ini, i - 1))
+            ini = i
+        for i in range(len(corridas) - 1, 0, -1):
+            if donos[corridas[i][0]] == donos[corridas[i - 1][0]]:
+                corridas[i - 1] = (corridas[i - 1][0], corridas[i][1])
+                del corridas[i]
+
+        if len(corridas) <= 1:
+            saida.append((do_trecho, s["text"]))
+        else:
+            saida += [(donos[de] or "?", "".join(w["text"] for w in ws[de:ate + 1]))
+                      for de, ate in corridas]
+    return saida
 
 
-def notas(pasta: Path, rot: list[str], nomes: dict[str, str | None]) -> dict:
-    segs = json.loads((pasta / "transcricao.json").read_text(encoding="utf-8"))["segments"]
-    nosso = [(str(k), s["text"]) for k, s in enumerate(segs) if (s.get("text") or "").strip()]
+def notas(pasta: Path, pedacos: list[tuple[str, str]], nomes: dict[str, str | None]) -> dict:
+    rot = [r for r, _ in pedacos]
+    nosso = [(str(k), t) for k, (_, t) in enumerate(pedacos) if (t or "").strip()]
     a_txt, a_quem = cg.fila(nosso)
     b_txt, b_quem = cg.fila(cg.ler_gemini(pasta / "gemini.md"))
     pares = []
@@ -183,6 +235,12 @@ def notas(pasta: Path, rot: list[str], nomes: dict[str, str | None]) -> dict:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--json", type=Path)
+    # Os trechos de outro ASR, em vez dos do transcricao.json da gravação: cada
+    # pasta tem <gravação>/transcricao.json, como as do tools/medir_asr_final.py.
+    # A diarização roda uma vez e cada fonte é pontuada sobre ela — é o que mede
+    # se o falante continua certo com os trechos de outro modelo (27/10/2026).
+    p.add_argument("--transcricoes", nargs="*", type=Path, default=[])
+    p.add_argument("--diarizadores", nargs="*", default=["pyannote", "nemotron"])
     a = p.parse_args()
 
     import onnxruntime as ort
@@ -198,11 +256,12 @@ def main() -> int:
         assert taxa == TAXA
         onda = onda.mean(1) if onda.ndim > 1 else onda
         n = len(onda) // 160
-        segs = json.loads((pasta / "transcricao.json").read_text(encoding="utf-8"))["segments"]
+        fontes = ([(t.name, t / g) for t in a.transcricoes] if a.transcricoes
+                  else [("app", pasta)])
         pessoas = banco_sem(g[:10])
         gemini = Counter(chave(q) for q, _ in cg.ler_gemini(pasta / "gemini.md"))
 
-        for nome_braco in ("pyannote", "nemotron"):
+        for nome_braco in a.diarizadores:
             base = Vigia.agora()
             v = Vigia()
             t0 = time.perf_counter()
@@ -220,18 +279,21 @@ def main() -> int:
                 del eng
 
             nomes = nomear(wes, onda, mascara, rotulos, pessoas)
-            r = {"reuniao": g, "diarizador": nome_braco,
-                 "minutos": len(onda) / TAXA / 60, "segundos": dt,
-                 "xrt": len(onda) / TAXA / dt, "vram_mb": pico - base,
-                 "falantes": len(rotulos),
-                 "falantes_gemini_sem_dono": sum(1 for q in gemini if not mesma_pessoa(q, DONO)),
-                 "nomes": {k: v for k, v in nomes.items()},
-                 **notas(pasta, rotular(segs, mascara, rotulos), nomes)}
-            saida.append(r)
-            print(f"{g[:10]} {nome_braco:9s} {r['minutos']:5.1f} min  {r['xrt']:6.0f}x  "
-                  f"{r['vram_mb']:5d} MB  falantes {r['falantes']} (Gemini {r['falantes_gemini_sem_dono']})  "
-                  f"separação {100 * r['separacao']:5.1f}%  nome {100 * r['nome']:5.1f}%  "
-                  f"{r['nomes']}", flush=True)
+            for nome_fonte, fonte in fontes:
+                segs = json.loads((fonte / "transcricao.json").read_text(encoding="utf-8"))["segments"]
+                r = {"reuniao": g, "diarizador": nome_braco, "fonte": nome_fonte,
+                     "minutos": len(onda) / TAXA / 60, "segundos": dt,
+                     "xrt": len(onda) / TAXA / dt, "vram_mb": pico - base,
+                     "falantes": len(rotulos),
+                     "falantes_gemini_sem_dono": sum(1 for q in gemini if not mesma_pessoa(q, DONO)),
+                     "nomes": {k: v for k, v in nomes.items()},
+                     **notas(fonte, pecas(segs, mascara, rotulos), nomes)}
+                saida.append(r)
+                print(f"{g[:10]} {nome_braco:9s} {nome_fonte:16s} {r['minutos']:5.1f} min  "
+                      f"{r['xrt']:6.0f}x  {r['vram_mb']:5d} MB  falantes {r['falantes']} "
+                      f"(Gemini {r['falantes_gemini_sem_dono']})  palavras {r['palavras']}  "
+                      f"separação {100 * r['separacao']:5.1f}%  nome {100 * r['nome']:5.1f}%",
+                      flush=True)
 
     if a.json:
         a.json.write_text(json.dumps(saida, indent=2, ensure_ascii=False), encoding="utf-8")

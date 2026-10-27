@@ -705,6 +705,32 @@ números: nas quatro reuniões com Gemini, pela régua do `wer_contra_gemini.py`
   comercial em escala. O `smdesai` é só Apple, mas deu a pista do `VIVO-8`: o
   quadro e o contexto de atenção mexem sem quebrar o modelo.
 
+**Varredura de 26/10/2026** (pedida pelo dono do produto; janela 29/09 → 26/10,
+pela API do HuggingFace). Pela régua de arquitetura da
+[CONVERGENCIA.md](CONVERGENCIA.md) — AED e LLM não dão carimbo de tempo:
+
+- `moondream/parakeet-ultra` (CC BY 4.0, Parakeet TDT v3 retreinado, GGUF no
+  `transcribe.cpp` ≥ 0.3) — **passou e foi medido**: ganha do `large-v3` nas
+  seis reuniões com Gemini. É o `MOD-3`;
+- `ibm-granite/granite-speech-5.0-2b` (20/10, Apache 2.0, GGUF oficial no
+  llama.cpp, vocabulário até 2.000 termos, prompt de idioma que pode consertar o
+  "traduz em vez de transcrever" do 4.1) — **LLM, sem carimbo**;
+- `CohereLabs/cohere-transcribe-03-2026` (março, Apache 2.0, roda no
+  `transcribe.cpp`) — **AED, sem carimbo**. Nunca tinha entrado aqui;
+- `microsoft/VibeVoice-ASR-Streaming` 1.5B e 7B (MIT, texto + falante +
+  hotword, GGUF no `audio.cpp`) — **o artigo diz "no timestamps are emitted"**,
+  e o 1.5B tem cpWER de 45 no AMI-IHM;
+- `netease-youdao/Confucius4-R2T2` (Qwen3-ASR em streaming, licença NetEase) —
+  pt não otimizado, LLM;
+- Phonon-2.5 e `desert-ant-labs/voz` — Parakeet v3 comprimido; o Phonon é pior
+  que o v3 em pt;
+- diarização: `desert-ant-labs/who` (exige crédito visível, 4 falantes por
+  5 min) e DiariZen (CC BY-NC, torch) — nenhum muda o `MOD-2`;
+- só inglês ou chinês, reprovam no 1: Whistle, Underdog-Bark-3.0,
+  Ming-3.0-asr-tiny, tyger, AuroraASR, fluid-speech-mini, Audio8-ASR-Infinite.
+
+Próxima: 26/11/2026.
+
 ### DIST-2 · Motores como pacotes por acelerador — `feature` · `espera`
 
 CUDA, Vulkan e CPU como variantes baixáveis, em vez de tudo embutido
@@ -1059,7 +1085,29 @@ turno) — sem tempo no turno, não há onde pôr o falante.
 
 ---
 
-### VIVO-8 · Os parâmetros do Nemotron da legenda nunca foram medidos — `débito` · `aberto`
+### VIVO-8 · Os parâmetros do Nemotron da legenda nunca foram medidos — `débito` · fechado em 26/10/2026
+
+> **Medido em 26/10/2026, e a hipótese caiu duas vezes** (`tools/medir_asr_final.py
+> legenda`, quatro reuniões com Gemini, 58 min). **O padrão de produção já é o
+> `att_context_right=13`**, o maior lookahead do modelo (o menu é 0, 3, 6, 13):
+> o padrão e o r13 saíram idênticos número por número. Menos lookahead só troca
+> atraso por texto pior e por velocidade menor:
+>
+> | r | lookahead | divergência | velocidade | atraso do firme | recomeços |
+> |---|---|---|---|---|---|
+> | 0 | 0 ms | 37,8% | 1,1× | 0,04 s | 7 |
+> | 3 | 240 ms | 33,9% | 4,6× | 0,17 s | 2 |
+> | 6 | 480 ms | 33,4% | 6,5× | 0,28 s | 2 |
+> | **13 = produção** | 1.040 ms | **32,8%** | 8,8× | 0,57 s | 2 |
+>
+> **A pontuação não volta com lookahead nenhum, porque o modelo não pontua fala
+> de reunião em português**: 0 a 2 pontos por mil palavras em todos os r, e
+> 1,8 também em bloco, com o contexto inteiro. **A referência oficial pelo
+> Transformers dá o mesmo texto, palavra por palavra, sem um ponto** — o porte
+> está fiel, e o card ("built-in punctuation") vale para a fala lida do FLEURS.
+> O `VIVO-1` não tem o ponto final para quebrar o turno: ele vem de outro lugar
+> (Smart-Turn, ou pontuar o texto depois). O r6 fica anotado para o dia em que
+> meio segundo de atraso incomodar: corta o atraso pela metade por 0,6 ponto.
 
 **Gatilho: pedido pelo dono do produto em 29/09/2026**, depois do spike de 23/09
 ter levantado a hipótese. O `motores/legenda/motor.py` abre o streaming só com
@@ -1176,6 +1224,64 @@ documento). Nada muda no banco, no formato, nem nas vozes aprendidas.
 pyannote não tinha — o teto de **8 falantes** por reunião. O acervo tem 99,7%
 dos blocos de 5 min dentro dele ([FASE7-RESULTADOS.md](FASE7-RESULTADOS.md) §2);
 por reunião inteira, falta contar.
+
+### MOD-3 · O Parakeet Ultra como opção de transcrição — `feature` · feito em 27/10/2026 · opção, não padrão
+
+> **Entrou como opção em Ajustes › Modelos › Transcrição**, pedida pelo dono do
+> produto depois da medição. O padrão continua o `large-v3`.
+
+**Por que ele.** Saiu na varredura do `DIST-5` de 26/10 e foi o único que passou
+na régua de arquitetura: é um Parakeet TDT v3 retreinado (`moondream`), e
+transducer dá carimbo de tempo. Medido nas seis reuniões com Gemini
+(`tools/medir_asr_final.py`, 140 min, sem vocabulário nos dois, que é o padrão do
+app), **pelo próprio `motores/asr/motor.py`**:
+
+| | divergência | cobertura | trocadas | faltando | velocidade | VRAM |
+|---|---|---|---|---|---|---|
+| `large-v3` | 27,9% | 74,7% | 1.340 | 4.118 | 4,6× | 4,7 GB |
+| **`parakeet-ultra`** | **25,9%** | **76,9%** | 1.434 | 3.558 | **7,9×** | **2,3 GB** |
+
+Ganha nas seis, e o ganho é **perder menos fala**. Troca um pouco mais, e boa
+parte disso é grafia formal ("está", "para" onde o Gemini escreveu "tá", "pra").
+Nos nomes os dois erram — ele escreveu "lugar/hugar/hogar" para Algar —, e é o
+que a `CorrecaoFonetica` com o vocabulário do projeto conserta, depois de
+qualquer motor. Ele **aguenta reunião que mistura português com termo em
+inglês**: na de 21/10 o Parakeet v3 original derivou para inglês e espanhol
+(79% de divergência), e o ultra não.
+
+**O falante não piora.** Com o pyannote de produção sobre o `system.wav` e o
+trecho repartido pela palavra como o app faz (`tools/medir_mod2.py
+--transcricoes`), as seis reuniões dão separação de 96,3% contra 96,2% e nome
+certo de 68,7% contra 68,9% — sobre 351 palavras a mais, que são as que o
+`large-v3` perde. **A régua tem de repartir pela palavra**: com um rótulo por
+trecho, o ultra parecia perder até 4 pontos, porque devolve trechos maiores
+(mediana de 3,3 s contra 1,8 s), e é exatamente o que o
+`Montagem.RepartirPorFalante` desfaz.
+
+**Como entrou.** No mesmo sidecar de ASR, e não como motor novo: o `motor.py`
+reconhece o id pelo `GGUF` dele e roda o `transcribe.cpp` em vez do
+faster-whisper, com o mesmo contrato de fio. O áudio vai em blocos de 5 min
+cortados no quadro mais quieto (progresso, e memória que não cresce com a
+duração), e os trechos são montados pela palavra, com o espaço na frente que o
+C# espera. O GGUF (F16, 1,26 GB) é avulso em `motores/asr/modelos`, como os de
+ata. O `transcribe.cpp` do app subiu da 0.2.3 para a 0.4.1, que é de onde ele
+existe — e que deixou a legenda 18% mais rápida com o mesmo texto.
+
+**O que ele não tem:** vocabulário na entrada (o `transcribe.cpp` não o expõe
+para o Parakeet) e dica de idioma (ele detecta sozinho; a dica não muda uma
+palavra). O vocabulário segue para a correção. Licença CC BY 4.0.
+
+**O que falta para virar padrão:**
+
+1. reunião de 2 h — a mais longa medida é de 49 min (o corte em blocos de
+   5 min existe para que a duração não importe, mas não foi provado);
+2. a régua de vocabulário com a correção aplicada, nos dois;
+3. uso de verdade, pela tela.
+
+**De quebra, um defeito antigo saiu:** remover um modelo de ata em Ajustes ›
+Modelos apagava a pasta `motores/ata/modelos` inteira — todos os GGUF de ata,
+inclusive o em uso. O `RemoverPacote` agora apaga só o arquivo do pacote nas
+famílias de arquivo avulso.
 
 ---
 

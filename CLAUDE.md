@@ -156,7 +156,7 @@ mais trabalho que alguém deva.
 ```bash
 export PATH="$HOME/.dotnet:$PATH"
 
-dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 905 testes
+dotnet test app-net/Tests/MeetingApp.Tests.csproj      # 909 testes
 tools/publicar.sh                                       # publica e instala
 tools/publicar.sh --so-build                            # só o binário, em dist/publicar
 tools/montar_instalador.sh                              # o instalador, 1,59 GB

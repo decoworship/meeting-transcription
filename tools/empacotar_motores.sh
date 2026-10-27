@@ -27,9 +27,13 @@ RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 DESTINO="${1:-$RAIZ/dist/motores}"
 PYTHON_VERSAO="3.12.8"
 PLATAFORMA="x86_64-pc-windows-msvc"
-# Cravada, e não "a mais nova": é a versão em que a legenda foi medido, e o
-# `transcribe.cpp` ainda está em 0.x — onde a compatibilidade não é promessa.
-TRANSCRIBE_CPP_VERSAO="0.2.3"
+# Cravada, e não "a mais nova": o `transcribe.cpp` ainda está em 0.x, onde a
+# compatibilidade não é promessa. **Subiu da 0.2.3 para a 0.4.1 em 27/10/2026**,
+# medida contra a anterior no mesmo dia (tools/medir_asr_final.py): o texto da
+# legenda e do Nemotron é o mesmo (98–99% das palavras iguais), a legenda roda
+# 18% mais rápido e o Nemotron em bloco usa 1,65 GB de VRAM contra 3,0 — e o
+# `parakeet-ultra` do motor de ASR só existe a partir da série 0.3 (PR #192).
+TRANSCRIBE_CPP_VERSAO="0.4.1"
 
 # O leitor de nomes (UI-12, motores/ocr). Cravado junto dos hashes dos modelos
 # em tools/empacotar_modelos_de_ocr.sh: os modelos são os da mesma versão.
@@ -120,7 +124,7 @@ uv pip install \
 # vinha por último era o torch, pela mesma razão; hoje é o onnxruntime-gpu.
 #
 # **São duas instalações, e a ordem importa.** O `transcribe-cpp` declara
-# `Requires-Dist: transcribe-cpp-native==0.2.3.*` — o backend de CPU —, e é ele
+# `Requires-Dist: transcribe-cpp-native==<versão>.*` — o backend de CPU —, e é ele
 # que vem do PyPI junto. O de CUDA é um pacote SEPARADO (`-native-cu12`),
 # declarado como `extra`, e é esse que **não** pode vir do PyPI: lá ele é um stub
 # de versão 0.0.0 que não registra o backend, e a falha é muda — o modelo carrega,
@@ -311,7 +315,14 @@ echo "    DLLs de CUDA: as doze no lugar"
 # stub 0.0.0. Se ele sumir, a legenda carrega e roda em CPU — mesma falha muda.
 [[ -d "$DESTINO/python/Lib/site-packages/transcribe_cpp_native_cu12" ]] \
   || reprovar "falta o transcribe_cpp_native_cu12 — a legenda rodaria em CPU."
-echo "    transcribe.cpp: com backend de CUDA"
+# E a versão, nos dois pacotes: o Python e o nativo têm de ser da mesma, e o
+# `parakeet-ultra` não existe antes da 0.3. Um empacotamento velho passaria na
+# linha de cima e o motor de ASR diria "modelo desconhecido" na hora de usar.
+for pacote in transcribe_cpp transcribe_cpp_native_cu12; do
+  compgen -G "$SITE/$pacote-$TRANSCRIBE_CPP_VERSAO.dist-info" >/dev/null \
+    || reprovar "o $pacote não está na versão $TRANSCRIBE_CPP_VERSAO."
+done
+echo "    transcribe.cpp $TRANSCRIBE_CPP_VERSAO: com backend de CUDA"
 
 for m in asr diarizacao modelos legenda; do
   [[ -f "$DESTINO/$m/motor.py" ]] || reprovar "falta $m/motor.py no empacotamento."
