@@ -100,6 +100,32 @@ test("relogioDoTocador", () => {
   assert.equal(R.relogioDoTocador(-3), "00:00");
 });
 
+const CATALOGO = [
+  { pacote: { id: "large-v3", nome: "Large v3", familia: "asr" }, estado: "instalado", em_uso: false },
+  { pacote: { id: "parakeet-ultra", nome: "Parakeet Ultra", familia: "asr" }, estado: "instalado", em_uso: true },
+  { pacote: { id: "medium", nome: "Medium", familia: "asr" }, estado: "ausente", em_uso: false },
+  { pacote: { id: "qwen3-4b-instruct", nome: "Qwen3 4B", familia: "ata" }, estado: "instalado", em_uso: true },
+];
+
+test("opcoesDeModelo vem do catálogo: só transcrição, nome bonito, id como valor", () => {
+  const o = R.opcoesDeModelo(CATALOGO);
+  assert.deepEqual(o.map((x) => x.valor), ["large-v3", "parakeet-ultra", "medium"]);
+  assert.equal(o[1].rotulo, "Parakeet Ultra");
+  assert.equal(o[2].rotulo, "Medium (não baixado)");
+});
+
+test("opcoesDeModelo marca o padrão de Ajustes, e não o primeiro da lista", () => {
+  assert.deepEqual(R.opcoesDeModelo(CATALOGO).filter((x) => x.padrao).map((x) => x.valor),
+                   ["parakeet-ultra"]);
+});
+
+test("opcoesDeModelo guarda o valor salvo que o catálogo não conhece", () => {
+  const o = R.opcoesDeModelo(CATALOGO, "tiny");
+  assert.equal(o.at(-1).valor, "tiny");
+  assert.equal(R.opcoesDeModelo(CATALOGO, "large-v3").length, 3);   // conhecido não duplica
+  assert.deepEqual(R.opcoesDeModelo(null), []);
+});
+
 test("resumoDoMotor diz numa linha o que as opções dobradas escondem", () => {
   assert.equal(R.resumoDoMotor({ modelo: "large-v3", idioma: "pt", diarizar: true }),
                "large-v3 · pt · separa os falantes");
