@@ -92,6 +92,8 @@ cp "$PUBLICADO/PulseMeet.exe" "$PUBLICADO/WebView2Loader.dll" "$PAYLOAD/"
 cp "$RAIZ/tools/repontar_atalhos.ps1" "$PAYLOAD/"
 cp "$RAIZ/docs/INSTALAR.md" "$RAIZ/CHANGELOG.md" "$PAYLOAD/"
 cp "$RAIZ/assets/logo.ico" "$PAYLOAD/"
+# A extensão do Meet (GRA-3), que a pessoa carrega no Chrome a partir da instalação.
+rsync -a "$RAIZ/extensao/meet/" "$PAYLOAD/extensao-meet/"
 
 # O bootstrapper do WebView2, 1,7 MB. Windows 11 já tem a runtime e o Windows 10
 # quase sempre também, pelo Edge — mas "quase sempre" na máquina de outra pessoa

@@ -64,6 +64,10 @@ internal sealed class Aplicacao : IDisposable
         _gravador.AoComecar += _ => LigarAtalhoDeCaptura();
         _gravador.AoTerminar += DesligarAtalhoDeCaptura;
 
+        // Desde a subida, e não só ao gravar: o pareamento acontece dentro de
+        // uma reunião, e a gravação pode começar depois dela (GRA-3).
+        _gravador.AplicarSincronia(Diagnostico.VersaoDoApp());
+
         ReleraAgendaEmSegundoPlano();
     }
 

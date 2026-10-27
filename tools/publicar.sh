@@ -214,6 +214,10 @@ cp "$SAIDA/PulseMeet.exe" "$DESTINO/"
 # nome, do disco, antes de o host gerenciado existir.
 cp "$SAIDA/WebView2Loader.dll" "$DESTINO/"
 ls -la "$DESTINO/PulseMeet.exe"
+# A extensão do Meet (GRA-3): a pessoa a carrega no Chrome a partir desta pasta,
+# então ela mora na instalação, e o Chrome a relê quando reinicia.
+rsync -a --delete "$RAIZ/extensao/meet/" "$DESTINO/extensao-meet/"
+echo "    extensao-meet/"
 
 # A troca de nome do .exe, na máquina que se atualiza por aqui e não pelo
 # instalador. O menu Iniciar, a área de trabalho, os fixados e o iniciar com o

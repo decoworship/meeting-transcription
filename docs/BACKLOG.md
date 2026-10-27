@@ -410,12 +410,55 @@ baixo. **Vira problema no dia em que alguém cruzar as duas listas.**
 
 **Gatilho:** um nome aparecer atribuído ao domínio errado.
 
-### GRA-3 · Espelhar o mute do Teams — `feature` · `espera`
+### GRA-3 · O mute junto com a chamada — `feature` · feito em 22/10/2026, falta a reunião real
 
-Por WebSocket local ([PLANO.md](PLANO.md) §2.1). Não depende de nada que as
-fases recentes mudaram.
+Pedido do dono, 22/10/2026: não mutar em dois lugares — na chamada e no
+gravador — quando não vai falar, e não desmutar em dois.
 
-**Gatilho:** esquecer o mute do gravador de novo por causa do mute do Teams.
+**Como ficou:** Ajustes › Gravador › Chamadas, uma chave por chamada, as duas
+desligadas por padrão. A decisão do que muta onde é uma só,
+`Gravacao/SincroniaDoMute.cs`, com testes, e roda uma por chamada:
+
+- **só a mudança do mute da chamada conta** — o Teams manda o estado inteiro a
+  cada câmera ou mão, e sair da reunião não desmuta a gravação;
+- **o eco do próprio comando não volta**: dois segundos de espera, e dois
+  cliques rápidos são dois comandos;
+- começar a gravar no meio da reunião segue o mute dela, e vence o
+  `start_muted`.
+
+**Meet e Teams no navegador** — uma extensão de Chrome/Edge em
+`extensao/meet/`, instalada em `extensao-meet/` e carregada pela pessoa "sem
+compactação". Ela lê o botão do microfone na página e o clica quando pedido.
+O PulseMeet escuta em `127.0.0.1:47821` (`Gravacao/ServidorDaExtensao.cs`) e
+só aceita a origem da extensão, cujo id é fixo pela chave do `manifest.json` —
+um teste confere os dois. **Frágil por natureza**: quando a página mudar, é o
+`pagina.js` que se conserta, e o diagnóstico que ela manda (rótulo
+`extensao` no `registro.log`) diz o que ela achou.
+
+- **Meet**: o `data-is-muted` do botão, separado da câmera pelo atalho
+  ctrl + d no rótulo, que vale em qualquer idioma. **Funcionou numa reunião
+  real do dono em 22/10/2026.**
+- **Teams no navegador** (pedido do dono no mesmo dia: com o mute junto, ele
+  troca o app desktop pelo navegador): o `#microphone-button` com
+  `data-state` "mic"/"mic-off", e o atalho ctrl + shift + m no rótulo como
+  alternativa. **Não medido** — é o que se sabe de fora, e a extensão roda
+  em todos os quadros da página caso a reunião esteja num iframe.
+
+**Teams desktop** — a API local em `ws://localhost:8124` ([PLANO.md](PLANO.md)
+§2.1), `Gravacao/ConexaoComOTeams.cs`. O pareamento é pedido com
+`query-state`, e não com a reação de "curtir" que os clientes de código aberto
+mandam — ela aparece para a reunião inteira. **Não medido.** **Na máquina do
+dono ele não existe:** a seção "Third-party app API" não aparece em
+Configurações › Privacidade (print de 22/10/2026), e ninguém escuta na 8124 —
+é política da organização. Fica para quem tiver.
+
+**O que falta é a reunião real do Teams**, no navegador: os dois sentidos,
+entrar e sair da reunião. O que acontece fica no `registro.log`, com os
+rótulos `extensao` e `teams`.
+
+**Fora, por enquanto:** o Zoom (o Plugin SDK de junho de 2026, que exige app no
+Marketplace e conta). O MuteDeck faz os
+três, mas é fechado — o caminho é o mesmo mecanismo público, escrito aqui.
 
 ### GRA-4 · "Gravar sem reunião da agenda" não tem como ser exato — `feature` · `espera`
 

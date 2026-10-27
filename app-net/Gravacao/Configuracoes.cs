@@ -43,6 +43,25 @@ public sealed class Configuracoes
     /// </summary>
     [JsonPropertyName("notifications")] public bool Notifications { get; set; } = true;
 
+    /// <summary>
+    /// GRA-3: o mute do gravador acompanha o da reunião do Teams, e o contrário.
+    /// Nasce desligado — ligar faz o Teams perguntar se permite o PulseMeet.
+    /// </summary>
+    [JsonPropertyName("sync_mute")] public bool SincronizarMute { get; set; }
+
+    /// <summary>
+    /// O que o Teams devolve quando a pessoa permite o PulseMeet. Sem ele, cada
+    /// conexão pediria permissão de novo.
+    /// </summary>
+    [JsonPropertyName("teams_token")] public string? TokenDoTeams { get; set; }
+
+    /// <summary>
+    /// GRA-3 pelo navegador: o mute acompanha o do Google Meet e o do Teams na
+    /// web, pela extensão em <c>extensao-meet/</c>. Nasce desligado.
+    /// </summary>
+    /// <remarks>A chave é sync_mute_meet porque nasceu só do Meet, e quem a ligou não pode vê-la desligar.</remarks>
+    [JsonPropertyName("sync_mute_meet")] public bool SincronizarMuteNoNavegador { get; set; }
+
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-recorder", "settings.json");
