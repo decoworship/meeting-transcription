@@ -30,6 +30,10 @@ function rotulo(el) {
  * **Teams:** o `#microphone-button` do Teams novo, com `data-state` "mic" ou
  * "mic-off". **Não medido** — é o que se sabe de fora, e por isso as
  * alternativas: o `data-tid`, e o atalho ctrl + shift + m no rótulo.
+ *
+ * **Medido em 27/10/2026**, no Teams em pt-BR no Chrome: o botão é o
+ * `#mic-button`, sem `data-state` nem atalho, e o estado só está no rótulo —
+ * "Ativar mudo do microfone" com som, "Desativar mudo do microfone" mudo.
  */
 const SITES = {
   meet: {
@@ -43,7 +47,7 @@ const SITES = {
   },
   teams: {
     botao() {
-      return document.querySelector("#microphone-button, [data-tid='microphone-button']")
+      return document.querySelector("#microphone-button, [data-tid='microphone-button'], #mic-button")
         ?? [...document.querySelectorAll("button[aria-label]")]
           .find((el) => /(ctrl|⌘)\s*\+\s*shift\s*\+\s*m\b/i.test(rotulo(el)));
     },
@@ -52,8 +56,9 @@ const SITES = {
       if (estado) return /off|mute/i.test(estado);
       // Sem o data-state: o rótulo diz a ação do clique — "ativar" o microfone
       // é porque ele está desligado.
-      // "Desativar" contém "ativar", por isso o lookbehind.
-      return /\bunmute\b|(?<!des)ativar (o )?mic|reativar|(?<!des)activar/i.test(rotulo(b));
+      // "Desativar" contém "ativar", por isso o lookbehind. E "desativar mudo"
+      // é o contrário: a ação é tirar o mudo, então ele está mudo.
+      return /\bunmute\b|desativar (o )?mudo|(?<!des)ativar (o )?mic|reativar|(?<!des)activar/i.test(rotulo(b));
     },
   },
 };

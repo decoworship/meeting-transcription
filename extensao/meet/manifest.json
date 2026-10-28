@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PulseMeet — mute do Meet e do Teams",
   "description": "Mutar no Google Meet ou no Teams pelo navegador muta a gravação do PulseMeet, e o contrário também.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApuJw6yaMa2fLDx9WqiYFfO886zo70pyD1OfAsXe3l0117pNsnUrF5+VyaAQrvKLoozR08oTLUirnLH4oDXI/3WQqEpO/4ps0plWAKl553crU508tAXnNtZDpp36qBo/EwDGQ44L8/6hfcTgSJ9FuXBnFPsguB39zhGNYMQbOMMiX0qWSpfLwIw6+3kSEl6l2takrMHR2a1JZuN56+xnQK8sZ0GsPpM277c//M/OEfLhBHHiWrryCTEnndjKLdL1+RyrUqmVN9oYSQ484uf6yWSqc9sYSbAWodO14PkwLUqO7VBAhO6B4iEwf81Vhxy9x79QNSNONxG/SBTq4MiYN6QIDAQAB",
   "icons": {
     "128": "icone.png"

@@ -410,7 +410,7 @@ baixo. **Vira problema no dia em que alguém cruzar as duas listas.**
 
 **Gatilho:** um nome aparecer atribuído ao domínio errado.
 
-### GRA-3 · O mute junto com a chamada — `feature` · feito em 22/10/2026, falta a reunião real
+### GRA-3 · O mute junto com a chamada — `feature` · feito em 22/10/2026, Teams no navegador validado em 28/10/2026
 
 Pedido do dono, 22/10/2026: não mutar em dois lugares — na chamada e no
 gravador — quando não vai falar, e não desmutar em dois.
@@ -441,8 +441,13 @@ um teste confere os dois. **Frágil por natureza**: quando a página mudar, é o
 - **Teams no navegador** (pedido do dono no mesmo dia: com o mute junto, ele
   troca o app desktop pelo navegador): o `#microphone-button` com
   `data-state` "mic"/"mic-off", e o atalho ctrl + shift + m no rótulo como
-  alternativa. **Não medido** — é o que se sabe de fora, e a extensão roda
-  em todos os quadros da página caso a reunião esteja num iframe.
+  alternativa; a extensão roda em todos os quadros da página caso a reunião
+  esteja num iframe. **A reunião real (27 e 28/10/2026) mostrou duas telas**:
+  numa, o `#microphone-button` com `data-state` "mic-volume-renderer"/"mic-off";
+  na outra, um `#mic-button` sem `data-state` nem atalho, cujo estado só está
+  no rótulo — "Ativar mudo do microfone" com som, "Desativar mudo do microfone"
+  mudo. A 0.12.0 não reconhecia a segunda; a extensão 1.1.1 (0.12.1) reconhece
+  as duas, **e o sync funcionou nas reuniões do dono.**
 
 **Teams desktop** — a API local em `ws://localhost:8124` ([PLANO.md](PLANO.md)
 §2.1), `Gravacao/ConexaoComOTeams.cs`. O pareamento é pedido com
@@ -452,9 +457,9 @@ dono ele não existe:** a seção "Third-party app API" não aparece em
 Configurações › Privacidade (print de 22/10/2026), e ninguém escuta na 8124 —
 é política da organização. Fica para quem tiver.
 
-**O que falta é a reunião real do Teams**, no navegador: os dois sentidos,
-entrar e sair da reunião. O que acontece fica no `registro.log`, com os
-rótulos `extensao` e `teams`.
+**O registro só vê o lado da extensão**: o rótulo `extensao` diz o botão que
+ela achou e o estado dele, mas o PulseMeet não anota quando muta a gravação
+por causa da chamada. Para conferir o gravador, o silêncio está no WAV do mic.
 
 **Fora, por enquanto:** o Zoom (o Plugin SDK de junho de 2026, que exige app no
 Marketplace e conta). O MuteDeck faz os
