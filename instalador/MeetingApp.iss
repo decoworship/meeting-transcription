@@ -243,6 +243,9 @@ Source: "{#MotoresUrl}"; DestName: "motores-{#MotoresVersao}.7z"; DestDir: "{app
 ; versão, e é por isso que não moram no pacote pesado.
 Source: "{#Payload}\codigo\*"; DestDir: "{app}\motores"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
+; A extensão do Meet (GRA-3): o Chrome a carrega desta pasta, "sem compactação".
+Source: "{#Payload}\extensao-meet\*"; DestDir: "{app}\extensao-meet"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Payload}\INSTALAR.md"; DestDir: "{app}"; Flags: ignoreversion isreadme
 Source: "{#Payload}\CHANGELOG.md"; DestDir: "{app}"; Flags: ignoreversion
 ; O bootstrapper do WebView2, executado só se a runtime não estiver presente.

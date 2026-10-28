@@ -1,6 +1,6 @@
 {
-  "versao": "0.11.1",
-  "publicada": "2026-10-22",
-  "notas": "O Claude Desktop lê as suas atas e transcrições sem copiar (Ajustes › Geral › Claude), os Ajustes mais arrumados e o logo na barra da janela.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.11.1"
+  "versao": "0.12.0",
+  "publicada": "2026-10-27",
+  "notas": "O mute anda junto com o Meet e o Teams no navegador, o Parakeet Ultra como opção de transcrição e a legenda ao vivo mais rápida.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.0"
 }

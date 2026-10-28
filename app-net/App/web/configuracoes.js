@@ -10,7 +10,7 @@
 // não se valida, mas um lugar que mostra dados reais e admite o que não faz,
 // sim.
 
-import { pedir } from "/ponte.js";
+import { assinar, pedir } from "/ponte.js";
 import { abaClientes } from "/clientes.js";
 import { abaVozes } from "/vozes.js";
 import { secaoDeModelos } from "/modelos-de-ata.js";
@@ -788,6 +788,8 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
       }, "Deixar o modelo pronto entre perguntas"),
     })));
 
+  painel.appendChild(secaoDasChamadas(gravador, aoMexer));
+
   // ---- notificações
   //
   // Dito no ⓘ porque é a diferença entre um aviso que incomoda e um aviso que
@@ -804,6 +806,108 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
 
   painel.appendChild(secaoDaAgenda(gravador, aoMexer, config, gravar));
   return painel;
+}
+
+/** O que dizer da ponte com o Teams, pelo `gravador.teams` do núcleo. */
+const LINHA_DO_TEAMS = {
+  desligada: "Mutar no Teams muta a gravação, e o contrário também.",
+  procurando: "O Teams não respondeu. Ele precisa estar aberto, com a API ligada "
+    + "em Configurações › Privacidade › Gerenciar API.",
+  conectado: "Conectado. Na próxima reunião, o Teams vai perguntar se permite o "
+    + "PulseMeet: é só permitir.",
+  pareado: "Pareado com o Teams. Numa reunião, mutar num lugar muta no outro.",
+  "em-reuniao": "Sincronizando com a reunião do Teams agora.",
+};
+
+/** O nome da reunião que a extensão segue, pelo `gravador.navegador_app`. */
+const NOME_DO_APP = { meet: "Meet", teams: "Teams" };
+
+/** O que dizer da extensão, pelo `gravador.navegador` do núcleo. */
+function linhaDoNavegador(g) {
+  switch (g?.navegador) {
+    case "esperando":
+      return "Esperando a extensão. Ela conecta quando há uma aba do Meet ou do Teams "
+        + "aberta — se já há uma, veja se a extensão está carregada e atualizada (ⓘ).";
+    case "conectado":
+      return "Extensão conectada. Numa reunião, mutar num lugar muta no outro.";
+    case "em-reuniao":
+      return `Sincronizando com a reunião do ${NOME_DO_APP[g.navegador_app] ?? "navegador"} agora.`;
+    default:
+      return "Mutar no Meet ou no Teams pelo navegador muta a gravação, e o contrário também.";
+  }
+}
+
+/**
+ * O mute junto com o da reunião (GRA-3): o Meet e o Teams no navegador, por uma
+ * extensão que vem com o app, e o Teams desktop, pela porta local dele.
+ *
+ * As frases acompanham o núcleo enquanto a tela está aberta — ligar a chave e
+ * ficar olhando "procurando" depois de a chamada já ter atendido faria parecer
+ * que não funcionou.
+ */
+function secaoDasChamadas(gravador, aoMexer) {
+  const navegador = ajuste({
+    titulo: "Mute junto com o Meet e o Teams no navegador",
+    linha: linhaDoNavegador(gravador),
+    dica: [
+      "No Chrome e no Edge: o Google Meet (na aba ou no app instalado) e o Teams "
+      + "aberto no navegador. Precisa de uma extensão que vem com o PulseMeet, "
+      + "carregada uma vez:",
+      "1. Abra chrome://extensions (ou edge://extensions) e ligue o Modo do "
+      + "desenvolvedor. 2. Clique em Carregar sem compactação e escolha a pasta "
+      + "que o botão Mostrar a extensão abre. 3. Recarregue a aba da reunião. "
+      + "Quando o PulseMeet atualizar, clique em ↻ na extensão.",
+      "Nem o Meet nem o Teams têm uma porta oficial para isso: a extensão lê o "
+      + "botão do microfone na página. Se a página mudar, ela pode parar até uma "
+      + "versão nova do PulseMeet — e aí o mute volta a ser à mão.",
+    ],
+    controle: chave(gravador.sincronizar_mute_navegador === true,
+      (v) => aoMexer("sincronizar-mute-navegador", { ligado: v }),
+      "Mute junto com o Meet e o Teams no navegador"),
+  });
+
+  // Só quando a instalação tem a pasta: um botão que abre o nada é pior que
+  // nenhum.
+  let mostrar = null;
+  if (gravador.extensao) {
+    const botao = document.createElement("button");
+    botao.className = "aa-btn aa-btn-secundario";
+    botao.type = "button";
+    botao.textContent = "Mostrar a extensão";
+    botao.addEventListener("click", () => pedir("mostrar-extensao").catch(() => {}));
+    mostrar = ajuste({
+      titulo: "Pasta da extensão", sub: true,
+      linha: gravador.extensao,
+      controle: botao,
+    });
+  }
+
+  const item = ajuste({
+    titulo: "Mute junto com o Teams desktop",
+    linha: LINHA_DO_TEAMS[gravador.teams] ?? LINHA_DO_TEAMS.desligada,
+    dica: [
+      "O app do Teams, que tem uma porta local para isso — a mesma que o Stream "
+      + "Deck usa. Para o Teams no navegador, é a chave de cima.",
+      "Na primeira reunião depois de ligar, o Teams pergunta se permite o "
+      + "PulseMeet. Se a opção Gerenciar API não aparecer no Teams, a empresa "
+      + "desligou: aí o mute continua sendo à mão, como antes.",
+    ],
+    controle: chave(gravador.sincronizar_mute === true,
+      (v) => aoMexer("sincronizar-mute", { ligado: v }), "Mute junto com o Teams desktop"),
+  });
+
+  const linhaTeams = item.querySelector(".ajuste__linha");
+  const linhaNavegador = navegador.querySelector(".ajuste__linha");
+  const cancelar = assinar("gravador", (evento) => {
+    if (!item.isConnected) { cancelar(); return; }
+    const g = evento.gravador;
+    const teams = LINHA_DO_TEAMS[g?.teams];
+    if (teams && linhaTeams.textContent !== teams) linhaTeams.textContent = teams;
+    const nav = linhaDoNavegador(g);
+    if (linhaNavegador.textContent !== nav) linhaNavegador.textContent = nav;
+  });
+
+  return secaoDeAjustes("Chamadas", navegador, mostrar, item);
 }
 
 /** A agenda: a conta, a chave de usar, e os domínios que dizem quem é da casa. */

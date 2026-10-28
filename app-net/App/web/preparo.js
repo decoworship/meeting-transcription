@@ -5,7 +5,7 @@ import { transcrever as pedirTranscricao, assinarTranscricoes, emCurso,
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, botaoApagarGravacao } from "/app.js";
 import { campoDeEtiquetas } from "/etiquetas.js";
-import { separarTermos, estadoDasEtapas, resumoDoMotor } from "/reuniao-regras.js";
+import { separarTermos, estadoDasEtapas, resumoDoMotor, opcoesDeModelo } from "/reuniao-regras.js";
 
 // ───────────────────────────────────────────── preparar / transcrever
 
@@ -42,12 +42,15 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   // O vínculo vem junto: cliente e projeto escolhidos antes sobrevivem a sair
   // da tela, porque moram em reuniao.json na pasta da gravação e não dentro da
   // transcrição — que, na tela de preparo, ainda não existe.
-  const [{ clientes }, vinculo, leg] = await Promise.all([
+  const [{ clientes }, vinculo, leg, { catalogo }] = await Promise.all([
     pedir("clientes"), pedir("reuniao", { gravacao: g.caminho }),
     // O que a legenda ao vivo deixou, se ela estava ligada. **Não é
     // transcrição** — é para conferir se o que foi dito está lá antes de
     // gastar a placa com a passada inteira.
     pedir("legenda-gravada", { gravacao: g.caminho }).catch(() => ({})),
+    // Os modelos que o seletor oferece. Sem o catálogo, o seletor fica só com o
+    // Large v3, que é o padrão do núcleo — a tela não pode cair por isto.
+    pedir("catalogo").catch(() => ({ catalogo: [] })),
   ]);
 
   // ---- o que a legenda ouviu, quando ouviu
@@ -141,11 +144,24 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
   motorResumo.className = "preparo__motor-resumo";
   const linha2 = document.createElement("div");
   linha2.className = "linha";
+  const campoModelo = campo("Modelo", "select", { id: "modelo" });
+  const seletorDeModelo = campoModelo.querySelector("select");
+  // Remontado quando a preferência do projeto chega, para que um valor salvo
+  // fora do catálogo apareça em vez de sumir. Ver opcoesDeModelo.
+  const preencherModelos = (atual) => {
+    const opcoes = opcoesDeModelo(catalogo, atual);
+    if (opcoes.length === 0) opcoes.push({ valor: "large-v3", rotulo: "Large v3", padrao: true });
+    seletorDeModelo.replaceChildren(...opcoes.map((o) => {
+      const op = document.createElement("option");
+      op.value = o.valor;
+      op.textContent = o.rotulo;
+      return op;
+    }));
+    seletorDeModelo.value = atual ?? (opcoes.find((o) => o.padrao) ?? opcoes[0]).valor;
+  };
+  preencherModelos();
   linha2.append(
-    campo("Modelo", "select", {
-      id: "modelo",
-      opcoes: ["large-v3", "medium", "small", "base", "tiny"],
-    }),
+    campoModelo,
     campo("Idioma", "input", { id: "idioma", valor: "pt" }),
     // Sim ou não, e nada de escolher o modelo de diarização: o "3.1" era opção
     // de tela que o pipeline ignorava — o motor sempre usou o community-1, que
@@ -306,7 +322,7 @@ export async function telaDePreparo(g, { cabecalho, tela, navegar, aoTerminar })
       return;
     }
     aviso.textContent = "preferências do projeto carregadas";
-    if (prefs.model_size) document.getElementById("modelo").value = prefs.model_size;
+    if (prefs.model_size) preencherModelos(prefs.model_size);
     if (prefs.language) document.getElementById("idioma").value = prefs.language;
     document.getElementById("diarizacao").value = prefs.diarization === false ? "não" : "sim";
     termos.definir(prefs.initial_prompt ?? "");

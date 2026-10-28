@@ -102,6 +102,10 @@ internal sealed class Bandeja : IDisposable
         // Aplicacao.cs descreve, e escolher a reunião é estado do gravador.
         else if (_gravador.Fixado is { } fx)
             status += $"\nVai gravar: {Gravador.Cortar(fx.Titulo, 40)}";
+        // Para o ícone laranja ser legível: o mute pode ter vindo do Teams.
+        if (_gravador.SituacaoDoTeams == "em-reuniao") status += "\nMute junto com o Teams";
+        if (_gravador.SituacaoDoNavegador == "em-reuniao")
+            status += $"\nMute junto com o {(_gravador.AppNoNavegador == "teams" ? "Teams" : "Meet")}";
         // Menu do Win32 não quebra linha: cada linha vira um item desabilitado.
         foreach (string linha in status.Split('\n'))
             raiz.Item(linha, habilitado: false);

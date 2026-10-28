@@ -221,7 +221,11 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             // olhando a agenda — melhor informada que qualquer heurística.
             Evento = Fixado;
             if (Cfg.UseCalendar && Fixado is null) ConsultarAgenda();
-            if (Cfg.StartMuted) AlternarMudo();
+            if (Cfg.StartMuted) DefinirMudo(true);
+            // Começar no meio de uma reunião do Teams segue o mute dela — vence o
+            // start_muted, que é um palpite de antes de saber da reunião.
+            Aplicar(_sincroniaDoTeams.AoComecarAGravar(Estado.Mudo));
+            Aplicar(_sincroniaDoNavegador.AoComecarAGravar(Estado.Mudo));
             Atualizar();
 
             // No fim, e só se chegou até aqui: quem escuta recebe uma gravação
@@ -259,13 +263,202 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         return e.GetDefaultAudioEndpoint(fluxo, papel);
     }
 
+    /// <summary>A pessoa mutou ou desmutou: a bandeja ou a tela do Gravador.</summary>
+    /// <remarks>
+    /// É o único caminho que vai às chamadas. O mute que veio delas, e o do
+    /// <c>start_muted</c>, passam pelo <see cref="DefinirMudo"/> direto — senão a
+    /// chamada receberia de volta o próprio eco.
+    /// </remarks>
     public void AlternarMudo()
     {
         if (!Estado.Gravando) return;
-        bool novo = !Estado.Mudo;
-        Estado.DefinirMudo(novo, DateTime.UtcNow);
-        foreach (var c in _capturas.Where(c => c.Stats.Nome == "mic")) c.Mudo = novo;
+        DefinirMudo(!Estado.Mudo);
+        var agora = DateTime.UtcNow;
+        if (_sincroniaDoTeams.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
+            _ = _teams?.EnviarAsync(ProtocoloDoTeams.AlternarMudo);
+        if (_sincroniaDoNavegador.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
+            _ = _navegador?.MutarAsync(Estado.Mudo);
+    }
+
+    private void DefinirMudo(bool mudo)
+    {
+        if (!Estado.Gravando || Estado.Mudo == mudo) return;
+        Estado.DefinirMudo(mudo, DateTime.UtcNow);
+        foreach (var c in _capturas.Where(c => c.Stats.Nome == "mic")) c.Mudo = mudo;
         Atualizar();
+    }
+
+    // ─────────────────────────────────────────── o mute junto com o Teams
+
+    private readonly SincroniaDoMute _sincroniaDoTeams = new();
+    private ConexaoComOTeams? _teams;
+
+    /// <summary>
+    /// "desligada", "procurando", "conectado", "pareado" ou "em-reuniao" — o que
+    /// Ajustes e a bandeja dizem sobre a ponte com o Teams.
+    /// </summary>
+    public string SituacaoDoTeams =>
+        _teams is null ? "desligada"
+        : !_teams.Conectado ? "procurando"
+        : _sincroniaDoTeams.Chamada is { EmReuniao: true, Mudo: not null } ? "em-reuniao"
+        : Cfg.TokenDoTeams is { Length: > 0 } ? "pareado"
+        : "conectado";
+
+    /// <summary>Liga ou desliga a sincronia, e guarda a escolha.</summary>
+    public void SincronizarMute(bool ligar)
+    {
+        Cfg.SincronizarMute = ligar;
+        Cfg.Salvar();
+        AplicarSincronia();
+        Atualizar();
+    }
+
+    /// <summary>Sobe ou derruba as pontes — o Teams desktop e a extensão — conforme o que está salvo.</summary>
+    /// <param name="versao">O que o Teams mostra ao pedir permissão, ao lado do nome.</param>
+    public void AplicarSincronia(string? versao = null)
+    {
+        if (versao is not null) _versaoParaOTeams = versao;
+        if (Cfg.SincronizarMute && _teams is null)
+        {
+            var c = new ConexaoComOTeams(MeetingApp.Nucleo.Marca.Nome, _versaoParaOTeams,
+                                         () => Cfg.TokenDoTeams);
+            c.AoReceber += m => naUi(() => AoMensagemDoTeams(m));
+            c.AoMudarConexao += conectou => naUi(() => AoMudarConexaoDoTeams(conectou));
+            _teams = c;
+            c.Ligar();
+            MeetingApp.Nucleo.Registro.Escrever("teams", "sincronia do mute ligada");
+        }
+        else if (!Cfg.SincronizarMute && _teams is { } velha)
+        {
+            _teams = null;
+            _sincroniaDoTeams.AoPerderAChamada();
+            // Fora da thread da UI: o laço pode levar até dois segundos para sair.
+            _ = Task.Run(velha.Dispose);
+            MeetingApp.Nucleo.Registro.Escrever("teams", "sincronia do mute desligada");
+        }
+
+        if (Cfg.SincronizarMuteNoNavegador && _navegador is null)
+        {
+            var s = new ServidorDaExtensao();
+            s.AoReceber += e => naUi(() => AoMensagemDoNavegador(e));
+            s.AoMudarConexao += conectou => naUi(() => AoMudarConexaoDoNavegador(conectou));
+            _navegador = s;
+            s.Ligar();
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute ligada");
+        }
+        else if (!Cfg.SincronizarMuteNoNavegador && _navegador is { } velho)
+        {
+            _navegador = null;
+            _sincroniaDoNavegador.AoPerderAChamada();
+            _ = Task.Run(velho.Dispose);
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute desligada");
+        }
+    }
+
+    private string _versaoParaOTeams = "0";
+
+    private void AoMudarConexaoDoTeams(bool conectou)
+    {
+        if (_teams is null) return;
+        if (!conectou) _sincroniaDoTeams.AoPerderAChamada();
+        MeetingApp.Nucleo.Registro.Escrever("teams", conectou ? "conectado"
+            : $"desconectado{(_teams.UltimaFalha is { } f ? $": {f}" : "")}");
+        Atualizar();
+    }
+
+    private void AoMensagemDoTeams(MensagemDoTeams m)
+    {
+        if (_teams is null) return;
+
+        if (m.TokenNovo is { } token && token != Cfg.TokenDoTeams)
+        {
+            Cfg.TokenDoTeams = token;
+            Cfg.Salvar();
+            MeetingApp.Nucleo.Registro.Escrever("teams", "pareado: o Teams permitiu o app");
+        }
+        if (m.Erro is { } erro)
+            MeetingApp.Nucleo.Registro.Escrever("teams", $"o Teams recusou: {erro}");
+
+        if (m.Estado is { } e)
+        {
+            var antes = SituacaoDoTeams;
+            Aplicar(_sincroniaDoTeams.AoEstadoDaChamada(e, Estado.Gravando, Estado.Mudo, DateTime.UtcNow));
+            if (_sincroniaDoTeams.QuerParear())
+            {
+                MeetingApp.Nucleo.Registro.Escrever("teams", "pedindo permissão ao Teams");
+                _ = _teams.EnviarAsync(ProtocoloDoTeams.PedirEstado);
+            }
+            if (SituacaoDoTeams != antes) Atualizar();
+        }
+    }
+
+    // ──────────────────── o mute junto com o Meet e o Teams no navegador
+
+    private readonly SincroniaDoMute _sincroniaDoNavegador = new();
+    private ServidorDaExtensao? _navegador;
+
+    /// <summary>
+    /// "desligada", "esperando" (a extensão não conectou), "conectado" ou
+    /// "em-reuniao" — o que Ajustes e a bandeja dizem sobre a extensão de
+    /// navegador. Qual reunião, se do Meet ou do Teams, é <see cref="AppNoNavegador"/>.
+    /// </summary>
+    public string SituacaoDoNavegador =>
+        _navegador is null ? "desligada"
+        : !_navegador.Conectado ? "esperando"
+        : _sincroniaDoNavegador.Chamada is { EmReuniao: true } ? "em-reuniao"
+        : "conectado";
+
+    /// <summary>"meet" ou "teams": a página da reunião que a extensão está seguindo.</summary>
+    public string? AppNoNavegador { get; private set; }
+
+    /// <summary>Liga ou desliga a sincronia pela extensão, e guarda a escolha.</summary>
+    public void SincronizarMuteNoNavegador(bool ligar)
+    {
+        Cfg.SincronizarMuteNoNavegador = ligar;
+        Cfg.Salvar();
+        AplicarSincronia();
+        Atualizar();
+    }
+
+    /// <summary>A pasta da extensão, que a pessoa carrega no Chrome ou no Edge.</summary>
+    /// <remarks>Chama-se extensao-meet porque nasceu só do Meet; o Chrome guarda o caminho.</remarks>
+    public static string PastaDaExtensao => Path.Combine(AppContext.BaseDirectory, "extensao-meet");
+
+    private void AoMudarConexaoDoNavegador(bool conectou)
+    {
+        if (_navegador is null) return;
+        if (!conectou)
+        {
+            _sincroniaDoNavegador.AoPerderAChamada();
+            AppNoNavegador = null;
+        }
+        MeetingApp.Nucleo.Registro.Escrever("extensao", conectou ? "extensão conectada"
+            : $"extensão saiu{(_navegador.UltimaFalha is { } f ? $" ({f})" : "")}");
+        Atualizar();
+    }
+
+    private void AoMensagemDoNavegador(MensagemDaExtensao m)
+    {
+        if (_navegador is null) return;
+        // O que a página achou do botão: é o que diz o que mudou quando o Google
+        // ou a Microsoft mexem na página. Só chega quando muda.
+        if (m.Diagnostico is { } d) MeetingApp.Nucleo.Registro.Escrever("extensao", d);
+        if (m.Estado is not { } e) return;
+
+        var antes = (SituacaoDoNavegador, AppNoNavegador);
+        // Trocar de reunião — do Meet para o Teams — é outra chamada: o mute da
+        // anterior não vale como "o que ela era antes".
+        if (e.EmReuniao && m.App is { } app && AppNoNavegador is { } eraOutro && app != eraOutro)
+            _sincroniaDoNavegador.AoPerderAChamada();
+        if (e.EmReuniao) AppNoNavegador = m.App;
+        Aplicar(_sincroniaDoNavegador.AoEstadoDaChamada(e, Estado.Gravando, Estado.Mudo, DateTime.UtcNow));
+        if ((SituacaoDoNavegador, AppNoNavegador) != antes) Atualizar();
+    }
+
+    private void Aplicar(AcaoDaSincronia a)
+    {
+        if (a == AcaoDaSincronia.MutarNoApp) DefinirMudo(true);
+        else if (a == AcaoDaSincronia.DesmutarNoApp) DefinirMudo(false);
     }
 
     /// <summary>O que o clique no ícone faz: iniciar quando parado, mutar quando gravando.</summary>
@@ -522,6 +715,8 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     public void Dispose()
     {
         Parar();
+        _teams?.Dispose();
+        _navegador?.Dispose();
         _consulta?.Cancel();
         _agenda.Dispose();
         Dispositivos.Dispose();

@@ -423,6 +423,23 @@ internal sealed class EstadoDoGravador
     [JsonPropertyName("conta")] public string? Conta { get; init; }
     [JsonPropertyName("agenda_configurada")] public bool AgendaConfigurada { get; init; }
 
+    /// <summary>GRA-3: o mute acompanha o da reunião do Teams.</summary>
+    [JsonPropertyName("sincronizar_mute")] public bool SincronizarMute { get; init; }
+
+    /// <summary>A ponte com o Teams, como em <c>Gravador.SituacaoDoTeams</c>.</summary>
+    [JsonPropertyName("teams")] public required string Teams { get; init; }
+
+    [JsonPropertyName("sincronizar_mute_navegador")] public bool SincronizarMuteNoNavegador { get; init; }
+
+    /// <summary>A extensão do Meet e do Teams na web, como em <c>Gravador.SituacaoDoNavegador</c>.</summary>
+    [JsonPropertyName("navegador")] public required string Navegador { get; init; }
+
+    /// <summary>"meet" ou "teams": a reunião que a extensão está seguindo.</summary>
+    [JsonPropertyName("navegador_app")] public string? NavegadorApp { get; init; }
+
+    /// <summary>Onde está a extensão, ou nulo se a instalação não a tem.</summary>
+    [JsonPropertyName("extensao")] public string? Extensao { get; init; }
+
     [JsonPropertyName("faixas")] public List<FaixaAoVivo> Faixas { get; init; } = [];
 
     /// <summary>
@@ -1466,6 +1483,26 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
                     break;
 
+                case "sincronizar-mute":
+                    gravador.SincronizarMute(p.Ligado ?? false);
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                case "sincronizar-mute-navegador":
+                    gravador.SincronizarMuteNoNavegador(p.Ligado ?? false);
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
+                // O Chrome pede a pasta num diálogo próprio ("Carregar sem
+                // compactação"); abri-la no Explorer é o jeito de copiar o
+                // caminho sem digitar.
+                case "mostrar-extensao":
+                    if (Directory.Exists(Bandeja.Gravador.PastaDaExtensao))
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                            "explorer.exe", $"\"{Bandeja.Gravador.PastaDaExtensao}\"") { UseShellExecute = true });
+                    Responder(new Resposta { Id = p.Id, Gravador = Instantaneo(gravador) });
+                    break;
+
                 case "conectar-agenda":
                     // Abre o navegador e volta na hora: a autorização acontece
                     // fora do app, e travar a tela até o usuário terminar de
@@ -1604,6 +1641,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             AgendaConfigurada = MeetingRecorder.Agenda.ClienteDaAgenda.EstaConfigurado(),
             Conta = MeetingRecorder.Agenda.ClienteDaAgenda.EstaAutorizado()
                 ? MeetingRecorder.Agenda.ClienteDaAgenda.EmailDaConta() : null,
+            SincronizarMute = g.Cfg.SincronizarMute,
+            Teams = g.SituacaoDoTeams,
+            SincronizarMuteNoNavegador = g.Cfg.SincronizarMuteNoNavegador,
+            Navegador = g.SituacaoDoNavegador,
+            NavegadorApp = g.AppNoNavegador,
+            Extensao = Directory.Exists(Bandeja.Gravador.PastaDaExtensao)
+                ? Bandeja.Gravador.PastaDaExtensao : null,
             Faixas = faixas,
             AtalhoDeCaptura = g.Estado.Gravando ? g.AtalhoDeCaptura : null,
         };
@@ -2932,6 +2976,18 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
     {
         var pacote = Catalogo.Pacotes.FirstOrDefault(x => x.Id == id)
             ?? throw new InvalidOperationException($"não conheço o pacote {id}");
+
+        // **No arquivo avulso apaga-se o arquivo, e não a pasta.** A pasta é
+        // compartilhada — `motores/ata/modelos` guarda todos os GGUF de ata, e
+        // `motores/asr/modelos` os de ASR do transcribe.cpp —, e apagá-la para
+        // remover um modelo levaria os vizinhos junto, inclusive o que está em
+        // uso. Foi assim até 27/10/2026.
+        if (Catalogo.EhArquivoAvulso(pacote))
+        {
+            string arquivo = Catalogo.ArquivoDoPacote(pacote);
+            if (File.Exists(arquivo)) File.Delete(arquivo);
+            return;
+        }
 
         string pasta = Catalogo.PastaDoPacote(pacote);
         if (Directory.Exists(pasta)) Directory.Delete(pasta, recursive: true);
