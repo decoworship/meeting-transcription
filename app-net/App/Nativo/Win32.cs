@@ -449,4 +449,62 @@ internal static partial class Win32
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool BitBlt(IntPtr hdc, int x, int y, int cx, int cy,
         IntPtr hdcSrc, int x1, int y1, uint rop);
+
+    // ───────────────────────────────────────────────── gravação de tela
+
+    internal const uint MONITORINFOF_PRIMARY = 0x00000001;
+    internal const uint CURSOR_SHOWING = 0x00000001;
+    internal const uint DI_NORMAL = 0x0003;
+
+    /// <summary>O <c>MONITORINFO</c> com o nome do dispositivo (<c>\\.\DISPLAY1</c>).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe struct MONITORINFOEX
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+        public fixed char szDevice[32];
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CURSORINFO
+    {
+        public uint cbSize;
+        public uint flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct ICONINFO
+    {
+        public int fIcon;
+        public uint xHotspot;
+        public uint yHotspot;
+        public IntPtr hbmMask;
+        public IntPtr hbmColor;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static unsafe partial bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip,
+        delegate* unmanaged<IntPtr, IntPtr, RECT*, IntPtr, int> lpfnEnum, IntPtr dwData);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetMonitorInfoEx(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetCursorInfo(ref CURSORINFO pci);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetIconInfo(IntPtr hIcon, out ICONINFO piconinfo);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
+        int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, uint diFlags);
 }

@@ -478,6 +478,46 @@ desliga o automático até a gravação terminar.
 **Gatilho:** querer gravar sem rótulo com uma reunião da agenda em curso — uma
 conversa de corredor no horário de uma reunião que não aconteceu.
 
+### GRA-5 · A tela gravada em vídeo, com a transcrição de legenda — `feature` · prova de conceito em 28/10/2026
+
+Pedido de uso real, 28/10/2026: gravar a tela para quem acompanha a reunião
+depois poder vê-la **na íntegra**, e não só ler e ouvir.
+
+**Como ficou:** Ajustes › Gravador › Dispositivos ganhou o seletor **Tela em
+vídeo** — "Não gravar" (o padrão) ou um dos monitores. Escolher é ligar
+(`screen_monitor` no `settings.json`). Gravando, sai um `tela.mp4` sem som ao
+lado das faixas, e um `tela.json` com onde o primeiro quadro cai no áudio
+(`Nucleo/VideoDaTela.cs`). A reunião aberta ganha a aba **Vídeo**: o
+`<audio>` do tocador manda, o vídeo é arrastado até `t − inicio_s`, e a
+legenda é desenhada por cima com quem fala — liga e desliga, tamanho, e tela
+cheia (`web/video.js`).
+
+- **Nada é juntado depois.** O vídeo é carimbado com a mesma origem QPC das
+  duas faixas, e os tempos da transcrição servem de legenda sem conversão;
+- **GDI + Media Foundation** (`Bandeja/GravadorDeTela.cs`,
+  `Nativo/CodificadorH264.cs`): o `BitBlt` do print, em laço a 10 qps, e o
+  encoder H.264 do Windows, da placa quando há. Sem FFmpeg. O MF é chamado
+  pela vtable — o `ComImport` exigiria redeclarar o `IMFAttributes` em cada
+  interface, e devolver interface de P/Invoke é IL2050;
+- **medido na máquina do dono (28/10/2026, 1920×1080, reunião do Teams):**
+  ~750 kb/s com um slide parado — perto de 350 MB por hora; o teto do
+  bitrate é 1,7 Mb/s, ~750 MB por hora —, texto de slide legível. O
+  codificador leva **~2,2 s para abrir**, e o vídeo começa esse tanto depois
+  do áudio: o `tela.json` registra, e a aba diz.
+
+**O que a prova de conceito não resolve:**
+
+- **queda do processo perde o vídeo.** O MP4 só tem índice depois do
+  `Finalize`; o áudio continua à prova de queda. O caminho é cortar em
+  segmentos de alguns minutos — e é o `SUP-2` que torna isso mais que teoria;
+- **um monitor só, inteiro.** Nem janela, nem região, nem os dois monitores;
+- **janela protegida sai preta** (Teams com "impedir captura"), e é de
+  propósito;
+- **não medido**: o custo de CPU ao lado da legenda ao vivo, e telas 4K.
+
+**Gatilho do próximo passo:** o primeiro uso real dizer o que falta — o
+segmento contra queda é o candidato natural.
+
 ---
 
 ## 5. Diagnóstico e suporte

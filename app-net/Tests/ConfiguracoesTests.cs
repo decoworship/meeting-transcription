@@ -95,6 +95,17 @@ public sealed class ConfiguracoesTests : IDisposable
     }
 
     [Fact]
+    public void ATelaNasceSemGravarEOMonitorEscolhidoVolta()
+    {
+        // Vídeo é opcional: quem nunca escolheu um monitor não grava a tela.
+        Assert.Null(Configuracoes.Carregar(Path.Combine(_dir, "nao-existe.json")).MonitorDaTela);
+
+        new Configuracoes { MonitorDaTela = @"\\.\DISPLAY2" }.Salvar(Caminho);
+        Assert.Equal(@"\\.\DISPLAY2", Configuracoes.Carregar(Caminho).MonitorDaTela);
+        Assert.Contains("\"screen_monitor\"", File.ReadAllText(Caminho));
+    }
+
+    [Fact]
     public void NaoDeixaArquivoTemporarioParaTras()
     {
         new Configuracoes().Salvar(Caminho);

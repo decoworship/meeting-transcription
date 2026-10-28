@@ -159,3 +159,67 @@ export function resumoDoMotor({ modelo, idioma, diarizar }) {
     diarizar ? "separa os falantes" : "sem separar falantes",
   ].join(" · ");
 }
+
+/**
+ * Uma fala em pedaços de legenda, com o tempo repartido pelo tamanho do texto.
+ *
+ * O trecho do ASR não tem tempo por palavra: a mediana é de 3 s e oito
+ * palavras, que já é uma legenda, mas há falas de vinte segundos e sessenta
+ * palavras que cobririam o vídeo. O corte é por palavra, nunca no meio de uma,
+ * e cada pedaço fica com a fatia do tempo que lhe cabe em letras — quem fala
+ * mais rápido não tem ritmo uniforme, mas o erro é de um ou dois segundos, e a
+ * próxima fala corrige.
+ */
+export function pedacosDaFala(seg, maxPalavras = 14) {
+  const palavras = String(seg?.text ?? "").trim().split(/\s+/).filter(Boolean);
+  if (palavras.length === 0) return [];
+  const n = Math.ceil(palavras.length / maxPalavras);
+  // Pedaços do mesmo tamanho, e não 14 + o resto: um "tá." sozinho no fim
+  // piscaria na tela por meio segundo.
+  const porPedaco = Math.ceil(palavras.length / n);
+  const textos = [];
+  for (let i = 0; i < palavras.length; i += porPedaco) textos.push(palavras.slice(i, i + porPedaco).join(" "));
+  const letras = textos.reduce((s, t) => s + t.length, 0);
+  const inicio = Number(seg.start) || 0;
+  const duracao = Math.max(0, (Number(seg.end) || inicio) - inicio);
+  let t = inicio;
+  return textos.map((texto, i) => {
+    const fim = i === textos.length - 1 ? inicio + duracao : t + duracao * texto.length / letras;
+    const p = { start: t, end: fim, text: texto };
+    t = fim;
+    return p;
+  });
+}
+
+/**
+ * A legenda do instante `t` do áudio: `{ falante, texto, indice }`, ou nulo.
+ *
+ * `segments` em ordem de início, como a transcrição grava. A fala fica na tela
+ * até `folga` segundos depois do fim — o ASR fecha o trecho na última sílaba, e
+ * a legenda sumir junto com ela não dá tempo de terminar de ler —, mas nunca
+ * por cima da próxima.
+ */
+export function legendaNoInstante(segments, t, folga = 0.8) {
+  const lista = segments ?? [];
+  if (!Number.isFinite(t) || lista.length === 0) return null;
+  let lo = 0, hi = lista.length - 1, i = -1;
+  while (lo <= hi) {
+    const meio = (lo + hi) >> 1;
+    if (lista[meio].start <= t) { i = meio; lo = meio + 1; } else hi = meio - 1;
+  }
+  if (i < 0) return null;
+  const seg = lista[i];
+  const proxima = lista[i + 1]?.start ?? Infinity;
+  const limite = Math.min(seg.end + folga, proxima);
+  if (t >= limite) return null;
+  const pedacos = pedacosDaFala(seg);
+  if (pedacos.length === 0) return null;
+  const pedaco = pedacos.find((p) => t < p.end) ?? pedacos[pedacos.length - 1];
+  const falante = seg.speaker && seg.speaker !== "Unknown" ? seg.speaker : null;
+  return { falante, texto: pedaco.text, indice: i };
+}
+
+/** Onde o vídeo deve estar no instante `t` do áudio; negativo é antes de ele começar. */
+export function tempoNoVideo(t, inicioDoVideo) {
+  return (Number(t) || 0) - (Number(inicioDoVideo) || 0);
+}

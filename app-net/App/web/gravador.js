@@ -183,6 +183,7 @@ export async function telaDoGravador(ctx) {
   };
   const vaiMic = itemVai("mic", "Seu microfone");
   const vaiAudio = itemVai("audio", "Áudio da reunião");
+  const vaiTela = itemVai("tela", "Tela em vídeo");
   const vaiAgenda = itemVai("agenda", "Agenda");
   const trocar = el("a", "grav-vai__trocar", "Trocar em Ajustes › Gravador");
   trocar.href = "#config=gravador";
@@ -930,6 +931,9 @@ export async function telaDoGravador(ctx) {
     };
     vaiMic.textContent = nomeDe(dispositivos.entradas, dispositivos.mic_id);
     vaiAudio.textContent = nomeDe(dispositivos.saidas, dispositivos.loopback_id);
+    // Sem padrão a cair: a tela só é gravada quando alguém escolheu uma.
+    const tela = (dispositivos.telas ?? []).find((t) => t.id === dispositivos.tela_id);
+    vaiTela.textContent = tela ? tela.nome : "não gravada";
   }
 
   atualizar.addEventListener("click", carregarProximas);
