@@ -240,6 +240,7 @@ export async function telaDoGravador(ctx) {
   const acoes = el("div", "grav-faixa__acoes");
   const marcar = botao("aa-btn-primario grav-marcar", "Marcar momento");
   marcar.prepend(icone("i-marca"));
+  marcar.title = "Põe o tempo de agora nas notas, onde está o cursor";
   // O print da tela vai para capturas/ e entra nas notas com o momento. Com o
   // app na frente, o print é do monitor dele sem ele — a reunião que está atrás.
   const capturar = botao("aa-btn-secundario grav-capturar", "Capturar tela");
@@ -309,8 +310,9 @@ export async function telaDoGravador(ctx) {
   function desenharDicaDasNotas(atalho) {
     if (atalho === atalhoDesenhado) return;
     atalhoDesenhado = atalho;
-    dicaNotas.textContent = "Marcar momento põe o tempo onde está o cursor. "
-      + (atalho ? `${atalho} captura a tela de qualquer janela; ` : "")
+    // Curta: numa coluna de 330 px, a versão longa eram quatro linhas tiradas
+    // do campo. O que o Marcar momento faz está no title dele.
+    dicaNotas.textContent = (atalho ? `${atalho} captura a tela de qualquer janela; ` : "")
       + "Ctrl+V cola uma imagem.";
   }
   desenharDicaDasNotas(estado.atalho_de_captura ?? null);
@@ -473,7 +475,9 @@ export async function telaDoGravador(ctx) {
   }
 
   // Falhas que não são do gravador (guardar o cliente): ficam com os avisos.
-  const avisosDeFora = el("div");
+  // Com a classe dos avisos para sumir quando vazio: na coluna flexível, um
+  // div vazio ainda custa o espaço de um gap.
+  const avisosDeFora = el("div", "grav-avisos");
   gravando.insertBefore(avisosDeFora, grade);
 
   // ─────────────────────────────────────────────────────── desenho
@@ -492,8 +496,11 @@ export async function telaDoGravador(ctx) {
     tempo.textContent = relogio(g.duracao_s);
     rotularMutar(g.mudo);
     desenharDicaDasNotas(g.atalho_de_captura ?? null);
-    capturar.title = g.atalho_de_captura
-      ? `Ou ${g.atalho_de_captura}, de qualquer janela` : "";
+    // O que o botão guarda, dito no botão: sem isto, o print só existia como
+    // uma linha de markdown nas notas.
+    capturar.title = "Guarda um print do monitor em que você está — sem esta janela — "
+      + "na pasta da gravação, e põe nas notas com o tempo"
+      + (g.atalho_de_captura ? `. Ou ${g.atalho_de_captura}, de qualquer janela` : "");
     faixa.dataset.mudo = String(Boolean(g.mudo));
 
     if (g.gravando !== gravandoDesenhado) trocouDeEstado(g);
