@@ -1,6 +1,6 @@
 {
-  "versao": "0.12.0",
-  "publicada": "2026-10-27",
-  "notas": "O mute anda junto com o Meet e o Teams no navegador, o Parakeet Ultra como opção de transcrição e a legenda ao vivo mais rápida.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.0"
+  "versao": "0.12.1",
+  "publicada": "2026-10-28",
+  "notas": "O mute junto com o Teams no navegador passa a funcionar também na tela de reunião em que ele falhava.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.1"
 }

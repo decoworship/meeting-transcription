@@ -3,6 +3,17 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.12.1 — 28/10/2026
+
+**O mute junto com o Teams no navegador funciona nas duas telas de reunião.** O
+Teams mostra a reunião de dois jeitos, e num deles a extensão não achava o botão
+do microfone: o mute não andava junto. Agora ela acha nos dois. Depois de
+atualizar, clique em ↻ na extensão, em chrome://extensions (em cada perfil do
+Chrome em que ela está), e recarregue a aba da reunião. A extensão passa a
+mostrar a versão 1.1.1.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.12.0 — 27/10/2026
 
 **O mute anda junto com a reunião.** Mutar no Google Meet ou no Teams aberto no
