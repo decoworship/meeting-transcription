@@ -230,7 +230,12 @@ export function blocoDeNotas(gravacao, opcoes = {}) {
 
   /** A imagem grande, com "ouvir daqui" quando ela tem momento e a tela toca. */
   function ampliar(imagem) {
-    const acoesDaImagem = [{ rotulo: "Ler nomes desta imagem", fazer: () => lerNomes(imagem) }];
+    const gravacao = alvo;
+    const acoesDaImagem = [
+      { rotulo: "Mostrar na pasta", fazer: () => pedir("mostrar-imagem", { gravacao, texto: imagem.caminho })
+          .catch((e) => { estado.textContent = e.message; }) },
+      { rotulo: "Ler nomes desta imagem", fazer: () => lerNomes(imagem) },
+    ];
     if (imagem.segundos != null && opcoes.aoTocar)
       acoesDaImagem.push({ rotulo: `Ouvir a partir de ${imagem.marca}`, fazer: () => opcoes.aoTocar(imagem.segundos) });
     const linha = campo.value.split("\n").find((l) => l.includes(`(${imagem.caminho})`)) ?? "";

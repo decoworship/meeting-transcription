@@ -3,6 +3,23 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.12.2 — 28/10/2026
+
+**As imagens das notas aparecem.** O print do Capturar tela (e do Ctrl+Alt+P) e
+as imagens coladas nas notas eram guardados certinho na pasta da gravação, mas a
+miniatura aparecia quebrada — no Gravador e na reunião. Agora aparecem, inclusive
+as das reuniões antigas. Clicar na miniatura abre a imagem grande, e o botão
+**Mostrar na pasta** abre o Explorer com o arquivo selecionado. O Capturar tela
+guarda o monitor em que você está, sem a janela do PulseMeet; passar o mouse no
+botão diz isso.
+
+**A tela do Gravador cabe na janela.** A barra da gravação não sobrepõe mais o
+cliente ao medidor: os medidores ficam numa linha própria, embaixo. E o aviso de
+microfone mudo não empurra mais a legenda e as notas para fora da janela — elas
+encolhem para caber.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.12.1 — 28/10/2026
 
 **O mute junto com o Teams no navegador funciona nas duas telas de reunião.** O

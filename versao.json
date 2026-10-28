@@ -1,6 +1,6 @@
 {
-  "versao": "0.12.1",
+  "versao": "0.12.2",
   "publicada": "2026-10-28",
-  "notas": "O mute junto com o Teams no navegador passa a funcionar também na tela de reunião em que ele falhava.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.1"
+  "notas": "As imagens das notas aparecem, e a tela do Gravador cabe na janela sem nada por cima de nada, mesmo com o microfone mudo.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.2"
 }

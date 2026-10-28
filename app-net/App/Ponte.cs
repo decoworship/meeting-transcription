@@ -1097,6 +1097,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                     await LerNomesAsync(p);
                     break;
 
+                // O print com o arquivo selecionado no Explorer: é onde a pessoa
+                // descobre o que o botão guardou, e de onde ela o copia.
+                case "mostrar-imagem":
+                {
+                    var (_, imagem) = ImagemDasNotas(p);
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                        "explorer.exe", $"/select,\"{imagem}\"") { UseShellExecute = true });
+                    Responder(new Resposta { Id = p.Id });
+                    break;
+                }
+
                 case "salvar-participantes":
                 {
                     if (p.Gravacao is not { Length: > 0 } onde || !Directory.Exists(onde))
@@ -1542,16 +1553,16 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             : null;
 
     /// <summary>
-    /// Lê os nomes de uma imagem das notas. Dois minutos de prazo: subir o
-    /// Python e ler um print leva uns 5 s, e um motor que não respondeu em dois
-    /// minutos não vai responder.
+    /// A imagem das notas que a página pediu, como caminho no disco.
     /// </summary>
-    private async Task LerNomesAsync(Pedido p)
+    /// <remarks>
+    /// Só imagens da reunião: o caminho vem da página, e a página não manda o
+    /// motor ler, nem o Explorer abrir, arquivo fora de <c>capturas/</c>.
+    /// </remarks>
+    private static (string Gravacao, string Imagem) ImagemDasNotas(Pedido p)
     {
         if (p.Gravacao is not { Length: > 0 } onde)
             throw new InvalidOperationException("sem gravação");
-        // Só imagens da reunião: o caminho vem da página, e a página não manda
-        // o motor ler arquivo fora de capturas/.
         if (p.Texto is not { Length: > 0 } relativo
             || !relativo.StartsWith(Capturas.Pasta + "/", StringComparison.Ordinal)
             || relativo.Contains("..") || relativo.Contains('\\')
@@ -1560,7 +1571,17 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
 
         string imagem = Path.Combine(onde, Capturas.Pasta, relativo[(Capturas.Pasta.Length + 1)..]);
         if (!File.Exists(imagem)) throw new InvalidOperationException("a imagem não está mais na pasta");
+        return (onde, imagem);
+    }
 
+    /// <summary>
+    /// Lê os nomes de uma imagem das notas. Dois minutos de prazo: subir o
+    /// Python e ler um print leva uns 5 s, e um motor que não respondeu em dois
+    /// minutos não vai responder.
+    /// </summary>
+    private async Task LerNomesAsync(Pedido p)
+    {
+        var (onde, imagem) = ImagemDasNotas(p);
         var convidados = ConvidadosEmCurso(onde) ?? ConvidadosDaAgenda.Ler(onde).Nomes;
         using var prazo = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         NomesDoPrint.Leitura leitura;

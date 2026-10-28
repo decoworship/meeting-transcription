@@ -827,8 +827,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 
 /* A imagem ampliada: a caixa cresce até quase a janela, e a imagem cabe nela
- * sem cortar — um print de 4K tem de ser legível, não decorativo. */
-.modal--imagem { width: min(80rem, 94vw); }
+ * sem cortar — um print de 4K tem de ser legível, não decorativo. As duas
+ * classes, e não só a do modificador: o .modal mora mais abaixo, e com o mesmo
+ * peso a largura dele (38rem) ganhava. */
+.modal.modal--imagem { width: min(80rem, 94vw); }
 
 /* Quem estava na reunião (UI-12): uma caixinha por nome lido no print. A
  * lista rola dentro da caixa — uma galeria cheia do Teams passa de vinte. */
@@ -1891,7 +1893,19 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   padding-top: var(--espaco-5);
 }
 .gravador-tela { display: grid; gap: var(--espaco-4); }
-.grav-antes, .grav-gravando { display: grid; gap: var(--espaco-4); }
+.grav-antes { display: grid; gap: var(--espaco-4); }
+/* **Gravando, a seção tem a altura da janela, e a grade fica com o que sobra.**
+ * A grade tinha altura própria, calculada contando a faixa e nada mais: o aviso
+ * de mudo — que aparece justamente quando é preciso olhar — empurrava o fim da
+ * legenda e das notas para fora da janela. Agora o aviso encolhe a grade.
+ * O container é o que deixa a faixa saber a própria largura, e não a da janela
+ * (o trilho e o padding da página comem uns 140 px que a media query não vê). */
+.grav-gravando {
+  display: flex; flex-direction: column; gap: var(--espaco-4);
+  height: calc(100vh - var(--altura-da-barra, 64px) - var(--espaco-5) - var(--espaco-4));
+  min-height: 34rem;
+  container-type: inline-size;
+}
 .grav-antes[hidden], .grav-gravando[hidden] { display: none; }
 
 .grav-rotulo {
@@ -1996,13 +2010,26 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .grav-ultima__barra[hidden] { display: none; }
 .grav-ultima > .aa-btn { justify-self: start; margin-top: var(--espaco-3); }
 
-/* ---- a faixa gravando */
+/* ---- a faixa gravando
+ *
+ * **Duas linhas: o que é a gravação e o que fazer em cima, os medidores
+ * embaixo, de ponta a ponta.** Numa linha só eram cinco colunas, e as quatro
+ * fixas comiam a do título: numa janela de 1100 px sobravam uns 120 px para
+ * ele, e a pílula do cliente quebrava em duas linhas por cima do medidor. */
 .grav-faixa {
-  grid-template-columns: auto auto minmax(0, 1fr) minmax(12rem, 16rem) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "ponto tempo info acoes"
+    "medidores medidores medidores medidores";
   align-items: center;
-  gap: var(--espaco-4);
+  gap: var(--espaco-3) var(--espaco-4);
   padding: var(--espaco-4) var(--espaco-5);
 }
+.grav-faixa > .gravador__ponto { grid-area: ponto; }
+.grav-faixa > .grav-faixa__tempo { grid-area: tempo; }
+.grav-faixa > .grav-faixa__info { grid-area: info; }
+.grav-faixa > .grav-faixa__medidores { grid-area: medidores; }
+.grav-faixa > .grav-faixa__acoes { grid-area: acoes; }
 .grav-faixa__tempo {
   margin: 0;
   font-family: var(--fonte-mono);
@@ -2019,13 +2046,24 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 .grav-faixa__linha { display: flex; align-items: center; gap: var(--espaco-3); flex-wrap: wrap; }
 .grav-faixa__convidados { font-size: var(--texto-pequeno); color: var(--cor-texto-suave); }
-.grav-faixa__medidores { display: grid; grid-template-columns: 1fr 1fr; gap: var(--espaco-4); }
-.grav-faixa__medidores .faixa { display: grid; grid-template-columns: 1fr; gap: var(--espaco-2); }
-.grav-faixa__medidores .faixa__nome { font-weight: 400; font-size: var(--texto-rotulo); color: var(--cor-texto-suave); }
+/* O rótulo ao lado da barra, e não em cima: a linha dos medidores fica com a
+ * altura de uma linha de texto. */
+.grav-faixa__medidores {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--espaco-6);
+  padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+}
+.grav-faixa__medidores .faixa { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--espaco-3); }
+.grav-faixa__medidores .faixa__nome { font-weight: 400; font-size: var(--texto-rotulo); color: var(--cor-texto-suave); white-space: nowrap; }
 .grav-faixa__medidores .medidor { height: 6px; }
 .medidor[data-morto="true"] { background: var(--cor-erro-bg); outline: 1px solid var(--cor-erro); }
 .faixa[data-mudo="true"] .medidor > div { background: var(--cor-texto-suave); }
 .grav-faixa__acoes { display: flex; gap: var(--espaco-2); }
+.grav-faixa__acoes > .aa-btn { white-space: nowrap; }
+/* A pílula do cliente não quebra: encolhe com reticências. Quebrada, ela
+ * crescia para baixo e cobria o medidor. */
+.grav-faixa .grav-vinculo { max-width: 100%; white-space: nowrap; }
+.grav-faixa .grav-vinculo__texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .grav-parar { color: var(--cor-erro); border-color: var(--cor-erro); }
 .grav-parar::before {
   content: ""; width: 9px; height: 9px; margin-right: var(--espaco-2);
@@ -2046,8 +2084,10 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   grid-template-columns: minmax(0, 1.9fr) minmax(18rem, 1fr);
   gap: var(--espaco-4);
   align-items: stretch;
-  height: max(26rem, calc(100vh - var(--altura-da-barra, 64px) - 13rem));
+  flex: 1 1 0;
+  min-height: 18rem;
 }
+.grav-gravando > .grav-faixa { flex: 0 0 auto; }
 .grav-grade > * { min-height: 0; }
 .grav-grade > .aovivo { display: flex; flex-direction: column; gap: 0; padding: var(--espaco-4) var(--espaco-5); }
 .grav-grade > .aovivo > .aovivo__topo { padding-bottom: var(--espaco-3); margin-bottom: 0; border-bottom: 1px solid var(--cor-borda); }
@@ -2073,7 +2113,9 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 .grav-abas__painel[hidden] { display: none; }
 /* Dentro da aba o bloco de notas perde a moldura e o título: a aba já diz. */
 .grav-abas .notas, .grav-abas .perguntar { border: 0; padding: 0; background: none; flex: 1 1 auto; min-height: 0; }
-.grav-abas .notas { grid-template-rows: auto 1fr auto; }
+/* Uma linha só: o topo e as ações somem dentro da aba, e com as três linhas de
+ * fora o campo caía na primeira (auto) e a do meio (1fr) sobrava vazia. */
+.grav-abas .notas { grid-template-rows: minmax(0, 1fr); }
 .grav-abas .notas__texto { height: 100%; resize: none; }
 /* O Marcar momento das notas mora na faixa enquanto grava. */
 .grav-abas .notas__acoes { display: none; }
@@ -2084,7 +2126,16 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 }
 .grav-abas .notas__topo { display: none; }
 /* As miniaturas ficam entre o campo e o rodapé, fora da grade do bloco. */
-.grav-abas__painel > .notas__imagens { flex: 0 0 auto; margin-top: var(--espaco-2); max-height: 12rem; overflow-y: auto; }
+/* Numa fileira só, que rola para o lado: quebrando em linhas, cada print novo
+ * tirava uma linha do campo de texto. */
+.grav-abas__painel > .notas__imagens {
+  flex: 0 0 auto; flex-wrap: nowrap; margin-top: var(--espaco-2);
+  overflow-x: auto; overflow-y: hidden; padding-bottom: 2px;
+}
+.grav-abas__painel > .notas__imagens > .notas__imagem { flex: 0 0 auto; }
+/* O rows=14 é a altura que o campo quer, não a que ele tem: sem um mínimo
+ * explícito, a grade não o deixa encolher e o rodapé sai da janela. */
+.grav-abas .notas__texto { min-height: 5rem; }
 .grav-abas__dica { align-items: center; }
 .grav-abas__inserir { flex: 0 0 auto; }
 
@@ -2096,14 +2147,22 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
 
 /* Janela estreita: nada lado a lado, e a grade perde a altura fixa. A tela do
  * app que está gravando nunca pode ficar apertada. */
-@media (max-width: 1100px) {
-  .grav-faixa { grid-template-columns: auto auto minmax(0, 1fr); }
-  .grav-faixa__medidores { grid-column: 1 / -1; }
-  .grav-faixa__acoes { grid-column: 1 / -1; }
+/* Os quatro botões pedem uns 560 px; abaixo de 62rem de faixa o título ficaria
+ * com menos de 200, e eles descem para uma linha própria. */
+@container (max-width: 62rem) {
+  .grav-faixa {
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "ponto tempo info"
+      "acoes acoes acoes"
+      "medidores medidores medidores";
+  }
+  .grav-faixa__acoes { flex-wrap: wrap; }
 }
 @media (max-width: 960px) {
   .grav-heroi, .grav-antes__baixo, .grav-grade { grid-template-columns: minmax(0, 1fr); }
-  .grav-grade { height: auto; }
+  .grav-gravando { height: auto; }
+  .grav-grade { flex: 0 0 auto; }
   .grav-grade > .aovivo { height: 60vh; }
   .grav-grade > .grav-abas { min-height: 24rem; }
   .grav-grade[data-legenda="false"] > .grav-sem-legenda { grid-column: 1; grid-row: auto; }
