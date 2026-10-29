@@ -1,6 +1,6 @@
 {
-  "versao": "0.12.2",
-  "publicada": "2026-10-28",
-  "notas": "As imagens das notas aparecem, e a tela do Gravador cabe na janela sem nada por cima de nada, mesmo com o microfone mudo.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.2"
+  "versao": "0.13.0",
+  "publicada": "2026-10-29",
+  "notas": "A tela pode ser gravada em vídeo junto com a reunião, e depois assistida com a transcrição como legenda.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.13.0"
 }

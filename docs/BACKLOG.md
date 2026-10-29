@@ -478,7 +478,7 @@ desliga o automático até a gravação terminar.
 **Gatilho:** querer gravar sem rótulo com uma reunião da agenda em curso — uma
 conversa de corredor no horário de uma reunião que não aconteceu.
 
-### GRA-5 · A tela gravada em vídeo, com a transcrição de legenda — `feature` · prova de conceito em 28/10/2026
+### GRA-5 · A tela gravada em vídeo, com a transcrição de legenda — `feature` · saiu na 0.13.0 (29/10/2026)
 
 Pedido de uso real, 28/10/2026: gravar a tela para quem acompanha a reunião
 depois poder vê-la **na íntegra**, e não só ler e ouvir.
@@ -513,7 +513,15 @@ cheia (`web/video.js`).
 - **um monitor só, inteiro.** Nem janela, nem região, nem os dois monitores;
 - **janela protegida sai preta** (Teams com "impedir captura"), e é de
   propósito;
-- **não medido**: o custo de CPU ao lado da legenda ao vivo, e telas 4K.
+- **não medido**: telas 4K, e máquina com uma placa só — onde o encoder
+  divide a placa com a legenda ao vivo.
+
+**Medido numa reunião real do dono (29/10/2026)**, com a legenda ao vivo
+ligada: ~600 kb/s (~270 MB por hora); o PulseMeet inteiro em 5,5% da CPU
+(8 lógicos) e 249 MB de memória. **O Windows escolheu o encoder da Radeon Vega
+11 integrada** (motor `codec` a ~16%), e não o NVENC da RTX 2060, que ficou em
+0% — o vídeo não disputa a placa com a legenda. A sincronia da legenda sobre o
+vídeo foi aprovada pelo dono no mesmo dia.
 
 **Gatilho do próximo passo:** o primeiro uso real dizer o que falta — o
 segmento contra queda é o candidato natural.

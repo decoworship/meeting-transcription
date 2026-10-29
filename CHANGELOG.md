@@ -3,6 +3,34 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.13.0 — 29/10/2026
+
+**A tela pode ser gravada em vídeo junto com a reunião.** Em Ajustes ›
+Gravador › Dispositivos há uma opção nova, **Tela em vídeo**: escolha o monitor
+em que a reunião fica, e ele passa a ser gravado sempre que você grava. Para
+desligar, volte para **Não gravar** — que é como a opção vem. O Gravador mostra,
+em "Vai gravar", qual tela está sendo gravada.
+
+**Depois, a reunião aberta tem a aba Vídeo**, com a transcrição como legenda por
+cima e o nome de quem está falando. O vídeo toca junto com o áudio: o ▶ do
+tocador, clicar num trecho da transcrição ou numa nota levam o vídeo para o
+mesmo ponto. A legenda pode ser desligada, o nome também, e ela tem três
+tamanhos. **Tela cheia** amplia o vídeo com a legenda; no vídeo, a barra de
+espaço toca e pausa e as setas andam cinco segundos.
+
+O que é bom saber:
+
+- **o vídeo ocupa espaço**: em torno de 300 MB por hora numa reunião comum, e no
+  máximo perto de 750 MB, numa tela de 1920×1080;
+- **os primeiros dois segundos ficam sem vídeo** — é o tempo de ele começar —,
+  e a aba diz isso; o áudio começa na hora, como sempre;
+- **se o computador desligar ou o app fechar de repente no meio da reunião, o
+  vídeo se perde.** O áudio continua salvo, como sempre foi;
+- uma janela protegida contra captura — o Teams com "impedir captura de tela" —
+  aparece preta no vídeo.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.12.2 — 28/10/2026
 
 **As imagens das notas aparecem.** O print do Capturar tela (e do Ctrl+Alt+P) e
