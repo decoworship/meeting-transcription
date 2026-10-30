@@ -73,9 +73,15 @@ const site = SITES[APP];
  */
 function estado() {
   const b = site.botao();
-  return b
+  const e = b
     ? { tipo: "estado", app: APP, em_reuniao: true, mudo: site.mudo(b) }
     : { tipo: "estado", app: APP, em_reuniao: false, mudo: false };
+  // O título da aba, que é o da janela quando ela está na frente: é por ele
+  // que o PulseMeet acha a janela da reunião para gravar em vídeo. Só o quadro
+  // de cima o tem — o do iframe é outro documento. Entra no texto que o
+  // `avisar` compara, então mudar de título também avisa.
+  if (window === window.top) e.titulo = document.title;
+  return e;
 }
 
 function enviar(m) {

@@ -21,6 +21,30 @@ public sealed class ExtensaoDoMeetTests
     }
 
     [Fact]
+    public void LeAAbaDaReuniaoQuandoAExtensaoManda()
+    {
+        var m = ProtocoloDaExtensao.Ler("""
+            {"tipo":"estado","app":"meet","em_reuniao":true,"mudo":false,
+             "aba":{"titulo":"Meet - abc-defg-hij","na_frente":true}}
+            """);
+        Assert.Equal(new AbaDaReuniao("Meet - abc-defg-hij", true), m!.Aba);
+
+        // Extensão 1.1 não manda a aba: o mute continua igual, e o vídeo espera.
+        Assert.Null(ProtocoloDaExtensao.Ler("""{"tipo":"estado","app":"meet","em_reuniao":true}""")!.Aba);
+        // Fora da reunião não há aba a gravar, mesmo que venha.
+        Assert.Null(ProtocoloDaExtensao.Ler("""
+            {"tipo":"estado","em_reuniao":false,"aba":{"titulo":"Meet","na_frente":true}}
+            """)!.Aba);
+        // Sem título não dá para achar a janela.
+        Assert.Null(ProtocoloDaExtensao.Ler("""
+            {"tipo":"estado","em_reuniao":true,"aba":{"na_frente":true}}
+            """)!.Aba);
+        Assert.False(ProtocoloDaExtensao.Ler("""
+            {"tipo":"estado","em_reuniao":true,"aba":{"titulo":"Reunião | Microsoft Teams"}}
+            """)!.Aba!.NaFrente);
+    }
+
+    [Fact]
     public void UmAppDesconhecidoNaoEntra()
     {
         // O app vai para o registro e para a tela; não é lugar de texto livre.

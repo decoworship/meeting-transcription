@@ -700,10 +700,15 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
       }),
       ajuste({
         titulo: "Tela em vídeo",
-        linha: "Grava um monitor junto, para rever a reunião com a legenda por cima.",
+        linha: "Grava a reunião em vídeo junto, para rever com a legenda por cima.",
         dica: [
           "O vídeo não tem som: ele começa no mesmo relógio das duas faixas, e na "
           + "reunião aberta toca preso ao áudio, com a transcrição como legenda.",
+          "A janela da reunião grava só a janela do Chrome ou do Edge em que está o "
+          + "Meet ou o Teams, mesmo com outra janela por cima. Quando você troca de "
+          + "aba nela ou a minimiza, o vídeo pausa com um aviso — e não grava o que "
+          + "entrou na frente. Precisa da extensão do PulseMeet carregada no navegador, "
+          + "a mesma do mute (veja Chamadas, abaixo); a chave do mute não precisa estar ligada.",
           "Dez quadros por segundo, até perto de 750 MB por hora em 1920×1080. Janela "
           + "protegida — o Teams com \"impedir captura\" — sai preta. Se o app fechar "
           + "de repente no meio, o áudio se salva e o vídeo se perde.",

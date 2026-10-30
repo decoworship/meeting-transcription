@@ -277,7 +277,8 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         var agora = DateTime.UtcNow;
         if (_sincroniaDoTeams.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
             _ = _teams?.EnviarAsync(ProtocoloDoTeams.AlternarMudo);
-        if (_sincroniaDoNavegador.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
+        if (Cfg.SincronizarMuteNoNavegador
+            && _sincroniaDoNavegador.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
             _ = _navegador?.MutarAsync(Estado.Mudo);
     }
 
@@ -338,22 +339,27 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             MeetingApp.Nucleo.Registro.Escrever("teams", "sincronia do mute desligada");
         }
 
-        if (Cfg.SincronizarMuteNoNavegador && _navegador is null)
+        // A porta da extensão serve a duas coisas — o mute junto e achar a
+        // janela da reunião para o vídeo —, e fica aberta enquanto uma delas
+        // quiser. O mute só anda junto com a chave dele ligada.
+        if (QuerAExtensao && _navegador is null)
         {
             var s = new ServidorDaExtensao();
             s.AoReceber += e => naUi(() => AoMensagemDoNavegador(e));
             s.AoMudarConexao += conectou => naUi(() => AoMudarConexaoDoNavegador(conectou));
             _navegador = s;
             s.Ligar();
-            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute ligada");
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "porta da extensão aberta");
         }
-        else if (!Cfg.SincronizarMuteNoNavegador && _navegador is { } velho)
+        else if (!QuerAExtensao && _navegador is { } velho)
         {
             _navegador = null;
+            _abaDaReuniao = null;
             _sincroniaDoNavegador.AoPerderAChamada();
             _ = Task.Run(velho.Dispose);
-            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute desligada");
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "porta da extensão fechada");
         }
+        if (!Cfg.SincronizarMuteNoNavegador) _sincroniaDoNavegador.AoPerderAChamada();
     }
 
     private string _versaoParaOTeams = "0";
@@ -404,7 +410,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     /// navegador. Qual reunião, se do Meet ou do Teams, é <see cref="AppNoNavegador"/>.
     /// </summary>
     public string SituacaoDoNavegador =>
-        _navegador is null ? "desligada"
+        _navegador is null || !Cfg.SincronizarMuteNoNavegador ? "desligada"
         : !_navegador.Conectado ? "esperando"
         : _sincroniaDoNavegador.Chamada is { EmReuniao: true } ? "em-reuniao"
         : "conectado";
@@ -432,6 +438,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         {
             _sincroniaDoNavegador.AoPerderAChamada();
             AppNoNavegador = null;
+            _abaDaReuniao = null;
         }
         MeetingApp.Nucleo.Registro.Escrever("extensao", conectou ? "extensão conectada"
             : $"extensão saiu{(_navegador.UltimaFalha is { } f ? $" ({f})" : "")}");
@@ -445,6 +452,10 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         // ou a Microsoft mexem na página. Só chega quando muda.
         if (m.Diagnostico is { } d) MeetingApp.Nucleo.Registro.Escrever("extensao", d);
         if (m.Estado is not { } e) return;
+
+        // Para o vídeo, com ou sem o mute junto.
+        _abaDaReuniao = e.EmReuniao ? m.Aba : null;
+        if (!Cfg.SincronizarMuteNoNavegador) return;
 
         var antes = (SituacaoDoNavegador, AppNoNavegador);
         // Trocar de reunião — do Meet para o Teams — é outra chamada: o mute da
@@ -530,6 +541,9 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         else if (faixa == "tela") Cfg.MonitorDaTela = id;
         else Cfg.LoopbackId = id;
         Cfg.Salvar();
+        // A janela da reunião precisa da extensão, e a porta dela só abre
+        // quando alguém a quer.
+        if (faixa == "tela") AplicarSincronia();
         Atualizar();
     }
 
@@ -537,6 +551,16 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
 
     /// <summary>A tela está sendo gravada em vídeo agora.</summary>
     public bool GravandoTela => _tela is not null;
+
+    /// <summary>
+    /// A aba da reunião como a extensão disse por último, ou nulo. Escrita na
+    /// thread da UI e lida pela do vídeo, a cada quadro — por isso volátil, e
+    /// um registro imutável trocado inteiro.
+    /// </summary>
+    private volatile AbaDaReuniao? _abaDaReuniao;
+
+    private bool QuerAExtensao =>
+        Cfg.SincronizarMuteNoNavegador || Cfg.MonitorDaTela == JanelaDaReuniao.Fonte;
 
     /// <summary>
     /// O vídeo da tela, na mesma origem das faixas. Nunca impede o áudio.
@@ -551,14 +575,28 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         if (Cfg.MonitorDaTela is not { Length: > 0 } id || PastaAtual is null) return;
         try
         {
-            var monitor = Nativo.Monitores.Achar(id);
-            if (monitor is null)
+            FonteDaTela fonte;
+            if (id == JanelaDaReuniao.Fonte)
+            {
+                // O quadro tem o tamanho do monitor principal, até 1920 de
+                // largura: a janela muda de tamanho durante a reunião, e o
+                // vídeo não pode.
+                var principal = Nativo.Monitores.Listar().FirstOrDefault();
+                int l = principal?.Largura ?? 1920, a = principal?.Altura ?? 1080;
+                if (l > 1920) (l, a) = (1920, (int)Math.Round(a * 1920.0 / l));
+                fonte = new FonteDaJanelaDaReuniao(() => _abaDaReuniao, l, a);
+            }
+            else if (Nativo.Monitores.Achar(id) is { } monitor)
+            {
+                fonte = new FonteDoMonitor(monitor);
+            }
+            else
             {
                 Avisar("A tela escolhida para gravar não está ligada; gravando só o áudio.",
                        Win32Aviso.Atencao, sempre: true);
                 return;
             }
-            _tela = new GravadorDeTela(monitor, PastaAtual, origem);
+            _tela = new GravadorDeTela(fonte, PastaAtual, origem);
             _tela.Iniciar();
         }
         catch (Exception e)

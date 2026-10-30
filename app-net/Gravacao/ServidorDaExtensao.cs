@@ -14,7 +14,9 @@ namespace MeetingRecorder.Core;
 /// O que a página achou do botão do microfone, para o registro.log: é por ele
 /// que se descobre o que mudou quando o Google ou a Microsoft mexem na página.
 /// </param>
-public sealed record MensagemDaExtensao(EstadoDaChamada? Estado, string? App, string? Diagnostico);
+/// <param name="Aba">A aba da reunião, quando há uma e a extensão é a 1.2.0 ou mais nova.</param>
+public sealed record MensagemDaExtensao(EstadoDaChamada? Estado, string? App, string? Diagnostico,
+                                        AbaDaReuniao? Aba = null);
 
 /// <summary>
 /// O que a extensão de navegador e o PulseMeet dizem um ao outro.
@@ -28,6 +30,12 @@ public sealed record MensagemDaExtensao(EstadoDaChamada? Estado, string? App, st
 /// outro caminho, o <see cref="ProtocoloDoTeams"/>. O PulseMeet manda <c>{"tipo":"mutar","mudo":…}</c> — o
 /// estado pedido, e não "inverter": a extensão vê o botão e só clica se for
 /// diferente.
+/// </para>
+/// <para>
+/// <b>Desde a extensão 1.2.0, o estado leva a aba</b>:
+/// <c>"aba":{"titulo":…,"na_frente":…}</c>. É por ela que o vídeo acha a janela
+/// da reunião (<see cref="JanelaDaReuniao"/>). Extensão antiga não manda, e o
+/// vídeo fica esperando, sem quebrar o mute.
 /// </para>
 /// <para>
 /// O código da extensão está em <c>extensao/meet/</c>, e a porta tem de ser a
@@ -64,10 +72,13 @@ public static class ProtocoloDaExtensao
             case "estado":
                 bool emReuniao = Bool(o, "em_reuniao");
                 // A página não pede permissão para nada: na reunião, dá para mutar.
+                AbaDaReuniao? aba = emReuniao && o["aba"] is JsonObject a && Texto(a, "titulo") is { } titulo
+                    ? new AbaDaReuniao(titulo.Length > 300 ? titulo[..300] : titulo, Bool(a, "na_frente"))
+                    : null;
                 return new MensagemDaExtensao(
                     new EstadoDaChamada(EmReuniao: emReuniao, Mudo: emReuniao && Bool(o, "mudo"),
                                         PodeMutar: emReuniao, PodeParear: false),
-                    app, null);
+                    app, null, aba);
             case "diagnostico" when Texto(o, "texto") is { } texto:
                 return new MensagemDaExtensao(null, app, texto.Length > 1000 ? texto[..1000] : texto);
             default:

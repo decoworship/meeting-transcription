@@ -13,6 +13,9 @@ const PORTA = 47821;
 const RECONECTAR_MS = 5_000;
 const OI_MS = 20_000;
 
+/** tabId → o título que o quadro de cima da página disse. */
+const titulos = new Map();
+
 /**
  * "tabId:frameId" → { tab, frame, app, em_reuniao, mudo, quando }. Por quadro,
  * e não por aba: o Teams pode pôr a reunião num iframe, e cada quadro da página
@@ -47,13 +50,54 @@ function enviar(m) {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m));
 }
 
+/**
+ * A aba da reunião para o vídeo: o título e se ela está na frente — a aba ativa
+ * da janela dela, e a janela não minimizada. Nulo sem reunião.
+ *
+ * O título vem do `chrome.tabs` quando ele o dá, e senão do que a página disse:
+ * sem a permissão "tabs", o Chrome só entrega o título das abas dos sites da
+ * extensão, que são justamente as da reunião — mas a página é a garantia.
+ */
+async function abaDoAtivo() {
+  const e = ativo !== null ? quadros.get(ativo) : null;
+  if (!e) return null;
+  try {
+    const tab = await chrome.tabs.get(e.tab);
+    const janela = await chrome.windows.get(tab.windowId);
+    const titulo = tab.title || titulos.get(e.tab) || "";
+    return titulo ? { titulo, na_frente: tab.active && janela.state !== "minimized" } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** O estado com a aba, quando há. A aba é consulta assíncrona ao Chrome. */
+async function enviarEstado() {
+  const m = estadoDoAtivo();
+  const aba = m.em_reuniao ? await abaDoAtivo() : null;
+  if (aba) m.aba = aba;
+  enviar(m);
+}
+
+/** A aba da reunião deixou de estar, ou voltou a estar, na frente. */
+function aoMexerNasAbas() {
+  if (ativo !== null) enviarEstado();
+}
+chrome.tabs.onActivated.addListener(aoMexerNasAbas);
+chrome.tabs.onUpdated.addListener((tab, mudanca) => {
+  if (mudanca.title !== undefined && ativo !== null && quadros.get(ativo)?.tab === tab) enviarEstado();
+});
+chrome.tabs.onAttached.addListener(aoMexerNasAbas);
+chrome.windows.onBoundsChanged.addListener(aoMexerNasAbas);
+chrome.windows.onFocusChanged.addListener(aoMexerNasAbas);
+
 function conectar() {
   if (ws || tentativa) return;
   const s = new WebSocket(`ws://127.0.0.1:${PORTA}/`);
   ws = s;
   let oi = null;
   s.onopen = () => {
-    enviar(estadoDoAtivo());
+    enviarEstado();
     oi = setInterval(() => enviar({ tipo: "oi" }), OI_MS);
   };
   s.onmessage = (ev) => {
@@ -86,6 +130,7 @@ chrome.runtime.onMessage.addListener((m, remetente) => {
   }
   if (m?.tipo !== "estado") return;
 
+  if (frame === 0 && typeof m.titulo === "string") titulos.set(tab, m.titulo.slice(0, 300));
   const chave = `${tab}:${frame}`;
   const antes = quadros.get(chave);
   const mudou = !antes || antes.em_reuniao !== m.em_reuniao || antes.mudo !== m.mudo;
@@ -97,15 +142,16 @@ chrome.runtime.onMessage.addListener((m, remetente) => {
   });
   escolherAtivo();
   conectar();
-  enviar(estadoDoAtivo());
+  enviarEstado();
 });
 
 chrome.tabs.onRemoved.addListener((tab) => {
   let tirou = false;
+  titulos.delete(tab);
   for (const chave of [...quadros.keys()]) {
     if (chave.startsWith(`${tab}:`)) { quadros.delete(chave); tirou = true; }
   }
   if (!tirou) return;
   escolherAtivo();
-  enviar(estadoDoAtivo());
+  enviarEstado();
 });

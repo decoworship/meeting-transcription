@@ -526,6 +526,28 @@ vídeo foi aprovada pelo dono no mesmo dia.
 **Gatilho do próximo passo:** o primeiro uso real dizer o que falta — o
 segmento contra queda é o candidato natural.
 
+**A janela da reunião, no navegador (30/10/2026, ramo `janela-da-reuniao`).**
+Pedido do dono: gravar só a reunião, e não o monitor. O seletor ganhou "A
+janela da reunião (Meet ou Teams no navegador)" (`screen_monitor` =
+`janela-da-reuniao`). A extensão 1.2.0 manda, no estado, a aba da reunião —
+título e se está na frente —, e o PulseMeet acha a janela do Chrome ou do Edge
+cujo título contém o da aba (`Gravacao/JanelaDaReuniao.cs`, com testes) e a
+copia por `PrintWindow` com `PW_RENDERFULLCONTENT`
+(`FonteDaJanelaDaReuniao`, em `Bandeja/GravadorDeTela.cs`).
+
+- **Só grava com a aba na frente**, e o título da janela é a segunda trava: ele
+  muda no instante da troca de aba, antes de a extensão avisar. Fora da frente
+  ou minimizada, o quadro vira um aviso escrito — o vídeo não abre buraco, e a
+  sincronia continua sendo uma subtração;
+- a porta da extensão abre com o mute junto **ou** com esta fonte; o mute só
+  anda junto com a chave dele;
+- **medido em 30/10/2026** com uma página de relógio numa janela do Chrome,
+  coberta 4 s por outra janela: o vídeo continuou andando, sem a janela de
+  cima. O cálculo de oclusão do Chrome não congelou a janela nesse teste.
+  **Não medido** numa chamada real, nem coberta por minutos;
+- o Zoom desktop, que é o caso da esposa do dono, ficou para depois por
+  escolha dele; a mesma `FonteDaTela` serve, achando a janela pelo processo.
+
 ---
 
 ## 5. Diagnóstico e suporte

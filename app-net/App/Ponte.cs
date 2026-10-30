@@ -1747,10 +1747,19 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Saidas = Mapear(cat.Saidas),
             MicId = g.Cfg.MicId,
             LoopbackId = g.Cfg.LoopbackId,
-            Telas = [.. Nativo.Monitores.Listar().Select((m, i) => new DispositivoResumo
-            {
-                Id = m.Id, Nome = Nativo.Monitores.Nome(m, i), Padrao = m.Principal,
-            })],
+            // A janela da reunião primeiro: é a escolha de quem grava reunião no
+            // navegador, e os monitores são o caminho para todo o resto.
+            Telas = [
+                new DispositivoResumo
+                {
+                    Id = MeetingRecorder.Core.JanelaDaReuniao.Fonte,
+                    Nome = "A janela da reunião (Meet ou Teams no navegador)",
+                },
+                .. Nativo.Monitores.Listar().Select((m, i) => new DispositivoResumo
+                {
+                    Id = m.Id, Nome = Nativo.Monitores.Nome(m, i), Padrao = m.Principal,
+                }),
+            ],
             TelaId = g.Cfg.MonitorDaTela,
         };
     }
