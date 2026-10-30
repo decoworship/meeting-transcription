@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using MeetingRecorder.Core;
 
 namespace MeetingRecorder.Agenda;
 
@@ -341,7 +342,10 @@ public sealed class ClienteDaAgenda : IDisposable
         Fim: Instante(i.End),
         Participantes: (i.Attendees ?? [])
             .Select(a => new Participante(a.DisplayName, a.Email, a.Resource)).ToList(),
-        Organizador: i.Organizer?.DisplayName);
+        Organizador: i.Organizer?.DisplayName,
+        Plataforma: FonteAutomatica.Plataforma(
+            i.HangoutLink, string.Join(" ", (i.ConferenceData?.EntryPoints ?? []).Select(e => e.Uri)),
+            i.Location, i.Description));
 
     /// <remarks>
     /// Só <c>dateTime</c>: evento de dia inteiro traz <c>date</c> e não

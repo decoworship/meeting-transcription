@@ -704,8 +704,11 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
         dica: [
           "O vídeo não tem som: ele começa no mesmo relógio das duas faixas, e na "
           + "reunião aberta toca preso ao áudio, com a transcrição como legenda.",
-          "A janela da reunião grava só a janela do Chrome ou do Edge em que está o "
-          + "Meet ou o Teams, mesmo com outra janela por cima. Quando você troca de "
+          "Automático grava a reunião que estiver aberta — no navegador ou no Zoom "
+          + "desktop —, e troca sozinho se ela mudar de lugar. Com duas abertas, fica a "
+          + "da agenda; sem nenhuma, o vídeo espera com um aviso.",
+          "A janela da reunião no navegador grava só a janela do Chrome ou do Edge em "
+          + "que está o Meet, o Teams ou o Zoom, mesmo com outra janela por cima. Quando você troca de "
           + "aba nela ou a minimiza, o vídeo pausa com um aviso — e não grava o que "
           + "entrou na frente. Precisa da extensão do PulseMeet carregada no navegador, "
           + "a mesma do mute (veja Chamadas, abaixo); a chave do mute não precisa estar ligada.",

@@ -1752,8 +1752,13 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Telas = [
                 new DispositivoResumo
                 {
+                    Id = MeetingRecorder.Core.FonteAutomatica.Fonte,
+                    Nome = "Automático: a reunião que estiver aberta",
+                },
+                new DispositivoResumo
+                {
                     Id = MeetingRecorder.Core.JanelaDaReuniao.Fonte,
-                    Nome = "A janela da reunião (Meet ou Teams no navegador)",
+                    Nome = "A janela da reunião (Meet, Teams ou Zoom no navegador)",
                 },
                 new DispositivoResumo
                 {

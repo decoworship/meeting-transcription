@@ -8,7 +8,8 @@ namespace MeetingRecorder.Core;
 /// outra janela ainda conta como na frente — a captura pede o desenho da
 /// própria janela, e não o pedaço de tela.
 /// </param>
-public sealed record AbaDaReuniao(string Titulo, bool NaFrente);
+/// <param name="App">"meet", "teams" ou "zoom": de que reunião é a aba.</param>
+public sealed record AbaDaReuniao(string Titulo, bool NaFrente, string? App = null);
 
 /// <summary>O que o quadro do vídeo mostra, com a fonte "janela da reunião".</summary>
 public enum SituacaoDaJanela
@@ -55,12 +56,19 @@ public static class JanelaDaReuniao
 
     /// <summary>O título desta janela mostra a aba da reunião.</summary>
     /// <remarks>
-    /// Título curto demais não casa: um "Meet", um "Teams" ou um vazio estariam
-    /// contidos em janelas que não são a reunião.
+    /// Título curto não casa por "contém": um "Zoom" ou um "Meet" estariam
+    /// contidos em janelas que não são a reunião. Ele casa só como começo do
+    /// título da janela, seguido de espaço — "Zoom - Google Chrome" —, que é
+    /// como o navegador escreve a aba que está na frente. É o caso do Zoom na
+    /// web, cuja aba se chama só "Zoom".
     /// </remarks>
-    public static bool Mostra(string? tituloDaJanela, string? tituloDaAba) =>
-        tituloDaAba?.Trim() is { Length: >= 6 } aba && tituloDaJanela is { Length: > 0 } janela
-        && janela.Contains(aba, StringComparison.Ordinal);
+    public static bool Mostra(string? tituloDaJanela, string? tituloDaAba)
+    {
+        if (tituloDaAba?.Trim() is not { Length: >= 3 } aba || tituloDaJanela is not { Length: > 0 } janela)
+            return false;
+        if (aba.Length >= 6 && janela.Contains(aba, StringComparison.Ordinal)) return true;
+        return janela == aba || janela.StartsWith(aba + " ", StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// Das janelas do navegador, a que mostra a aba — a de título mais curto

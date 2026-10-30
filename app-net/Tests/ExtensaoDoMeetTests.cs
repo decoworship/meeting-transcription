@@ -27,7 +27,14 @@ public sealed class ExtensaoDoMeetTests
             {"tipo":"estado","app":"meet","em_reuniao":true,"mudo":false,
              "aba":{"titulo":"Meet - abc-defg-hij","na_frente":true}}
             """);
-        Assert.Equal(new AbaDaReuniao("Meet - abc-defg-hij", true), m!.Aba);
+        Assert.Equal(new AbaDaReuniao("Meet - abc-defg-hij", true, "meet"), m!.Aba);
+
+        // O Zoom na web (extensão 1.3.0) entra, para o vídeo.
+        var zoom = ProtocoloDaExtensao.Ler("""
+            {"tipo":"estado","app":"zoom","em_reuniao":true,"aba":{"titulo":"Zoom","na_frente":true}}
+            """);
+        Assert.Equal("zoom", zoom!.App);
+        Assert.Equal(new AbaDaReuniao("Zoom", true, "zoom"), zoom.Aba);
 
         // Extensão 1.1 não manda a aba: o mute continua igual, e o vídeo espera.
         Assert.Null(ProtocoloDaExtensao.Ler("""{"tipo":"estado","app":"meet","em_reuniao":true}""")!.Aba);
@@ -48,7 +55,7 @@ public sealed class ExtensaoDoMeetTests
     public void UmAppDesconhecidoNaoEntra()
     {
         // O app vai para o registro e para a tela; não é lugar de texto livre.
-        Assert.Null(ProtocoloDaExtensao.Ler("""{"tipo":"estado","app":"zoom","em_reuniao":true}""")!.App);
+        Assert.Null(ProtocoloDaExtensao.Ler("""{"tipo":"estado","app":"webex","em_reuniao":true}""")!.App);
         Assert.NotNull(ProtocoloDaExtensao.Ler("""{"tipo":"estado","em_reuniao":true}""")!.Estado);
     }
 
@@ -102,6 +109,7 @@ public sealed class ExtensaoDoMeetTests
         Assert.Contains("https://meet.google.com/*", sites);
         Assert.Contains("https://teams.microsoft.com/*", sites);
         Assert.Contains("https://teams.cloud.microsoft/*", sites);
+        Assert.Contains("https://*.zoom.us/*", sites);
     }
 
     [Fact]

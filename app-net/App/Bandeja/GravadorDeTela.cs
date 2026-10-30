@@ -434,15 +434,21 @@ internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
     private SituacaoDoZoom _situacao = SituacaoDoZoom.Esperando;
     private long _ultimaBusca = -1000;
 
-    public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
+    /// <summary>
+    /// Olha as janelas do Zoom e diz em que pé a reunião está. Chamado a cada
+    /// quadro; a busca de verdade só roda quando precisa.
+    /// </summary>
+    public SituacaoDoZoom Atualizar()
     {
         // A janela guardada continua valendo enquanto estiver de pé e do jeito
         // que estava; qualquer mudança — começou ou parou de compartilhar,
-        // minimizou — faz procurar de novo. Em pausa, a cada quarto de segundo,
-        // para voltar a gravar logo.
+        // minimizou — faz procurar de novo na hora. Minimizada, a cada quarto de
+        // segundo, para voltar a gravar logo; sem reunião, a cada segundo, que é
+        // o que custa listar os processos.
         bool gravando = _situacao is SituacaoDoZoom.Reuniao or SituacaoDoZoom.Compartilhando;
         bool perdeu = gravando && !(Win32.IsWindow(_hwnd) && Win32.IsWindowVisible(_hwnd) && !Win32.IsIconic(_hwnd));
-        if (perdeu || Environment.TickCount64 - _ultimaBusca >= (gravando ? 1000 : 250))
+        long intervalo = _situacao == SituacaoDoZoom.Minimizada ? 250 : 1000;
+        if (perdeu || Environment.TickCount64 - _ultimaBusca >= intervalo)
         {
             _ultimaBusca = Environment.TickCount64;
             var janelas = JanelasDoZoom.Listar();
@@ -450,7 +456,12 @@ internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
             _situacao = s;
             _hwnd = i >= 0 ? janelas[i].Hwnd : IntPtr.Zero;
         }
+        return _situacao;
+    }
 
+    public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
+    {
+        Atualizar();
         aviso = ReuniaoDoZoom.Aviso(_situacao);
         if (aviso is not null) return true;
 
@@ -465,4 +476,55 @@ internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
     }
 
     public override void Dispose() => _copia.Dispose();
+}
+
+/// <summary>
+/// A reunião que estiver aberta, onde estiver: a do navegador que a extensão
+/// aponta, ou a do Zoom desktop. A regra é <see cref="FonteAutomatica.Escolher"/>.
+/// </summary>
+/// <param name="aba">A aba da reunião no navegador, como a extensão disse por último.</param>
+/// <param name="agenda">A plataforma do evento sendo gravado, ou nulo. Lida a cada quadro: a agenda responde depois de a gravação começar.</param>
+internal sealed class FonteDaReuniaoAberta(Func<AbaDaReuniao?> aba, Func<string?> agenda, int largura, int altura)
+    : FonteDaTela
+{
+    public override int Largura { get; } = Par(largura);
+    public override int Altura { get; } = Par(altura);
+    public override string Descricao => FonteAutomatica.Fonte;
+
+    private readonly FonteDaJanelaDaReuniao _navegador = new(aba, largura, altura);
+    private readonly FonteDoZoom _zoom = new(largura, altura);
+    private EscolhaAutomatica _atual = EscolhaAutomatica.Nenhuma;
+
+    public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
+    {
+        var a = aba();
+        string? plataforma = agenda();
+        bool zoomAberto = _zoom.Atualizar() != SituacaoDoZoom.Esperando;
+        var escolha = FonteAutomatica.Escolher(a is null ? null : a.App ?? "meet", zoomAberto, plataforma, _atual);
+        if (escolha != _atual)
+        {
+            Registro.Escrever("tela", escolha switch
+            {
+                EscolhaAutomatica.Navegador => $"automático: a reunião do navegador ({a?.App ?? "?"})",
+                EscolhaAutomatica.Zoom => "automático: a reunião do Zoom",
+                _ => "automático: nenhuma reunião aberta",
+            });
+            _atual = escolha;
+        }
+
+        switch (escolha)
+        {
+            case EscolhaAutomatica.Navegador: return _navegador.Desenhar(dc, tela, out aviso);
+            case EscolhaAutomatica.Zoom: return _zoom.Desenhar(dc, tela, out aviso);
+            default:
+                aviso = FonteAutomatica.Espera(plataforma);
+                return true;
+        }
+    }
+
+    public override void Dispose()
+    {
+        _navegador.Dispose();
+        _zoom.Dispose();
+    }
 }

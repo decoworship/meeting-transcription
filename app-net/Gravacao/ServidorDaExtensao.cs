@@ -9,7 +9,11 @@ using System.Text.Json.Nodes;
 namespace MeetingRecorder.Core;
 
 /// <summary>Uma mensagem da extensão, com só o que o gravador usa.</summary>
-/// <param name="App"><c>"meet"</c> ou <c>"teams"</c> — de que página veio o estado.</param>
+/// <param name="App">
+/// <c>"meet"</c>, <c>"teams"</c> ou <c>"zoom"</c> — de que página veio o estado. O
+/// Zoom na web (extensão 1.3.0) serve só ao vídeo: o mute dele não foi medido, e
+/// o gravador não o segue.
+/// </param>
 /// <param name="Diagnostico">
 /// O que a página achou do botão do microfone, para o registro.log: é por ele
 /// que se descobre o que mudou quando o Google ou a Microsoft mexem na página.
@@ -66,14 +70,14 @@ public static class ProtocoloDaExtensao
         catch (JsonException) { return null; }
         if (o is null) return null;
 
-        string? app = Texto(o, "app") is "meet" or "teams" ? Texto(o, "app") : null;
+        string? app = Texto(o, "app") is "meet" or "teams" or "zoom" ? Texto(o, "app") : null;
         switch (Texto(o, "tipo"))
         {
             case "estado":
                 bool emReuniao = Bool(o, "em_reuniao");
                 // A página não pede permissão para nada: na reunião, dá para mutar.
                 AbaDaReuniao? aba = emReuniao && o["aba"] is JsonObject a && Texto(a, "titulo") is { } titulo
-                    ? new AbaDaReuniao(titulo.Length > 300 ? titulo[..300] : titulo, Bool(a, "na_frente"))
+                    ? new AbaDaReuniao(titulo.Length > 300 ? titulo[..300] : titulo, Bool(a, "na_frente"), app)
                     : null;
                 return new MensagemDaExtensao(
                     new EstadoDaChamada(EmReuniao: emReuniao, Mudo: emReuniao && Bool(o, "mudo"),

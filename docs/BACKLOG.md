@@ -561,6 +561,18 @@ tela, porque é transparente. Minimizada, a miniatura sai preta no
 `PrintWindow`, e o quadro vira aviso. **Não medido:** outra pessoa
 compartilhando, e o modo "lado a lado".
 
+**Automático e o Zoom na web (30/10/2026, mesmo ramo).** "Automático: a
+reunião que estiver aberta" é a primeira opção do seletor (`automatico`): grava
+a reunião do navegador que a extensão aponta ou a do Zoom desktop, e troca se
+ela mudar de lugar (`Gravacao/FonteAutomatica.cs`, com testes). **O que está
+aberto vale mais que a agenda**; o link do evento — `hangoutLink`,
+`conferenceData`, local e descrição, lidos agora pelo `ClienteDaAgenda` — só
+desempata duas abertas e diz qual esperar. Sem nenhuma, aviso de espera, e não
+o monitor (escolha minha, pela privacidade). A extensão 1.3.0 roda também no
+`*.zoom.us`: só diz que há reunião (`#wc-footer` e o botão de sair, **não
+medidos**), e o PulseMeet não segue o mute do Zoom. A aba do Zoom se chama
+"Zoom", e título curto passou a casar como começo do título da janela.
+
 ---
 
 ## 5. Diagnóstico e suporte

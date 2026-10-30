@@ -24,11 +24,19 @@ public sealed class JanelaDaReuniaoTests
 
     [Theory]
     [InlineData("Caixa de entrada (6) - Gmail - Google Chrome", "Meet - abc-defg-hij")]
-    [InlineData("Meet - Google Chrome", "Meet")]                // título curto demais
+    [InlineData("Meeting notes - Google Chrome", "Meet")]      // título curto: só como começo, com espaço
+    [InlineData("Gmail - Zoom - Google Chrome", "Zoom")]       // título curto no meio não conta
     [InlineData("", "Meet - abc-defg-hij")]
     [InlineData("Meet - abc-defg-hij - Google Chrome", null)]
     public void OResto_NaoCasa(string tituloDaJanela, string? tituloDaAba) =>
         Assert.False(JanelaDaReuniao.Mostra(tituloDaJanela, tituloDaAba));
+
+    [Theory]
+    [InlineData("Zoom - Google Chrome")]                        // o Zoom na web
+    [InlineData("Zoom e mais 2 guias - Pessoal — Microsoft\u200b Edge")]
+    [InlineData("Zoom")]
+    public void OTituloCurtoCasaComoComecoDaJanela(string tituloDaJanela) =>
+        Assert.True(JanelaDaReuniao.Mostra(tituloDaJanela, "Zoom"));
 
     [Fact]
     public void EscolheAJanelaDaReuniaoEntreAsDoNavegador()

@@ -455,7 +455,9 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
 
         // Para o vídeo, com ou sem o mute junto.
         _abaDaReuniao = e.EmReuniao ? m.Aba : null;
-        if (!Cfg.SincronizarMuteNoNavegador) return;
+        // O Zoom na web serve só ao vídeo: o botão do microfone dele não foi
+        // medido, e um "com som" constante desmutaria a gravação ao começar.
+        if (!Cfg.SincronizarMuteNoNavegador || m.App == "zoom") return;
 
         var antes = (SituacaoDoNavegador, AppNoNavegador);
         // Trocar de reunião — do Meet para o Teams — é outra chamada: o mute da
@@ -560,7 +562,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     private volatile AbaDaReuniao? _abaDaReuniao;
 
     private bool QuerAExtensao =>
-        Cfg.SincronizarMuteNoNavegador || Cfg.MonitorDaTela == JanelaDaReuniao.Fonte;
+        Cfg.SincronizarMuteNoNavegador || Cfg.MonitorDaTela is JanelaDaReuniao.Fonte or FonteAutomatica.Fonte;
 
     /// <summary>
     /// O vídeo da tela, na mesma origem das faixas. Nunca impede o áudio.
@@ -580,6 +582,11 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             {
                 var (l, a) = TamanhoDoQuadro();
                 fonte = new FonteDaJanelaDaReuniao(() => _abaDaReuniao, l, a);
+            }
+            else if (id == FonteAutomatica.Fonte)
+            {
+                var (l, a) = TamanhoDoQuadro();
+                fonte = new FonteDaReuniaoAberta(() => _abaDaReuniao, () => Evento?.Plataforma, l, a);
             }
             else if (id == ReuniaoDoZoom.Fonte)
             {
