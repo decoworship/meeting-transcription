@@ -709,6 +709,9 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
           + "aba nela ou a minimiza, o vídeo pausa com um aviso — e não grava o que "
           + "entrou na frente. Precisa da extensão do PulseMeet carregada no navegador, "
           + "a mesma do mute (veja Chamadas, abaixo); a chave do mute não precisa estar ligada.",
+          "A janela da reunião do Zoom grava a janela do Zoom desktop, sem extensão. "
+          + "Quando é você quem compartilha a tela, grava o que está sendo compartilhado — "
+          + "o mesmo que os outros estão vendo. Minimizada, o vídeo pausa com um aviso.",
           "Dez quadros por segundo, até perto de 750 MB por hora em 1920×1080. Janela "
           + "protegida — o Teams com \"impedir captura\" — sai preta. Se o app fechar "
           + "de repente no meio, o áudio se salva e o vídeo se perde.",

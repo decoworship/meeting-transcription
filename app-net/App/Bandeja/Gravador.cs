@@ -578,13 +578,13 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             FonteDaTela fonte;
             if (id == JanelaDaReuniao.Fonte)
             {
-                // O quadro tem o tamanho do monitor principal, até 1920 de
-                // largura: a janela muda de tamanho durante a reunião, e o
-                // vídeo não pode.
-                var principal = Nativo.Monitores.Listar().FirstOrDefault();
-                int l = principal?.Largura ?? 1920, a = principal?.Altura ?? 1080;
-                if (l > 1920) (l, a) = (1920, (int)Math.Round(a * 1920.0 / l));
+                var (l, a) = TamanhoDoQuadro();
                 fonte = new FonteDaJanelaDaReuniao(() => _abaDaReuniao, l, a);
+            }
+            else if (id == ReuniaoDoZoom.Fonte)
+            {
+                var (l, a) = TamanhoDoQuadro();
+                fonte = new FonteDoZoom(l, a);
             }
             else if (Nativo.Monitores.Achar(id) is { } monitor)
             {
@@ -604,6 +604,17 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             _tela = null;
             MeetingApp.Nucleo.Registro.Escrever("tela", $"não foi possível começar: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// O quadro das fontes de janela: o tamanho do monitor principal, até 1920
+    /// de largura. A janela muda de tamanho durante a reunião, e o vídeo não pode.
+    /// </summary>
+    private static (int Largura, int Altura) TamanhoDoQuadro()
+    {
+        var principal = Nativo.Monitores.Listar().FirstOrDefault();
+        int l = principal?.Largura ?? 1920, a = principal?.Altura ?? 1080;
+        return l > 1920 ? (1920, (int)Math.Round(a * 1920.0 / l)) : (l, a);
     }
 
     private void PararTela()

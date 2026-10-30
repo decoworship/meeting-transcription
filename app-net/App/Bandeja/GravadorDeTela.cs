@@ -249,24 +249,32 @@ internal sealed class FonteDoMonitor(Monitores.Monitor monitor) : FonteDaTela
         if (!Win32.BitBlt(dc, 0, 0, Largura, Altura, tela, monitor.Area.Left, monitor.Area.Top,
                           Win32.SRCCOPY | Win32.CAPTUREBLT))
             return false;
-        DesenharCursor(dc, monitor.Area);
+        Ponteiro.Desenhar(dc, monitor.Area, 0, 0, 1.0);
         return true;
     }
+}
 
-    /// <summary>
-    /// O ponteiro do mouse por cima do quadro: o <c>BitBlt</c> não o copia, e
-    /// quem compartilha a tela aponta com ele.
-    /// </summary>
-    private static void DesenharCursor(IntPtr dc, Win32.RECT area)
+/// <summary>
+/// O ponteiro do mouse por cima do quadro: o <c>BitBlt</c> não o copia, e
+/// quem compartilha a tela aponta com ele.
+/// </summary>
+internal static class Ponteiro
+{
+    /// <param name="area">O pedaço da tela que foi copiado.</param>
+    /// <param name="x">Onde ele caiu no quadro.</param>
+    /// <param name="escala">Quanto ele foi reduzido ou ampliado.</param>
+    public static void Desenhar(IntPtr dc, Win32.RECT area, int x, int y, double escala)
     {
         var info = new Win32.CURSORINFO { cbSize = (uint)Marshal.SizeOf<Win32.CURSORINFO>() };
         if (!Win32.GetCursorInfo(ref info) || (info.flags & Win32.CURSOR_SHOWING) == 0
             || info.hCursor == IntPtr.Zero) return;
+        if (info.ptScreenPos.X < area.Left || info.ptScreenPos.X >= area.Right
+            || info.ptScreenPos.Y < area.Top || info.ptScreenPos.Y >= area.Bottom) return;
         if (!Win32.GetIconInfo(info.hCursor, out var icone)) return;
         try
         {
-            Win32.DrawIconEx(dc, info.ptScreenPos.X - area.Left - (int)icone.xHotspot,
-                             info.ptScreenPos.Y - area.Top - (int)icone.yHotspot,
+            Win32.DrawIconEx(dc, x + (int)((info.ptScreenPos.X - area.Left) * escala) - (int)icone.xHotspot,
+                             y + (int)((info.ptScreenPos.Y - area.Top) * escala) - (int)icone.yHotspot,
                              info.hCursor, 0, 0, 0, IntPtr.Zero, Win32.DI_NORMAL);
         }
         finally
@@ -279,19 +287,86 @@ internal sealed class FonteDoMonitor(Monitores.Monitor monitor) : FonteDaTela
 }
 
 /// <summary>
+/// Uma janela inteira encaixada no quadro, por <c>PrintWindow</c> com
+/// <c>PW_RENDERFULLCONTENT</c>, e não <c>BitBlt</c> da tela: ele pede ao DWM o
+/// desenho da própria janela, então outra janela por cima não entra no vídeo.
+/// Medido com o Chrome (coberto, 30/10/2026) e com a câmera do Zoom.
+/// </summary>
+internal sealed class CopiaDeJanela : IDisposable
+{
+    // O DIB do tamanho da janela, refeito quando ela muda de tamanho.
+    private IntPtr _dc, _dib, _anterior;
+    private int _largura, _altura;
+
+    /// <returns>Falso quando a cópia falhou, e o quadro deve ser pulado.</returns>
+    public bool Copiar(IntPtr hwnd, IntPtr dc, IntPtr tela, int quadroL, int quadroA)
+    {
+        if (!Win32.GetWindowRect(hwnd, out var r)) return false;
+        // O retângulo da janela inclui a borda invisível de redimensionar; o
+        // do DWM é o que se vê. Sem ele, sobra uma moldura transparente.
+        if (Win32.DwmGetWindowAttribute(hwnd, Win32.DWMWA_EXTENDED_FRAME_BOUNDS, out var v,
+                                        Marshal.SizeOf<Win32.RECT>()) != 0) v = r;
+        int jl = r.Right - r.Left, ja = r.Bottom - r.Top;
+        if (jl <= 0 || ja <= 0) return false;
+
+        if (jl != _largura || ja != _altura)
+        {
+            Dispose();
+            _dc = Win32.CreateCompatibleDC(tela);
+            _dib = Dib.Criar(tela, jl, ja, out _);
+            _anterior = Win32.SelectObject(_dc, _dib);
+            (_largura, _altura) = (jl, ja);
+        }
+        if (!Win32.PrintWindow(hwnd, _dc, Win32.PW_RENDERFULLCONTENT)) return false;
+
+        int ox = Math.Clamp(v.Left - r.Left, 0, jl - 1), oy = Math.Clamp(v.Top - r.Top, 0, ja - 1);
+        int vl = Math.Min(v.Right - v.Left, jl - ox), va = Math.Min(v.Bottom - v.Top, ja - oy);
+        Encaixar(dc, _dc, ox, oy, vl, va, quadroL, quadroA);
+        return true;
+    }
+
+    /// <summary>
+    /// Um retângulo de <paramref name="origem"/> no meio do quadro, sem
+    /// distorcer, com faixa preta onde sobra (<see cref="JanelaDaReuniao.Encaixar"/>).
+    /// </summary>
+    /// <returns>Onde ele caiu e a escala, para o ponteiro.</returns>
+    public static (int X, int Y, double Escala) Encaixar(IntPtr dc, IntPtr origem, int ox, int oy, int l, int a,
+                                                         int quadroL, int quadroA)
+    {
+        var (x, y, el, ea) = JanelaDaReuniao.Encaixar(l, a, quadroL, quadroA);
+        Win32.PatBlt(dc, 0, 0, quadroL, quadroA, Win32.BLACKNESS);
+        if (el == l && ea == a)
+        {
+            Win32.BitBlt(dc, x, y, el, ea, origem, ox, oy, Win32.SRCCOPY | Win32.CAPTUREBLT);
+        }
+        else
+        {
+            // HALFTONE é o modo que reduz sem serrilhar o texto; ele exige
+            // reposicionar a origem do pincel depois de escolhido.
+            Win32.SetStretchBltMode(dc, Win32.HALFTONE);
+            Win32.SetBrushOrgEx(dc, 0, 0, IntPtr.Zero);
+            Win32.StretchBlt(dc, x, y, el, ea, origem, ox, oy, l, a, Win32.SRCCOPY | Win32.CAPTUREBLT);
+        }
+        return (x, y, l > 0 ? (double)el / l : 1.0);
+    }
+
+    public void Dispose()
+    {
+        if (_anterior != IntPtr.Zero) Win32.SelectObject(_dc, _anterior);
+        if (_dib != IntPtr.Zero) Win32.DeleteObject(_dib);
+        if (_dc != IntPtr.Zero) Win32.DeleteDC(_dc);
+        (_dc, _dib, _anterior, _largura, _altura) = (IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, 0);
+    }
+}
+
+/// <summary>
 /// A janela do navegador com a aba da reunião, que a extensão aponta.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b><c>PrintWindow</c> com <c>PW_RENDERFULLCONTENT</c>, e não <c>BitBlt</c> da
-/// tela.</b> Ele pede ao DWM o desenho da própria janela, então outra janela
-/// por cima não entra no vídeo. Minimizada não há desenho, e o quadro vira aviso.
-/// </para>
-/// <para>
 /// <b>Só grava quando a aba da reunião está na frente</b>, pela regra de
 /// <see cref="JanelaDaReuniao.Decidir"/>: a janela é do navegador, e trocar de
-/// aba nela poria no vídeo o que entrou no lugar.
-/// </para>
+/// aba nela poria no vídeo o que entrou no lugar. Minimizada não há desenho, e
+/// o quadro vira aviso.
 /// </remarks>
 /// <param name="aba">A aba como a extensão disse por último. Lida de outra thread.</param>
 internal sealed class FonteDaJanelaDaReuniao(Func<AbaDaReuniao?> aba, int largura, int altura) : FonteDaTela
@@ -300,12 +375,9 @@ internal sealed class FonteDaJanelaDaReuniao(Func<AbaDaReuniao?> aba, int largur
     public override int Altura { get; } = Par(altura);
     public override string Descricao => JanelaDaReuniao.Fonte;
 
+    private readonly CopiaDeJanela _copia = new();
     private IntPtr _hwnd;
     private long _ultimaBusca = -1000;   // procura já no primeiro quadro
-
-    // O DIB do tamanho da janela, refeito quando ela muda de tamanho.
-    private IntPtr _dc, _dib, _anterior;
-    private int _dibL, _dibA;
 
     public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
     {
@@ -333,53 +405,64 @@ internal sealed class FonteDaJanelaDaReuniao(Func<AbaDaReuniao?> aba, int largur
 
         var situacao = JanelaDaReuniao.Decidir(a, achou, achou && Win32.IsIconic(_hwnd), titulo);
         aviso = JanelaDaReuniao.Aviso(situacao);
+        return aviso is not null || _copia.Copiar(_hwnd, dc, tela, Largura, Altura);
+    }
+
+    public override void Dispose() => _copia.Dispose();
+}
+
+/// <summary>
+/// A reunião do Zoom desktop: a janela dela, ou — quando quem grava está
+/// compartilhando a tela — o que está sendo compartilhado, que é o que a
+/// reunião está vendo. A regra é <see cref="ReuniaoDoZoom.Decidir"/>.
+/// </summary>
+/// <remarks>
+/// <b>Sem extensão e sem aba.</b> As janelas do <c>Zoom.exe</c> se acham pelo
+/// processo e pela classe, e não há outra coisa que possa entrar na frente
+/// dentro delas. O compartilhamento é copiado da tela (<c>BitBlt</c>), porque a
+/// camada de anotação que o marca é transparente: o que está por baixo dela é
+/// o que se compartilha.
+/// </remarks>
+internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
+{
+    public override int Largura { get; } = Par(largura);
+    public override int Altura { get; } = Par(altura);
+    public override string Descricao => ReuniaoDoZoom.Fonte;
+
+    private readonly CopiaDeJanela _copia = new();
+    private IntPtr _hwnd;
+    private SituacaoDoZoom _situacao = SituacaoDoZoom.Esperando;
+    private long _ultimaBusca = -1000;
+
+    public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
+    {
+        // A janela guardada continua valendo enquanto estiver de pé e do jeito
+        // que estava; qualquer mudança — começou ou parou de compartilhar,
+        // minimizou — faz procurar de novo. Em pausa, a cada quarto de segundo,
+        // para voltar a gravar logo.
+        bool gravando = _situacao is SituacaoDoZoom.Reuniao or SituacaoDoZoom.Compartilhando;
+        bool perdeu = gravando && !(Win32.IsWindow(_hwnd) && Win32.IsWindowVisible(_hwnd) && !Win32.IsIconic(_hwnd));
+        if (perdeu || Environment.TickCount64 - _ultimaBusca >= (gravando ? 1000 : 250))
+        {
+            _ultimaBusca = Environment.TickCount64;
+            var janelas = JanelasDoZoom.Listar();
+            var (s, i) = ReuniaoDoZoom.Decidir([.. janelas.Select(j => j.Dados)]);
+            _situacao = s;
+            _hwnd = i >= 0 ? janelas[i].Hwnd : IntPtr.Zero;
+        }
+
+        aviso = ReuniaoDoZoom.Aviso(_situacao);
         if (aviso is not null) return true;
 
-        if (!Win32.GetWindowRect(_hwnd, out var r)) return false;
-        // O retângulo da janela inclui a borda invisível de redimensionar; o
-        // do DWM é o que se vê. Sem ele, sobra uma moldura transparente.
-        if (Win32.DwmGetWindowAttribute(_hwnd, Win32.DWMWA_EXTENDED_FRAME_BOUNDS, out var v,
-                                        Marshal.SizeOf<Win32.RECT>()) != 0) v = r;
-        int jl = r.Right - r.Left, ja = r.Bottom - r.Top;
-        if (jl <= 0 || ja <= 0) return false;
+        if (_situacao == SituacaoDoZoom.Reuniao)
+            return _copia.Copiar(_hwnd, dc, tela, Largura, Altura);
 
-        if (jl != _dibL || ja != _dibA)
-        {
-            Soltar();
-            _dc = Win32.CreateCompatibleDC(tela);
-            _dib = Dib.Criar(tela, jl, ja, out _);
-            _anterior = Win32.SelectObject(_dc, _dib);
-            (_dibL, _dibA) = (jl, ja);
-        }
-        if (!Win32.PrintWindow(_hwnd, _dc, Win32.PW_RENDERFULLCONTENT)) return false;
-
-        int ox = Math.Clamp(v.Left - r.Left, 0, jl - 1), oy = Math.Clamp(v.Top - r.Top, 0, ja - 1);
-        int vl = Math.Min(v.Right - v.Left, jl - ox), va = Math.Min(v.Bottom - v.Top, ja - oy);
-        var (x, y, l, h) = JanelaDaReuniao.Encaixar(vl, va, Largura, Altura);
-
-        Win32.PatBlt(dc, 0, 0, Largura, Altura, Win32.BLACKNESS);
-        if (l == vl && h == va)
-        {
-            Win32.BitBlt(dc, x, y, l, h, _dc, ox, oy, Win32.SRCCOPY);
-        }
-        else
-        {
-            // HALFTONE é o modo que reduz sem serrilhar o texto; ele exige
-            // reposicionar a origem do pincel depois de escolhido.
-            Win32.SetStretchBltMode(dc, Win32.HALFTONE);
-            Win32.SetBrushOrgEx(dc, 0, 0, IntPtr.Zero);
-            Win32.StretchBlt(dc, x, y, l, h, _dc, ox, oy, vl, va, Win32.SRCCOPY);
-        }
+        if (!Win32.GetWindowRect(_hwnd, out var r) || r.Right <= r.Left || r.Bottom <= r.Top) return false;
+        var (x, y, escala) = CopiaDeJanela.Encaixar(dc, tela, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top,
+                                                    Largura, Altura);
+        Ponteiro.Desenhar(dc, r, x, y, escala);
         return true;
     }
 
-    private void Soltar()
-    {
-        if (_anterior != IntPtr.Zero) Win32.SelectObject(_dc, _anterior);
-        if (_dib != IntPtr.Zero) Win32.DeleteObject(_dib);
-        if (_dc != IntPtr.Zero) Win32.DeleteDC(_dc);
-        (_dc, _dib, _anterior, _dibL, _dibA) = (IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, 0, 0);
-    }
-
-    public override void Dispose() => Soltar();
+    public override void Dispose() => _copia.Dispose();
 }

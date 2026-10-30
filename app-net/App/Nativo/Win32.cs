@@ -525,6 +525,9 @@ internal static partial class Win32
     internal static unsafe partial bool EnumWindows(delegate* unmanaged<IntPtr, IntPtr, int> lpEnumFunc,
         IntPtr lParam);
 
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
     [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW")]
     internal static unsafe partial int GetWindowText(IntPtr hWnd, char* lpString, int nMaxCount);
 

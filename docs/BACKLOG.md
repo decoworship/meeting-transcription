@@ -545,8 +545,21 @@ copia por `PrintWindow` com `PW_RENDERFULLCONTENT`
   coberta 4 s por outra janela: o vídeo continuou andando, sem a janela de
   cima. O cálculo de oclusão do Chrome não congelou a janela nesse teste.
   **Não medido** numa chamada real, nem coberta por minutos;
-- o Zoom desktop, que é o caso da esposa do dono, ficou para depois por
-  escolha dele; a mesma `FonteDaTela` serve, achando a janela pelo processo.
+- o picture-in-picture do Meet foi gravado por ~10 s por acaso (tem o mesmo
+  título da reunião, e a extensão ainda não tinha avisado a troca). Gravá-lo de
+  propósito, com a aba fora da frente, é uma mudança pequena — fica para quando
+  o dono pedir.
+
+**O Zoom desktop (30/10/2026, mesmo ramo).** "A janela da reunião (Zoom)" no
+seletor (`janela-do-zoom`), sem extensão: as janelas do `Zoom.exe` pela
+classe (`Gravacao/ReuniaoDoZoom.cs`, com testes; `FonteDoZoom`). **Medido
+numa reunião de um só, com câmera:** a reunião é a
+`ConfMultiTabContentWndClass`, e o `PrintWindow` traz a câmera perfeita;
+**compartilhando a tela, ela some** e surge a `ZoomAnnoWindowWndClass`, do
+tamanho exato do que se compartilha — é ela que se grava, por `BitBlt` da
+tela, porque é transparente. Minimizada, a miniatura sai preta no
+`PrintWindow`, e o quadro vira aviso. **Não medido:** outra pessoa
+compartilhando, e o modo "lado a lado".
 
 ---
 
