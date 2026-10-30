@@ -526,7 +526,7 @@ vídeo foi aprovada pelo dono no mesmo dia.
 **Gatilho do próximo passo:** o primeiro uso real dizer o que falta — o
 segmento contra queda é o candidato natural.
 
-**A janela da reunião, no navegador (30/10/2026, ramo `janela-da-reuniao`).**
+**A janela da reunião, no navegador (30/10/2026, saiu na 0.14.0).**
 Pedido do dono: gravar só a reunião, e não o monitor. O seletor ganhou "A
 janela da reunião (Meet ou Teams no navegador)" (`screen_monitor` =
 `janela-da-reuniao`). A extensão 1.2.0 manda, no estado, a aba da reunião —
@@ -550,7 +550,7 @@ copia por `PrintWindow` com `PW_RENDERFULLCONTENT`
   propósito, com a aba fora da frente, é uma mudança pequena — fica para quando
   o dono pedir.
 
-**O Zoom desktop (30/10/2026, mesmo ramo).** "A janela da reunião (Zoom)" no
+**O Zoom desktop (30/10/2026, saiu na 0.14.0).** "A janela da reunião (Zoom)" no
 seletor (`janela-do-zoom`), sem extensão: as janelas do `Zoom.exe` pela
 classe (`Gravacao/ReuniaoDoZoom.cs`, com testes; `FonteDoZoom`). **Medido
 numa reunião de um só, com câmera:** a reunião é a
@@ -561,7 +561,7 @@ tela, porque é transparente. Minimizada, a miniatura sai preta no
 `PrintWindow`, e o quadro vira aviso. **Não medido:** outra pessoa
 compartilhando, e o modo "lado a lado".
 
-**Automático e o Zoom na web (30/10/2026, mesmo ramo).** "Automático: a
+**Automático e o Zoom na web (30/10/2026, saiu na 0.14.0).** "Automático: a
 reunião que estiver aberta" é a primeira opção do seletor (`automatico`): grava
 a reunião do navegador que a extensão aponta ou a do Zoom desktop, e troca se
 ela mudar de lugar (`Gravacao/FonteAutomatica.cs`, com testes). **O que está

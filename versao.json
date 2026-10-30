@@ -1,6 +1,6 @@
 {
-  "versao": "0.13.0",
-  "publicada": "2026-10-29",
-  "notas": "A tela pode ser gravada em vídeo junto com a reunião, e depois assistida com a transcrição como legenda.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.13.0"
+  "versao": "0.14.0",
+  "publicada": "2026-10-30",
+  "notas": "O vídeo pode gravar só a janela da reunião — Meet, Teams ou Zoom, no navegador ou no Zoom desktop — e o Automático escolhe sozinho.",
+  "onde": ""
 }

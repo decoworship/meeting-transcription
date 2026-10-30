@@ -3,6 +3,33 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.14.0 — 30/10/2026
+
+**O vídeo pode gravar só a reunião, e não a tela inteira.** Em Ajustes ›
+Gravador › Tela em vídeo há três opções novas:
+
+- **Automático: a reunião que estiver aberta** — grava o Meet, o Teams ou o
+  Zoom, no navegador ou no Zoom desktop, onde a reunião estiver. Se ela mudar de
+  lugar no meio da gravação, o vídeo vai junto. Com duas reuniões abertas, fica a
+  do evento da agenda que está sendo gravado;
+- **A janela da reunião (Meet, Teams ou Zoom no navegador)** — também no app
+  instalado do Meet;
+- **A janela da reunião (Zoom)** — o Zoom desktop. Quando você compartilha a
+  tela, grava o que está sendo compartilhado, que é o que os outros veem.
+
+A janela é gravada mesmo coberta por outra. Quando a reunião sai da frente —
+outra aba no navegador, a janela minimizada — ou ainda não abriu, o vídeo
+mostra um aviso escrito no lugar dela, e não o que estava na tela. A legenda
+continua sincronizada.
+
+**A reunião no navegador é encontrada pela extensão**, a mesma do mute junto.
+Depois de atualizar, clique em ↻ na extensão, em chrome://extensions (e
+edge://extensions, em cada perfil em que ela está), e recarregue a aba da
+reunião. A extensão passa a mostrar a versão 1.3.0, e roda também no Zoom pela
+web — só para achar a reunião; o mute do Zoom não acompanha o PulseMeet.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.13.0 — 29/10/2026
 
 **A tela pode ser gravada em vídeo junto com a reunião.** Em Ajustes ›
