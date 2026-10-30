@@ -1,6 +1,6 @@
 {
-  "versao": "0.12.2",
-  "publicada": "2026-10-28",
-  "notas": "As imagens das notas aparecem, e a tela do Gravador cabe na janela sem nada por cima de nada, mesmo com o microfone mudo.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.12.2"
+  "versao": "0.14.0",
+  "publicada": "2026-10-30",
+  "notas": "O vídeo pode gravar só a janela da reunião — Meet, Teams ou Zoom, no navegador ou no Zoom desktop — e o Automático escolhe sozinho.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.14.0"
 }

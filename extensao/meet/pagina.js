@@ -1,6 +1,7 @@
-// Roda dentro da reunião — o Google Meet (aba ou app instalado) e o Teams no
-// navegador: lê o botão do microfone, avisa o fundo quando ele muda, e o clica
-// quando o PulseMeet pede.
+// Roda dentro da reunião — o Google Meet (aba ou app instalado), o Teams e o
+// Zoom no navegador: lê o botão do microfone, avisa o fundo quando ele muda, e
+// o clica quando o PulseMeet pede. No Zoom, só diz que há reunião, para o
+// vídeo achar a janela: o mute dele não foi medido.
 //
 // **Nenhum dos dois tem API para isto**, e o que se lê aqui é a página. Quando
 // o Google ou a Microsoft mudarem a página, é aqui que se conserta — e o
@@ -61,9 +62,26 @@ const SITES = {
       return /\bunmute\b|desativar (o )?mudo|(?<!des)ativar (o )?mic|reativar|(?<!des)activar/i.test(rotulo(b));
     },
   },
+  /**
+   * **Zoom no navegador** (app.zoom.us/wc/…). **Não medido** — é o que se sabe
+   * de fora do cliente web: o rodapé da reunião (`#wc-footer`) e o botão de
+   * sair. Só serve para dizer que há reunião; `semMute` faz o pedido de mutar
+   * ser ignorado, e o PulseMeet não segue o mute do Zoom. Quando o seletor
+   * falhar, o diagnóstico manda os candidatos.
+   */
+  zoom: {
+    semMute: true,
+    botao() {
+      if (!/\/wc\//.test(location.pathname)) return null;
+      return document.querySelector("#wc-footer, .footer__leave-btn, [class*='footer__leave'], "
+        + "button[aria-label^='Leave' i], button[aria-label^='Sair' i]");
+    },
+    mudo: () => false,
+  },
 };
 
-const APP = location.hostname === "meet.google.com" ? "meet" : "teams";
+const APP = location.hostname === "meet.google.com" ? "meet"
+  : /(^|\.)zoom\.us$/.test(location.hostname) ? "zoom" : "teams";
 const site = SITES[APP];
 
 /**
@@ -73,9 +91,15 @@ const site = SITES[APP];
  */
 function estado() {
   const b = site.botao();
-  return b
+  const e = b
     ? { tipo: "estado", app: APP, em_reuniao: true, mudo: site.mudo(b) }
     : { tipo: "estado", app: APP, em_reuniao: false, mudo: false };
+  // O título da aba, que é o da janela quando ela está na frente: é por ele
+  // que o PulseMeet acha a janela da reunião para gravar em vídeo. Só o quadro
+  // de cima o tem — o do iframe é outro documento. Entra no texto que o
+  // `avisar` compara, então mudar de título também avisa.
+  if (window === window.top) e.titulo = document.title;
+  return e;
 }
 
 function enviar(m) {
@@ -118,7 +142,17 @@ function diagnosticar() {
   const b = site.botao();
   let texto;
   if (b) {
-    texto = `${APP}: botão ${descrever(b)} → ${site.mudo(b) ? "mudo" : "com som"}`;
+    texto = site.semMute
+      ? `${APP}: reunião achada por ${descrever(b)}`
+      : `${APP}: botão ${descrever(b)} → ${site.mudo(b) ? "mudo" : "com som"}`;
+  } else if (APP === "zoom") {
+    if (!/\/wc\//.test(location.pathname)) return;
+    const candidatos = [...document.querySelectorAll("button, [role='button']")]
+      .filter((el) => /leave|sair|mute|áudio|audio/i.test(`${el.id} ${el.className} ${rotulo(el)}`))
+      .slice(0, 4)
+      .map(descrever);
+    if (candidatos.length === 0) return;
+    texto = `${APP}: nenhuma reunião reconhecida; candidatos: ${candidatos.join(" | ")}`;
   } else if (APP === "teams") {
     // Só os que parecem microfone: nome, id ou atalho.
     const candidatos = [...document.querySelectorAll("button, [role='button'], [role='switch']")]
@@ -152,7 +186,7 @@ new MutationObserver(() => {
 setInterval(() => { avisar(true); diagnosticar(); }, 10_000);
 
 chrome.runtime.onMessage.addListener((m) => {
-  if (m?.tipo !== "mutar") return;
+  if (m?.tipo !== "mutar" || site.semMute) return;
   const b = site.botao();
   // O pedido diz o estado, não "inverter": clicar só se for diferente.
   if (b && site.mudo(b) !== m.mudo) b.click();

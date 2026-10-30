@@ -62,6 +62,17 @@ public sealed class Configuracoes
     /// <remarks>A chave é sync_mute_meet porque nasceu só do Meet, e quem a ligou não pode vê-la desligar.</remarks>
     [JsonPropertyName("sync_mute_meet")] public bool SincronizarMuteNoNavegador { get; set; }
 
+    /// <summary>
+    /// O monitor gravado em vídeo junto com o áudio (<c>\\.\DISPLAY1</c>), ou
+    /// nulo para não gravar a tela — o padrão.
+    /// </summary>
+    /// <remarks>
+    /// Escolher o monitor é ligar: uma chave e uma lista seriam dois controles
+    /// para uma decisão só. Monitor que sumiu desliga em silêncio, como o
+    /// dispositivo de áudio que cai no padrão.
+    /// </remarks>
+    [JsonPropertyName("screen_monitor")] public string? MonitorDaTela { get; set; }
+
     public static string CaminhoPadrao => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".meeting-recorder", "settings.json");

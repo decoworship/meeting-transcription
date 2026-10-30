@@ -448,6 +448,9 @@ internal sealed class EstadoDoGravador
     /// a tela não promete um atalho que não existe.
     /// </summary>
     [JsonPropertyName("atalho_de_captura")] public string? AtalhoDeCaptura { get; init; }
+
+    /// <summary>A tela está sendo gravada em vídeo junto com o áudio.</summary>
+    [JsonPropertyName("gravando_tela")] public bool GravandoTela { get; init; }
 }
 
 /// <summary>Uma faixa enquanto grava — é daqui que sai o medidor de nível.</summary>
@@ -555,6 +558,12 @@ internal sealed class DispositivosDisponiveis
     /// <summary>Os escolhidos, ou nulo para "padrão do Windows".</summary>
     [JsonPropertyName("mic_id")] public string? MicId { get; init; }
     [JsonPropertyName("loopback_id")] public string? LoopbackId { get; init; }
+
+    /// <summary>Os monitores, para gravar um deles em vídeo.</summary>
+    [JsonPropertyName("telas")] public List<DispositivoResumo> Telas { get; init; } = [];
+
+    /// <summary>O monitor gravado, ou nulo para não gravar a tela.</summary>
+    [JsonPropertyName("tela_id")] public string? TelaId { get; init; }
 }
 
 internal sealed class DispositivoResumo
@@ -678,6 +687,12 @@ internal sealed class GravacaoResumo
 
     /// <summary>O começo das notas, para o painel. Ver <c>Notas.Inicio</c>.</summary>
     [JsonPropertyName("notas_inicio")] public string? NotasInicio { get; init; }
+
+    /// <summary>
+    /// Onde o vídeo da tela começa no áudio, em segundos, ou nulo se a
+    /// gravação não tem vídeo. Ver <c>Nucleo/VideoDaTela.cs</c>.
+    /// </summary>
+    [JsonPropertyName("video_inicio_s")] public double? VideoInicioS { get; init; }
 }
 
 /// <summary>Uma fala da legenda gravada, como a tela a recebe.</summary>
@@ -1671,6 +1686,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 ? Bandeja.Gravador.PastaDaExtensao : null,
             Faixas = faixas,
             AtalhoDeCaptura = g.Estado.Gravando ? g.AtalhoDeCaptura : null,
+            GravandoTela = g.GravandoTela,
         };
     }
 
@@ -1731,6 +1747,30 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             Saidas = Mapear(cat.Saidas),
             MicId = g.Cfg.MicId,
             LoopbackId = g.Cfg.LoopbackId,
+            // As janelas de reunião primeiro: são a escolha de quem grava
+            // reunião, e os monitores são o caminho para todo o resto.
+            Telas = [
+                new DispositivoResumo
+                {
+                    Id = MeetingRecorder.Core.FonteAutomatica.Fonte,
+                    Nome = "Automático: a reunião que estiver aberta",
+                },
+                new DispositivoResumo
+                {
+                    Id = MeetingRecorder.Core.JanelaDaReuniao.Fonte,
+                    Nome = "A janela da reunião (Meet, Teams ou Zoom no navegador)",
+                },
+                new DispositivoResumo
+                {
+                    Id = MeetingRecorder.Core.ReuniaoDoZoom.Fonte,
+                    Nome = "A janela da reunião (Zoom)",
+                },
+                .. Nativo.Monitores.Listar().Select((m, i) => new DispositivoResumo
+                {
+                    Id = m.Id, Nome = Nativo.Monitores.Nome(m, i), Padrao = m.Principal,
+                }),
+            ],
+            TelaId = g.Cfg.MonitorDaTela,
         };
     }
 
@@ -3245,6 +3285,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
             PendenciasInicio = [.. ata.PrimeirasPendencias],
             Resumo = ata.Resumo,
             NotasInicio = Notas.Inicio(pasta),
+            VideoInicioS = VideoDaTela.Ler(pasta)?.InicioS,
         };
     }
 }

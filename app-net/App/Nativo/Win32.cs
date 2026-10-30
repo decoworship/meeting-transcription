@@ -449,4 +449,139 @@ internal static partial class Win32
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool BitBlt(IntPtr hdc, int x, int y, int cx, int cy,
         IntPtr hdcSrc, int x1, int y1, uint rop);
+
+    // ───────────────────────────────────────────────── gravação de tela
+
+    internal const uint MONITORINFOF_PRIMARY = 0x00000001;
+    internal const uint CURSOR_SHOWING = 0x00000001;
+    internal const uint DI_NORMAL = 0x0003;
+
+    /// <summary>O <c>MONITORINFO</c> com o nome do dispositivo (<c>\\.\DISPLAY1</c>).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe struct MONITORINFOEX
+    {
+        public uint cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+        public fixed char szDevice[32];
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct CURSORINFO
+    {
+        public uint cbSize;
+        public uint flags;
+        public IntPtr hCursor;
+        public POINT ptScreenPos;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct ICONINFO
+    {
+        public int fIcon;
+        public uint xHotspot;
+        public uint yHotspot;
+        public IntPtr hbmMask;
+        public IntPtr hbmColor;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static unsafe partial bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip,
+        delegate* unmanaged<IntPtr, IntPtr, RECT*, IntPtr, int> lpfnEnum, IntPtr dwData);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetMonitorInfoEx(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetCursorInfo(ref CURSORINFO pci);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetIconInfo(IntPtr hIcon, out ICONINFO piconinfo);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DrawIconEx(IntPtr hdc, int xLeft, int yTop, IntPtr hIcon,
+        int cxWidth, int cyWidth, uint istepIfAniCur, IntPtr hbrFlickerFreeDraw, uint diFlags);
+
+    // ───────────────────────────────────────────────── gravação da janela da reunião
+
+    /// <summary>Pede ao DWM o conteúdo composto, e não o WM_PRINT da janela — é o que o Chrome desenha pela GPU.</summary>
+    internal const uint PW_RENDERFULLCONTENT = 0x00000002;
+    internal const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+    internal const int HALFTONE = 4;
+    internal const uint BLACKNESS = 0x00000042;
+    internal const int TRANSPARENT = 1;
+    internal const uint DT_CENTER = 0x00000001;
+    internal const uint DT_VCENTER = 0x00000004;
+    internal const uint DT_SINGLELINE = 0x00000020;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static unsafe partial bool EnumWindows(delegate* unmanaged<IntPtr, IntPtr, int> lpEnumFunc,
+        IntPtr lParam);
+
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW")]
+    internal static unsafe partial int GetWindowText(IntPtr hWnd, char* lpString, int nMaxCount);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassNameW")]
+    internal static unsafe partial int GetClassName(IntPtr hWnd, char* lpClassName, int nMaxCount);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint nFlags);
+
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute,
+        int cbAttribute);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool StretchBlt(IntPtr hdcDest, int xDest, int yDest, int wDest, int hDest,
+        IntPtr hdcSrc, int xSrc, int ySrc, int wSrc, int hSrc, uint rop);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial int SetStretchBltMode(IntPtr hdc, int mode);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool SetBrushOrgEx(IntPtr hdc, int x, int y, IntPtr lppt);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PatBlt(IntPtr hdc, int x, int y, int w, int h, uint rop);
+
+    [LibraryImport("gdi32.dll", EntryPoint = "CreateFontW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial IntPtr CreateFont(int cHeight, int cWidth, int cEscapement, int cOrientation,
+        int cWeight, uint bItalic, uint bUnderline, uint bStrikeOut, uint iCharSet, uint iOutPrecision,
+        uint iClipPrecision, uint iQuality, uint iPitchAndFamily, string pszFaceName);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial uint SetTextColor(IntPtr hdc, uint color);
+
+    [LibraryImport("gdi32.dll")]
+    internal static partial int SetBkMode(IntPtr hdc, int mode);
+
+    /// <summary>Esvazia a fila do GDI da thread: depois dele, os bits do DIB são o que foi desenhado.</summary>
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GdiFlush();
+
+    [LibraryImport("user32.dll", EntryPoint = "DrawTextW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int DrawText(IntPtr hdc, string lpchText, int cchText, ref RECT lprc, uint format);
 }

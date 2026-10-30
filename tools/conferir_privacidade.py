@@ -160,6 +160,41 @@ def homonimo(caminho: Path, termo: str) -> str | None:
     return None
 
 
+# ── o dicionário do Brotli ───────────────────────────────────────────────────
+#
+# Achado em 30/10/2026, montando a 0.14.0: a régua reprovou 'William' dentro do
+# PulseMeet.exe. O binário não tinha mudado nisso -- 'William' entrou no banco
+# de vozes naquela manhã. Os bytes são o **dicionário estático do Brotli** (RFC
+# 7932, apêndice A), que o host de arquivo único do .NET embute com o
+# System.IO.Compression.Native: 122.784 bytes de palavras da web coladas umas
+# nas outras -- "electricscotland", "anderson", "hamilton", "William".
+#
+# Ele não é perdoado pelo caminho, como os HOMONIMOS: o .exe é o arquivo em que
+# um vazamento nosso cairia. O perdão exige que **toda** ocorrência do termo
+# esteja dentro do dicionário, achado pelo começo dele, e nenhuma em UTF-16 --
+# que é como as strings do C# ficam no binário. Uma ocorrência fora reprova.
+_INICIO_DO_BROTLI = b"timedownlifeleftbackcodedatashowonlysitecityopen"
+_TAMANHO_DO_BROTLI = 122_784
+
+
+def so_no_dicionario_do_brotli(caminho: Path, termo: str) -> bool:
+    if caminho.suffix.lower() != ".exe":
+        return False
+    try:
+        dados = caminho.read_bytes()
+    except OSError:
+        return False
+    inicio = dados.find(_INICIO_DO_BROTLI)
+    if inicio < 0 or dados.find(_INICIO_DO_BROTLI, inicio + 1) >= 0:
+        return False
+    if termo.encode("utf-16-le") in dados:
+        return False
+    alvo = termo.encode("utf-8")
+    posicoes = [m.start() for m in re.finditer(re.escape(alvo), dados)]
+    return bool(posicoes) and all(
+        inicio <= p and p + len(alvo) <= inicio + _TAMANHO_DO_BROTLI for p in posicoes)
+
+
 # ── o que é nosso não é vazamento ────────────────────────────────────────────
 #
 # Achado em 19/08/2026, montando a 0.4.0: a régua reprovou 'Sprint' dentro do
@@ -547,6 +582,11 @@ def main() -> int:
             if (motivo := homonimo(caminho, termo)) is not None:
                 print(f"  ignorado: {termo!r} em {caminho.name}")
                 print(f"            {motivo}")
+                continue
+            if so_no_dicionario_do_brotli(caminho, termo):
+                print(f"  ignorado: {termo!r} em {caminho.name}")
+                print(f"            só dentro do dicionário estático do Brotli, "
+                      f"que o .NET embute no executável")
                 continue
             if (roda := intacto_do_pacote(caminho)) is not None:
                 # Uma linha por achado, e não duas: são nove só do 'Anderson', e

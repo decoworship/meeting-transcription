@@ -3,6 +3,61 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.14.0 — 30/10/2026
+
+**O vídeo pode gravar só a reunião, e não a tela inteira.** Em Ajustes ›
+Gravador › Tela em vídeo há três opções novas:
+
+- **Automático: a reunião que estiver aberta** — grava o Meet, o Teams ou o
+  Zoom, no navegador ou no Zoom desktop, onde a reunião estiver. Se ela mudar de
+  lugar no meio da gravação, o vídeo vai junto. Com duas reuniões abertas, fica a
+  do evento da agenda que está sendo gravado;
+- **A janela da reunião (Meet, Teams ou Zoom no navegador)** — também no app
+  instalado do Meet;
+- **A janela da reunião (Zoom)** — o Zoom desktop. Quando você compartilha a
+  tela, grava o que está sendo compartilhado, que é o que os outros veem.
+
+A janela é gravada mesmo coberta por outra. Quando a reunião sai da frente —
+outra aba no navegador, a janela minimizada — ou ainda não abriu, o vídeo
+mostra um aviso escrito no lugar dela, e não o que estava na tela. A legenda
+continua sincronizada.
+
+**A reunião no navegador é encontrada pela extensão**, a mesma do mute junto.
+Depois de atualizar, clique em ↻ na extensão, em chrome://extensions (e
+edge://extensions, em cada perfil em que ela está), e recarregue a aba da
+reunião. A extensão passa a mostrar a versão 1.3.0, e roda também no Zoom pela
+web — só para achar a reunião; o mute do Zoom não acompanha o PulseMeet.
+
+Esta atualização não baixa de novo o pacote de motores.
+
+## 0.13.0 — 29/10/2026
+
+**A tela pode ser gravada em vídeo junto com a reunião.** Em Ajustes ›
+Gravador › Dispositivos há uma opção nova, **Tela em vídeo**: escolha o monitor
+em que a reunião fica, e ele passa a ser gravado sempre que você grava. Para
+desligar, volte para **Não gravar** — que é como a opção vem. O Gravador mostra,
+em "Vai gravar", qual tela está sendo gravada.
+
+**Depois, a reunião aberta tem a aba Vídeo**, com a transcrição como legenda por
+cima e o nome de quem está falando. O vídeo toca junto com o áudio: o ▶ do
+tocador, clicar num trecho da transcrição ou numa nota levam o vídeo para o
+mesmo ponto. A legenda pode ser desligada, o nome também, e ela tem três
+tamanhos. **Tela cheia** amplia o vídeo com a legenda; no vídeo, a barra de
+espaço toca e pausa e as setas andam cinco segundos.
+
+O que é bom saber:
+
+- **o vídeo ocupa espaço**: em torno de 300 MB por hora numa reunião comum, e no
+  máximo perto de 750 MB, numa tela de 1920×1080;
+- **os primeiros dois segundos ficam sem vídeo** — é o tempo de ele começar —,
+  e a aba diz isso; o áudio começa na hora, como sempre;
+- **se o computador desligar ou o app fechar de repente no meio da reunião, o
+  vídeo se perde.** O áudio continua salvo, como sempre foi;
+- uma janela protegida contra captura — o Teams com "impedir captura de tela" —
+  aparece preta no vídeo.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.12.2 — 28/10/2026
 
 **As imagens das notas aparecem.** O print do Capturar tela (e do Ctrl+Alt+P) e

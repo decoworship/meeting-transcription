@@ -19,7 +19,8 @@ public sealed record Evento(
     DateTimeOffset? Inicio,
     DateTimeOffset? Fim,
     IReadOnlyList<Participante> Participantes,
-    string? Organizador)
+    string? Organizador,
+    string? Plataforma = null)
 {
     /// <summary>Nomes para o vocabulário. Sem e-mails, sem salas.</summary>
     public List<string> NomesDosParticipantes()

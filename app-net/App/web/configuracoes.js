@@ -675,12 +675,17 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
                                      "Microfone");
     const sis = seletorDeDispositivo("loopback", dispositivos.saidas,
                                      dispositivos.loopback_id, "Áudio da reunião");
-    for (const [faixa, campo] of [["mic", mic], ["loopback", sis]]) {
+    const tela = seletorDeDispositivo("tela", dispositivos.telas, dispositivos.tela_id,
+                                      "Tela em vídeo");
+    // O primeiro item da tela é o contrário do das faixas: sem escolha, não grava.
+    tela.options[0].textContent = "Não gravar";
+    const ID = { mic: "mic_id", loopback: "loopback_id", tela: "tela_id" };
+    for (const [faixa, campo] of [["mic", mic], ["loopback", sis], ["tela", tela]]) {
       campo.disabled = gravador.gravando === true;
       campo.addEventListener("change", () => {
         // A tela se redesenha com o estado do gravador que volta; o dispositivo
         // escolhido tem que estar na lista local para não voltar ao anterior.
-        dispositivos[faixa === "mic" ? "mic_id" : "loopback_id"] = campo.value;
+        dispositivos[ID[faixa]] = campo.value;
         aoMexer("escolher-dispositivo", { faixa, dispositivo: campo.value });
       });
     }
@@ -692,12 +697,36 @@ function abaGravador({ gravador, dispositivos, config }, aoMexer, gravar) {
                + "da chamada. Ele é gravado numa faixa separada da sua, e é isso que "
                + "permite saber com certeza quando quem falou foi você."],
         controle: sis,
+      }),
+      ajuste({
+        titulo: "Tela em vídeo",
+        linha: "Grava a reunião em vídeo junto, para rever com a legenda por cima.",
+        dica: [
+          "O vídeo não tem som: ele começa no mesmo relógio das duas faixas, e na "
+          + "reunião aberta toca preso ao áudio, com a transcrição como legenda.",
+          "Automático grava a reunião que estiver aberta — no navegador ou no Zoom "
+          + "desktop —, e troca sozinho se ela mudar de lugar. Com duas abertas, fica a "
+          + "da agenda; sem nenhuma, o vídeo espera com um aviso.",
+          "A janela da reunião no navegador grava só a janela do Chrome ou do Edge em "
+          + "que está o Meet, o Teams ou o Zoom, mesmo com outra janela por cima. Quando você troca de "
+          + "aba nela ou a minimiza, o vídeo pausa com um aviso — e não grava o que "
+          + "entrou na frente. Precisa da extensão do PulseMeet carregada no navegador, "
+          + "a mesma do mute (veja Chamadas, abaixo); a chave do mute não precisa estar ligada.",
+          "A janela da reunião do Zoom grava a janela do Zoom desktop, sem extensão. "
+          + "Quando é você quem compartilha a tela, grava o que está sendo compartilhado — "
+          + "o mesmo que os outros estão vendo. Minimizada, o vídeo pausa com um aviso.",
+          "Dez quadros por segundo, até perto de 750 MB por hora em 1920×1080. Janela "
+          + "protegida — o Teams com \"impedir captura\" — sai preta. Se o app fechar "
+          + "de repente no meio, o áudio se salva e o vídeo se perde.",
+        ],
+        custo: "até 750 MB/h",
+        controle: tela,
       }));
     if (gravador.gravando) {
       const trava = document.createElement("p");
       trava.className = "ajustes__trava";
-      trava.textContent = "Gravando agora: os dois ficam travados até a gravação parar — "
-        + "as faixas começam alinhadas por começarem juntas.";
+      trava.textContent = "Gravando agora: os três ficam travados até a gravação parar — "
+        + "as faixas e o vídeo começam alinhados por começarem juntos.";
       secao.appendChild(trava);
     }
     painel.appendChild(secao);

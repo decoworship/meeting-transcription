@@ -1008,6 +1008,81 @@ textarea.aa-entrada { font-family: inherit; resize: vertical; }
   color: var(--cor-texto-suave);
   white-space: nowrap;
 }
+
+/* A aba Vídeo (video.js). O palco é preto em qualquer tema: é uma tela gravada,
+ * e a legenda é branca sobre faixa escura, como em qualquer tocador — a cor do
+ * falante vai numa barra ao lado do nome, e não no texto, porque os tons da
+ * paleta foram escolhidos para o fundo do tema, e não para cima de um vídeo. */
+.video { display: grid; gap: var(--espaco-3); }
+.video__palco {
+  position: relative;
+  background: #000;
+  border-radius: var(--raio-m, 8px);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - var(--altura-da-barra) - var(--altura-das-abas) - 9rem);
+  margin-inline: auto;
+  width: 100%;
+  --legenda: 1.15rem;
+}
+.video__palco[data-tamanho="pequena"] { --legenda: 0.95rem; }
+.video__palco[data-tamanho="grande"] { --legenda: 1.6rem; }
+.video__palco:fullscreen { border-radius: 0; max-height: none; --legenda: 1.6rem; }
+.video__palco:fullscreen[data-tamanho="pequena"] { --legenda: 1.25rem; }
+.video__palco:fullscreen[data-tamanho="grande"] { --legenda: 2.2rem; }
+.video__palco:focus-visible { outline: 2px solid var(--cor-foco, currentColor); outline-offset: 2px; }
+.video__tela { width: 100%; height: 100%; object-fit: contain; display: block; cursor: pointer; }
+.video__antes {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: #fff;
+  font-size: var(--texto-pequeno);
+  pointer-events: none;
+}
+.video__antes[hidden] { display: none; }
+.video__legenda {
+  position: absolute;
+  left: 50%;
+  bottom: 6%;
+  transform: translateX(-50%);
+  max-width: min(90%, 60ch);
+  padding: 0.35em 0.7em;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.72);
+  color: #fff;
+  font-size: var(--legenda);
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+}
+.video__legenda--vazia, .video__legenda[hidden] { display: none; }
+.video__falante {
+  display: block;
+  font-size: 0.75em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.video__falante::before {
+  content: "";
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.4em;
+  border-radius: 50%;
+  background: var(--cor-do-falante, transparent);
+}
+.video__falante[hidden] { display: none; }
+.video__opcoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+.video__opcao { display: inline-flex; align-items: center; gap: var(--espaco-1, 4px); }
+.video__tamanho { width: auto; }
 @media (max-width: 720px) {
   .tocador__dica { display: none; }
 }

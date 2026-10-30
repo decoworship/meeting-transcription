@@ -210,6 +210,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             // construção em vez de por sorte.
             long origem = WasapiTrackCapture.QpcAgora();
             foreach (var c in _capturas) c.Iniciar(origem);
+            IniciarTela(origem);
 
             _inicio = DateTime.UtcNow;
             _jaAvisou.Clear();
@@ -276,7 +277,8 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         var agora = DateTime.UtcNow;
         if (_sincroniaDoTeams.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
             _ = _teams?.EnviarAsync(ProtocoloDoTeams.AlternarMudo);
-        if (_sincroniaDoNavegador.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
+        if (Cfg.SincronizarMuteNoNavegador
+            && _sincroniaDoNavegador.AoMutarNoApp(Estado.Mudo, agora) == AcaoDaSincronia.AlternarNaChamada)
             _ = _navegador?.MutarAsync(Estado.Mudo);
     }
 
@@ -337,22 +339,27 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
             MeetingApp.Nucleo.Registro.Escrever("teams", "sincronia do mute desligada");
         }
 
-        if (Cfg.SincronizarMuteNoNavegador && _navegador is null)
+        // A porta da extensão serve a duas coisas — o mute junto e achar a
+        // janela da reunião para o vídeo —, e fica aberta enquanto uma delas
+        // quiser. O mute só anda junto com a chave dele ligada.
+        if (QuerAExtensao && _navegador is null)
         {
             var s = new ServidorDaExtensao();
             s.AoReceber += e => naUi(() => AoMensagemDoNavegador(e));
             s.AoMudarConexao += conectou => naUi(() => AoMudarConexaoDoNavegador(conectou));
             _navegador = s;
             s.Ligar();
-            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute ligada");
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "porta da extensão aberta");
         }
-        else if (!Cfg.SincronizarMuteNoNavegador && _navegador is { } velho)
+        else if (!QuerAExtensao && _navegador is { } velho)
         {
             _navegador = null;
+            _abaDaReuniao = null;
             _sincroniaDoNavegador.AoPerderAChamada();
             _ = Task.Run(velho.Dispose);
-            MeetingApp.Nucleo.Registro.Escrever("extensao", "sincronia do mute desligada");
+            MeetingApp.Nucleo.Registro.Escrever("extensao", "porta da extensão fechada");
         }
+        if (!Cfg.SincronizarMuteNoNavegador) _sincroniaDoNavegador.AoPerderAChamada();
     }
 
     private string _versaoParaOTeams = "0";
@@ -403,7 +410,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     /// navegador. Qual reunião, se do Meet ou do Teams, é <see cref="AppNoNavegador"/>.
     /// </summary>
     public string SituacaoDoNavegador =>
-        _navegador is null ? "desligada"
+        _navegador is null || !Cfg.SincronizarMuteNoNavegador ? "desligada"
         : !_navegador.Conectado ? "esperando"
         : _sincroniaDoNavegador.Chamada is { EmReuniao: true } ? "em-reuniao"
         : "conectado";
@@ -431,6 +438,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         {
             _sincroniaDoNavegador.AoPerderAChamada();
             AppNoNavegador = null;
+            _abaDaReuniao = null;
         }
         MeetingApp.Nucleo.Registro.Escrever("extensao", conectou ? "extensão conectada"
             : $"extensão saiu{(_navegador.UltimaFalha is { } f ? $" ({f})" : "")}");
@@ -444,6 +452,12 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         // ou a Microsoft mexem na página. Só chega quando muda.
         if (m.Diagnostico is { } d) MeetingApp.Nucleo.Registro.Escrever("extensao", d);
         if (m.Estado is not { } e) return;
+
+        // Para o vídeo, com ou sem o mute junto.
+        _abaDaReuniao = e.EmReuniao ? m.Aba : null;
+        // O Zoom na web serve só ao vídeo: o botão do microfone dele não foi
+        // medido, e um "com som" constante desmutaria a gravação ao começar.
+        if (!Cfg.SincronizarMuteNoNavegador || m.App == "zoom") return;
 
         var antes = (SituacaoDoNavegador, AppNoNavegador);
         // Trocar de reunião — do Meet para o Teams — é outra chamada: o mute da
@@ -478,6 +492,7 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
         Avisar(() => AoTerminar?.Invoke());
 
         foreach (var c in _capturas) c.Parar();
+        PararTela();
 
         var system = Stats("system");
         var mic = Stats("mic");
@@ -524,9 +539,105 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     public void EscolherDispositivo(string faixa, string? id)
     {
         if (Estado.Gravando) return;
-        if (faixa == "mic") Cfg.MicId = id; else Cfg.LoopbackId = id;
+        if (faixa == "mic") Cfg.MicId = id;
+        else if (faixa == "tela") Cfg.MonitorDaTela = id;
+        else Cfg.LoopbackId = id;
         Cfg.Salvar();
+        // A janela da reunião precisa da extensão, e a porta dela só abre
+        // quando alguém a quer.
+        if (faixa == "tela") AplicarSincronia();
         Atualizar();
+    }
+
+    private GravadorDeTela? _tela;
+
+    /// <summary>A tela está sendo gravada em vídeo agora.</summary>
+    public bool GravandoTela => _tela is not null;
+
+    /// <summary>
+    /// A aba da reunião como a extensão disse por último, ou nulo. Escrita na
+    /// thread da UI e lida pela do vídeo, a cada quadro — por isso volátil, e
+    /// um registro imutável trocado inteiro.
+    /// </summary>
+    private volatile AbaDaReuniao? _abaDaReuniao;
+
+    private bool QuerAExtensao =>
+        Cfg.SincronizarMuteNoNavegador || Cfg.MonitorDaTela is JanelaDaReuniao.Fonte or FonteAutomatica.Fonte;
+
+    /// <summary>
+    /// O vídeo da tela, na mesma origem das faixas. Nunca impede o áudio.
+    /// </summary>
+    /// <remarks>
+    /// Depois das faixas, e não antes: abrir o codificador leva uns dois
+    /// segundos, e eles não podem atrasar o primeiro pacote de áudio. O vídeo
+    /// começa um pouco depois, e o <c>tela.json</c> diz quanto.
+    /// </remarks>
+    private void IniciarTela(long origem)
+    {
+        if (Cfg.MonitorDaTela is not { Length: > 0 } id || PastaAtual is null) return;
+        try
+        {
+            FonteDaTela fonte;
+            if (id == JanelaDaReuniao.Fonte)
+            {
+                var (l, a) = TamanhoDoQuadro();
+                fonte = new FonteDaJanelaDaReuniao(() => _abaDaReuniao, l, a);
+            }
+            else if (id == FonteAutomatica.Fonte)
+            {
+                var (l, a) = TamanhoDoQuadro();
+                fonte = new FonteDaReuniaoAberta(() => _abaDaReuniao, () => Evento?.Plataforma, l, a);
+            }
+            else if (id == ReuniaoDoZoom.Fonte)
+            {
+                var (l, a) = TamanhoDoQuadro();
+                fonte = new FonteDoZoom(l, a);
+            }
+            else if (Nativo.Monitores.Achar(id) is { } monitor)
+            {
+                fonte = new FonteDoMonitor(monitor);
+            }
+            else
+            {
+                Avisar("A tela escolhida para gravar não está ligada; gravando só o áudio.",
+                       Win32Aviso.Atencao, sempre: true);
+                return;
+            }
+            _tela = new GravadorDeTela(fonte, PastaAtual, origem);
+            _tela.Iniciar();
+        }
+        catch (Exception e)
+        {
+            _tela = null;
+            MeetingApp.Nucleo.Registro.Escrever("tela", $"não foi possível começar: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// O quadro das fontes de janela: o tamanho do monitor principal, até 1920
+    /// de largura. A janela muda de tamanho durante a reunião, e o vídeo não pode.
+    /// </summary>
+    private static (int Largura, int Altura) TamanhoDoQuadro()
+    {
+        var principal = Nativo.Monitores.Listar().FirstOrDefault();
+        int l = principal?.Largura ?? 1920, a = principal?.Altura ?? 1080;
+        return l > 1920 ? (1920, (int)Math.Round(a * 1920.0 / l)) : (l, a);
+    }
+
+    private void PararTela()
+    {
+        if (_tela is not { } tela) return;
+        _tela = null;
+        try
+        {
+            tela.Dispose();
+            if (tela.Falha is not null)
+                Avisar($"O vídeo da tela parou antes da gravação: {tela.Falha}", Win32Aviso.Atencao, sempre: true);
+        }
+        catch (Exception e)
+        {
+            MeetingApp.Nucleo.Registro.Escrever("tela", $"não foi possível fechar: {e.Message}");
+        }
     }
 
     public void DefinirPastaDeSaida(string? pasta)

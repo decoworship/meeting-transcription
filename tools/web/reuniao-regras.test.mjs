@@ -132,3 +132,51 @@ test("resumoDoMotor diz numa linha o que as opções dobradas escondem", () => {
   assert.equal(R.resumoDoMotor({ modelo: "small", idioma: " ", diarizar: false }),
                "small · idioma automático · sem separar falantes");
 });
+
+test("pedacosDaFala deixa a fala curta inteira, com o tempo dela", () => {
+  assert.deepEqual(R.pedacosDaFala({ start: 10, end: 13, text: " vamos começar " }),
+    [{ start: 10, end: 13, text: "vamos começar" }]);
+  assert.deepEqual(R.pedacosDaFala({ start: 0, end: 1, text: "  " }), []);
+});
+
+test("pedacosDaFala corta a fala longa em pedaços parecidos, e o tempo segue as letras", () => {
+  const texto = Array.from({ length: 30 }, (_, i) => `p${i}`).join(" ");
+  const p = R.pedacosDaFala({ start: 100, end: 130, text: texto }, 14);
+  // 30 palavras em no máximo 14: três de 10, e não 14 + 14 + 2.
+  assert.deepEqual(p.map((x) => x.text.split(" ").length), [10, 10, 10]);
+  assert.equal(p[0].start, 100);
+  assert.equal(p.at(-1).end, 130);
+  for (let i = 1; i < p.length; i++) assert.equal(p[i].start, p[i - 1].end);
+  // O primeiro tem menos letras ("p0".."p9"), então fica com menos tempo.
+  assert.ok(p[0].end - p[0].start < p[1].end - p[1].start);
+});
+
+test("legendaNoInstante acha a fala do instante, com folga, sem passar da próxima", () => {
+  const segs = [
+    { start: 0, end: 2, text: "bom dia", speaker: "Ana" },
+    { start: 2.3, end: 4, text: "oi", speaker: "Unknown" },
+    { start: 10, end: 12, text: "voltando", speaker: "Bia" },
+  ];
+  assert.deepEqual(R.legendaNoInstante(segs, 1), { falante: "Ana", texto: "bom dia", indice: 0 });
+  // A folga segura "bom dia" até a próxima começar, e não além.
+  assert.equal(R.legendaNoInstante(segs, 2.2).texto, "bom dia");
+  assert.deepEqual(R.legendaNoInstante(segs, 2.5), { falante: null, texto: "oi", indice: 1 });
+  assert.equal(R.legendaNoInstante(segs, 4.5).texto, "oi");
+  assert.equal(R.legendaNoInstante(segs, 6), null);
+  assert.equal(R.legendaNoInstante(segs, -1), null);
+  assert.equal(R.legendaNoInstante([], 1), null);
+  assert.equal(R.legendaNoInstante(segs, NaN), null);
+});
+
+test("legendaNoInstante mostra o pedaço da fala longa que corresponde ao instante", () => {
+  const texto = Array.from({ length: 28 }, (_, i) => `p${i}`).join(" ");
+  const segs = [{ start: 0, end: 28, text: texto, speaker: "Ana" }];
+  assert.ok(R.legendaNoInstante(segs, 1).texto.startsWith("p0 "));
+  assert.ok(R.legendaNoInstante(segs, 27).texto.endsWith(" p27"));
+});
+
+test("tempoNoVideo desconta onde o vídeo começou", () => {
+  assert.equal(R.tempoNoVideo(10, 2.25), 7.75);
+  assert.equal(R.tempoNoVideo(1, 2.25), -1.25);
+  assert.equal(R.tempoNoVideo(5, undefined), 5);
+});

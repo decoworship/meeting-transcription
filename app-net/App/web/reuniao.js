@@ -1,4 +1,5 @@
-// A reunião aberta: Transcrição · Ata · Notas.
+// A reunião aberta: Transcrição · Vídeo · Ata · Notas. O Vídeo só aparece na
+// reunião que teve a tela gravada (video.js).
 //
 // A ata foi um destino à parte (FASE3.md §4), e esse destino desenhava a mesma
 // lista de Reuniões com um botão a mais. Ela é uma propriedade da reunião, e
@@ -18,8 +19,10 @@ import { montarAta } from "/atas.js";
 import { blocoDeNotas } from "/notas.js";
 import { duracao, quando, tituloDe, acoesDaBarra } from "/app.js";
 import { tocadorDaReuniao, ouvir } from "/tocador.js";
+import { painelDoVideo } from "/video.js";
 
-const ABAS = ["transcricao", "ata", "notas"];
+/** Todas as abas que o endereço pode pedir; a de cada reunião sai daqui. */
+const TODAS = ["transcricao", "video", "ata", "notas"];
 
 /** A troca de aba da reunião aberta, para o endereço (`#revisao=N&notas`). */
 let mostrarAba = null;
@@ -35,6 +38,10 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
   const raiz = document.createElement("div");
   raiz.className = "reuniao-aberta";
 
+  const temVideo = g.video_inicio_s != null;
+  const ABAS = TODAS.filter((id) => id !== "video" || temVideo);
+  let video = null;
+
   const lista = document.createElement("div");
   lista.className = "reuniao-aberta__abas";
   lista.setAttribute("role", "tablist");
@@ -43,6 +50,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
 
   const rotulos = {
     transcricao: ["Transcrição", String(dados.segments.length)],
+    video: ["Vídeo", null],
     ata: ["Ata", g.tem_ata ? rotuloDePendencias(g.pendencias) : null],
     notas: ["Notas", null],
   };
@@ -105,6 +113,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
     // A revisão recebe um cabeçalho que não faz nada: quem diz o título da
     // barra é a reunião, e não a aba.
     transcricao: (p) => telaDeRevisao(g, dados, { cabecalho: () => {}, tela: p, aoRefazer, aoApagar }),
+    video: (p) => { video = painelDoVideo(g, dados); p.appendChild(video.raiz); },
     ata: (p) => montarAta(p, g, { aoContar: (n) => contar(abas.get("ata").botao, rotuloDePendencias(n)) }),
     notas: (p) => p.appendChild(blocoDeNotas(g.caminho, { linhas: 18, aoTocar: (s) => ouvir(g, s).catch(() => {}) }).raiz),
   };
@@ -132,6 +141,7 @@ export function telaDaReuniao(g, dados, { cabecalho, tela, aba = "transcricao", 
       montar[alvo](a.painel);
     }
     if (antes && antes !== a) rolador().scrollTop = a.rolagem ?? 0;
+    if (alvo === "video") video?.mostrar();
     if (focar) a.botao.focus();
   }
 
@@ -181,6 +191,6 @@ function contar(botao, texto) {
  * revisão (falantes, exportar, editar:N), que continua sendo dela.
  */
 export function abrirPainel(qual) {
-  if (ABAS.includes(qual)) return mostrarAba?.(qual, { focar: true });
+  if (TODAS.includes(qual)) return mostrarAba?.(qual, { focar: true });
   return abrirPainelDaRevisao(qual);
 }

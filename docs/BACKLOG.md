@@ -478,6 +478,101 @@ desliga o automático até a gravação terminar.
 **Gatilho:** querer gravar sem rótulo com uma reunião da agenda em curso — uma
 conversa de corredor no horário de uma reunião que não aconteceu.
 
+### GRA-5 · A tela gravada em vídeo, com a transcrição de legenda — `feature` · saiu na 0.13.0 (29/10/2026)
+
+Pedido de uso real, 28/10/2026: gravar a tela para quem acompanha a reunião
+depois poder vê-la **na íntegra**, e não só ler e ouvir.
+
+**Como ficou:** Ajustes › Gravador › Dispositivos ganhou o seletor **Tela em
+vídeo** — "Não gravar" (o padrão) ou um dos monitores. Escolher é ligar
+(`screen_monitor` no `settings.json`). Gravando, sai um `tela.mp4` sem som ao
+lado das faixas, e um `tela.json` com onde o primeiro quadro cai no áudio
+(`Nucleo/VideoDaTela.cs`). A reunião aberta ganha a aba **Vídeo**: o
+`<audio>` do tocador manda, o vídeo é arrastado até `t − inicio_s`, e a
+legenda é desenhada por cima com quem fala — liga e desliga, tamanho, e tela
+cheia (`web/video.js`).
+
+- **Nada é juntado depois.** O vídeo é carimbado com a mesma origem QPC das
+  duas faixas, e os tempos da transcrição servem de legenda sem conversão;
+- **GDI + Media Foundation** (`Bandeja/GravadorDeTela.cs`,
+  `Nativo/CodificadorH264.cs`): o `BitBlt` do print, em laço a 10 qps, e o
+  encoder H.264 do Windows, da placa quando há. Sem FFmpeg. O MF é chamado
+  pela vtable — o `ComImport` exigiria redeclarar o `IMFAttributes` em cada
+  interface, e devolver interface de P/Invoke é IL2050;
+- **medido na máquina do dono (28/10/2026, 1920×1080, reunião do Teams):**
+  ~750 kb/s com um slide parado — perto de 350 MB por hora; o teto do
+  bitrate é 1,7 Mb/s, ~750 MB por hora —, texto de slide legível. O
+  codificador leva **~2,2 s para abrir**, e o vídeo começa esse tanto depois
+  do áudio: o `tela.json` registra, e a aba diz.
+
+**O que a prova de conceito não resolve:**
+
+- **queda do processo perde o vídeo.** O MP4 só tem índice depois do
+  `Finalize`; o áudio continua à prova de queda. O caminho é cortar em
+  segmentos de alguns minutos — e é o `SUP-2` que torna isso mais que teoria;
+- **um monitor só, inteiro.** Nem janela, nem região, nem os dois monitores;
+- **janela protegida sai preta** (Teams com "impedir captura"), e é de
+  propósito;
+- **não medido**: telas 4K, e máquina com uma placa só — onde o encoder
+  divide a placa com a legenda ao vivo.
+
+**Medido numa reunião real do dono (29/10/2026)**, com a legenda ao vivo
+ligada: ~600 kb/s (~270 MB por hora); o PulseMeet inteiro em 5,5% da CPU
+(8 lógicos) e 249 MB de memória. **O Windows escolheu o encoder da Radeon Vega
+11 integrada** (motor `codec` a ~16%), e não o NVENC da RTX 2060, que ficou em
+0% — o vídeo não disputa a placa com a legenda. A sincronia da legenda sobre o
+vídeo foi aprovada pelo dono no mesmo dia.
+
+**Gatilho do próximo passo:** o primeiro uso real dizer o que falta — o
+segmento contra queda é o candidato natural.
+
+**A janela da reunião, no navegador (30/10/2026, saiu na 0.14.0).**
+Pedido do dono: gravar só a reunião, e não o monitor. O seletor ganhou "A
+janela da reunião (Meet ou Teams no navegador)" (`screen_monitor` =
+`janela-da-reuniao`). A extensão 1.2.0 manda, no estado, a aba da reunião —
+título e se está na frente —, e o PulseMeet acha a janela do Chrome ou do Edge
+cujo título contém o da aba (`Gravacao/JanelaDaReuniao.cs`, com testes) e a
+copia por `PrintWindow` com `PW_RENDERFULLCONTENT`
+(`FonteDaJanelaDaReuniao`, em `Bandeja/GravadorDeTela.cs`).
+
+- **Só grava com a aba na frente**, e o título da janela é a segunda trava: ele
+  muda no instante da troca de aba, antes de a extensão avisar. Fora da frente
+  ou minimizada, o quadro vira um aviso escrito — o vídeo não abre buraco, e a
+  sincronia continua sendo uma subtração;
+- a porta da extensão abre com o mute junto **ou** com esta fonte; o mute só
+  anda junto com a chave dele;
+- **medido em 30/10/2026** com uma página de relógio numa janela do Chrome,
+  coberta 4 s por outra janela: o vídeo continuou andando, sem a janela de
+  cima. O cálculo de oclusão do Chrome não congelou a janela nesse teste.
+  **Não medido** numa chamada real, nem coberta por minutos;
+- o picture-in-picture do Meet foi gravado por ~10 s por acaso (tem o mesmo
+  título da reunião, e a extensão ainda não tinha avisado a troca). Gravá-lo de
+  propósito, com a aba fora da frente, é uma mudança pequena — fica para quando
+  o dono pedir.
+
+**O Zoom desktop (30/10/2026, saiu na 0.14.0).** "A janela da reunião (Zoom)" no
+seletor (`janela-do-zoom`), sem extensão: as janelas do `Zoom.exe` pela
+classe (`Gravacao/ReuniaoDoZoom.cs`, com testes; `FonteDoZoom`). **Medido
+numa reunião de um só, com câmera:** a reunião é a
+`ConfMultiTabContentWndClass`, e o `PrintWindow` traz a câmera perfeita;
+**compartilhando a tela, ela some** e surge a `ZoomAnnoWindowWndClass`, do
+tamanho exato do que se compartilha — é ela que se grava, por `BitBlt` da
+tela, porque é transparente. Minimizada, a miniatura sai preta no
+`PrintWindow`, e o quadro vira aviso. **Não medido:** outra pessoa
+compartilhando, e o modo "lado a lado".
+
+**Automático e o Zoom na web (30/10/2026, saiu na 0.14.0).** "Automático: a
+reunião que estiver aberta" é a primeira opção do seletor (`automatico`): grava
+a reunião do navegador que a extensão aponta ou a do Zoom desktop, e troca se
+ela mudar de lugar (`Gravacao/FonteAutomatica.cs`, com testes). **O que está
+aberto vale mais que a agenda**; o link do evento — `hangoutLink`,
+`conferenceData`, local e descrição, lidos agora pelo `ClienteDaAgenda` — só
+desempata duas abertas e diz qual esperar. Sem nenhuma, aviso de espera, e não
+o monitor (escolha minha, pela privacidade). A extensão 1.3.0 roda também no
+`*.zoom.us`: só diz que há reunião (`#wc-footer` e o botão de sair, **não
+medidos**), e o PulseMeet não segue o mute do Zoom. A aba do Zoom se chama
+"Zoom", e título curto passou a casar como começo do título da janela.
+
 ---
 
 ## 5. Diagnóstico e suporte

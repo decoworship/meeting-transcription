@@ -20,6 +20,24 @@ internal sealed class ItemDeEvento
     [JsonPropertyName("end")] public MomentoDoEvento? End { get; set; }
     [JsonPropertyName("attendees")] public List<ParticipanteJson>? Attendees { get; set; }
     [JsonPropertyName("organizer")] public OrganizadorJson? Organizer { get; set; }
+
+    // O link da reunião, para o vídeo saber de que plataforma ela é
+    // (FonteAutomatica.Plataforma). O Meet vem no hangoutLink; o Teams e o
+    // Zoom, nos complementos (conferenceData) ou colados no local e na descrição.
+    [JsonPropertyName("hangoutLink")] public string? HangoutLink { get; set; }
+    [JsonPropertyName("location")] public string? Location { get; set; }
+    [JsonPropertyName("description")] public string? Description { get; set; }
+    [JsonPropertyName("conferenceData")] public ConferenciaJson? ConferenceData { get; set; }
+}
+
+internal sealed class ConferenciaJson
+{
+    [JsonPropertyName("entryPoints")] public List<EntradaJson>? EntryPoints { get; set; }
+}
+
+internal sealed class EntradaJson
+{
+    [JsonPropertyName("uri")] public string? Uri { get; set; }
 }
 
 /// <remarks>
