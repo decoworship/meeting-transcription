@@ -440,6 +440,82 @@ public static class Montagem
     }
 
     /// <summary>
+    /// Rótulo cru do motor → o "Speaker N" que vai para o segmento.
+    /// </summary>
+    /// <remarks>
+    /// Público desde 05/11/2026 para o reconhecimento de vozes ler a linha do
+    /// tempo com os mesmos rótulos que os segmentos carregam
+    /// (<see cref="AprendizadoDeVozes.TrechosDaDiarizacao"/>). Dois mapas
+    /// escritos em dois lugares fariam o reconhecimento extrair a voz de outra
+    /// pessoa no dia em que divergissem.
+    /// </remarks>
+    public static Dictionary<string, string> Rotulos(IReadOnlyList<SegmentoDeFalante> diarizacao)
+    {
+        // O dono não é renumerado. Ele entra na mesma lista que o pyannote
+        // (VozDoDono.Juntar), mas o rótulo dele não é uma etiqueta anônima a
+        // resolver depois — é o nome que o app sempre gravou, e virar
+        // "Speaker 2" faria a única atribuição certa da gravação parecer
+        // estimativa.
+        var nomes = diarizacao.Select(d => d.Falante).Distinct()
+            .Where(f => f != VozDoDono.Rotulo)
+            .Order(StringComparer.Ordinal)
+            .Select((cru, i) => (cru, nome: $"Speaker {i + 1}"))
+            .ToDictionary(x => x.cru, x => x.nome);
+        nomes[VozDoDono.Rotulo] = VozDoDono.Rotulo;
+        return nomes;
+    }
+
+    /// <summary>Menor que isto, um trecho sem nome entre dois da mesma pessoa é ilha.</summary>
+    public const double IlhaCurtaS = 3.0;
+
+    /// <summary>A folga máxima entre a ilha e cada vizinho, em segundos.</summary>
+    public const double FolgaDaIlhaS = 1.0;
+
+    /// <summary>
+    /// Devolve ao vizinho o trecho curto e sem nome que caiu no meio da fala dele.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>O sintoma relatado em 05/11/2026</b>: no meio da fala longa de uma
+    /// pessoa, uma ou duas palavras saem como "Speaker 4". Medido nas sete
+    /// reuniões com Gemini: de 165 ilhas, 48 estavam certas e 83 eram do próprio
+    /// vizinho. Elas nascem de clusters-fragmento — a diarização parte uma
+    /// pessoa em duas — e de quadros soltos que o corte por palavra
+    /// (<see cref="RepartirPorFalante"/>) transforma em pedaço.
+    /// </para>
+    /// <para>
+    /// <b>Só a ilha sem nome.</b> Absorver também as nomeadas piorou o acerto
+    /// (83,6% → 83,4%): um "sim" de outra pessoa reconhecida é aparte de
+    /// verdade. Só as sem nome deram +0,4 ponto e não pioraram nenhuma reunião.
+    /// Roda depois do reconhecimento, quando "sem nome" já quer dizer que o
+    /// banco não reconheceu.
+    /// </para>
+    /// </remarks>
+    /// <returns>Quantos trechos mudaram de falante.</returns>
+    public static int AbsorverIlhas(List<SegmentoFinal> segmentos)
+    {
+        int mudados = 0;
+        for (int i = 1; i < segmentos.Count - 1; i++)
+        {
+            var (antes, ilha, depois) = (segmentos[i - 1], segmentos[i], segmentos[i + 1]);
+            if (!SemNome(ilha.Speaker) || antes.Speaker is null) continue;
+            if (antes.Speaker != depois.Speaker || ilha.Speaker == antes.Speaker) continue;
+            if (ilha.End - ilha.Start >= IlhaCurtaS) continue;
+            if (ilha.Start - antes.End >= FolgaDaIlhaS || depois.Start - ilha.End >= FolgaDaIlhaS)
+                continue;
+
+            ilha.Speaker = antes.Speaker;
+            mudados++;
+        }
+        return mudados;
+    }
+
+    /// <summary>Um rótulo que nenhuma voz conhecida reclamou.</summary>
+    private static bool SemNome(string? falante) =>
+        falante is null or "Unknown"
+        || System.Text.RegularExpressions.Regex.IsMatch(falante, @"^Speaker \d+$");
+
+    /// <summary>
     /// Cada segmento transcrito recebe o falante com maior sobreposição
     /// temporal na diarização.
     /// </summary>
@@ -453,17 +529,7 @@ public static class Montagem
     public static void AtribuirFalantes(
         List<SegmentoFinal> segmentos, IReadOnlyList<SegmentoDeFalante> diarizacao)
     {
-        // O dono não é renumerado. Ele entra na mesma lista que o pyannote
-        // (VozDoDono.Juntar), mas o rótulo dele não é uma etiqueta anônima a
-        // resolver depois — é o nome que o app sempre gravou, e virar
-        // "Speaker 2" faria a única atribuição certa da gravação parecer
-        // estimativa.
-        var nomes = diarizacao.Select(d => d.Falante).Distinct()
-            .Where(f => f != VozDoDono.Rotulo)
-            .Order(StringComparer.Ordinal)
-            .Select((cru, i) => (cru, nome: $"Speaker {i + 1}"))
-            .ToDictionary(x => x.cru, x => x.nome);
-        nomes[VozDoDono.Rotulo] = VozDoDono.Rotulo;
+        var nomes = Rotulos(diarizacao);
 
         foreach (var seg in segmentos)
         {

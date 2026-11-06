@@ -3,6 +3,25 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.14.1 — 06/11/2026
+
+**Menos "Speaker 2" ao lado de quem já tem nome.** A transcrição saía com a
+pessoa reconhecida e, ao mesmo tempo, a mesma pessoa como um falante sem nome —
+às vezes um trecho inteiro, às vezes uma palavra solta no meio da fala dela. A
+culpa era do reconhecimento de vozes, que comparava a voz usando pedaços de
+áudio em que outra pessoa também falava. Agora ele usa só os momentos em que a
+pessoa fala sozinha, e um trecho curto e sem nome no meio da fala de alguém
+volta para essa pessoa.
+
+Nas reuniões de teste, as palavras com o nome certo foram de 84% para 90%; numa
+reunião de 4/11, as palavras sem nome caíram de 44% para 3%.
+
+Vale para as transcrições novas. Uma reunião já transcrita melhora se for
+transcrita de novo — mas isso substitui a transcrição dela, inclusive o que
+você tiver corrigido à mão.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.14.0 — 30/10/2026
 
 **O vídeo pode gravar só a reunião, e não a tela inteira.** Em Ajustes ›

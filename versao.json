@@ -1,6 +1,6 @@
 {
-  "versao": "0.14.0",
-  "publicada": "2026-10-30",
-  "notas": "O vídeo pode gravar só a janela da reunião — Meet, Teams ou Zoom, no navegador ou no Zoom desktop — e o Automático escolhe sozinho.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.14.0"
+  "versao": "0.14.1",
+  "publicada": "2026-11-06",
+  "notas": "Menos \"Speaker 2\" ao lado de quem já tem nome: o reconhecimento de vozes passou a usar só os momentos em que a pessoa fala sozinha.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.14.1"
 }

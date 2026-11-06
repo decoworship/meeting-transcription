@@ -160,6 +160,49 @@ def comparar(nosso: list[tuple[str, str]], deles: list[tuple[str, str]]):
     }
 
 
+def mesma_pessoa(a: str, b: str) -> bool:
+    """Nome inteiro sem acento; "Aline Sena" casa com "Aline Sena de Souza".
+
+    Primeiro nome não basta: André Yuri e André Monlevade são os dois "andre".
+    """
+    x = set(sem_acento((a or "").lower()).split())
+    y = set(sem_acento((b or "").lower()).split())
+    return bool(x) and bool(y) and (x <= y or y <= x)
+
+
+def sem_nome(rotulo: str) -> bool:
+    return bool(re.fullmatch(r"Speaker \d+|Unknown|\?|You", rotulo or "?"))
+
+
+def estrito(nosso: list[tuple[str, str]], deles: list[tuple[str, str]]) -> dict:
+    """O nome que a pessoa veria, contra o do Gemini. "Speaker N" é erro.
+
+    **Por que existe (05/11/2026).** O ``comparar`` casa cada rótulo nosso com
+    o falante do Gemini que mais coincide — então um "Speaker 4" que é o Roger
+    inteiro conta como acerto. Ela mede se as pessoas foram *separadas*, não se
+    saíram com o *nome*: a reunião de 21/08 dava 94,8% nela e 60,8% aqui, e foi
+    assim que 16% de palavras sem nome passaram por todas as medições. Falante
+    do Gemini com menos de 20 palavras fica fora: são os títulos do "Detalhes"
+    que o leitor pega como fala.
+    """
+    a_txt, a_quem = fila(nosso)
+    b_txt, b_quem = fila(deles)
+    reais = {q for q, n in Counter(b_quem).items() if n >= 20}
+    casador = SequenceMatcher(None, a_txt, b_txt, autojunk=False)
+    tot = ok = anon = 0
+    for i, j, n in casador.get_matching_blocks():
+        for k in range(n):
+            esperado, obtido = b_quem[j + k], a_quem[i + k]
+            if esperado not in reais:
+                continue
+            tot += 1
+            if mesma_pessoa(obtido, esperado):
+                ok += 1
+            elif sem_nome(obtido):
+                anon += 1
+    return {"palavras": tot, "certo": ok, "sem_nome": anon, "outro_nome": tot - ok - anon}
+
+
 def trechos(r: dict, teto: int) -> list[str]:
     """Agrupa palavras erradas seguidas num trecho só, que é como se lê."""
     saida: list[str] = []
@@ -220,6 +263,13 @@ def main() -> int:
     print()
     print(f"  falante certo         {ac:>6}  ({100 * ac / al:.1f}%)")
     print(f"  falante errado        {al - ac:>6}  ({100 * (al - ac) / al:.1f}%)")
+
+    e = estrito(nosso, deles)
+    t = max(e["palavras"], 1)
+    print("\n  com o nome que aparece na tela (régua estrita — ver estrito()):")
+    print(f"    nome certo          {e['certo']:>6}  ({100 * e['certo'] / t:.1f}%)")
+    print(f"    sem nome            {e['sem_nome']:>6}  ({100 * e['sem_nome'] / t:.1f}%)")
+    print(f"    outra pessoa        {e['outro_nome']:>6}  ({100 * e['outro_nome'] / t:.1f}%)")
 
     print("\n  por falante do Gemini (quanto da fala dele nós acertamos):")
     por_falante: dict[str, list[int]] = defaultdict(lambda: [0, 0])
