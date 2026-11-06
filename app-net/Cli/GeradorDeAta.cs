@@ -73,7 +73,7 @@ public static class GeradorDeAta
         var relogio = Stopwatch.StartNew();
 
         var ata = await GeracaoDeAta.GerarAsync(pasta, tipo, dados, ctx, motor.GerarAsync,
-            p => Console.WriteLine($"  {p.Etapa}: {p.Texto}"), ct, formato);
+            p => Console.WriteLine($"  {p.Etapa}: {p.Texto}"), ct, formato, motor.AbrirSessaoAsync);
 
         Console.WriteLine($"gerou em {relogio.Elapsed.TotalSeconds:F0} s: "
                           + $"{ata.Secoes.Count} seções, {ata.Decisoes.Count} decisões, "

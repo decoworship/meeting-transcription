@@ -2711,7 +2711,7 @@ internal sealed class Ponte(string pastaDasGravacoes, Action<string> responder,
                 {
                     _transcricoes.Progredir(pasta, e.Etapa, e.Fracao, e.Texto);
                     EmpurrarTranscricoes();
-                }, trabalho.Token, cfg.Formato);
+                }, trabalho.Token, cfg.Formato, motor.AbrirSessaoAsync);
 
                 _transcricoes.Terminar(pasta);
                 Avisar($"Ata pronta: {trabalho.Nome}");
