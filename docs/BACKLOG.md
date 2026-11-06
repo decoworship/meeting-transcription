@@ -372,6 +372,33 @@ entre os vetores já sabe apontá-lo ([VOZES.md](VOZES.md) §6).
 
 **Gatilho:** a mesma pessoa aparecer duas vezes na lista.
 
+### VOZ-2 · "Speaker N" ao lado da pessoa já nomeada — `bug` · feito em 06/11/2026
+
+Relatado em 05/11/2026: a transcrição saía com a pessoa nomeada e a mesma
+pessoa como falante sem nome, inclusive em pedaços no meio de uma fala longa.
+Re-transcritas do zero as sete reuniões com Gemini, com os parâmetros de cada
+projeto: **16% das palavras saíam sem nome**, e a diarização não era a culpada
+— trocar o `community-1` pelo `nemotron-3` mudava 60,3% para 62,2%.
+
+**A causa era o áudio com que se reconhece.** O `ReconhecerAsync` tirava o
+vetor de janelas de 4 s dos segmentos do ASR, que esbarram na fala de outra
+pessoa; os quadros em que a diarização diz que só aquele falante fala davam
+~0,1 a mais de semelhança (0,65 → 0,75; 0,46 → 0,81), e o limiar é 0,70. O
+cluster-fragmento — a mesma pessoa partida em duas — nem era tentado: os
+pedaços que o `RepartirPorFalante` cria encostam no vizinho e nunca passavam
+pela guarda de vizinhos. Agora o reconhecimento usa
+`AprendizadoDeVozes.TrechosDaDiarizacao` (até 30 s, mic quieto, o método
+antigo de reserva), e `Montagem.AbsorverIlhas` devolve ao vizinho o trecho
+curto **sem nome** entre duas falas da mesma pessoa (absorver os nomeados
+piorava).
+
+**Por que nenhuma medição pegou:** o `comparar_com_gemini` casava "Speaker 4"
+com quem mais coincidia no tempo — 21/08 dava 94,8% nele e 60,8% com o nome da
+tela. A ferramenta ganhou o `estrito()`, que é a régua a ler daqui em diante.
+Os vetores ruins também explicam por que o `VOZ-1` não sugeriu juntar
+"Vanessa Levorato" e "Vanessa Levorato Sao Bernado" (0,55): o banco tinha ~15
+duplicatas, e as dez óbvias foram juntadas à mão em 05/11, com backup.
+
 ---
 
 ## 4. Gravação e agenda

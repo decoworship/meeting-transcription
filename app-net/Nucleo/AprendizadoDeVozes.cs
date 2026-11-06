@@ -59,6 +59,81 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     public const double SegundosDoOrcamentoDeReconhecimento = 15.0;
 
     /// <summary>
+    /// Quanto áudio exclusivo da diarização acumular para reconhecer, em segundos.
+    /// </summary>
+    /// <remarks>
+    /// O dobro de <see cref="SegundosDoOrcamentoDeReconhecimento"/> porque aqui o
+    /// risco de contaminação é outro: cada quadro já é de uma pessoa só pela
+    /// diarização, e mais áudio limpo só estabiliza o vetor. É o teto com que o
+    /// ganho de 05/11/2026 foi medido.
+    /// </remarks>
+    public const double SegundosLimposDeReconhecimento = 30.0;
+
+    /// <summary>Um pedaço exclusivo mais curto que isto não entra no vetor.</summary>
+    public const double MinimoDoTrechoLimpoS = 0.4;
+
+    /// <summary>
+    /// Os pedaços em que só <paramref name="falante"/> fala, pela linha do tempo
+    /// da diarização.
+    /// </summary>
+    /// <param name="linhaDoTempo">
+    /// A diarização com os rótulos dos segmentos (<see cref="Montagem.Rotulos"/>)
+    /// e a trilha do dono dentro — o dono conta como outra pessoa.
+    /// </param>
+    /// <param name="mic">Quando há, descarta o pedaço em que o microfone tem fala.</param>
+    /// <remarks>
+    /// <para>
+    /// <b>Por que não os segmentos do ASR.</b> O <see cref="TrechosDe"/> toma os
+    /// primeiros 4 s de cada segmento, e o segmento do ASR não sabe onde outra
+    /// pessoa entrou por cima. Medido em 05/11/2026 nas sete reuniões com Gemini:
+    /// para o mesmo cluster, estes pedaços deram ~0,1 a mais de semelhança
+    /// (0,65 → 0,75; 0,66 → 0,76; 0,46 → 0,81), e o acerto de nome por palavra
+    /// subiu de 83,6% para 90,1%. Um cluster-fragmento — a mesma pessoa partida
+    /// em duas pela diarização — também deixa de ficar sem vetor: os pedaços que
+    /// o corte por palavra cria encostam no vizinho e nunca passavam pela guarda
+    /// de vizinhos de <see cref="TrechosDe"/>.
+    /// </para>
+    /// <para>
+    /// Do mais longo ao mais curto, até <see cref="SegundosLimposDeReconhecimento"/>.
+    /// </para>
+    /// </remarks>
+    public static List<TrechoLimpo> TrechosDaDiarizacao(
+        IReadOnlyList<SegmentoDeFalante> linhaDoTempo, string falante, float[]? mic = null)
+    {
+        var outros = linhaDoTempo.Where(d => d.Falante != falante).ToList();
+        var pedacos = new List<TrechoLimpo>();
+
+        foreach (var d in linhaDoTempo.Where(d => d.Falante == falante))
+        {
+            var restos = new List<TrechoLimpo> { new(d.Inicio, d.Fim) };
+            foreach (var o in outros)
+            {
+                var novos = new List<TrechoLimpo>();
+                foreach (var r in restos)
+                {
+                    if (o.Fim <= r.Inicio || o.Inicio >= r.Fim) { novos.Add(r); continue; }
+                    if (o.Inicio > r.Inicio) novos.Add(new(r.Inicio, o.Inicio));
+                    if (o.Fim < r.Fim) novos.Add(new(o.Fim, r.Fim));
+                }
+                restos = novos;
+            }
+            pedacos.AddRange(restos.Where(r =>
+                r.Duracao >= MinimoDoTrechoLimpoS
+                && (mic is null || Faixas.Rms(mic, r.Inicio, r.Fim) < Montagem.RmsMinimoDoDono)));
+        }
+
+        var usados = new List<TrechoLimpo>();
+        double soma = 0;
+        foreach (var p in pedacos.OrderByDescending(p => p.Duracao))
+        {
+            if (soma >= SegundosLimposDeReconhecimento) break;
+            usados.Add(p);
+            soma += p.Duracao;
+        }
+        return usados;
+    }
+
+    /// <summary>
     /// Os trechos de um falante que servem para aprender a voz dele.
     /// </summary>
     /// <param name="mic">
@@ -227,7 +302,8 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
     /// <returns>Rótulo cru → nome reconhecido.</returns>
     public async Task<Dictionary<string, string>> ReconhecerAsync(
         string pastaDaGravacao, IReadOnlyList<SegmentoFinal> segmentos,
-        float[]? mic = null, CancellationToken ct = default)
+        float[]? mic = null, CancellationToken ct = default,
+        IReadOnlyList<SegmentoDeFalante>? linhaDoTempo = null)
     {
         var achados = new Dictionary<string, string>();
         if (vozes.Pessoas().Count == 0) return achados;   // biblioteca vazia: nada a fazer
@@ -238,26 +314,21 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
             // poderia piorar o que já se sabe.
             if (falante == DonoDoMicrofone || falante == "Unknown") continue;
 
-            var trechos = TrechosDe(segmentos, falante, mic);
-            if (trechos.Sum(t => t.Duracao) < Vozes.SegundosMinimos) continue;
-
             string audio = Path.Combine(pastaDaGravacao, $"{FaixaDe(falante)}.wav");
             if (!File.Exists(audio)) continue;
 
             try
             {
-                // Acumula até o orçamento em segundos, não um número fixo de
-                // blocos — ver SegundosDoOrcamentoDeReconhecimento. Se sobrar
-                // menos trechos limpos que o orçamento, usa o que há: o
-                // orçamento é teto, não exigência.
-                var usados = new List<TrechoLimpo>();
-                double soma = 0;
-                foreach (var t in trechos)
-                {
-                    usados.Add(t);
-                    soma += t.Duracao;
-                    if (soma >= SegundosDoOrcamentoDeReconhecimento) break;
-                }
+                // Pela diarização quando ela veio — ver TrechosDaDiarizacao. Sem
+                // ela, ou sem fala exclusiva bastante, o caminho de antes: quem
+                // chama sem linha do tempo, e o falante que só fala por cima de
+                // alguém, não ficam piores do que estavam.
+                var usados = linhaDoTempo is null
+                    ? []
+                    : TrechosDaDiarizacao(linhaDoTempo, falante, mic);
+                if (usados.Sum(t => t.Duracao) < Vozes.SegundosMinimos)
+                    usados = PeloAsr(segmentos, falante, mic);
+                if (usados.Sum(t => t.Duracao) < Vozes.SegundosMinimos) continue;
 
                 var voz = await ExtrairAsync(audio, usados, ct);
                 // O modelo vai junto: com um modelo novo ninguém é reconhecido,
@@ -273,6 +344,28 @@ public sealed class AprendizadoDeVozes(Motores motores, Vozes vozes)
             }
         }
         return achados;
+    }
+
+    /// <summary>
+    /// Os trechos limpos dos segmentos do ASR, até o orçamento em segundos.
+    /// </summary>
+    /// <remarks>
+    /// Acumula até o orçamento, não um número fixo de blocos — ver
+    /// <see cref="SegundosDoOrcamentoDeReconhecimento"/>. Se sobrar menos que o
+    /// orçamento, usa o que há: o orçamento é teto, não exigência.
+    /// </remarks>
+    private static List<TrechoLimpo> PeloAsr(IReadOnlyList<SegmentoFinal> segmentos,
+                                             string falante, float[]? mic)
+    {
+        var usados = new List<TrechoLimpo>();
+        double soma = 0;
+        foreach (var t in TrechosDe(segmentos, falante, mic))
+        {
+            usados.Add(t);
+            soma += t.Duracao;
+            if (soma >= SegundosDoOrcamentoDeReconhecimento) break;
+        }
+        return usados;
     }
 
     private async Task<VozExtraida> ExtrairAsync(string audio, List<TrechoLimpo> trechos,

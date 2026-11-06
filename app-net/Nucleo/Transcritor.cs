@@ -642,10 +642,19 @@ public sealed class Transcritor(Motores motores)
         try
         {
             progresso?.Invoke(new Progresso("montagem", 0.5, "procurando vozes conhecidas"));
+
+            // A diarização com os rótulos que os segmentos carregam: é dela que
+            // sai o áudio exclusivo de cada falante. Ver
+            // AprendizadoDeVozes.TrechosDaDiarizacao.
+            var rotulos = Montagem.Rotulos(diarizacao);
+            var linhaDoTempo = diarizacao
+                .Select(d => d with { Falante = rotulos[d.Falante] })
+                .ToList();
+
             var conhecidos = await new AprendizadoDeVozes(motores, new Vozes())
                 // As faixas já estão em memória aqui; a guarda de contaminação
                 // sai de graça. Ver AprendizadoDeVozes.TrechosDe.
-                .ReconhecerAsync(pastaDaGravacao, segmentos, faixas.Mic, ct);
+                .ReconhecerAsync(pastaDaGravacao, segmentos, faixas.Mic, ct, linhaDoTempo);
 
             foreach (var seg in segmentos)
                 if (seg.Speaker is { } r && conhecidos.TryGetValue(r, out string? nome))
@@ -655,6 +664,13 @@ public sealed class Transcritor(Motores motores)
         {
             // Reconhecer voz é um extra sobre a transcrição, não um requisito.
         }
+
+        // Depois do reconhecimento, quando "sem nome" já quer dizer que nenhuma
+        // voz conhecida reclamou o trecho. Ver Montagem.AbsorverIlhas.
+        int ilhas = Montagem.AbsorverIlhas(segmentos);
+        if (ilhas > 0)
+            Registro.Escrever("pipeline",
+                $"{ilhas} trecho(s) curtos sem nome no meio da fala de alguém voltaram para essa pessoa");
 
         // O "You" vira o nome do dono, se ele escreveu um em Ajustes › Geral.
         // Depois do reconhecimento, que procura vozes por rótulo e pula o "You".
