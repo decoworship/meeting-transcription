@@ -3,6 +3,30 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.15.0 — 06/11/2026
+
+**Um tipo de ata novo: Formalização (e-mail ao cliente).** É a ata curta que se
+manda depois da reunião para fixar o combinado: só duas listas, **Resolvidos em
+reunião** e **Pendentes**, cada pendência com quem faz e para quando. Sem
+resumo, sem riscos, sem participantes — pronta para colar no e-mail.
+
+Ela é feita de outro jeito, e é isso que a torna mais confiável: o app primeiro
+lista o que foi decidido e o que ficou pendente **apontando a fala de onde cada
+item saiu**, depois confere cada item contra essa fala, e só então escreve. Um
+prazo que ninguém disse é apagado; um item que não aparece na conversa não
+entra; "pôr na agenda" e "mandar a ata" não viram pendência. O que a conferência
+mexeu fica num arquivo à parte, e não vai para a ata que você envia.
+
+Medido em reuniões reais contra atas escritas à mão: o jeito de antes chegou a
+inventar a mesma data para todas as pendências de uma reunião; este não
+inventou nenhum prazo.
+
+Para usar, escolha **Formalização (e-mail ao cliente)** como tipo da ata. Os
+outros tipos continuam iguais. Nas medições, o modelo **Gemma 4 E4B** (Ajustes ›
+Modelos) foi o que menos errou neste tipo.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.14.1 — 06/11/2026
 
 **Menos "Speaker 2" ao lado de quem já tem nome.** A transcrição saía com a

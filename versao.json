@@ -1,6 +1,6 @@
 {
-  "versao": "0.14.1",
+  "versao": "0.15.0",
   "publicada": "2026-11-06",
-  "notas": "Menos \"Speaker 2\" ao lado de quem já tem nome: o reconhecimento de vozes passou a usar só os momentos em que a pessoa fala sozinha.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.14.1"
+  "notas": "Ata nova, curta, para mandar ao cliente: só o que foi resolvido e o que ficou pendente, conferido contra a fala — sem prazo inventado.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.15.0"
 }

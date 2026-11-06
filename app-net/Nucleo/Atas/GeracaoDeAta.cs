@@ -95,8 +95,13 @@ public static class GeracaoDeAta
     public static async Task<AtaGerada> GerarAsync(
         string pasta, ModeloDeAta tipo, ResultadoDaTranscricao dados, ContextoDaReuniao ctx,
         Motor motor, Action<ProgressoDaAta>? progresso, CancellationToken ct,
-        FormatoDaAta formato = FormatoDaAta.Classico)
+        FormatoDaAta formato = FormatoDaAta.Classico, AbrirSessao? abrir = null)
     {
+        // O tipo de formalização tem caminho próprio, e não muda com o formato:
+        // ele é o formato do e-mail ao cliente.
+        if (tipo.Id == AtaDeFormalizacao.Id && abrir is not null)
+            return await GerarFormalizacaoAsync(pasta, dados, ctx, abrir, progresso, ct);
+
         var roteiro = RoteiroDeFatos.De(dados.Segments);
         string prompt = PromptDeAta.Montar(tipo, ctx, dados.Segments, roteiro, formato);
         string esquema = AtaGerada.EsquemaPara(PromptDeAta.Agrupa(tipo, formato));
@@ -118,6 +123,72 @@ public static class GeracaoDeAta
             await File.WriteAllTextAsync(obs, texto, ct);
         else if (File.Exists(obs))
             File.Delete(obs);
+
+        await File.WriteAllTextAsync(Path.Combine(pasta, "ata.json"), ata.ParaJson(), ct);
+        return ata;
+    }
+
+    /// <summary>
+    /// Sobe o motor preso a um sistema e a um esquema — o
+    /// <see cref="MotorDeAta.AbrirSessaoAsync"/>, ou um falso nos testes.
+    /// </summary>
+    public delegate Task<ISessaoDoMotor> AbrirSessao(
+        string sistema, string nomeDoEsquema, string esquema,
+        int caracteresMaximos, int tokensDeSaida, CancellationToken ct);
+
+    /// <summary>
+    /// A ata de formalização: extrair com citação, conferir sem modelo,
+    /// escrever no estilo. Ver <see cref="AtaDeFormalizacao"/>.
+    /// </summary>
+    /// <remarks>
+    /// Duas subidas do motor, uma por etapa, porque cada sessão é presa a um
+    /// sistema e a um esquema. Custa os 6 a 9 s de carregar o modelo uma vez a
+    /// mais, e não exige mexer no motor.
+    /// </remarks>
+    public static async Task<AtaGerada> GerarFormalizacaoAsync(
+        string pasta, ResultadoDaTranscricao dados, ContextoDaReuniao ctx,
+        AbrirSessao abrir, Action<ProgressoDaAta>? progresso, CancellationToken ct)
+    {
+        var turnos = AtaDeFormalizacao.Turnos(dados.Segments);
+        string pedido = AtaDeFormalizacao.PedidoDaExtracao(ctx, turnos);
+
+        progresso?.Invoke(new ProgressoDaAta("modelo", 0.05, "carregando o modelo"));
+        AtaDeFormalizacao.Extracao extraida;
+        using (var sessao = await abrir(AtaDeFormalizacao.SistemaDaExtracao, "extracao",
+                   AtaDeFormalizacao.EsquemaDaExtracao,
+                   pedido.Length + AtaDeFormalizacao.SistemaDaExtracao.Length, 6144, ct))
+        {
+            progresso?.Invoke(new ProgressoDaAta("lendo", 0.2, "lendo a reunião"));
+            extraida = AtaDeFormalizacao.LerExtracao(await sessao.PerguntarAsync(pedido, ct));
+        }
+
+        progresso?.Invoke(new ProgressoDaAta("conferindo", 0.6, "conferindo cada item com a fala"));
+        var (conferida, obs) = AtaDeFormalizacao.Conferir(extraida, turnos, ctx);
+
+        progresso?.Invoke(new ProgressoDaAta("escrevendo", 0.7, "escrevendo a ata"));
+        string pedidoDaEscrita = AtaDeFormalizacao.PedidoDaEscrita(conferida);
+        AtaDeFormalizacao.Escrita escrita;
+        using (var sessao = await abrir(AtaDeFormalizacao.SistemaDaEscrita, "escrita",
+                   AtaDeFormalizacao.EsquemaDaEscrita,
+                   pedidoDaEscrita.Length + AtaDeFormalizacao.SistemaDaEscrita.Length, 2048, ct))
+        {
+            escrita = AtaDeFormalizacao.LerEscrita(await sessao.PerguntarAsync(pedidoDaEscrita, ct));
+        }
+
+        var ata = AtaDeFormalizacao.Montar(conferida, escrita, obs, ctx);
+
+        progresso?.Invoke(new ProgressoDaAta("montagem", 0.95, "montando a ata"));
+        string md = Path.Combine(pasta, "ata.md");
+        if (File.Exists(md))
+            File.Copy(md, Path.Combine(pasta, ArquivoAnterior), overwrite: true);
+        await File.WriteAllTextAsync(md, AtaDeFormalizacao.Markdown(ata), ct);
+
+        // A ata vai por e-mail ao cliente: a conferência fica fora dela, sempre.
+        string arquivoObs = Path.Combine(pasta, ArquivoDeObservacoes);
+        if (AtaDeFormalizacao.Observacoes(ata) is { } texto)
+            await File.WriteAllTextAsync(arquivoObs, texto, ct);
+        else if (File.Exists(arquivoObs))
+            File.Delete(arquivoObs);
 
         await File.WriteAllTextAsync(Path.Combine(pasta, "ata.json"), ata.ParaJson(), ct);
         return ata;

@@ -68,6 +68,7 @@
     <EmbeddedResource Include="../../assets/atas/kickoff.md" LogicalName="MeetingApp.atas.kickoff.md" />
     <EmbeddedResource Include="../../assets/atas/resultados.md" LogicalName="MeetingApp.atas.resultados.md" />
     <EmbeddedResource Include="../../assets/atas/daily.md" LogicalName="MeetingApp.atas.daily.md" />
+    <EmbeddedResource Include="../../assets/atas/formalizacao.md" LogicalName="MeetingApp.atas.formalizacao.md" />
   </ItemGroup>
 
 </Project>

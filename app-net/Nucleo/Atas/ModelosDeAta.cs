@@ -148,7 +148,7 @@ public static class ModelosDeAta
 {
     /// <summary>A ordem em que a tela oferece. Não é alfabética: é de uso.</summary>
     private static readonly string[] Embutidos =
-        ["cliente-update", "sprint", "trabalho", "kickoff", "resultados", "daily"];
+        ["cliente-update", "sprint", "trabalho", "kickoff", "resultados", "daily", "formalizacao"];
 
     private static readonly Dictionary<string, string> NomesBonitos = new()
     {
@@ -158,6 +158,7 @@ public static class ModelosDeAta
         ["kickoff"] = "Kickoff",
         ["resultados"] = "Apresentação de resultados",
         ["daily"] = "Daily / status curto",
+        ["formalizacao"] = "Formalização (e-mail ao cliente)",
     };
 
     public static string PastaDoUsuario => Path.Combine(
