@@ -47,6 +47,9 @@ internal sealed class GravadorDeTela : IDisposable
     private long _primeiro = -1;
     private int _quadros;
 
+    /// <summary>A janela da reunião no último quadro; ver <see cref="FonteDaTela.Alvo"/>.</summary>
+    public AlvoDoPrint? Alvo => _fonte.Alvo;
+
     /// <summary>Por que o vídeo parou antes da hora, ou nulo.</summary>
     public string? Falha { get; private set; }
 
@@ -211,6 +214,13 @@ internal static class Dib
     }
 }
 
+/// <summary>
+/// De onde o print sai quando a gravação está na reunião: a janela dela, ou —
+/// <paramref name="DaTela"/> — o retângulo dela copiado da tela, como o vídeo
+/// faz com o compartilhamento do Zoom.
+/// </summary>
+internal sealed record AlvoDoPrint(IntPtr Hwnd, bool DaTela);
+
 /// <summary>O que vai para dentro de cada quadro. Chamada só da thread do vídeo.</summary>
 internal abstract class FonteDaTela : IDisposable
 {
@@ -226,6 +236,13 @@ internal abstract class FonteDaTela : IDisposable
     /// <param name="aviso">A frase do quadro de pausa, quando não há o que mostrar.</param>
     /// <returns>Falso para pular o quadro: a cópia falhou, e o anterior fica.</returns>
     public abstract bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso);
+
+    /// <summary>
+    /// A janela da reunião que o último quadro mostrou, para o print sair dela
+    /// e não do monitor inteiro. Nulo para o monitor, e quando o quadro é um
+    /// aviso. Lida de outra thread: cada fonte guarda num campo volátil.
+    /// </summary>
+    public virtual AlvoDoPrint? Alvo => null;
 
     public virtual void Dispose() { }
 
@@ -378,6 +395,9 @@ internal sealed class FonteDaJanelaDaReuniao(Func<AbaDaReuniao?> aba, int largur
     private readonly CopiaDeJanela _copia = new();
     private IntPtr _hwnd;
     private long _ultimaBusca = -1000;   // procura já no primeiro quadro
+    private volatile AlvoDoPrint? _alvo;
+
+    public override AlvoDoPrint? Alvo => _alvo;
 
     public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
     {
@@ -405,6 +425,7 @@ internal sealed class FonteDaJanelaDaReuniao(Func<AbaDaReuniao?> aba, int largur
 
         var situacao = JanelaDaReuniao.Decidir(a, achou, achou && Win32.IsIconic(_hwnd), titulo);
         aviso = JanelaDaReuniao.Aviso(situacao);
+        _alvo = aviso is null && achou ? new AlvoDoPrint(_hwnd, false) : null;
         return aviso is not null || _copia.Copiar(_hwnd, dc, tela, Largura, Altura);
     }
 
@@ -433,6 +454,9 @@ internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
     private IntPtr _hwnd;
     private SituacaoDoZoom _situacao = SituacaoDoZoom.Esperando;
     private long _ultimaBusca = -1000;
+    private volatile AlvoDoPrint? _alvo;
+
+    public override AlvoDoPrint? Alvo => _alvo;
 
     /// <summary>
     /// Olha as janelas do Zoom e diz em que pé a reunião está. Chamado a cada
@@ -463,6 +487,8 @@ internal sealed class FonteDoZoom(int largura, int altura) : FonteDaTela
     {
         Atualizar();
         aviso = ReuniaoDoZoom.Aviso(_situacao);
+        _alvo = aviso is not null ? null
+              : new AlvoDoPrint(_hwnd, DaTela: _situacao != SituacaoDoZoom.Reuniao);
         if (aviso is not null) return true;
 
         if (_situacao == SituacaoDoZoom.Reuniao)
@@ -493,7 +519,14 @@ internal sealed class FonteDaReuniaoAberta(Func<AbaDaReuniao?> aba, Func<string?
 
     private readonly FonteDaJanelaDaReuniao _navegador = new(aba, largura, altura);
     private readonly FonteDoZoom _zoom = new(largura, altura);
-    private EscolhaAutomatica _atual = EscolhaAutomatica.Nenhuma;
+    private volatile EscolhaAutomatica _atual = EscolhaAutomatica.Nenhuma;
+
+    public override AlvoDoPrint? Alvo => _atual switch
+    {
+        EscolhaAutomatica.Navegador => _navegador.Alvo,
+        EscolhaAutomatica.Zoom => _zoom.Alvo,
+        _ => null,
+    };
 
     public override bool Desenhar(IntPtr dc, IntPtr tela, out string? aviso)
     {
