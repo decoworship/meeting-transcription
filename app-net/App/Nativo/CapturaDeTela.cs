@@ -67,6 +67,92 @@ internal static class CapturaDeTela
         }
     }
 
+    /// <summary>
+    /// A janela da reunião que a gravação de tela está mostrando, do tamanho
+    /// dela — o mesmo recorte do vídeo, sem as faixas pretas do encaixe.
+    /// </summary>
+    /// <returns>Nulo quando ela sumiu, minimizou ou não deixou copiar: aí vale o monitor.</returns>
+    public static Quadro? DaJanela(Bandeja.AlvoDoPrint alvo, IntPtr nossaJanela)
+    {
+        IntPtr hwnd = alvo.Hwnd;
+        if (hwnd == IntPtr.Zero || !Win32.IsWindow(hwnd) || Win32.IsIconic(hwnd)) return null;
+        if (!Win32.GetWindowRect(hwnd, out var r) || r.Right <= r.Left || r.Bottom <= r.Top) return null;
+        // O que se vê, sem a borda invisível de redimensionar.
+        if (Win32.DwmGetWindowAttribute(hwnd, Win32.DWMWA_EXTENDED_FRAME_BOUNDS, out var v,
+                                        Marshal.SizeOf<Win32.RECT>()) != 0) v = r;
+        try
+        {
+            if (alvo.DaTela)
+            {
+                // O compartilhamento do Zoom: o que está por baixo da camada
+                // transparente. Da tela, então o PulseMeet sai dela antes.
+                bool escondeu = nossaJanela != IntPtr.Zero
+                                && Win32.SetWindowDisplayAffinity(nossaJanela, Win32.WDA_EXCLUDEFROMCAPTURE);
+                try
+                {
+                    if (escondeu) { Win32.DwmFlush(); Win32.DwmFlush(); }
+                    return Copiar(v);
+                }
+                finally
+                {
+                    if (escondeu) Win32.SetWindowDisplayAffinity(nossaJanela, Win32.WDA_NONE);
+                }
+            }
+            return PelaJanela(hwnd, r, v);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// <c>PrintWindow</c> com <c>PW_RENDERFULLCONTENT</c>, como o vídeo
+    /// (<c>CopiaDeJanela</c>): outra janela por cima — o próprio PulseMeet —
+    /// não entra.
+    /// </summary>
+    private static Quadro? PelaJanela(IntPtr hwnd, Win32.RECT r, Win32.RECT v)
+    {
+        int jl = r.Right - r.Left, ja = r.Bottom - r.Top;
+        int ox = Math.Clamp(v.Left - r.Left, 0, jl - 1), oy = Math.Clamp(v.Top - r.Top, 0, ja - 1);
+        int vl = Math.Min(v.Right - v.Left, jl - ox), va = Math.Min(v.Bottom - v.Top, ja - oy);
+        if (vl <= 0 || va <= 0) return null;
+
+        IntPtr tela = Win32.GetDC(IntPtr.Zero);
+        if (tela == IntPtr.Zero) return null;
+        IntPtr memoria = IntPtr.Zero, dib = IntPtr.Zero, anterior = IntPtr.Zero;
+        try
+        {
+            memoria = Win32.CreateCompatibleDC(tela);
+            var cabecalho = new Win32.BITMAPINFOHEADER
+            {
+                biSize = (uint)Marshal.SizeOf<Win32.BITMAPINFOHEADER>(),
+                biWidth = jl,
+                biHeight = -ja,
+                biPlanes = 1,
+                biBitCount = 32,
+            };
+            dib = Win32.CreateDIBSection(tela, ref cabecalho, 0, out IntPtr bits, IntPtr.Zero, 0);
+            if (dib == IntPtr.Zero || bits == IntPtr.Zero) return null;
+            anterior = Win32.SelectObject(memoria, dib);
+            if (!Win32.PrintWindow(hwnd, memoria, Win32.PW_RENDERFULLCONTENT)) return null;
+            Win32.GdiFlush();
+
+            // Só o retângulo visível, linha a linha.
+            byte[] bgra = new byte[vl * va * 4];
+            for (int y = 0; y < va; y++)
+                Marshal.Copy(bits + ((oy + y) * jl + ox) * 4, bgra, y * vl * 4, vl * 4);
+            return new Quadro(vl, va, bgra);
+        }
+        finally
+        {
+            if (anterior != IntPtr.Zero) Win32.SelectObject(memoria, anterior);
+            if (dib != IntPtr.Zero) Win32.DeleteObject(dib);
+            if (memoria != IntPtr.Zero) Win32.DeleteDC(memoria);
+            Win32.ReleaseDC(IntPtr.Zero, tela);
+        }
+    }
+
     private static Quadro Copiar(Win32.RECT r)
     {
         int largura = r.Right - r.Left, altura = r.Bottom - r.Top;

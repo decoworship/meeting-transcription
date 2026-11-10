@@ -555,6 +555,12 @@ internal sealed class Gravador(Action<Action> naUi) : IDisposable
     public bool GravandoTela => _tela is not null;
 
     /// <summary>
+    /// A janela da reunião que o vídeo está gravando, ou nulo — gravando um
+    /// monitor, sem vídeo, ou com a reunião fora da frente. O print sai dela.
+    /// </summary>
+    public AlvoDoPrint? AlvoDoPrint => _tela?.Alvo;
+
+    /// <summary>
     /// A aba da reunião como a extensão disse por último, ou nulo. Escrita na
     /// thread da UI e lida pela do vídeo, a cada quadro — por isso volátil, e
     /// um registro imutável trocado inteiro.

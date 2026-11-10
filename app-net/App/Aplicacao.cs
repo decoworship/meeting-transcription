@@ -221,7 +221,11 @@ internal sealed class Aplicacao : IDisposable
         CapturaDeTela.Quadro quadro;
         try
         {
-            quadro = CapturaDeTela.DoMonitorEmFoco(_janela?.Hwnd ?? IntPtr.Zero);
+            // Gravando a reunião, o print é dela, como o vídeo; senão, ou se
+            // a janela não deixou copiar, o monitor que está na frente.
+            IntPtr nossa = _janela?.Hwnd ?? IntPtr.Zero;
+            quadro = (_gravador.AlvoDoPrint is { } alvo ? CapturaDeTela.DaJanela(alvo, nossa) : null)
+                     ?? CapturaDeTela.DoMonitorEmFoco(nossa);
         }
         catch (Exception e)
         {
