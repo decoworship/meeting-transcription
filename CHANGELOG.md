@@ -3,6 +3,19 @@
 Escrito para quem usa o app, não para quem o compila. O histórico técnico está
 nos commits e nos `docs/*-HANDOFF.md`.
 
+## 0.15.2 — 11/11/2026
+
+**Numa instalação nova, a janela abre.** Até aqui, num computador em que o
+PulseMeet nunca tinha gravado nada, a janela abria vazia — só o fundo, sem
+mensagem — porque a pasta das gravações ainda não existia. Ela passa a ser
+criada ao abrir. Quem já usa o app não via o defeito, e nada muda para quem
+já tem gravações.
+
+Se a interface não conseguir carregar por qualquer outro motivo, o app agora
+avisa com uma mensagem, em vez de deixar a janela em branco.
+
+Esta atualização não baixa de novo o pacote de motores.
+
 ## 0.15.1 — 10/11/2026
 
 **O print sai da reunião, e não da tela inteira.** Com a gravação de tela

@@ -85,4 +85,34 @@ public sealed class PastaDasGravacoesTests : IDisposable
         Assert.Equal(@"E:\Outra",
             PastaDasGravacoes.Resolver(depois, null, Settings, AppJson));
     }
+
+    // A janela mapeia esta pasta no WebView2 antes de carregar a página, e o
+    // mapeamento falha se ela não existe. Numa máquina nova ela só nascia na
+    // primeira gravação — e até lá o app abria com a janela vazia (PR 444966
+    // do winget-pkgs, 10/11/2026).
+    [Fact]
+    public void GarantirCriaAPastaQueAindaNaoExiste()
+    {
+        string nova = Path.Combine(_pasta, "Documentos", "MeetingRecordings");
+
+        Assert.True(PastaDasGravacoes.Garantir(nova));
+        Assert.True(Directory.Exists(nova));
+    }
+
+    [Fact]
+    public void GarantirAceitaAPastaQueJaExiste()
+    {
+        Assert.True(PastaDasGravacoes.Garantir(_pasta));
+    }
+
+    [Fact]
+    public void GarantirNaoLancaQuandoAPastaNaoPodeSerCriada()
+    {
+        // Um arquivo no meio do caminho: o mesmo efeito de um compartilhamento
+        // de rede fora do ar. A janela tem de abrir mesmo assim.
+        string arquivo = Path.Combine(_pasta, "um-arquivo");
+        File.WriteAllText(arquivo, "");
+
+        Assert.False(PastaDasGravacoes.Garantir(Path.Combine(arquivo, "sub")));
+    }
 }

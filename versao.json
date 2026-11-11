@@ -1,6 +1,6 @@
 {
-  "versao": "0.15.1",
-  "publicada": "2026-11-10",
-  "notas": "O botão Capturar tela agora tira o print da janela da reunião, a mesma que a gravação de tela mostra.",
-  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.15.1"
+  "versao": "0.15.2",
+  "publicada": "2026-11-11",
+  "notas": "Numa instalação nova, a janela abria vazia até a primeira gravação. Agora abre direto.",
+  "onde": "https://github.com/decoworship/meeting-transcription/releases/tag/v0.15.2"
 }

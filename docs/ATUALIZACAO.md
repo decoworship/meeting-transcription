@@ -178,7 +178,11 @@ Três coisas que já custaram tempo, todas na primeira vez:
   descobrir isso antes de publicar. **Sem `DisplayVersion` no manifesto**: igual
   ao `PackageVersion`, ele é redundante, e o moderador do `winget-pkgs` pede para
   tirar (PR 444966, 01/10/2026). Ele só volta se um dia as duas versões
-  divergirem — um `0.9.1-rc1`, por exemplo.
+  divergirem — um `0.9.1-rc1`, por exemplo;
+- **`ManifestVersion: 1.28.0`, e o cabeçalho `$schema` da mesma versão.** O
+  `winget-pkgs` recusa o `1.6.0` por obsoleto (PR 444966, 30/10/2026). As pastas
+  até a 0.15.1 ainda estão em `1.6.0`; a partir da 0.15.2, copiar da anterior
+  já traz o certo. O `winget validate` sem nenhum aviso é a régua.
 
 **O `versao.json` só vale depois do push**, porque o canal é o repositório. Subir
 o número antes de o instalador existir avisa todo mundo de uma versão que ninguém

@@ -70,4 +70,26 @@ public static class PastaDasGravacoes
 
         return Padrao;
     }
+
+    /// <summary>Cria a pasta se ela ainda não existe; diz se ela existe depois.</summary>
+    /// <remarks>
+    /// A janela mapeia esta pasta no WebView2 antes de carregar a página, e o
+    /// mapeamento lança se a pasta não existe. Numa máquina nova ela só nascia
+    /// na primeira gravação, e até lá o app abria com a janela vazia — o que o
+    /// moderador do winget-pkgs viu ao instalar (PR 444966, 10/11/2026). Não
+    /// lança: uma pasta de rede fora do ar custa o áudio da tela de reunião,
+    /// não a interface inteira.
+    /// </remarks>
+    public static bool Garantir(string pasta)
+    {
+        try
+        {
+            Directory.CreateDirectory(pasta);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
 }
