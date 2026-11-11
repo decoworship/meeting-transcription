@@ -103,7 +103,35 @@ internal sealed class JanelaDoApp : IDisposable
 
         // O WebView2 é assíncrono e completa pelo laço de mensagens, que quem
         // roda é a JanelaDeMensagens da bandeja. Aqui só se dispara.
-        _ = IniciarWebAsync();
+        _ = IniciarWebOuAvisarAsync();
+    }
+
+    /// <summary>
+    /// Sobe a página, e diz em voz alta se não conseguir.
+    /// </summary>
+    /// <remarks>
+    /// Disparado e esquecido, um erro aqui sumia dentro da Task: a janela ficava
+    /// aberta, só com o fundo, sem mensagem e sem linha no registro. Foi assim
+    /// que a pasta das gravações inexistente passou meses sem ser vista — só
+    /// aparece numa máquina nova, e quem viu primeiro foi o moderador do
+    /// winget-pkgs (PR 444966, 10/11/2026).
+    /// </remarks>
+    private async Task IniciarWebOuAvisarAsync()
+    {
+        try
+        {
+            await IniciarWebAsync();
+        }
+        catch (Exception e)
+        {
+            Registro.Escrever("janela", $"a interface não carregou: {e}");
+            Win32.MessageBox(Hwnd,
+                $"A interface do {Marca.Nome} não conseguiu carregar:\n\n{e.Message}\n\n"
+                + "A gravação pela bandeja continua funcionando. Se a mensagem "
+                + "falar em WebView2, instale o runtime:\n"
+                + "https://developer.microsoft.com/microsoft-edge/webview2/",
+                Marca.Nome, Win32.MB_OK | Win32.MB_ICONERROR);
+        }
     }
 
     /// <summary>Traz a janela de volta, esteja escondida ou só atrás.</summary>
@@ -149,9 +177,15 @@ internal sealed class JanelaDoApp : IDisposable
         // nosso handler: assim o WebView2 serve o arquivo direto do disco, com
         // suporte nativo a Range — que é o que faz "pular para 12:34" funcionar
         // num WAV de 200 MB sem carregá-lo inteiro na memória.
-        _web.SetVirtualHostNameToFolderMapping(
-            "gravacoes.local", _pastaDasGravacoes,
-            CoreWebView2HostResourceAccessKind.Allow);
+        // O mapeamento lança se a pasta não existe, e numa máquina nova ela só
+        // nasceria na primeira gravação: sem isto a página nunca carregava.
+        if (PastaDasGravacoes.Garantir(_pastaDasGravacoes))
+            _web.SetVirtualHostNameToFolderMapping(
+                "gravacoes.local", _pastaDasGravacoes,
+                CoreWebView2HostResourceAccessKind.Allow);
+        else
+            Registro.Escrever("janela",
+                $"pasta das gravações inacessível, sem áudio na tela: {_pastaDasGravacoes}");
 
         // Os trechos de voz, pelo mesmo mecanismo. São 4 segundos de WAV, então
         // o Range importa pouco aqui; o que importa é que a tela de vozes possa
