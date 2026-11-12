@@ -1,15 +1,20 @@
 # Rastreabilidade — da ata ao acompanhamento do projeto
 
 Aberto em 10/11/2026. É um roteiro de quatro passos, e não o desenho de nenhum
-deles: cada passo tem o seu desenho em `docs/superpowers/specs/`, e nenhum virou
-código ainda.
+deles: cada passo tem o seu desenho em `docs/superpowers/specs/` e o seu plano em
+`docs/superpowers/plans/`, e nenhum virou código ainda.
 
-| passo | desenho | estado em 11/11/2026 |
-|---|---|---|
-| 1 · Ata em que dá para confiar | [a ata conferida](superpowers/specs/2026-11-11-ata-conferida-design.md) | discutido com o dono ponto a ponto, com protótipo visto; falta a aprovação final e o plano |
-| 2 · Pendências que atravessam reuniões | [as pendências do projeto](superpowers/specs/2026-11-11-pendencias-do-projeto-design.md) | desenho inicial, com perguntas abertas para o dono |
-| 3 · Briefing antes da reunião | [o briefing da reunião](superpowers/specs/2026-11-11-briefing-da-reuniao-design.md) | desenho inicial, com perguntas abertas para o dono |
-| 4 · Envio e compartilhamento | [envio e compartilhamento](superpowers/specs/2026-11-11-envio-e-compartilhamento-design.md) | desenho inicial; as perguntas mudam o desenho |
+| passo | desenho | plano | estado em 12/11/2026 |
+|---|---|---|---|
+| 1 · Ata em que dá para confiar | [a ata conferida](superpowers/specs/2026-11-11-ata-conferida-design.md) | [plano](superpowers/plans/2026-11-11-ata-conferida.md) | discutido com o dono ponto a ponto, com protótipo visto; plano escrito, nada construído |
+| 2 · Pendências que atravessam reuniões | [as pendências do projeto](superpowers/specs/2026-11-11-pendencias-do-projeto-design.md) | [plano](superpowers/plans/2026-11-11-pendencias-do-projeto.md) | desenho inicial; plano escrito sobre respostas assumidas |
+| 3 · Briefing antes da reunião | [o briefing da reunião](superpowers/specs/2026-11-11-briefing-da-reuniao-design.md) | [plano](superpowers/plans/2026-11-11-briefing-da-reuniao.md) | desenho inicial; plano escrito sobre respostas assumidas |
+| 4 · Envio e compartilhamento | [envio e compartilhamento](superpowers/specs/2026-11-11-envio-e-compartilhamento-design.md) | [plano](superpowers/plans/2026-11-11-envio-e-compartilhamento.md) | desenho inicial; plano escrito, com um portão antes do envio pelo Gmail |
+
+**Os planos dos passos 2 a 4 foram escritos em 12/11/2026, a pedido do dono,
+antes de as perguntas dos desenhos serem respondidas.** Cada um abre com a
+tabela "Respostas assumidas": o que foi assumido em cada pergunta e que tarefas
+mudam se a resposta for outra. Ela é para ser lida antes de construir o passo.
 
 **Os desenhos foram escritos antes de implementar, a pedido do dono**, que tinha
 outras coisas a resolver primeiro. Os passos 2 a 4 não foram discutidos como o
